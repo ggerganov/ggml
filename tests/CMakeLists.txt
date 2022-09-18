@@ -1,0 +1,74 @@
+#
+# test-vec0
+
+set(TEST_TARGET test-vec0)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+
+#
+# test-vec1 (x86)
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86")
+    set(TEST_TARGET test-vec1)
+    add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+    target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+    add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+    set_target_properties(${TEST_TARGET} PROPERTIES COMPILE_FLAGS "-mavx -mavx2 -mfma -mf16c")
+endif()
+
+#
+# test-vec2 (arm)
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
+    set(TEST_TARGET test-vec2)
+    add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+    target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+    add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+endif()
+
+#
+# test-grad0
+
+set(TEST_TARGET test-grad0)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+
+#
+# test-mul-mat
+
+set(TEST_TARGET test-mul-mat0)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+
+#
+# test0
+
+set(TEST_TARGET test0)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+
+#
+# test1
+
+set(TEST_TARGET test1)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+
+#
+# test2
+
+set(TEST_TARGET test2)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+
+#
+# test3
+
+set(TEST_TARGET test3)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
