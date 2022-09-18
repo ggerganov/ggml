@@ -86,7 +86,7 @@ The most performance critical part of the implementation is of course the matrix
 
 On Arm64, I utilize the 128-bit NEON intrinsics for 16-bit floating point operations:
 
-https://github.com/ggerganov/ggml/blob/1548ac6743c594cc920ccb3503444b0e2bdf4d56/src/ggml.c#L187-L243
+https://github.com/ggerganov/ggml/blob/fb558f78d905f85c54813602649ddd628ffe0f3a/src/ggml.c#L187-L243
 
 These instructions allow each core to operate simultaneously on 64 floating point numbers. I'm no expert
 in SIMD, but after quite some trials this was the most efficient code for dot product that I could come up
@@ -98,7 +98,7 @@ One interesting property of the GPT-J transformer architecture is that it allows
 of the inference in parallel - i.e. the Feed-forward layer can be computed in parallel to the Self-Attention
 layer:
 
-https://github.com/ggerganov/ggml/blob/1548ac6743c594cc920ccb3503444b0e2bdf4d56/examples/gpt-j/main.cpp#L507-L531
+https://github.com/ggerganov/ggml/blob/fb558f78d905f85c54813602649ddd628ffe0f3a/examples/gpt-j/main.cpp#L507-L531
 
 So I thought why not bring in the M1 GPU to compute half of the neural network in parallel to the CPU.
 Thanks to the shared memory model, it was relatively easy to offload half of the computation to the GPU
