@@ -1,7 +1,6 @@
 # gpt-2
 
 This is a C++ example running GPT-2 inference using the [ggml](https://github.com/ggerganov/ggml) library.
-The enitre code of the example is in [main.cpp](main.cpp).
 
 The program runs on the CPU - no video card is required.
 
@@ -73,11 +72,11 @@ main:    total time =   629.84 ms
 
 ## Downloading and converting the original models
 
-You can download the original model files using the [download-model.sh](download-model.sh) Bash script.
-The model is in Tensorflow format, so before using it with ggml, we need to convert it to appropriate format.
-This is done via the [convert-ckpt-to-ggml.py](convert-ckpt-to-ggml.py) python script.
+You can download the original model files using the [download-model.sh](download-model.sh) Bash script. The models are
+in Tensorflow format, so in order to use them with ggml, you need to convert them to appropriate format. This is done
+via the [convert-ckpt-to-ggml.py](convert-ckpt-to-ggml.py) python script.
 
-Here is the entire process for the GPT-2 117M model:
+Here is the entire process for the GPT-2 117M model (download from official site + conversion):
 
 ```
 cd ggml/build
@@ -99,14 +98,13 @@ Run the convert-ckpt-to-ggml.py script to convert the model to ggml format.
 
 ```
 
-This conversion requires that you have python and Tensorflow installed on your computer.
-Still, if you want to avoid this, you can download the already converted ggml models as
-described below.
+This conversion requires that you have python and Tensorflow installed on your computer. Still, if you want to avoid
+this, you can download the already converted ggml models as described below.
 
 ## Downloading the ggml model directly
 
-For convenience, I will be hosting the converted ggml model files in order to make it easier to run the examples.
-This way, you can directly download a single binary file and start using it. No python or Tensorflow is required.
+For convenience, I will be hosting the converted ggml model files in order to make it easier to run the examples. This
+way, you can directly download a single binary file and start using it. No python or Tensorflow is required.
 
 Here is how to get the 117M ggml model:
 
@@ -123,4 +121,4 @@ You can now use it like this:
 
 ```
 
-At some point, I might stop hosting these models. So in that case, simply revert to the manual process above.
+At some point, I might decide to stop hosting these models. So in that case, simply revert to the manual process above.

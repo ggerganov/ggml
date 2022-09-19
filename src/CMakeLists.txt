@@ -48,6 +48,10 @@ set(TARGET ggml)
 #    endif()
 #endif()
 
+if (GGML_PERF)
+    set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_PERF)
+endif()
+
 add_library(${TARGET}
     ggml.c
     )

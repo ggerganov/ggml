@@ -12,11 +12,10 @@
 #include <pthread.h>
 
 #define GGML_DEBUG 0
+#define GGML_MEM_ALIGN 16
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
-
-#define GGML_MEM_ALIGN 16
 
 #define UNUSED(x) (void)(x)
 #define SWAP(x, y, T) do { T SWAP = x; x = y; y = SWAP; } while (0)
@@ -117,7 +116,6 @@ ggml_fp16_t ggml_fp32_to_fp16(float f) {
 // timing
 //
 
-// TODO: need to be able to disable these in performance critical code since they make slow system calls
 int64_t ggml_time_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -137,6 +135,18 @@ int64_t ggml_cycles(void) {
 int64_t ggml_cycles_per_ms(void) {
     return CLOCKS_PER_SEC/1000;
 }
+
+#ifdef GGML_PERF
+#define ggml_perf_time_ms()       ggml_time_ms()
+#define ggml_perf_time_us()       ggml_time_us()
+#define ggml_perf_cycles()        ggml_cycles()
+#define ggml_perf_cycles_per_ms() ggml_cycles_per_ms()
+#else
+#define ggml_perf_time_ms()       0
+#define ggml_perf_time_us()       0
+#define ggml_perf_cycles()        0
+#define ggml_perf_cycles_per_ms() 0
+#endif
 
 //
 // cache line
@@ -3053,7 +3063,7 @@ void ggml_compute_forward_mul_mat_f32(
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
               struct ggml_tensor * dst) {
-    int64_t t0 = ggml_time_us();
+    int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
     const int ne00 = src0->ne[0];
@@ -3232,7 +3242,7 @@ void ggml_compute_forward_mul_mat_f32(
         }
     }
 
-    //int64_t t1 = ggml_time_us();
+    //int64_t t1 = ggml_perf_time_us();
     //static int64_t acc = 0;
     //acc += t1 - t0;
     //if (t1 - t0 > 10) {
@@ -3251,7 +3261,7 @@ void ggml_compute_forward_mul_mat_f16_f32(
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
               struct ggml_tensor * dst) {
-    int64_t t0 = ggml_time_us();
+    int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
     const int ne00 = src0->ne[0];
@@ -4619,8 +4629,8 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
         }
     }
 
-    const int64_t perf_start_cycles  = ggml_cycles();
-    const int64_t perf_start_time_us = ggml_time_us();
+    const int64_t perf_start_cycles  = ggml_perf_cycles();
+    const int64_t perf_start_time_us = ggml_perf_time_us();
 
     for (int i = 0; i < cgraph->n_nodes; i++) {
         GGML_PRINT_DEBUG_5("%s: %d/%d\n", __func__, i, cgraph->n_nodes);
@@ -4632,8 +4642,8 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
         //    continue;
         //}
 
-        const int64_t perf_node_start_cycles  = ggml_cycles();
-        const int64_t perf_node_start_time_us = ggml_time_us();
+        const int64_t perf_node_start_cycles  = ggml_perf_cycles();
+        const int64_t perf_node_start_time_us = ggml_perf_time_us();
 
         // INIT
         struct ggml_compute_params params = {
@@ -4706,8 +4716,8 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
 
         // performance stats (node)
         {
-            int64_t perf_cycles_cur  = ggml_cycles()  - perf_node_start_cycles;
-            int64_t perf_time_us_cur = ggml_time_us() - perf_node_start_time_us;
+            int64_t perf_cycles_cur  = ggml_perf_cycles()  - perf_node_start_cycles;
+            int64_t perf_time_us_cur = ggml_perf_time_us() - perf_node_start_time_us;
 
             node->perf_runs++;
             node->perf_cycles  += perf_cycles_cur;
@@ -4731,8 +4741,8 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
 
     // performance stats (graph)
     {
-        int64_t perf_cycles_cur  = ggml_cycles()  - perf_start_cycles;
-        int64_t perf_time_us_cur = ggml_time_us() - perf_start_time_us;
+        int64_t perf_cycles_cur  = ggml_perf_cycles()  - perf_start_cycles;
+        int64_t perf_time_us_cur = ggml_perf_time_us() - perf_start_time_us;
 
         cgraph->perf_runs++;
         cgraph->perf_cycles  += perf_cycles_cur;

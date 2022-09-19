@@ -1,24 +1,23 @@
 # ggml
 
-Tensor library in C for machine learning
+Tensor library for machine learning
 
 ## Features
 
-- Automatic differentiation (WIP)
+- Written in C
 - 16-bit float support
+- Automatic differentiation (WIP in progress)
 - ADAM and L-BFGS optimizers
-- Optimized for Arm64 architectures (i.e. MacBook M1) via NEON intrinsics
+- Optimized for Arm64 architectures (M1) via NEON intrinsics
 - On x86 architectures utilzes AVX intrinsics
 - No third-party dependencies
 - Zero memory allocations during runtime
 
-## Local GPT inference
+## Example - GPT inference
 
-Using ggml you can run [GPT-2](examples/gpt-2) and [GPT-J](examples/gpt-j) inference locally on your computer without any additional software or hardware. You don't even need to install python or any other third-party library.
+With ggml you can efficiently run [GPT-2](examples/gpt-2) and [GPT-J](examples/gpt-j) inference on the CPU.
 
-The example programs are implemented in C++. They run entirely on the CPU.
-
-Here is how to use them:
+Here is how to run the example programs:
 
 ```bash
 # Build ggml + examples
@@ -37,7 +36,7 @@ make -j4 gpt-2 gpt-j
 ./bin/gpt-j -m models/gpt-j-6B/ggml-model.bin -p "This is an example"
 ```
 
-This is the inference speed for the different models on my MacBook M1 Pro:
+The inference speeds that I get for the different models on my 32GB MacBook M1 Pro are as follows:
 
 | Model | Size  | Time / Token |
 | ---   | ---   | ---    |

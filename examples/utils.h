@@ -14,7 +14,7 @@
 
 struct gpt_params {
     int32_t seed      = -1; // RNG seed
-    int32_t n_threads = std::min(8, (int32_t) std::thread::hardware_concurrency());
+    int32_t n_threads = std::min(4, (int32_t) std::thread::hardware_concurrency());
     int32_t n_predict = 200; // new tokens to predict
 
     // sampling parameters
