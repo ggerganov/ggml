@@ -12,6 +12,7 @@ extern "C" {
 #define GGML_MAX_NODES    4096
 #define GGML_MAX_PARAMS   16
 #define GGML_MAX_CONTEXTS 16
+#define GGML_MAX_OPT      4
 
 #ifdef __ARM_NEON
 // we use the built-in 16-bit float type
@@ -68,6 +69,11 @@ enum ggml_op {
     GGML_OP_DIAG_MASK_INF,
     GGML_OP_SOFT_MAX,
     GGML_OP_ROPE,
+    GGML_OP_CONV_1D_1S,
+    GGML_OP_CONV_1D_2S,
+
+    GGML_OP_FLASH_ATTN,
+    GGML_OP_FLASH_FF,
 
     GGML_OP_COUNT,
 };
@@ -91,6 +97,7 @@ struct ggml_tensor {
     struct ggml_tensor * grad;
     struct ggml_tensor * src0;
     struct ggml_tensor * src1;
+    struct ggml_tensor * opt[GGML_MAX_OPT];
 
     // thread scheduling
     int n_tasks;
@@ -180,13 +187,18 @@ struct ggml_tensor * ggml_new_tensor_4d(
         int    ne2,
         int    ne3);
 
+struct ggml_tensor * ggml_new_i32(struct ggml_context * ctx, int32_t value);
 struct ggml_tensor * ggml_new_f32(struct ggml_context * ctx, float value);
 
 struct ggml_tensor * ggml_dup_tensor (struct ggml_context * ctx, const struct ggml_tensor * src);
 struct ggml_tensor * ggml_view_tensor(struct ggml_context * ctx, const struct ggml_tensor * src);
 
 struct ggml_tensor * ggml_set_zero(struct ggml_tensor * tensor);
+struct ggml_tensor * ggml_set_i32 (struct ggml_tensor * tensor, int32_t value);
 struct ggml_tensor * ggml_set_f32 (struct ggml_tensor * tensor, float value);
+
+int32_t ggml_get_i32_1d(const struct ggml_tensor * tensor, int i);
+void    ggml_set_i32_1d(const struct ggml_tensor * tensor, int i, int32_t value);
 
 float ggml_get_f32_1d(const struct ggml_tensor * tensor, int i);
 void  ggml_set_f32_1d(const struct ggml_tensor * tensor, int i, float value);
@@ -382,6 +394,35 @@ struct ggml_tensor * ggml_rope(
         int                   n_past,
         int                   n_dims,
         int                   mode);
+
+// padding = 1
+// TODO: we don't support extra parameters for now
+//       that's why we are hard-coding the stride, padding, and dilation
+//       not great ..
+struct ggml_tensor * ggml_conv_1d_1s(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        struct ggml_tensor  * b);
+
+struct ggml_tensor * ggml_conv_1d_2s(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        struct ggml_tensor  * b);
+
+struct ggml_tensor * ggml_flash_attn(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * q,
+        struct ggml_tensor  * k,
+        struct ggml_tensor  * v,
+        bool                  masked);
+
+struct ggml_tensor * ggml_flash_ff(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        struct ggml_tensor  * b0,
+        struct ggml_tensor  * b1,
+        struct ggml_tensor  * c0,
+        struct ggml_tensor  * c1);
 
 //
 // automatic differentiation

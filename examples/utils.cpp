@@ -57,6 +57,25 @@ void gpt_print_usage(int argc, char ** argv, const gpt_params & params) {
     fprintf(stderr, "\n");
 }
 
+std::string gpt_random_prompt(std::mt19937 & rng) {
+    const int r = rng() % 10;
+    switch (r) {
+        case 0: return "So";
+        case 1: return "Once upon a time";
+        case 2: return "When";
+        case 3: return "The";
+        case 4: return "After";
+        case 5: return "If";
+        case 6: return "import";
+        case 7: return "He";
+        case 8: return "She";
+        case 9: return "They";
+        default: return "To";
+    }
+
+    return "The";
+}
+
 void replace(std::string & str, const std::string & needle, const std::string & replacement) {
     size_t pos = 0;
     while ((pos = str.find(needle, pos)) != std::string::npos) {
@@ -65,7 +84,6 @@ void replace(std::string & str, const std::string & needle, const std::string & 
     }
 }
 
-// poor-man's JSON parsing
 std::map<std::string, int32_t> json_parse(const std::string & fname) {
     std::map<std::string, int32_t> result;
 
@@ -155,25 +173,6 @@ std::map<std::string, int32_t> json_parse(const std::string & fname) {
     }
 
     return result;
-}
-
-std::string gpt_random_prompt(std::mt19937 & rng) {
-    const int r = rng() % 10;
-    switch (r) {
-        case 0: return "So";
-        case 1: return "Once upon a time";
-        case 2: return "When";
-        case 3: return "The";
-        case 4: return "After";
-        case 5: return "If";
-        case 6: return "import";
-        case 7: return "He";
-        case 8: return "She";
-        case 9: return "They";
-        default: return "To";
-    }
-
-    return "The";
 }
 
 std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::string & text) {

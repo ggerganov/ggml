@@ -28,9 +28,9 @@ struct gpt_params {
     std::string prompt;
 };
 
-void gpt_print_usage(int argc, char ** argv, const gpt_params & params);
-
 bool gpt_params_parse(int argc, char ** argv, gpt_params & params);
+
+void gpt_print_usage(int argc, char ** argv, const gpt_params & params);
 
 std::string gpt_random_prompt(std::mt19937 & rng);
 

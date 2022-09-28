@@ -25,6 +25,8 @@ option(GGML_SANITIZE_UNDEFINED      "ggml: enable undefined sanitizer" OFF)
 option(GGML_BUILD_TESTS             "ggml: build tests"    ${GGML_STANDALONE})
 option(GGML_BUILD_EXAMPLES          "ggml: build examples" ${GGML_STANDALONE})
 
+option(GGML_PERF                    "ggml: enable perf timings" ${GGML_PERF})
+
 # sanitizers
 
 if (GGML_SANITIZE_THREAD)

@@ -59,6 +59,7 @@ add_library(${TARGET}
 target_include_directories(${TARGET} PUBLIC
     .
     ../include
+    ../include/ggml
     )
 
 target_link_libraries(${TARGET} PUBLIC m ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})

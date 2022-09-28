@@ -558,7 +558,7 @@ bool gptj_eval(
                 inpL);
     }
 
-    // to logits
+    // logits -> probs
     inpL = ggml_soft_max(ctx0, inpL);
 
     // run the computation

@@ -13,7 +13,21 @@ Tensor library for machine learning
 - No third-party dependencies
 - Zero memory allocations during runtime
 
-## Example - GPT inference
+## Whisper inference (example)
+
+With ggml you can efficiently run [Whisper](examples/whisper) inference on the CPU.
+
+Memory requirements:
+
+| Model | Mem |
+| ---   | --- |
+| tiny.en | ~460 MB |
+| base.en | ~620 MB |
+| small.en | ~1.3 GB |
+| medium.en | ~2.8 GB |
+| large | ~4.9 GB |
+
+## GPT inference (example)
 
 With ggml you can efficiently run [GPT-2](examples/gpt-2) and [GPT-J](examples/gpt-j) inference on the CPU.
 
