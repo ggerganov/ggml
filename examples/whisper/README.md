@@ -9,13 +9,13 @@ Checkout https://github.com/ggerganov/whisper.cpp
 
 ## Memory usage
 
-| Model | Mem |
-| ---   | --- |
-| tiny.en | ~460 MB |
-| base.en | ~620 MB |
-| small.en | ~1.3 GB |
-| medium.en | ~2.8 GB |
-| large | ~4.9 GB |
+| Model  | Disk   | Mem     |
+| ---    | ---    | ---     |
+| tiny   |  75 MB | ~240 MB |
+| base   | 142 MB | ~380 MB |
+| small  | 466 MB | ~970 MB |
+| medium | 1.5 GB | ~2.5 GB |
+| large  | 2.9 GB | ~4.6 GB |
 
 ## ggml format
 
