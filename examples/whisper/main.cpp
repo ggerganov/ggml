@@ -149,11 +149,11 @@ int main(int argc, char ** argv) {
         // convert to mono, float
         pcmf32.resize(n);
         if (wav.channels == 1) {
-            for (size_t i = 0; i < n; i++) {
+            for (int i = 0; i < n; i++) {
                 pcmf32[i] = float(pcm16[i])/32768.0f;
             }
         } else {
-            for (size_t i = 0; i < n; i++) {
+            for (int i = 0; i < n; i++) {
                 pcmf32[i] = float(pcm16[2*i] + pcm16[2*i + 1])/65536.0f;
             }
         }
@@ -185,6 +185,9 @@ int main(int argc, char ** argv) {
         wparams.print_progress       = false;
         wparams.print_timestamps     = !params.no_timestamps;
         wparams.print_special_tokens = params.print_special_tokens;
+        wparams.translate            = params.translate;
+        wparams.language             = params.language.c_str();
+        wparams.n_threads            = params.n_threads;
 
         if (whisper_full(ctx, wparams, pcmf32.data(), pcmf32.size()) != 0) {
             fprintf(stderr, "%s: failed to process audio\n", argv[0]);
