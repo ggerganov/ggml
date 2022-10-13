@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cassert>
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -2072,6 +2073,8 @@ bool log_mel_spectrogram(
 //
 
 struct whisper_context * whisper_init(const char * path_model) {
+    ggml_time_init();
+
     whisper_context * ctx = new whisper_context;
 
     const int64_t t_start_us = ggml_time_us();
@@ -2259,7 +2262,7 @@ struct whisper_full_params whisper_full_default_params(enum whisper_decode_strat
     switch (strategy) {
         case WHISPER_DECODE_GREEDY:
             {
-                result = (struct whisper_full_params) {
+                result = {
                     .strategy  = WHISPER_DECODE_GREEDY,
                     .n_threads = std::min(4, (int32_t) std::thread::hardware_concurrency()),
                     .offset_ms = 0,
@@ -2280,7 +2283,7 @@ struct whisper_full_params whisper_full_default_params(enum whisper_decode_strat
             } break;
         case WHISPER_DECODE_BEAM_SEARCH:
             {
-                result = (struct whisper_full_params) {
+                result = {
                     .strategy  = WHISPER_DECODE_GREEDY,
                     .n_threads = std::min(4, (int32_t) std::thread::hardware_concurrency()),
                     .offset_ms = 0,
@@ -2315,6 +2318,13 @@ int whisper_full(
     if (whisper_pcm_to_mel(ctx, samples, n_samples, params.n_threads) != 0) {
         fprintf(stderr, "%s: failed to compute log mel spectrogram\n", __func__);
         return -1;
+    }
+
+    // if length of spectrogram is less than 1s (100 samples), then return
+    // basically don't process anything that is less than 1s
+    // see issue #39: https://github.com/ggerganov/whisper.cpp/issues/39
+    if (whisper_n_len(ctx) < 100) {
+        return 0;
     }
 
     // the accumulated text context so far
@@ -2386,7 +2396,7 @@ int whisper_full(
         // print the prompt
         //printf("\n\n");
         //for (int i = 0; i < prompt.size(); i++) {
-        //    printf("%s: prompt[%d] = %s\n", __func__, i, vocab.id_to_token[prompt[i]].c_str());
+        //    printf("%s: prompt[%d] = %s\n", __func__, i, ctx->vocab.id_to_token[prompt[i]].c_str());
         //}
         //printf("\n\n");
 
