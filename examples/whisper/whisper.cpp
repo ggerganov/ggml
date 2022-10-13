@@ -1307,7 +1307,7 @@ bool whisper_encode(
             ggml_build_forward_expand(&gf, inpO);
             ggml_graph_compute       (ctxL, &gf);
 
-            //ggml_graph_print(&gf);
+            ggml_graph_print(&gf);
         }
 
         // TODO: this is a hack to have per-layer computation graphs - need to come up with something better
