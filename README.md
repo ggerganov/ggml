@@ -8,10 +8,12 @@ Tensor library for machine learning
 - 16-bit float support
 - Automatic differentiation (WIP in progress)
 - ADAM and L-BFGS optimizers
-- Optimized for Arm64 architectures (M1) via NEON intrinsics
+- Optimized for Apple silicon via NEON intrinsics and Accelerate framework
 - On x86 architectures utilzes AVX intrinsics
 - No third-party dependencies
 - Zero memory allocations during runtime
+
+*Note that this project is under development and not ready for production use*
 
 ## Whisper inference (example)
 
@@ -19,13 +21,13 @@ With ggml you can efficiently run [Whisper](examples/whisper) inference on the C
 
 Memory requirements:
 
-| Model | Mem |
-| ---   | --- |
-| tiny.en | ~460 MB |
-| base.en | ~620 MB |
-| small.en | ~1.3 GB |
-| medium.en | ~2.8 GB |
-| large | ~4.9 GB |
+| Model  | Disk   | Mem     |
+| ---    | ---    | ---     |
+| tiny   |  75 MB | ~280 MB |
+| base   | 142 MB | ~430 MB |
+| small  | 466 MB | ~1.0 GB |
+| medium | 1.5 GB | ~2.6 GB |
+| large  | 2.9 GB | ~4.7 GB |
 
 ## GPT inference (example)
 

@@ -11,11 +11,11 @@ Checkout https://github.com/ggerganov/whisper.cpp
 
 | Model  | Disk   | Mem     |
 | ---    | ---    | ---     |
-| tiny   |  75 MB | ~240 MB |
-| base   | 142 MB | ~380 MB |
-| small  | 466 MB | ~970 MB |
-| medium | 1.5 GB | ~2.5 GB |
-| large  | 2.9 GB | ~4.6 GB |
+| tiny   |  75 MB | ~280 MB |
+| base   | 142 MB | ~430 MB |
+| small  | 466 MB | ~1.0 GB |
+| medium | 1.5 GB | ~2.6 GB |
+| large  | 2.9 GB | ~4.7 GB |
 
 ## ggml format
 

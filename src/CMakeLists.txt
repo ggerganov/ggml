@@ -36,17 +36,17 @@ endif()
 set(TARGET ggml)
 
 # on APPLE - include Accelerate framework
-#if (APPLE)
-#    find_library(ACCELERATE_FRAMEWORK Accelerate)
-#    if (ACCELERATE_FRAMEWORK)
-#        message(STATUS "Accelerate framework found")
-#
-#        set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${ACCELERATE_FRAMEWORK})
-#        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_ACCELERATE)
-#    else()
-#        message(WARNING "Accelerate framework not found")
-#    endif()
-#endif()
+if (APPLE AND NOT GGML_NO_ACCELERATE)
+    find_library(ACCELERATE_FRAMEWORK Accelerate)
+    if (ACCELERATE_FRAMEWORK)
+        message(STATUS "Accelerate framework found")
+
+        set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${ACCELERATE_FRAMEWORK})
+        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_ACCELERATE)
+    else()
+        message(WARNING "Accelerate framework not found")
+    endif()
+endif()
 
 if (GGML_PERF)
     set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_PERF)
