@@ -149,7 +149,7 @@ static const std::map<e_model, size_t> MEM_REQ_ENCODE = {
 
 static const std::map<e_model, size_t> MEM_REQ_ENCODE_LAYER = {
     { MODEL_TINY,    104ull*MB },
-    { MODEL_BASE,    136ull*MB },
+    { MODEL_BASE,    138ull*MB },
     { MODEL_SMALL,   208ull*MB },
     { MODEL_MEDIUM,  280ull*MB },
     { MODEL_LARGE,   354ull*MB },

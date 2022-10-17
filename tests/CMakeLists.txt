@@ -31,7 +31,7 @@ endif()
 
 #
 # test-vec2 (arm)
-if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm" AND ACCELERATE_FRAMEWORK)
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
     set(TEST_TARGET test-vec2)
     add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
     target_link_libraries(${TEST_TARGET} PRIVATE ggml)
@@ -57,7 +57,7 @@ add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
 #
 # test-mul-mat1 (arm)
 
-if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm" AND NOT GGML_NO_ACCELERATE)
     set(TEST_TARGET test-mul-mat1)
     add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
     target_link_libraries(${TEST_TARGET} PRIVATE ggml ${GGML_EXTRA_LIBS})
