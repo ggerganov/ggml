@@ -156,11 +156,11 @@ static const std::map<e_model, size_t> MEM_REQ_ENCODE_LAYER = {
 };
 
 static const std::map<e_model, size_t> MEM_REQ_DECODE = {
-    { MODEL_TINY,     94ull*MB },
-    { MODEL_BASE,     96ull*MB },
-    { MODEL_SMALL,    98ull*MB },
-    { MODEL_MEDIUM,  100ull*MB },
-    { MODEL_LARGE,   102ull*MB },
+    { MODEL_TINY,    200ull*MB },
+    { MODEL_BASE,    202ull*MB },
+    { MODEL_SMALL,   204ull*MB },
+    { MODEL_MEDIUM,  206ull*MB },
+    { MODEL_LARGE,   208ull*MB },
 };
 
 static const std::map<e_model, size_t> MEM_REQ_DECODE_LAYER = {
@@ -2314,6 +2314,12 @@ int whisper_full(
         struct whisper_full_params params,
         const float * samples,
         int n_samples) {
+    // clear old results
+    auto & result_all = ctx->result_all;
+    auto & result_cur = ctx->result_cur;
+
+    result_all.clear();
+
     // compute log mel spectrogram
     if (whisper_pcm_to_mel(ctx, samples, n_samples, params.n_threads) != 0) {
         fprintf(stderr, "%s: failed to compute log mel spectrogram\n", __func__);
@@ -2343,11 +2349,6 @@ int whisper_full(
             prompt_init.push_back(whisper_token_transcribe());
         }
     }
-
-    auto & result_all = ctx->result_all;
-    auto & result_cur = ctx->result_cur;
-
-    result_all.clear();
 
     int progress_prev = 0;
     int progress_step = 5;
@@ -2424,7 +2425,7 @@ int whisper_full(
                 whisper_token id  = 0;
                 whisper_token tid = whisper_token_beg(ctx);
 
-                id = whisper_sample_best(ctx, result_len == 0);
+                id = whisper_sample_best(ctx, result_len == 0 || i > 32);
                 if (i > 0) {
                     tid = whisper_sample_timestamp(ctx);
                 }
@@ -2444,7 +2445,9 @@ int whisper_full(
                 // end of text token
                 if (id == whisper_token_eot(ctx)) {
                     if (result_len == 0) {
-                        result_len = i + 1;
+                        // TODO: figure out how to resolve this
+                        fprintf(stderr, "\n%s: failed to generate timestamp token - this should not happen\n\n", __func__);
+                        //result_len = i + 1;
                     }
                     break;
                 }
