@@ -15,7 +15,7 @@ endif()
 
 # options
 
-option(GGML_ALL_WARNINGS            "ggml: enable all compiler warnings" ON)
+option(GGML_ALL_WARNINGS            "ggml: enable all compiler warnings"                   ON)
 option(GGML_ALL_WARNINGS_3RD_PARTY  "ggml: enable all compiler warnings in 3rd party libs" OFF)
 
 option(GGML_SANITIZE_THREAD         "ggml: enable thread sanitizer"    OFF)
@@ -25,7 +25,7 @@ option(GGML_SANITIZE_UNDEFINED      "ggml: enable undefined sanitizer" OFF)
 option(GGML_BUILD_TESTS             "ggml: build tests"    ${GGML_STANDALONE})
 option(GGML_BUILD_EXAMPLES          "ggml: build examples" ${GGML_STANDALONE})
 
-option(GGML_PERF                    "ggml: enable perf timings" ${GGML_PERF})
+option(GGML_PERF                    "ggml: enable perf timings"          OFF)
 option(GGML_NO_ACCELERATE           "ggml: disable Accelerate framework" OFF)
 
 # sanitizers
