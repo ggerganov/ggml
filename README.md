@@ -13,7 +13,9 @@ Tensor library for machine learning
 - No third-party dependencies
 - Zero memory allocations during runtime
 
-*Note that this project is under development and not ready for production use*
+***Note that this project is under development and not ready for production use.
+More active development is happening in the ***[whisper.cpp](https://github.com/ggerganov/whisper.cpp) ***repo
+so if you are interested in this project, make sure to follow what is happening there***
 
 ## Whisper inference (example)
 

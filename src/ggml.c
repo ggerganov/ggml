@@ -15,10 +15,44 @@
 #include <stdio.h>
 
 #if defined _MSC_VER
-#include "msvc_thread_atomic.h"
+#include <Windows.h>
+
+typedef volatile LONG atomic_int;
+typedef atomic_int atomic_bool;
+
+static void atomic_store(atomic_int* ptr, LONG val) {
+    InterlockedExchange(ptr, val);
+}
+static LONG atomic_load(atomic_int* ptr) {
+    return InterlockedCompareExchange(ptr, 0, 0);
+}
+static LONG atomic_fetch_add(atomic_int* ptr, LONG inc) {
+    return InterlockedExchangeAdd(ptr, inc);
+}
+static LONG atomic_fetch_sub(atomic_int* ptr, LONG dec) {
+    return atomic_fetch_add(ptr, -(dec));
+}
+
+typedef HANDLE pthread_t;
+
+typedef DWORD thread_ret_t;
+static int pthread_create(pthread_t* out, void* unused, thread_ret_t(*func)(void*), void* arg) {
+    out = CreateThread(NULL, 0, func, arg, 0, NULL);
+    return out != NULL;
+}
+
+static int pthread_join(pthread_t thread, void* unused) {
+    return (int) WaitForSingleObject(thread, INFINITE);
+}
+
+static int sched_yield (void) {
+    Sleep (0);
+    return 0;
+}
 #else
 #include <pthread.h>
 #include <stdatomic.h>
+
 typedef void* thread_ret_t;
 #endif
 
@@ -47,6 +81,8 @@ typedef void* thread_ret_t;
 
 #ifdef GGML_USE_ACCELERATE
 #include <Accelerate/Accelerate.h>
+#elif GGML_USE_OPENBLAS
+#include <cblas.h>
 #endif
 
 // floating point type used to accumulate sums
@@ -73,7 +109,11 @@ ggml_fp16_t ggml_fp32_to_fp16(float x) {
 
 #else
 
+#ifdef __wasm_simd128__
+#include <wasm_simd128.h>
+#else
 #include <immintrin.h>
+#endif
 
 // FP16 <-> FP32
 // ref: https://github.com/Maratyszcza/FP16
@@ -288,7 +328,7 @@ inline static void ggml_vec_dot_f32(const int n, float * restrict s, const float
         sumf += x[i]*y[i];
     }
 #elif defined(__AVX2__)
-    // AVX 256-bit (unroll 4)
+    // AVX 256-bit
     const int n32 = (n & ~31);
 
     __m256 sum0 = _mm256_setzero_ps();
@@ -328,6 +368,45 @@ inline static void ggml_vec_dot_f32(const int n, float * restrict s, const float
 
     // leftovers
     for (int i = n32; i < n; ++i) {
+        sumf += x[i]*y[i];
+    }
+#elif defined(__wasm_simd128__)
+    // WASM 128-bit
+    const int n16 = (n & ~15);
+
+    v128_t sum0 = wasm_f32x4_splat(0);
+    v128_t sum1 = wasm_f32x4_splat(0);
+    v128_t sum2 = wasm_f32x4_splat(0);
+    v128_t sum3 = wasm_f32x4_splat(0);
+
+    v128_t x0, x1, x2, x3;
+    v128_t y0, y1, y2, y3;
+
+    for (int i = 0; i < n16; i += 16) {
+        x0 = wasm_v128_load(x + i + 0);
+        x1 = wasm_v128_load(x + i + 4);
+        x2 = wasm_v128_load(x + i + 8);
+        x3 = wasm_v128_load(x + i + 12);
+
+        y0 = wasm_v128_load(y + i + 0);
+        y1 = wasm_v128_load(y + i + 4);
+        y2 = wasm_v128_load(y + i + 8);
+        y3 = wasm_v128_load(y + i + 12);
+
+        sum0 = wasm_f32x4_add(sum0, wasm_f32x4_mul(x0, y0));
+        sum1 = wasm_f32x4_add(sum1, wasm_f32x4_mul(x1, y1));
+        sum2 = wasm_f32x4_add(sum2, wasm_f32x4_mul(x2, y2));
+        sum3 = wasm_f32x4_add(sum3, wasm_f32x4_mul(x3, y3));
+    }
+
+    sum0 = wasm_f32x4_add(sum0, sum1);
+    sum2 = wasm_f32x4_add(sum2, sum3);
+    sum0 = wasm_f32x4_add(sum0, sum2);
+
+    sumf = wasm_f32x4_extract_lane(sum0, 0) + wasm_f32x4_extract_lane(sum0, 1) + wasm_f32x4_extract_lane(sum0, 2) + wasm_f32x4_extract_lane(sum0, 3);
+
+    // leftovers
+    for (int i = n16; i < n; ++i) {
         sumf += x[i]*y[i];
     }
 #else
@@ -446,7 +525,7 @@ inline static void ggml_vec_dot_f16(const int n, float * restrict s, ggml_fp16_t
         sumf += ggml_fp16_to_fp32(x[i])*ggml_fp16_to_fp32(y[i]);
     }
 #elif defined(__AVX2__)
-    // AVX 256-bit (unroll 4)
+    // AVX 256-bit
     const int n32 = (n & ~31);
 
     __m256 sum0 = _mm256_setzero_ps();
@@ -486,6 +565,54 @@ inline static void ggml_vec_dot_f16(const int n, float * restrict s, ggml_fp16_t
 
     // leftovers
     for (int i = n32; i < n; ++i) {
+        //GGML_ASSERT(false);
+        sumf += ggml_fp16_to_fp32(x[i])*ggml_fp16_to_fp32(y[i]);
+    }
+#elif defined(__wasm_simd128__)
+    // WASM 128-bit
+    const int n16 = (n & ~15);
+
+    v128_t sum0 = wasm_f32x4_splat(0.0f);
+    v128_t sum1 = wasm_f32x4_splat(0.0f);
+    v128_t sum2 = wasm_f32x4_splat(0.0f);
+    v128_t sum3 = wasm_f32x4_splat(0.0f);
+
+    v128_t x0, x1, x2, x3;
+    v128_t y0, y1, y2, y3;
+
+    float tx[16];
+    float ty[16];
+
+    for (int i = 0; i < n16; i += 16) {
+        for (int k = 0; k < 16; ++k) {
+            tx[k] = ggml_fp16_to_fp32(x[i + k]);
+            ty[k] = ggml_fp16_to_fp32(y[i + k]);
+        }
+
+        x0 = wasm_v128_load(tx + 0);
+        x1 = wasm_v128_load(tx + 4);
+        x2 = wasm_v128_load(tx + 8);
+        x3 = wasm_v128_load(tx + 12);
+
+        y0 = wasm_v128_load(ty + 0);
+        y1 = wasm_v128_load(ty + 4);
+        y2 = wasm_v128_load(ty + 8);
+        y3 = wasm_v128_load(ty + 12);
+
+        sum0 = wasm_f32x4_add(sum0, wasm_f32x4_mul(x0, y0));
+        sum1 = wasm_f32x4_add(sum1, wasm_f32x4_mul(x1, y1));
+        sum2 = wasm_f32x4_add(sum2, wasm_f32x4_mul(x2, y2));
+        sum3 = wasm_f32x4_add(sum3, wasm_f32x4_mul(x3, y3));
+    }
+
+    sum0 = wasm_f32x4_add(sum0, sum1);
+    sum2 = wasm_f32x4_add(sum2, sum3);
+    sum0 = wasm_f32x4_add(sum0, sum2);
+
+    sumf = wasm_f32x4_extract_lane(sum0, 0) + wasm_f32x4_extract_lane(sum0, 1) + wasm_f32x4_extract_lane(sum0, 2) + wasm_f32x4_extract_lane(sum0, 3);
+
+    // leftovers
+    for (int i = n16; i < n; ++i) {
         //GGML_ASSERT(false);
         sumf += ggml_fp16_to_fp32(x[i])*ggml_fp16_to_fp32(y[i]);
     }
@@ -535,7 +662,7 @@ inline static void ggml_vec_mad_f32(const int n, float * restrict y, const float
         y[i] += x[i]*v;
     }
 #elif defined(__AVX2__)
-    // AVX 256-bit (unroll 4)
+    // AVX 256-bit
     const int n32 = (n & ~31);
 
     const __m256 v4 = _mm256_set1_ps(v);
@@ -567,6 +694,41 @@ inline static void ggml_vec_mad_f32(const int n, float * restrict y, const float
 
     // leftovers
     for (int i = n32; i < n; ++i) {
+        y[i] += x[i]*v;
+    }
+#elif defined(__wasm_simd128__)
+    // WASM SIMD 128-bit
+    const int n16 = (n & ~15);
+
+    const v128_t v4 = wasm_f32x4_splat(v);
+
+    v128_t x0, x1, x2, x3;
+    v128_t y0, y1, y2, y3;
+
+    for (int i = 0; i < n16; i += 16) {
+        x0 = wasm_v128_load(x + i + 0);
+        x1 = wasm_v128_load(x + i + 4);
+        x2 = wasm_v128_load(x + i + 8);
+        x3 = wasm_v128_load(x + i + 12);
+
+        y0 = wasm_v128_load(y + i + 0);
+        y1 = wasm_v128_load(y + i + 4);
+        y2 = wasm_v128_load(y + i + 8);
+        y3 = wasm_v128_load(y + i + 12);
+
+        y0 = wasm_f32x4_add(y0, wasm_f32x4_mul(x0, v4));
+        y1 = wasm_f32x4_add(y1, wasm_f32x4_mul(x1, v4));
+        y2 = wasm_f32x4_add(y2, wasm_f32x4_mul(x2, v4));
+        y3 = wasm_f32x4_add(y3, wasm_f32x4_mul(x3, v4));
+
+        wasm_v128_store(y + i + 0, y0);
+        wasm_v128_store(y + i + 4, y1);
+        wasm_v128_store(y + i + 8, y2);
+        wasm_v128_store(y + i + 12, y3);
+    }
+
+    // leftovers
+    for (int i = n16; i < n; ++i) {
         y[i] += x[i]*v;
     }
 #else
@@ -693,6 +855,54 @@ inline static void ggml_vec_mad_f16(const int n, ggml_fp16_t * restrict y, ggml_
 
     // leftovers
     for (int i = n32; i < n; ++i) {
+        GGML_ASSERT(false);
+        y[i] = ggml_fp32_to_fp16(ggml_fp16_to_fp32(y[i]) + ggml_fp16_to_fp32(x[i])*v);
+    }
+#elif defined(__wasm_simd128__)
+    // WASM SIMD 128-bit
+    const int n16 = (n & ~15);
+
+    const v128_t v4 = wasm_f32x4_splat(v);
+
+    v128_t x0, x1, x2, x3;
+    v128_t y0, y1, y2, y3;
+
+    float tx[16];
+    float ty[16];
+
+    for (int i = 0; i < n16; i += 16) {
+        for (int k = 0; k < 16; ++k) {
+            tx[k] = ggml_fp16_to_fp32(x[i + k]);
+            ty[k] = ggml_fp16_to_fp32(y[i + k]);
+        }
+
+        x0 = wasm_v128_load(tx + 0);
+        x1 = wasm_v128_load(tx + 4);
+        x2 = wasm_v128_load(tx + 8);
+        x3 = wasm_v128_load(tx + 12);
+
+        y0 = wasm_v128_load(ty + 0);
+        y1 = wasm_v128_load(ty + 4);
+        y2 = wasm_v128_load(ty + 8);
+        y3 = wasm_v128_load(ty + 12);
+
+        y0 = wasm_f32x4_add(y0, wasm_f32x4_mul(x0, v4));
+        y1 = wasm_f32x4_add(y1, wasm_f32x4_mul(x1, v4));
+        y2 = wasm_f32x4_add(y2, wasm_f32x4_mul(x2, v4));
+        y3 = wasm_f32x4_add(y3, wasm_f32x4_mul(x3, v4));
+
+        wasm_v128_store(ty + 0, y0);
+        wasm_v128_store(ty + 4, y1);
+        wasm_v128_store(ty + 8, y2);
+        wasm_v128_store(ty + 12, y3);
+
+        for (int k = 0; k < 16; ++k) {
+            y[i + k] = ggml_fp32_to_fp16(ty[k]);
+        }
+    }
+
+    // leftovers
+    for (int i = n16; i < n; ++i) {
         GGML_ASSERT(false);
         y[i] = ggml_fp32_to_fp16(ggml_fp16_to_fp32(y[i]) + ggml_fp16_to_fp32(x[i])*v);
     }
@@ -931,6 +1141,7 @@ struct ggml_state {
 
 // global state
 struct ggml_state g_state;
+atomic_int g_state_barrier = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1060,6 +1271,17 @@ int ggml_up64(int n) {
 ////////////////////////////////////////////////////////////////////////////////
 
 struct ggml_context * ggml_init(struct ggml_init_params params) {
+    // make this function thread safe
+    {
+        int processing = atomic_fetch_add(&g_state_barrier, 1);
+        while (processing > 0) {
+            // wait for other threads to finish
+            atomic_fetch_sub(&g_state_barrier, 1);
+            sched_yield();
+            processing = atomic_fetch_add(&g_state_barrier, 1);
+        }
+    }
+
     static bool is_first_call = true;
     if (is_first_call) {
         const uint64_t t_start = ggml_time_us(); UNUSED(t_start);
@@ -1103,6 +1325,9 @@ struct ggml_context * ggml_init(struct ggml_init_params params) {
 
     if (ctx == NULL) {
         GGML_PRINT_DEBUG("%s: no unused context found\n", __func__);
+
+        atomic_fetch_sub(&g_state_barrier, 1);
+
         return NULL;
     }
 
@@ -1117,10 +1342,25 @@ struct ggml_context * ggml_init(struct ggml_init_params params) {
 
     ggml_assert_aligned(ctx->mem_buffer);
 
+    GGML_PRINT_DEBUG("%s: context initialized\n", __func__);
+
+    atomic_fetch_sub(&g_state_barrier, 1);
+
     return ctx;
 }
 
 void ggml_free(struct ggml_context * ctx) {
+    // make this function thread safe
+    {
+        int processing = atomic_fetch_add(&g_state_barrier, 1);
+        while (processing > 0) {
+            // wait for other threads to finish
+            atomic_fetch_sub(&g_state_barrier, 1);
+            sched_yield();
+            processing = atomic_fetch_add(&g_state_barrier, 1);
+        }
+    }
+
     for (int i = 0; i < GGML_MAX_CONTEXTS; i++) {
         if (&g_state.contexts[i].context == ctx) {
             g_state.contexts[i].used = false;
@@ -1132,11 +1372,15 @@ void ggml_free(struct ggml_context * ctx) {
                 free(ctx->mem_buffer);
             }
 
+            atomic_fetch_sub(&g_state_barrier, 1);
+
             return;
         }
     }
 
     GGML_PRINT_DEBUG("%s: context not found\n", __func__);
+
+    atomic_fetch_sub(&g_state_barrier, 1);
 }
 
 size_t ggml_used_mem(const struct ggml_context * ctx) {
@@ -3852,46 +4096,44 @@ void ggml_compute_forward_mul_mat_f32(
     // nb00 <  nb01 - src0 is transposed
     //   compute by src0 columns
 
-//#ifdef GGML_USE_ACCELERATE
-//    if (ggml_compute_forward_mul_mat_use_blas(src0, src1, dst)) {
-//        GGML_ASSERT(ggml_is_contiguous(src0));
-//        GGML_ASSERT(nb10 == sizeof(float));
-//
-//        if (params->ith != 0) return;
-//
-//        if (params->type == GGML_TASK_INIT) {
-//            return;
-//        }
-//
-//        if (params->type == GGML_TASK_FINALIZE) {
-//            return;
-//        }
-//
-//        float * const wdata = params->wdata;
-//
-//        for (int i03 = 0; i03 < ne03; i03++) {
-//            for (int i02 = 0; i02 < ne02; i02++) {
-//                const float * x = (float *) (src0->data);
-//                const float * y = (float *) ((char *) src1->data + i02*nb12 + i03*nb13);
-//
-//                float * d = (float *) ((char *) dst->data + i02*nb2 + i03*nb3);
-//
-//                // zT = y * xT
-//                {
-//                    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
-//                            ne11, ne01, ne10,
-//                            1.0f,    y, ne10,
-//                                     x, ne10,
-//                            0.0f,    d, ne01);
-//                }
-//            }
-//        }
-//
-//        //printf("CBLAS F32 = %f ms, %d x %d x %d x %d\n", (ggml_perf_time_us() - t0)/1000.0, ne0, ne1, ne2, ne3);
-//
-//        return;
-//    }
-//#endif
+#if defined(GGML_USE_ACCELERATE) || defined(GGML_USE_OPENBLAS)
+    if (ggml_compute_forward_mul_mat_use_blas(src0, src1, dst)) {
+        GGML_ASSERT(ggml_is_contiguous(src0));
+        GGML_ASSERT(nb10 == sizeof(float));
+
+        if (params->ith != 0) return;
+
+        if (params->type == GGML_TASK_INIT) {
+            return;
+        }
+
+        if (params->type == GGML_TASK_FINALIZE) {
+            return;
+        }
+
+        for (int i03 = 0; i03 < ne03; i03++) {
+            for (int i02 = 0; i02 < ne02; i02++) {
+                const float * x = (float *) (src0->data);
+                const float * y = (float *) ((char *) src1->data + i02*nb12 + i03*nb13);
+
+                float * d = (float *) ((char *) dst->data + i02*nb2 + i03*nb3);
+
+                // zT = y * xT
+                {
+                    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+                            ne11, ne01, ne10,
+                            1.0f,    y, ne10,
+                                     x, ne10,
+                            0.0f,    d, ne01);
+                }
+            }
+        }
+
+        //printf("CBLAS F32 = %f ms, %d x %d x %d x %d\n", (ggml_perf_time_us() - t0)/1000.0, ne0, ne1, ne2, ne3);
+
+        return;
+    }
+#endif
 
     if (params->type == GGML_TASK_INIT) {
         if (nb01 >= nb00) {
@@ -4098,7 +4340,7 @@ void ggml_compute_forward_mul_mat_f16_f32(
     // nb00 <  nb01 - src0 is transposed
     //   compute by src0 columns
 
-#ifdef GGML_USE_ACCELERATE
+#if defined(GGML_USE_ACCELERATE) || defined(GGML_USE_OPENBLAS)
     if (ggml_compute_forward_mul_mat_use_blas(src0, src1, dst)) {
         GGML_ASSERT(nb10 == sizeof(float));
 
@@ -6654,7 +6896,7 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
                         } else {
                             if (node->src0->type == GGML_TYPE_F16 &&
                                 node->src1->type == GGML_TYPE_F32) {
-#ifdef GGML_USE_ACCELERATE
+#if defined(GGML_USE_ACCELERATE) || defined(GGML_USE_OPENBLAS)
                                 if (ggml_compute_forward_mul_mat_use_blas(node->src0, node->src1, node)) {
                                     cur = sizeof(float)*(node->src0->ne[0]*node->src0->ne[1]);
                                 } else {
@@ -7358,7 +7600,7 @@ enum ggml_opt_result ggml_opt_adam(
 
         {
             const int64_t t_end_cpu = ggml_cycles();
-            GGML_PRINT_DEBUG("time iter:      %5.3f s\n", (t_end_cpu - t_start_cpu)/CLOCKS_PER_SEC);
+            GGML_PRINT_DEBUG("time iter:      %5.3f s\n", ((float)(t_end_cpu - t_start_cpu))/CLOCKS_PER_SEC);
             UNUSED(t_end_cpu);
 
             const int64_t t_end_wall = ggml_time_us();
@@ -7826,6 +8068,56 @@ enum ggml_opt_result ggml_opt(
     }
 
     return result;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int ggml_cpu_has_avx2(void) {
+#if defined(__AVX2__)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+int ggml_cpu_has_avx512(void) {
+#if defined(__AVX512F__)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+int ggml_cpu_has_neon(void) {
+#if defined(__ARM_NEON__)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+int ggml_cpu_has_fp16_va(void) {
+#if defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+int ggml_cpu_has_wasm_simd(void) {
+#if defined(__wasm_simd128__)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+int ggml_cpu_has_blas(void) {
+#if defined(GGML_USE_ACCELERATE) || defined(GGML_USE_OPENBLAS)
+    return 1;
+#else
+    return 0;
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////

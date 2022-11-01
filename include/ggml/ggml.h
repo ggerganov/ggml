@@ -11,7 +11,7 @@ extern "C" {
 #define GGML_MAX_DIMS     4
 #define GGML_MAX_NODES    4096
 #define GGML_MAX_PARAMS   16
-#define GGML_MAX_CONTEXTS 16
+#define GGML_MAX_CONTEXTS 64
 #define GGML_MAX_OPT      4
 
 #ifdef __ARM_NEON
@@ -547,6 +547,17 @@ enum ggml_opt_result ggml_opt(
         struct ggml_context * ctx,
         struct ggml_opt_params params,
         struct ggml_tensor * f);
+
+//
+// system info
+//
+
+int ggml_cpu_has_avx2(void);
+int ggml_cpu_has_avx512(void);
+int ggml_cpu_has_neon(void);
+int ggml_cpu_has_fp16_va(void);
+int ggml_cpu_has_wasm_simd(void);
+int ggml_cpu_has_blas(void);
 
 #ifdef  __cplusplus
 }
