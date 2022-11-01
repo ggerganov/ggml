@@ -14,8 +14,8 @@ Tensor library for machine learning
 - Zero memory allocations during runtime
 
 ***Note that this project is under development and not ready for production use.
-More active development is happening in the ***[whisper.cpp](https://github.com/ggerganov/whisper.cpp) ***repo
-so if you are interested in this project, make sure to follow what is happening there***
+Most of the development is currently happening in the [whisper.cpp](https://github.com/ggerganov/whisper.cpp) repo,
+so if you are interested in this project, make sure to follow what is happening there.***
 
 ## Whisper inference (example)
 
