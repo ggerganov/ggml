@@ -14,7 +14,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#if defined _MSC_VER
+#if defined _MSC_VER || defined(__MINGW32__)
 #include <Windows.h>
 
 typedef volatile LONG atomic_int;
@@ -37,8 +37,14 @@ typedef HANDLE pthread_t;
 
 typedef DWORD thread_ret_t;
 static int pthread_create(pthread_t* out, void* unused, thread_ret_t(*func)(void*), void* arg) {
-    out = CreateThread(NULL, 0, func, arg, 0, NULL);
-    return out != NULL;
+    HANDLE handle = CreateThread(NULL, 0, func, arg, 0, NULL);
+    if (handle == NULL)
+    {
+        return EAGAIN;
+    }
+
+    *out = handle;
+    return 0;
 }
 
 static int pthread_join(pthread_t thread, void* unused) {
@@ -198,7 +204,7 @@ static ggml_fp16_t table_exp_f16[1 << 16];
 // timing
 //
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__MINGW32__)
 static int64_t timer_freq;
 void ggml_time_init(void) {
     LARGE_INTEGER frequency;
@@ -3150,7 +3156,10 @@ void ggml_compute_forward_add_f32(
     GGML_ASSERT(nb00 == sizeof(float));
 
     if (nb10 == sizeof(float)) {
-        for (int j = ith; j < n; j += nth) {
+        const int j0 = (n/nth)*ith;
+        const int j1 = ith == nth - 1 ? n : (n/nth)*(ith + 1);
+
+        for (int j = j0; j < j1; j++) {
             ggml_vec_add_f32(nc,
                     (float *) ((char *) dst->data  + j*nb1),
                     (float *) ((char *) src0->data + j*nb01),
@@ -6857,7 +6866,7 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
                     } break;
                 case GGML_OP_ADD:
                     {
-                        node->n_tasks = 1;
+                        node->n_tasks = n_threads;
                     } break;
                 case GGML_OP_SUB:
                 case GGML_OP_MUL:
@@ -8089,7 +8098,7 @@ int ggml_cpu_has_avx512(void) {
 }
 
 int ggml_cpu_has_neon(void) {
-#if defined(__ARM_NEON__)
+#if defined(__ARM_NEON)
     return 1;
 #else
     return 0;
