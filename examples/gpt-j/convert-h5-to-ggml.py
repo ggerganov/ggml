@@ -91,13 +91,14 @@ byte_encoder = bytes_to_unicode()
 byte_decoder = {v:k for k, v in byte_encoder.items()}
 
 fout.write(struct.pack("i", len(encoder) + len(encoder_added)))
+
 for key in encoder:
-    text = bytearray([byte_decoder[c] for c in key]).decode('utf-8', errors='replace').encode('utf-8')
+    text = bytearray([byte_decoder[c] for c in key])
     fout.write(struct.pack("i", len(text)))
     fout.write(text)
 
 for key in encoder_added:
-    text = bytearray([byte_decoder[c] for c in key]).decode('utf-8', errors='replace').encode('utf-8')
+    text = bytearray([byte_decoder[c] for c in key])
     fout.write(struct.pack("i", len(text)))
     fout.write(text)
 
@@ -119,6 +120,10 @@ for name in list_vars.keys():
             print("  Converting to float16")
             data = data.astype(np.float16)
             ftype = 1
+        else:
+            print("  Converting to float32")
+            data = data.astype(np.float32)
+            ftype = 0
 
     # for efficiency - transpose these matrices:
     #  "transformer.h.*.mlp.fc_in.weight
