@@ -5,6 +5,12 @@
 #
 # If you want to download the original GPT-J model files, use the "download-model.sh" script instead.
 
+#src="https://ggml.ggerganov.com"
+#pfx="ggml-model-gpt-j"
+
+src="https://huggingface.co/datasets/ggerganov/ggml"
+pfx="resolve/main/ggml-model-gpt-j"
+
 ggml_path=$(dirname $(realpath $0))
 
 # GPT-J models
@@ -42,7 +48,14 @@ printf "Downloading ggml model $model ...\n"
 
 mkdir -p models/gpt-j-$model
 
-wget --quiet --show-progress -O models/gpt-j-$model/ggml-model.bin https://ggml.ggerganov.com/ggml-model-gpt-j-$model.bin
+if [ -x "$(command -v wget)" ]; then
+    wget --quiet --show-progress -O models/gpt-j-$model/ggml-model.bin $src/$pfx-$model.bin
+elif [ -x "$(command -v curl)" ]; then
+    curl -L --output models/gpt-j-$model/ggml-model.bin $src/$pfx-$model.bin
+else
+    printf "Either wget or curl is required to download models.\n"
+    exit 1
+fi
 
 if [ $? -ne 0 ]; then
     printf "Failed to download ggml model $model \n"

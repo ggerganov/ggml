@@ -5,6 +5,12 @@
 #
 # If you want to download the original GPT-2 model files, use the "download-model.sh" script instead.
 
+#src="https://ggml.ggerganov.com"
+#pfx="ggml-model-gpt-2"
+
+src="https://huggingface.co/datasets/ggerganov/ggml"
+pfx="resolve/main/ggml-model-gpt-2"
+
 ggml_path=$(dirname $(realpath $0))
 
 # GPT-2 models
@@ -42,7 +48,14 @@ printf "Downloading ggml model $model ...\n"
 
 mkdir -p models/gpt-2-$model
 
-wget --quiet --show-progress -O models/gpt-2-$model/ggml-model.bin https://ggml.ggerganov.com/ggml-model-gpt-2-$model.bin
+if [ -x "$(command -v wget)" ]; then
+    wget --quiet --show-progress -O models/gpt-2-$model/ggml-model.bin $src/$pfx-$model.bin
+elif [ -x "$(command -v curl)" ]; then
+    curl -L --output models/gpt-2-$model/ggml-model.bin $src/$pfx-$model.bin
+else
+    printf "Either wget or curl is required to download models.\n"
+    exit 1
+fi
 
 if [ $? -ne 0 ]; then
     printf "Failed to download ggml model $model \n"
