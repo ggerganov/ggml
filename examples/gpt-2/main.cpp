@@ -756,7 +756,7 @@ int main(int argc, char ** argv) {
             // if here, it means we are still processing the input prompt
             for (int k = i; k < embd_inp.size(); k++) {
                 embd.push_back(embd_inp[k]);
-                if (embd.size() > params.n_batch) {
+                if (embd.size() >= params.n_batch) {
                     break;
                 }
             }
