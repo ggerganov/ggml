@@ -7,7 +7,8 @@ import numpy
 
 import code # tmp
 
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+#from transformers import AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer
 
 if len(sys.argv) < 3:
     print("Usage: convert-flan-t5-pt-to-ggml.py path-to-pt-model dir-output [use-f32]\n")
@@ -61,6 +62,7 @@ fout.write(struct.pack("i", config["d_model"]))
 fout.write(struct.pack("i", config["n_positions"]))
 fout.write(struct.pack("i", config["num_heads"]))
 fout.write(struct.pack("i", config["num_layers"]))
+fout.write(struct.pack("i", use_f16))
 
 # sort tokenizer.vocab by value
 tokens = sorted(tokenizer.vocab.items(), key=lambda x: x[1])
