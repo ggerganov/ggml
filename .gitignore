@@ -9,3 +9,4 @@ compile_commands.json
 .DS_Store
 
 src/arm_neon.h
+tests/arm_neon.h

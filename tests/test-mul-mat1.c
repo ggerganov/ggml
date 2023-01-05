@@ -16,6 +16,12 @@ const int M = 1280;
 const int N = 1500;
 const int K = 1280;
 
+uint64_t get_time_us() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec * 1000000 + tv.tv_usec;
+}
+
 //
 // naive implementation
 //
@@ -204,12 +210,6 @@ void mul_mat_vec_f8_0(
             dst[i*n + j] = sumf;
         }
     }
-}
-
-uint64_t get_time_us() {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return tv.tv_sec * 1000000 + tv.tv_usec;
 }
 
 int main(int argc, const char ** argv) {
