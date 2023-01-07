@@ -9,6 +9,7 @@ if (GGML_ALL_WARNINGS)
             -Wcast-qual                     \
             -Wstrict-prototypes             \
             -Wpointer-arith                 \
+            -Wno-unused-function            \
         ")
     else()
         # todo : windows
