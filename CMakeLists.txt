@@ -47,6 +47,7 @@ endif()
 
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffast-math")
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
+#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=native")
 
 # dependencies
 
