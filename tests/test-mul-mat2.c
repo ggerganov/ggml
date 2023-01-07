@@ -208,6 +208,8 @@ void mul_mat_vec_gq_1(
 void quantize_2(const float * src, void * dst, int n, int k) {
     char * p0 = dst;
 
+    gq_t pp[QB];
+
     for (int j = 0; j < n; j++) {
         for (int i = 0; i < k/QK; i++) {
             float min = FLT_MAX;
@@ -254,7 +256,7 @@ void quantize_2(const float * src, void * dst, int n, int k) {
             //printf("min/max/d/id: %f %f %f %f\n", min, max, d, id);
 
             for (int s = 0; s < QK/gq_t_bits; ++s) {
-                gq_t pp[QB] = {0};
+                memset(pp, 0, sizeof(pp));
 
                 for (int l = 0; l < gq_t_bits; l++) {
                     const   float v = src[j*k + i*QK + s*gq_t_bits + l];
