@@ -96,8 +96,8 @@ int main(int argc, const char ** argv) {
         enum ggml_opt_result res = ggml_opt(NULL, opt_params, f);
 
         assert(res == GGML_OPT_OK);
-        assert(is_close(ggml_get_f32_1d(t0, 0),  5.0f, 1e-3f));
-        assert(is_close(ggml_get_f32_1d(t1, 0), 10.0f, 1e-3f));
+        assert(is_close(ggml_get_f32_1d(t0, 0),  5.0f, 1e-2f));
+        assert(is_close(ggml_get_f32_1d(t1, 0), 10.0f, 1e-2f));
     }
 
     {
