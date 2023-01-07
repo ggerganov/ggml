@@ -1,5 +1,7 @@
 // quantized matrix multiplication
 
+#include "ggml.h"
+
 #include <float.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -59,6 +61,8 @@ void mul_mat_vec_f32_0(
 void quantize(const float * src, void * dst, int n, int k) {
     char * p0 = dst;
 
+    gq_t pp[QB];
+
     for (int j = 0; j < n; j++) {
         for (int i = 0; i < k/QK; i++) {
             float min = FLT_MAX;
@@ -105,7 +109,7 @@ void quantize(const float * src, void * dst, int n, int k) {
             //printf("min/max/d/id: %f %f %f %f\n", min, max, d, id);
 
             for (int s = 0; s < QK/gq_t_bits; ++s) {
-                gq_t pp[QB] = {0};
+                memset(pp, 0, sizeof(pp));
 
                 for (int l = 0; l < gq_t_bits; l++) {
                     const   float v = src[j*k + i*QK + s*gq_t_bits + l];
@@ -209,7 +213,7 @@ int main(int argc, const char ** argv) {
     void * src0_gq = calloc(1, (2*sizeof(float) + (QK/gq_t_bits)*QB*sizeof(gq_t))*(K/QK)*M);
     void * src1_gq = calloc(1, (2*sizeof(float) + (QK/gq_t_bits)*QB*sizeof(gq_t))*(K/QK)*N);
 
-    const size_t sizef16 = sizeof(__fp16)*M*K + sizeof(__fp16)*N*K;
+    const size_t sizef16 = sizeof(ggml_fp16_t)*M*K + sizeof(ggml_fp16_t)*N*K;
     const size_t sizegq  = (2*sizeof(float) + (QK/gq_t_bits)*QB*sizeof(gq_t))*(K/QK)*M +
                            (2*sizeof(float) + (QK/gq_t_bits)*QB*sizeof(gq_t))*(K/QK)*N;
 
@@ -256,7 +260,7 @@ int main(int argc, const char ** argv) {
         const clock_t end = clock();
         const uint64_t end_us = get_time_us();
         printf("%s: elapsed ticks: %ld\n",  __func__, end - start);
-        printf("%s: elapsed us:    %llu / %f ms\n",  __func__, end_us - start_us, (end_us - start_us) / 1000.0 / nIter);
+        printf("%s: elapsed us:    %d / %f ms\n",  __func__, (int)(end_us - start_us), (end_us - start_us) / 1000.0 / nIter);
     }
 
     printf("%f\n", sum);

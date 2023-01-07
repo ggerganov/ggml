@@ -1,7 +1,7 @@
 #
 # whisper
 
-add_library(whisper-cpp SHARED
+add_library(whisper-cpp
     whisper.cpp
     )
 
