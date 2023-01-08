@@ -18,8 +18,10 @@ endif()
 
 # compiler flags
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=vla")
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-math-errno -ffinite-math-only -funsafe-math-optimizations")
+if (NOT MSVC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=vla")
+    #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-math-errno -ffinite-math-only -funsafe-math-optimizations")
+endif()
 
 message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
 
@@ -63,7 +65,11 @@ target_include_directories(${TARGET} PUBLIC
     ../include/ggml
     )
 
-target_link_libraries(${TARGET} PUBLIC m ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
+if (MSVC)
+    target_link_libraries(${TARGET} PUBLIC ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
+else()
+    target_link_libraries(${TARGET} PUBLIC m ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
+endif()
 
 if (BUILD_SHARED_LIBS)
     target_link_libraries(${TARGET} PUBLIC
