@@ -261,8 +261,11 @@ gpt_vocab::id gpt_sample_top_k_top_p(
     std::vector<std::pair<double, gpt_vocab::id>> logits_id;
     logits_id.reserve(n_logits);
 
-    for (int i = 0; i < n_logits; i++) {
-        logits_id.push_back(std::make_pair(logits[i], i));
+    {
+        const double scale = 1.0/temp;
+        for (int i = 0; i < n_logits; ++i) {
+            logits_id.push_back(std::make_pair(logits[i]*scale, i));
+        }
     }
 
     // find the top K tokens
@@ -275,58 +278,50 @@ gpt_vocab::id gpt_sample_top_k_top_p(
 
     logits_id.resize(top_k);
 
-    // normalize
-    {
-        double sum = 0.0f;
-        for (int i = 0; i < (int)logits_id.size(); i++) {
-            sum += logits_id[i].first;
-        }
+    double maxl = -INFINITY;
+    for (const auto & kv : logits_id) {
+        maxl = std::max(maxl, kv.first);
+    }
 
-        sum = 1.0/sum;
-        for (int i = 0; i < (int)logits_id.size(); i++) {
-            logits_id[i].first *= sum;
-        }
+    // compute probs for the top K tokens
+    std::vector<double> probs;
+    probs.reserve(logits_id.size());
+
+    double sum = 0.0;
+    for (const auto & kv : logits_id) {
+        double p = exp(kv.first - maxl);
+        probs.push_back(p);
+        sum += p;
+    }
+
+    // normalize the probs
+    for (auto & p : probs) {
+        p /= sum;
     }
 
     if (top_p < 1.0f) {
-        {
-            double cumsum = 0.0f;
-            for (int i = 0; i < top_k; i++) {
-                cumsum += logits_id[i].first;
-                if (cumsum >= top_p) {
-                    logits_id.resize(i+1);
-                    break;
-                }
+        double cumsum = 0.0f;
+        for (int i = 0; i < top_k; i++) {
+            cumsum += probs[i];
+            if (cumsum >= top_p) {
+                top_k = i + 1;
+                probs.resize(top_k);
+                logits_id.resize(top_k);
+                break;
             }
         }
 
-        // normalize again
-        {
-            double sum = 0.0f;
-            for (int i = 0; i < (int)logits_id.size(); i++) {
-                sum += logits_id[i].first;
-            }
-
-            sum = 1.0/sum;
-            for (int i = 0; i < (int)logits_id.size(); i++) {
-                logits_id[i].first *= sum;
-            }
+        cumsum = 1.0/cumsum;
+        for (int i = 0; i < (int) probs.size(); i++) {
+            probs[i] *= cumsum;
         }
     }
 
     //printf("\n");
-    //for (int i = 0; i < (int)logits_id.size(); i++) {
-    //    printf("%d: '%s' %f\n", i, vocab.id_to_token.at(logits_id[i].second).c_str(), logits_id[i].first);
+    //for (int i = 0; i < (int) probs.size(); i++) {
+    //    printf("%d: '%s' %f\n", i, vocab.id_to_token.at(logits_id[i].second).c_str(), probs[i]);
     //}
     //exit(0);
-
-    // sample from the obtained distribution
-    std::vector<double> probs;
-    probs.reserve(logits_id.size());
-
-    for (int i = 0; i < (int) logits_id.size(); i++) {
-        probs.push_back(logits_id[i].first);
-    }
 
     std::discrete_distribution<> dist(probs.begin(), probs.end());
     int idx = dist(rng);

@@ -355,7 +355,7 @@ bool gptj_model_load(const std::string & fname, gptj_model & model, gpt_vocab & 
 //   - n_threads: number of threads to use
 //   - n_past:    the context size so far
 //   - embd_inp:  the embeddings of the tokens in the context
-//   - embd_w:    the predicted probabilities of the next token
+//   - embd_w:    the predicted logits for the next token
 //
 // The GPT-J model requires about 16MB of memory per input token.
 //
@@ -559,7 +559,7 @@ bool gptj_eval(
     }
 
     // logits -> probs
-    inpL = ggml_soft_max(ctx0, inpL);
+    //inpL = ggml_soft_max(ctx0, inpL);
 
     // run the computation
     ggml_build_forward_expand(&gf, inpL);
@@ -630,7 +630,7 @@ int main(int argc, char ** argv) {
     int64_t t_sample_us  = 0;
     int64_t t_predict_us = 0;
 
-    std::vector<float> embd_w;
+    std::vector<float> logits;
 
     // tokenize the prompt
     std::vector<gpt_vocab::id> embd_inp = ::gpt_tokenize(vocab, params.prompt);
@@ -644,14 +644,14 @@ int main(int argc, char ** argv) {
 
     // determine the required inference memory per token:
     size_t mem_per_token = 0;
-    gptj_eval(model, params.n_threads, 0, { 0, 1, 2, 3 }, embd_w, mem_per_token);
+    gptj_eval(model, params.n_threads, 0, { 0, 1, 2, 3 }, logits, mem_per_token);
 
     for (int i = embd.size(); i < embd_inp.size() + params.n_predict; i++) {
         // predict
         if (embd.size() > 0) {
             const int64_t t_start_us = ggml_time_us();
 
-            if (!gptj_eval(model, params.n_threads, n_past, embd, embd_w, mem_per_token)) {
+            if (!gptj_eval(model, params.n_threads, n_past, embd, logits, mem_per_token)) {
                 printf("Failed to predict\n");
                 return 1;
             }
@@ -675,7 +675,7 @@ int main(int argc, char ** argv) {
             {
                 const int64_t t_start_sample_us = ggml_time_us();
 
-                id = gpt_sample_top_k_top_p(vocab, embd_w.data() + (embd_w.size() - n_vocab), top_k, top_p, temp, rng);
+                id = gpt_sample_top_k_top_p(vocab, logits.data() + (logits.size() - n_vocab), top_k, top_p, temp, rng);
 
                 t_sample_us += ggml_time_us() - t_start_sample_us;
             }
