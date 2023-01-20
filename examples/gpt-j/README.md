@@ -214,8 +214,11 @@ make -j4 gpt-j
 ```
 
 To run the `gpt-j` tool, you need the 12GB `ggml-model.bin` file which contains the GPT-J model in
-[ggml](https://github.com/ggerganov/ggml) compatible format. In the instructions above, I download the binary file
-directly from one of my servers, using the [download-ggml-model.sh](download-ggml-model.sh) script.
+[ggml](https://github.com/ggerganov/ggml) compatible format. In the instructions above, the binary file
+is downloaded from my repository on Hugging Face using the [download-ggml-model.sh](download-ggml-model.sh) script.
+You can also, download the file manually from this link:
+
+https://huggingface.co/datasets/ggerganov/ggml/tree/main
 
 ---
 
