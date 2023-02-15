@@ -113,6 +113,16 @@ extern "C" {
                                int   n_samples,
                                int   n_threads);
 
+    // Convert RAW PCM audio to log mel spectrogram but applies a Phase Vocoder to speed up the audio x2. 
+    // The resulting spectrogram is stored inside the provided whisper context.
+    // Returns 0 on success
+    WHISPER_API int whisper_pcm_to_mel_phase_vocoder(
+        struct whisper_context* ctx,
+        const float* samples,
+        int   n_samples,
+        int   n_threads);
+
+
     // This can be used to set a custom log mel spectrogram inside the provided whisper context.
     // Use this instead of whisper_pcm_to_mel() if you want to provide your own log mel spectrogram.
     // n_mel must be 80
@@ -245,7 +255,7 @@ extern "C" {
         int duration_ms;        // audio duration to process in ms
 
         bool translate;
-        bool no_context;        // do not use initial prompt for the decoder (if any)
+        bool no_context;        // do not use past transcription (if any) as initial prompt for the decoder
         bool single_segment;    // force single segment output (useful for streaming)
         bool print_special;     // print special tokens (e.g. <SOT>, <EOT>, <BEG>, etc.)
         bool print_progress;    // print progress information
@@ -257,6 +267,7 @@ extern "C" {
         float thold_pt;         // timestamp token probability threshold (~0.01)
         float thold_ptsum;      // timestamp token sum probability threshold (~0.01)
         int   max_len;          // max segment length in characters
+        bool  split_on_word;    // split on word rather than on token (when used with max_len)
         int   max_tokens;       // max tokens per segment (0 = no limit)
 
         // [EXPERIMENTAL] speed-up techniques
@@ -274,6 +285,7 @@ extern "C" {
 
         // common decoding parameters:
         bool suppress_blank;    // ref: https://github.com/openai/whisper/blob/f82bc59f5ea234d4b97fb2860842ed38519f7e65/whisper/decoding.py#L89
+        bool suppress_non_speech_tokens; // ref: https://github.com/openai/whisper/blob/7858aa9c08d98f75575035ecd6481f462d66ca27/whisper/tokenizer.py#L224-L253
 
         float temperature;      // initial decoding temperature, ref: https://ai.stackexchange.com/a/32478
         float max_initial_ts;   // ref: https://github.com/openai/whisper/blob/f82bc59f5ea234d4b97fb2860842ed38519f7e65/whisper/decoding.py#L97
@@ -329,6 +341,9 @@ extern "C" {
     // A segment can be a few words, a sentence, or even a paragraph.
     WHISPER_API int whisper_full_n_segments(struct whisper_context * ctx);
 
+    // Language id associated with the current context
+    WHISPER_API int whisper_full_lang_id(struct whisper_context * ctx);
+
     // Get the start and end time of the specified segment.
     WHISPER_API int64_t whisper_full_get_segment_t0(struct whisper_context * ctx, int i_segment);
     WHISPER_API int64_t whisper_full_get_segment_t1(struct whisper_context * ctx, int i_segment);
@@ -349,6 +364,13 @@ extern "C" {
 
     // Get the probability of the specified token in the specified segment.
     WHISPER_API float whisper_full_get_token_p(struct whisper_context * ctx, int i_segment, int i_token);
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    // Temporary helpers needed for exposing ggml interface
+
+    WHISPER_API int whisper_bench_memcpy(int n_threads);
+    WHISPER_API int whisper_bench_ggml_mul_mat(int n_threads);
 
 #ifdef __cplusplus
 }

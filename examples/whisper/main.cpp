@@ -1,9 +1,6 @@
-#include "whisper.h"
+#include "common.h"
 
-// third-party utilities
-// use your favorite implementations
-#define DR_WAV_IMPLEMENTATION
-#include "dr_wav.h"
+#include "whisper.h"
 
 #include <cmath>
 #include <fstream>
@@ -53,22 +50,24 @@ void replace_all(std::string & s, const std::string & search, const std::string 
 // command-line parameters
 struct whisper_params {
     int32_t n_threads    = std::min(4, (int32_t) std::thread::hardware_concurrency());
-    int32_t n_processors = 1;
-    int32_t offset_t_ms  = 0;
-    int32_t offset_n     = 0;
-    int32_t duration_ms  = 0;
+    int32_t n_processors =  1;
+    int32_t offset_t_ms  =  0;
+    int32_t offset_n     =  0;
+    int32_t duration_ms  =  0;
     int32_t max_context  = -1;
-    int32_t max_len      = 0;
-    int32_t best_of      = 5;
+    int32_t max_len      =  0;
+    int32_t best_of      =  5;
     int32_t beam_size    = -1;
 
-    float word_thold    = 0.01f;
-    float entropy_thold = 2.4f;
-    float logprob_thold = -1.0f;
+    float word_thold    =  0.01f;
+    float entropy_thold =  2.40f;
+    float logprob_thold = -1.00f;
 
     bool speed_up       = false;
     bool translate      = false;
     bool diarize        = false;
+    bool split_on_word  = false;
+    bool no_fallback    = false;
     bool output_txt     = false;
     bool output_vtt     = false;
     bool output_srt     = false;
@@ -84,6 +83,7 @@ struct whisper_params {
     std::string model    = "models/ggml-base.en.bin";
 
     std::vector<std::string> fname_inp = {};
+    std::vector<std::string> fname_out = {};
 };
 
 void whisper_print_usage(int argc, char ** argv, const whisper_params & params);
@@ -91,7 +91,12 @@ void whisper_print_usage(int argc, char ** argv, const whisper_params & params);
 bool whisper_params_parse(int argc, char ** argv, whisper_params & params) {
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
-
+	    
+        if (arg == "-"){
+            params.fname_inp.push_back(arg);
+            continue;
+        }
+	
         if (arg[0] != '-') {
             params.fname_inp.push_back(arg);
             continue;
@@ -116,11 +121,14 @@ bool whisper_params_parse(int argc, char ** argv, whisper_params & params) {
         else if (arg == "-su"   || arg == "--speed-up")       { params.speed_up       = true; }
         else if (arg == "-tr"   || arg == "--translate")      { params.translate      = true; }
         else if (arg == "-di"   || arg == "--diarize")        { params.diarize        = true; }
+        else if (arg == "-sow"  || arg == "--split-on-word")  { params.split_on_word  = true; }
+        else if (arg == "-nf"   || arg == "--no-fallback")    { params.no_fallback    = true; }
         else if (arg == "-otxt" || arg == "--output-txt")     { params.output_txt     = true; }
         else if (arg == "-ovtt" || arg == "--output-vtt")     { params.output_vtt     = true; }
         else if (arg == "-osrt" || arg == "--output-srt")     { params.output_srt     = true; }
         else if (arg == "-owts" || arg == "--output-words")   { params.output_wts     = true; }
         else if (arg == "-ocsv" || arg == "--output-csv")     { params.output_csv     = true; }
+        else if (arg == "-of"   || arg == "--output-file")    { params.fname_out.emplace_back(argv[++i]); }
         else if (arg == "-ps"   || arg == "--print-special")  { params.print_special  = true; }
         else if (arg == "-pc"   || arg == "--print-colors")   { params.print_colors   = true; }
         else if (arg == "-pp"   || arg == "--print-progress") { params.print_progress = true; }
@@ -144,35 +152,38 @@ void whisper_print_usage(int /*argc*/, char ** argv, const whisper_params & para
     fprintf(stderr, "usage: %s [options] file0.wav file1.wav ...\n", argv[0]);
     fprintf(stderr, "\n");
     fprintf(stderr, "options:\n");
-    fprintf(stderr, "  -h,       --help            [default] show this help message and exit\n");
-    fprintf(stderr, "  -t N,     --threads N       [%-7d] number of threads to use during computation\n",    params.n_threads);
-    fprintf(stderr, "  -p N,     --processors N    [%-7d] number of processors to use during computation\n", params.n_processors);
-    fprintf(stderr, "  -ot N,    --offset-t N      [%-7d] time offset in milliseconds\n",                    params.offset_t_ms);
-    fprintf(stderr, "  -on N,    --offset-n N      [%-7d] segment index offset\n",                           params.offset_n);
-    fprintf(stderr, "  -d  N,    --duration N      [%-7d] duration of audio to process in milliseconds\n",   params.duration_ms);
-    fprintf(stderr, "  -mc N,    --max-context N   [%-7d] maximum number of text context tokens to store\n", params.max_context);
-    fprintf(stderr, "  -ml N,    --max-len N       [%-7d] maximum segment length in characters\n",           params.max_len);
-    fprintf(stderr, "  -bo N,    --best-of N       [%-7d] number of best candidates to keep\n",              params.best_of);
-    fprintf(stderr, "  -bs N,    --beam-size N     [%-7d] beam size for beam search\n",                      params.beam_size);
-    fprintf(stderr, "  -wt N,    --word-thold N    [%-7.2f] word timestamp probability threshold\n",         params.word_thold);
-    fprintf(stderr, "  -et N,    --entropy-thold N [%-7.2f] entropy threshold for decoder fail\n",           params.entropy_thold);
-    fprintf(stderr, "  -lpt N,   --logprob-thold N [%-7.2f] log probability threshold for decoder fail\n",   params.logprob_thold);
-    fprintf(stderr, "  -su,      --speed-up        [%-7s] speed up audio by x2 (reduced accuracy)\n",        params.speed_up ? "true" : "false");
-    fprintf(stderr, "  -tr,      --translate       [%-7s] translate from source language to english\n",      params.translate ? "true" : "false");
-    fprintf(stderr, "  -di,      --diarize         [%-7s] stereo audio diarization\n",                       params.diarize ? "true" : "false");
-    fprintf(stderr, "  -otxt,    --output-txt      [%-7s] output result in a text file\n",                   params.output_txt ? "true" : "false");
-    fprintf(stderr, "  -ovtt,    --output-vtt      [%-7s] output result in a vtt file\n",                    params.output_vtt ? "true" : "false");
-    fprintf(stderr, "  -osrt,    --output-srt      [%-7s] output result in a srt file\n",                    params.output_srt ? "true" : "false");
-    fprintf(stderr, "  -owts,    --output-words    [%-7s] output script for generating karaoke video\n",     params.output_wts ? "true" : "false");
-    fprintf(stderr, "  -ocsv,    --output-csv      [%-7s] output result in a CSV file\n",                    params.output_csv ? "true" : "false");
-    fprintf(stderr, "  -ps,      --print-special   [%-7s] print special tokens\n",                           params.print_special ? "true" : "false");
-    fprintf(stderr, "  -pc,      --print-colors    [%-7s] print colors\n",                                   params.print_colors ? "true" : "false");
-    fprintf(stderr, "  -pp,      --print-progress  [%-7s] print progress\n",                                 params.print_progress ? "true" : "false");
-    fprintf(stderr, "  -nt,      --no-timestamps   [%-7s] do not print timestamps\n",                        params.no_timestamps ? "false" : "true");
-    fprintf(stderr, "  -l LANG,  --language LANG   [%-7s] spoken language ('auto' for auto-detect)\n",       params.language.c_str());
-    fprintf(stderr, "            --prompt PROMPT   [%-7s] initial prompt\n",                                 params.prompt.c_str());
-    fprintf(stderr, "  -m FNAME, --model FNAME     [%-7s] model path\n",                                     params.model.c_str());
-    fprintf(stderr, "  -f FNAME, --file FNAME      [%-7s] input WAV file path\n",                            "");
+    fprintf(stderr, "  -h,        --help              [default] show this help message and exit\n");
+    fprintf(stderr, "  -t N,      --threads N         [%-7d] number of threads to use during computation\n",    params.n_threads);
+    fprintf(stderr, "  -p N,      --processors N      [%-7d] number of processors to use during computation\n", params.n_processors);
+    fprintf(stderr, "  -ot N,     --offset-t N        [%-7d] time offset in milliseconds\n",                    params.offset_t_ms);
+    fprintf(stderr, "  -on N,     --offset-n N        [%-7d] segment index offset\n",                           params.offset_n);
+    fprintf(stderr, "  -d  N,     --duration N        [%-7d] duration of audio to process in milliseconds\n",   params.duration_ms);
+    fprintf(stderr, "  -mc N,     --max-context N     [%-7d] maximum number of text context tokens to store\n", params.max_context);
+    fprintf(stderr, "  -ml N,     --max-len N         [%-7d] maximum segment length in characters\n",           params.max_len);
+    fprintf(stderr, "  -sow,      --split-on-word     [%-7s] split on word rather than on token\n",             params.split_on_word ? "true" : "false");
+    fprintf(stderr, "  -bo N,     --best-of N         [%-7d] number of best candidates to keep\n",              params.best_of);
+    fprintf(stderr, "  -bs N,     --beam-size N       [%-7d] beam size for beam search\n",                      params.beam_size);
+    fprintf(stderr, "  -wt N,     --word-thold N      [%-7.2f] word timestamp probability threshold\n",         params.word_thold);
+    fprintf(stderr, "  -et N,     --entropy-thold N   [%-7.2f] entropy threshold for decoder fail\n",           params.entropy_thold);
+    fprintf(stderr, "  -lpt N,    --logprob-thold N   [%-7.2f] log probability threshold for decoder fail\n",   params.logprob_thold);
+    fprintf(stderr, "  -su,       --speed-up          [%-7s] speed up audio by x2 (reduced accuracy)\n",        params.speed_up ? "true" : "false");
+    fprintf(stderr, "  -tr,       --translate         [%-7s] translate from source language to english\n",      params.translate ? "true" : "false");
+    fprintf(stderr, "  -di,       --diarize           [%-7s] stereo audio diarization\n",                       params.diarize ? "true" : "false");
+    fprintf(stderr, "  -nf,       --no-fallback       [%-7s] do not use temperature fallback while decoding\n", params.no_fallback ? "true" : "false");
+    fprintf(stderr, "  -otxt,     --output-txt        [%-7s] output result in a text file\n",                   params.output_txt ? "true" : "false");
+    fprintf(stderr, "  -ovtt,     --output-vtt        [%-7s] output result in a vtt file\n",                    params.output_vtt ? "true" : "false");
+    fprintf(stderr, "  -osrt,     --output-srt        [%-7s] output result in a srt file\n",                    params.output_srt ? "true" : "false");
+    fprintf(stderr, "  -owts,     --output-words      [%-7s] output script for generating karaoke video\n",     params.output_wts ? "true" : "false");
+    fprintf(stderr, "  -ocsv,     --output-csv        [%-7s] output result in a CSV file\n",                    params.output_csv ? "true" : "false");
+    fprintf(stderr, "  -of FNAME, --output-file FNAME [%-7s] output file path (without file extension)\n",      "");
+    fprintf(stderr, "  -ps,       --print-special     [%-7s] print special tokens\n",                           params.print_special ? "true" : "false");
+    fprintf(stderr, "  -pc,       --print-colors      [%-7s] print colors\n",                                   params.print_colors ? "true" : "false");
+    fprintf(stderr, "  -pp,       --print-progress    [%-7s] print progress\n",                                 params.print_progress ? "true" : "false");
+    fprintf(stderr, "  -nt,       --no-timestamps     [%-7s] do not print timestamps\n",                        params.no_timestamps ? "false" : "true");
+    fprintf(stderr, "  -l LANG,   --language LANG     [%-7s] spoken language ('auto' for auto-detect)\n",       params.language.c_str());
+    fprintf(stderr, "             --prompt PROMPT     [%-7s] initial prompt\n",                                 params.prompt.c_str());
+    fprintf(stderr, "  -m FNAME,  --model FNAME       [%-7s] model path\n",                                     params.model.c_str());
+    fprintf(stderr, "  -f FNAME,  --file FNAME        [%-7s] input WAV file path\n",                            "");
     fprintf(stderr, "\n");
 }
 
@@ -343,9 +354,6 @@ bool output_csv(struct whisper_context * ctx, const char * fname) {
     const int n_segments = whisper_full_n_segments(ctx);
     for (int i = 0; i < n_segments; ++i) {
         const char * text = whisper_full_get_segment_text(ctx, i);
-        if (text[0] == ' ') {
-            text = text + sizeof(char); //whisper_full_get_segment_text() returns a string with leading space, point to the next character.
-        }
         const int64_t t0 = whisper_full_get_segment_t0(ctx, i);
         const int64_t t1 = whisper_full_get_segment_t1(ctx, i);
 
@@ -514,90 +522,14 @@ int main(int argc, char ** argv) {
 
     for (int f = 0; f < (int) params.fname_inp.size(); ++f) {
         const auto fname_inp = params.fname_inp[f];
+		const auto fname_out = f < (int) params.fname_out.size() && !params.fname_out[f].empty() ? params.fname_out[f] : params.fname_inp[f];
 
-        std::vector<float> pcmf32; // mono-channel F32 PCM
+        std::vector<float> pcmf32;               // mono-channel F32 PCM
         std::vector<std::vector<float>> pcmf32s; // stereo-channel F32 PCM
 
-        // WAV input
-        {
-            drwav wav;
-            std::vector<uint8_t> wav_data; // used for pipe input from stdin
-
-            if (fname_inp == "-") {
-                {
-                    uint8_t buf[1024];
-                    while (true)
-                    {
-                        const size_t n = fread(buf, 1, sizeof(buf), stdin);
-                        if (n == 0) {
-                            break;
-                        }
-                        wav_data.insert(wav_data.end(), buf, buf + n);
-                    }
-                }
-
-                if (drwav_init_memory(&wav, wav_data.data(), wav_data.size(), nullptr) == false) {
-                    fprintf(stderr, "error: failed to open WAV file from stdin\n");
-                    return 4;
-                }
-
-                fprintf(stderr, "%s: read %zu bytes from stdin\n", __func__, wav_data.size());
-            }
-            else if (drwav_init_file(&wav, fname_inp.c_str(), nullptr) == false) {
-                fprintf(stderr, "error: failed to open '%s' as WAV file\n", fname_inp.c_str());
-                return 5;
-            }
-
-            if (wav.channels != 1 && wav.channels != 2) {
-                fprintf(stderr, "%s: WAV file '%s' must be mono or stereo\n", argv[0], fname_inp.c_str());
-                return 6;
-            }
-
-            if (params.diarize && wav.channels != 2 && params.no_timestamps == false) {
-                fprintf(stderr, "%s: WAV file '%s' must be stereo for diarization and timestamps have to be enabled\n", argv[0], fname_inp.c_str());
-                return 6;
-            }
-
-            if (wav.sampleRate != WHISPER_SAMPLE_RATE) {
-                fprintf(stderr, "%s: WAV file '%s' must be %i kHz\n", argv[0], fname_inp.c_str(), WHISPER_SAMPLE_RATE/1000);
-                return 8;
-            }
-
-            if (wav.bitsPerSample != 16) {
-                fprintf(stderr, "%s: WAV file '%s' must be 16-bit\n", argv[0], fname_inp.c_str());
-                return 9;
-            }
-
-            const uint64_t n = wav_data.empty() ? wav.totalPCMFrameCount : wav_data.size()/(wav.channels*wav.bitsPerSample/8);
-
-            std::vector<int16_t> pcm16;
-            pcm16.resize(n*wav.channels);
-            drwav_read_pcm_frames_s16(&wav, n, pcm16.data());
-            drwav_uninit(&wav);
-
-            // convert to mono, float
-            pcmf32.resize(n);
-            if (wav.channels == 1) {
-                for (uint64_t i = 0; i < n; i++) {
-                    pcmf32[i] = float(pcm16[i])/32768.0f;
-                }
-            } else {
-                for (uint64_t i = 0; i < n; i++) {
-                    pcmf32[i] = float(pcm16[2*i] + pcm16[2*i + 1])/65536.0f;
-                }
-            }
-
-            if (params.diarize) {
-                // convert to stereo, float
-                pcmf32s.resize(2);
-
-                pcmf32s[0].resize(n);
-                pcmf32s[1].resize(n);
-                for (uint64_t i = 0; i < n; i++) {
-                    pcmf32s[0][i] = float(pcm16[2*i])/32768.0f;
-                    pcmf32s[1][i] = float(pcm16[2*i + 1])/32768.0f;
-                }
-            }
+        if (!::read_wav(fname_inp, pcmf32, pcmf32s, params.diarize)) {
+            fprintf(stderr, "error: failed to read WAV file '%s'\n", fname_inp.c_str());
+            continue;
         }
 
         // print system information
@@ -646,18 +578,20 @@ int main(int argc, char ** argv) {
 
             wparams.token_timestamps = params.output_wts || params.max_len > 0;
             wparams.thold_pt         = params.word_thold;
-            wparams.entropy_thold    = params.entropy_thold;
-            wparams.logprob_thold    = params.logprob_thold;
             wparams.max_len          = params.output_wts && params.max_len == 0 ? 60 : params.max_len;
+            wparams.split_on_word    = params.split_on_word;
 
             wparams.speed_up         = params.speed_up;
 
-            wparams.greedy.best_of        = params.best_of;
-            wparams.beam_search.beam_size = params.beam_size;
-            wparams.temperature_inc = -1;
-
             wparams.prompt_tokens     = prompt_tokens.empty() ? nullptr : prompt_tokens.data();
             wparams.prompt_n_tokens   = prompt_tokens.empty() ? 0       : prompt_tokens.size();
+
+            wparams.greedy.best_of        = params.best_of;
+            wparams.beam_search.beam_size = params.beam_size;
+
+            wparams.temperature_inc  = params.no_fallback ? 0.0f : wparams.temperature_inc;
+            wparams.entropy_thold    = params.entropy_thold;
+            wparams.logprob_thold    = params.logprob_thold;
 
             whisper_print_user_data user_data = { &params, &pcmf32s };
 
@@ -692,34 +626,33 @@ int main(int argc, char ** argv) {
 
             // output to text file
             if (params.output_txt) {
-                const auto fname_txt = fname_inp + ".txt";
+                const auto fname_txt = fname_out + ".txt";
                 output_txt(ctx, fname_txt.c_str());
             }
 
             // output to VTT file
             if (params.output_vtt) {
-                const auto fname_vtt = fname_inp + ".vtt";
+                const auto fname_vtt = fname_out + ".vtt";
                 output_vtt(ctx, fname_vtt.c_str());
             }
 
             // output to SRT file
             if (params.output_srt) {
-                const auto fname_srt = fname_inp + ".srt";
+                const auto fname_srt = fname_out + ".srt";
                 output_srt(ctx, fname_srt.c_str(), params);
             }
 
             // output to WTS file
             if (params.output_wts) {
-                const auto fname_wts = fname_inp + ".wts";
+                const auto fname_wts = fname_out + ".wts";
                 output_wts(ctx, fname_wts.c_str(), fname_inp.c_str(), params, float(pcmf32.size() + 1000)/WHISPER_SAMPLE_RATE);
             }
 
-	    // output to CSV file
+            // output to CSV file
             if (params.output_csv) {
-                const auto fname_csv = fname_inp + ".csv";
+                const auto fname_csv = fname_out + ".csv";
                 output_csv(ctx, fname_csv.c_str());
             }
-
         }
     }
 
