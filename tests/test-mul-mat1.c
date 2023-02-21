@@ -13,7 +13,7 @@
 #include <Accelerate/Accelerate.h>
 
 const int M = 1280;
-const int N = 1500;
+const int N = 1536;
 const int K = 1280;
 
 uint64_t get_time_us() {
@@ -284,7 +284,7 @@ int main(int argc, const char ** argv) {
 
         if (method == 4) {
             // Use BLAS sgemm from Accelerate framework
-            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, K, N, 1.0f, src0, N, src1, N, 0.0f, dst, N);
+            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, M, N, K, 1.0f, src0, K, src1, K, 0.0f, dst, N);
         }
     }
 
