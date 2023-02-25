@@ -117,19 +117,20 @@ def convert_to_ftype(data, ftype):
 
         # populate the destination array
         n = data.size
-        for i in range(0, n, 64):
-            d = pd[i//64][0]
-            b = pb[i:i+64].reshape(-1)
-            #print("d:", d)
-            #print("b:", b)
+        nr = data.shape[-1]
+        nn = nr//64
+        for i in range(0, n, nr):
+            for j in range(0, nr, 64):
+                d = pd[(i//nr)*nn + j//64][0]
+                b = pb[i+j:i+j+64].reshape(-1)
 
-            db = struct.unpack("4B", struct.pack("f", d))
-            dst[(i//64)*36 + 0] = db[0]
-            dst[(i//64)*36 + 1] = db[1]
-            dst[(i//64)*36 + 2] = db[2]
-            dst[(i//64)*36 + 3] = db[3]
-            for j in range(32):
-                dst[(i//64)*36 + 4 + j] = b[j] | (b[j+1] << 4)
+                db = struct.unpack("4B", struct.pack("f", d))
+                dst[(i//nr)*nn*36 + (j//64)*4 + 0] = db[0]
+                dst[(i//nr)*nn*36 + (j//64)*4 + 1] = db[1]
+                dst[(i//nr)*nn*36 + (j//64)*4 + 2] = db[2]
+                dst[(i//nr)*nn*36 + (j//64)*4 + 3] = db[3]
+                for k in range(32):
+                    dst[(i//nr)*nn*36 + nn*4 + (j//64)*32 + k] = b[k] | (b[k+1] << 4)
 
         return dst
 
