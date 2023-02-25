@@ -45,6 +45,96 @@ def bytes_to_unicode():
     cs = [chr(n) for n in cs]
     return dict(zip(bs, cs))
 
+# helper method to convert a numpy array to different float types
+def convert_to_ftype(data, ftype):
+    # fp16
+    if ftype == 1:
+        return data.astype(np.float16)
+
+    # qint4_0
+    # C code:
+    #    {
+    #        for (int l = 0; l < QK; l++) {
+    #            const float v = src[i*QK + l];
+    #            amax = MAX(amax, fabsf(v));
+    #        }
+    #
+    #        const float d = amax / ((1 << (QB - 1)) - 1);
+    #        const float id = d ? 1.0/d : 0.0;
+    #
+    #        pd[i] = GGML_FP32_TO_GQ(d);
+    #
+    #        for (int l = 0; l < QK; l++) {
+    #            const float v = src[i*QK + l]*id;
+    #            const int8_t vi = ((int8_t) (round(v))) + 8;
+    #            assert(vi >= 0 && vi < 16);
+    #            pp[l/2] |= (vi & 0xf) << (4*(l & 1));
+    #        }
+    #
+    #        memcpy(pb + i*QK/2, pp, sizeof(pp));
+    #    }
+    if ftype == 2:
+        assert data.dtype == np.float32
+        assert data.shape[-1] % 64 == 0
+
+        # create 2 new arrays:
+        #  - pd: float32 (lowest dimension is data.shape[-1] // 64)
+        #  - pb: int8
+        pd = np.zeros(data.shape[:-1] + (data.shape[-1] // 64,), dtype=np.float32)
+        pb = np.zeros(data.shape[:-1] + (data.shape[-1],      ), dtype=np.int8)
+
+        # the quantized data goes here
+        dst = np.zeros((data.size // 64) * (4 + 32), dtype=np.uint8)
+
+        print("data:", data.shape, data.size)
+        print("pd:  ", pd.shape, pd.size)
+        print("pb:  ", pb.shape, pb.size)
+        print("dst: ", dst.shape, dst.size)
+
+        for i in range(0, data.shape[-1], 64):
+            max_abs = np.max(np.abs(data[..., i:i+64]))
+            max_q = (1 << 3) - 1
+            d = max_abs / max_q
+            id = 1.0 / d if d != 0 else 0.0
+            pd[..., i//64] = d
+
+            for j in range(64):
+                v = data[..., i+j] * id
+                vi = np.round(v).astype(np.int8) + 8
+                assert np.all(vi >= 0) and np.all(vi < 16)
+
+                #ve = vi[...,(j & 1) == 0].reshape(-1, 1)
+
+                #print("ve:", ve.shape, ve)
+                #print("vo:", vo.shape, vo)
+                #print("pb:", pb[..., (i+j)//2].shape, pb[..., (i+j)//2])
+
+                pb[..., i+j] = vi
+
+        # convert to 1D array
+        pd = pd.reshape(-1, 1)
+        pb = pb.reshape(-1, 1)
+
+        # populate the destination array
+        n = data.size
+        for i in range(0, n, 64):
+            d = pd[i//64][0]
+            b = pb[i:i+64].reshape(-1)
+            #print("d:", d)
+            #print("b:", b)
+
+            db = struct.unpack("4B", struct.pack("f", d))
+            dst[(i//64)*36 + 0] = db[0]
+            dst[(i//64)*36 + 1] = db[1]
+            dst[(i//64)*36 + 2] = db[2]
+            dst[(i//64)*36 + 3] = db[3]
+            for j in range(32):
+                dst[(i//64)*36 + 4 + j] = b[j] | (b[j+1] << 4)
+
+        return dst
+
+    assert False, "Invalid ftype: " + str(ftype)
+
 if len(sys.argv) < 2:
     print("Usage: convert-ckpt-to-ggml.py dir-model [use-f32]\n")
     sys.exit(1)
@@ -59,11 +149,22 @@ with open(dir_model + "/encoder.json", "r") as f:
 with open(dir_model + "/hparams.json", "r") as f:
     hparams = json.load(f)
 
-# use 16-bit or 32-bit floats
-use_f16 = True
+# possible data types
+#   ftype == 0 -> float32
+#   ftype == 1 -> float16
+#   ftype == 2 -> qint4_0
+#   ftype == 3 -> qint4_1
+#
+# map from ftype to string
+ftype_str = ["f32", "f16", "q4_0", "q4_1"]
+
+ftype = 1
 if len(sys.argv) > 2:
-    use_f16 = False
-    fname_out = sys.argv[1] + "/ggml-model-f32.bin"
+    ftype = int(sys.argv[2])
+    if ftype < 0 or ftype > 3:
+        print("Invalid ftype: " + str(ftype))
+        sys.exit(1)
+    fname_out = sys.argv[1] + "/ggml-model-" + ftype_str[ftype] + ".bin"
 
 list_vars = tf.train.list_variables(dir_model)
 
@@ -75,7 +176,7 @@ fout.write(struct.pack("i", hparams["n_ctx"]))
 fout.write(struct.pack("i", hparams["n_embd"]))
 fout.write(struct.pack("i", hparams["n_head"]))
 fout.write(struct.pack("i", hparams["n_layer"]))
-fout.write(struct.pack("i", use_f16))
+fout.write(struct.pack("i", ftype))
 
 byte_encoder = bytes_to_unicode()
 byte_decoder = {v:k for k, v in byte_encoder.items()}
@@ -93,9 +194,15 @@ for name, shape in list_vars:
     data = tf.train.load_variable(dir_model, name).squeeze()
     n_dims = len(data.shape);
 
-    # ftype == 0 -> float32, ftype == 1 -> float16
-    ftype = 0;
-    if use_f16:
+    # for efficiency - transpose the projection matrices
+    if name[-13:] == "/mlp/c_proj/w":
+        print("  Transposing")
+        data = data.transpose()
+
+    dshape = data.shape
+
+    ftype_cur = 0
+    if ftype != 0:
         # match name:
         #  "model/wte"
         #  "model/h.*/attn/c_attn/w"
@@ -103,24 +210,19 @@ for name, shape in list_vars:
         #  "model/h.*/mlp/c_fc/w"
         #  "model/h.*/mlp/c_proj/w"
         if name == "model/wte" or name[-2:] == "/w":
-            print("  Converting to float16")
-            data = data.astype(np.float16)
-            ftype = 1
+            print("  Converting to " + ftype_str[ftype])
+            data = convert_to_ftype(data, ftype)
+            ftype_cur = ftype
         else:
             print("  Converting to float32")
             data = data.astype(np.float32)
-            ftype = 0
-
-    # for efficiency - transpose the projection matrices
-    if name[-13:] == "/mlp/c_proj/w":
-        print("  Transposing")
-        data = data.transpose()
+            ftype_cur = 0
 
     # header
     str = name.encode('utf-8')
-    fout.write(struct.pack("iii", n_dims, len(str), ftype))
+    fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
     for i in range(n_dims):
-        fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
+        fout.write(struct.pack("i", dshape[n_dims - 1 - i]))
     fout.write(str);
 
     # data
