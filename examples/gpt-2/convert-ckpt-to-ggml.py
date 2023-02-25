@@ -51,190 +51,6 @@ def convert_to_ftype(data, ftype):
     if ftype == 1:
         return data.astype(np.float16)
 
-    # qint4_0
-    # C code:
-    #    {
-    #        for (int l = 0; l < QK; l++) {
-    #            const float v = src[i*QK + l];
-    #            amax = MAX(amax, fabsf(v));
-    #        }
-    #
-    #        const float d = amax / ((1 << (QB - 1)) - 1);
-    #        const float id = d ? 1.0/d : 0.0;
-    #
-    #        pd[i] = GGML_FP32_TO_GQ(d);
-    #
-    #        for (int l = 0; l < QK; l++) {
-    #            const float v = src[i*QK + l]*id;
-    #            const int8_t vi = ((int8_t) (round(v))) + 8;
-    #            assert(vi >= 0 && vi < 16);
-    #            pp[l/2] |= (vi & 0xf) << (4*(l & 1));
-    #        }
-    #
-    #        memcpy(pb + i*QK/2, pp, sizeof(pp));
-    #    }
-    if ftype == 2:
-        assert data.dtype == np.float32
-        assert data.shape[-1] % 64 == 0
-
-        # create 2 new arrays:
-        #  - pd: float32 (lowest dimension is data.shape[-1] // 64)
-        #  - pb: int8
-        pd = np.zeros(data.shape[:-1] + (data.shape[-1] // 64,), dtype=np.float32)
-        pb = np.zeros(data.shape[:-1] + (data.shape[-1],      ), dtype=np.int8)
-
-        # the quantized data goes here
-        dst = np.zeros((data.size // 64) * (4 + 32), dtype=np.uint8)
-
-        print("data:", data.shape, data.size)
-        print("pd:  ", pd.shape, pd.size)
-        print("pb:  ", pb.shape, pb.size)
-        print("dst: ", dst.shape, dst.size)
-
-        for i in range(0, data.shape[-1], 64):
-            max_abs = np.max(np.abs(data[..., i:i+64]))
-            max_q = (1 << 3) - 1
-            d = max_abs / max_q
-            id = 1.0 / d if d != 0 else 0.0
-            pd[..., i//64] = d
-
-            for j in range(64):
-                v = data[..., i+j] * id
-                vi = np.round(v).astype(np.int8) + 8
-                assert np.all(vi >= 0) and np.all(vi < 16)
-
-                #ve = vi[...,(j & 1) == 0].reshape(-1, 1)
-
-                #print("ve:", ve.shape, ve)
-                #print("vo:", vo.shape, vo)
-                #print("pb:", pb[..., (i+j)//2].shape, pb[..., (i+j)//2])
-
-                pb[..., i+j] = vi
-
-        # convert to 1D array
-        pd = pd.reshape(-1, 1)
-        pb = pb.reshape(-1, 1)
-
-        # populate the destination array
-        n = data.size
-        nr = data.shape[-1]
-        nn = nr//64
-        for i in range(0, n, nr):
-            for j in range(0, nr, 64):
-                d = pd[(i//nr)*nn + j//64][0]
-                b = pb[i+j:i+j+64].reshape(-1)
-
-                db = struct.unpack("4B", struct.pack("f", d))
-                dst[(i//nr)*nn*36 + (j//64)*4 + 0] = db[0]
-                dst[(i//nr)*nn*36 + (j//64)*4 + 1] = db[1]
-                dst[(i//nr)*nn*36 + (j//64)*4 + 2] = db[2]
-                dst[(i//nr)*nn*36 + (j//64)*4 + 3] = db[3]
-                for k in range(32):
-                    dst[(i//nr)*nn*36 + nn*4 + (j//64)*32 + k] = b[2*k] | (b[2*k+1] << 4)
-
-        return dst
-
-    # qint4_1
-    # C code:
-    #    {
-    #        for (int l = 0; l < QK; l++) {
-    #            const float v = src[i*QK + l];
-    #            if (v < min) min = v;
-    #            if (v > max) max = v;
-    #        }
-
-    #        const float d = (max - min) / ((1 << QB) - 1);
-    #        const float id = d ? 1.0/d : 0.0;
-
-    #        pm[i] = GGML_FP32_TO_GQ(min);
-    #        pd[i] = GGML_FP32_TO_GQ(d);
-
-    #        for (int l = 0; l < QK; l++) {
-    #            const float v = (src[i*QK + l] - min) * id;
-    #            const uint8_t vi = (uint8_t) (v + frand());
-    #            pp[l/2] |= (vi & 0xf) << (4*(l & 1));
-    #        }
-
-    #        memcpy(pb + i*QK/2, pp, sizeof(pp));
-    #    }
-    if ftype == 3:
-        assert data.dtype == np.float32
-        assert data.shape[-1] % 64 == 0
-
-        # create 2 new arrays:
-        #  - pd: float32 (lowest dimension is data.shape[-1] // 64)
-        #  - pb: int8
-        pm = np.zeros(data.shape[:-1] + (data.shape[-1] // 64,), dtype=np.float32)
-        pd = np.zeros(data.shape[:-1] + (data.shape[-1] // 64,), dtype=np.float32)
-        pb = np.zeros(data.shape[:-1] + (data.shape[-1],      ), dtype=np.int8)
-
-        # the quantized data goes here
-        dst = np.zeros((data.size // 64) * (4 + 4 + 32), dtype=np.uint8)
-
-        print("data:", data.shape, data.size)
-        print("pm:  ", pm.shape, pm.size)
-        print("pd:  ", pd.shape, pd.size)
-        print("pb:  ", pb.shape, pb.size)
-        print("dst: ", dst.shape, dst.size)
-
-        for i in range(0, data.shape[-1], 64):
-            mmin = np.min(data[..., i:i+64])
-            mmax = np.max(data[..., i:i+64])
-            max_q = (1 << 4) - 1
-            d = (mmax - mmin) / max_q
-            id = 1.0 / d if d != 0 else 0.0
-
-            pm[..., i//64] = mmin
-            pd[..., i//64] = d
-
-            for j in range(64):
-                v = (data[..., i+j] - mmin) * id
-                vi = np.round(v).astype(np.uint8)
-                assert np.all(vi >= 0) and np.all(vi < 16)
-
-                pb[..., i+j] = vi
-
-        # convert to 1D array
-        pm = pm.reshape(-1, 1)
-        pd = pd.reshape(-1, 1)
-        pb = pb.reshape(-1, 1)
-
-        # populate the destination array
-        n = data.size
-        nr = data.shape[-1]
-        nn = nr//64
-        for i in range(0, n, nr):
-            for j in range(0, nr, 64):
-                m = pm[(i//nr)*nn + j//64][0]
-
-                idx = (i//nr)*nn*40 + (j//64)*4
-
-                mb = struct.unpack("4B", struct.pack("f", m))
-                dst[idx + 0] = mb[0]
-                dst[idx + 1] = mb[1]
-                dst[idx + 2] = mb[2]
-                dst[idx + 3] = mb[3]
-
-            for j in range(0, nr, 64):
-                d = pd[(i//nr)*nn + j//64][0]
-
-                idx = (i//nr)*nn*40 + 4*nn + (j//64)*4
-
-                db = struct.unpack("4B", struct.pack("f", d))
-                dst[idx + 0] = db[0]
-                dst[idx + 1] = db[1]
-                dst[idx + 2] = db[2]
-                dst[idx + 3] = db[3]
-
-            for j in range(0, nr, 64):
-                b = pb[i+j:i+j+64].reshape(-1)
-
-                idx = (i//nr)*nn*40 + nn*8 + (j//64)*32
-                for k in range(32):
-                    dst[idx + k] = b[2*k] | (b[2*k+1] << 4)
-
-        return dst
-
     assert False, "Invalid ftype: " + str(ftype)
 
 if len(sys.argv) < 2:
@@ -258,12 +74,12 @@ with open(dir_model + "/hparams.json", "r") as f:
 #   ftype == 3 -> qint4_1
 #
 # map from ftype to string
-ftype_str = ["f32", "f16", "q4_0", "q4_1"]
+ftype_str = ["f32", "f16"]
 
 ftype = 1
 if len(sys.argv) > 2:
     ftype = int(sys.argv[2])
-    if ftype < 0 or ftype > 3:
+    if ftype < 0 or ftype > 1:
         print("Invalid ftype: " + str(ftype))
         sys.exit(1)
     fname_out = sys.argv[1] + "/ggml-model-" + ftype_str[ftype] + ".bin"
@@ -312,8 +128,6 @@ for name, shape in list_vars:
         #  "model/h.*/mlp/c_fc/w"
         #  "model/h.*/mlp/c_proj/w"
         if name == "model/wte" or name[-2:] == "/w":
-        #if name[-6:] == "attn/w":
-        #if name == "model/wte":
             print("  Converting to " + ftype_str[ftype])
             data = convert_to_ftype(data, ftype)
             ftype_cur = ftype
