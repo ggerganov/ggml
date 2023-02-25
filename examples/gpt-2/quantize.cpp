@@ -12,7 +12,7 @@
 #include <vector>
 #include <regex>
 
-#define QK 64
+#define QK 32
 
 size_t ggml_quantize_q4_0(float * src, void * dst, int n, int k) {
     const int nb = k / QK;

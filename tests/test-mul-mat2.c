@@ -1956,9 +1956,9 @@ void vec_dot_gq_5(const int n, float * restrict s, const void * restrict x, cons
         //const float32x4_t pf1 = vcvtq_f32_s32(vmovl_s16(vget_high_s16(p)));
 
         // scalar
-        sum11 += d0*d1*vaddvq_u16(p);
-        //sum11 += d0*d1*(vaddvq_u16(pl) + vaddvq_u16(ph));
-        //sum11 += d0*d1*vaddvq_u16(vaddq_s16(pl, ph));
+        sum11 += d0*d1*vaddvq_s16(p);
+        //sum11 += d0*d1*(vaddvq_s16(pl) + vaddvq_s16(ph));
+        //sum11 += d0*d1*vaddvq_s16(vaddq_s16(pl, ph));
         //sum11 += d0*d1*(vaddvq_s8(pl0) + vaddvq_s8(pl1) + vaddvq_s8(ph0) + vaddvq_s8(ph1));
         //sum11 += d0*d1*(vaddvq_s16(pll) + vaddvq_s16(plh) + vaddvq_s16(phl) + vaddvq_s16(phh));
 
@@ -2246,7 +2246,7 @@ void vec_dot_gq_6(const int n, float * restrict s, const void * restrict x, cons
         const int16x8_t p = vaddq_s16(pl, ph);
 
         // scalar
-        sum0 += d0*d1*vaddvq_u16(p);
+        sum0 += d0*d1*vaddvq_s16(p);
     }
 
     sumf = sum0;
@@ -2267,8 +2267,8 @@ void vec_dot_gq_6(const int n, float * restrict s, const void * restrict x, cons
         const int8x16_t  s8b = vdupq_n_s8(0x8);
 
         const uint8x16_t v0_0 = vld1q_u8(p0);
-        const uint8x16_t v1_0 = vld1q_u8(p1);
         const uint8x16_t v0_1 = vld1q_u8(p0 + 16);
+        const uint8x16_t v1_0 = vld1q_u8(p1);
         const uint8x16_t v1_1 = vld1q_u8(p1 + 16);
 
         // 4-bit -> 8-bit
@@ -2320,8 +2320,8 @@ void vec_dot_gq_6(const int n, float * restrict s, const void * restrict x, cons
         const int16x8_t p_1 = vaddq_s16(pl_1, ph_1);
 
         // scalar
-        sum0 += d0_0*d1_0*vaddvq_u16(p_0);
-        sum1 += d0_1*d1_1*vaddvq_u16(p_1);
+        sum0 += d0_0*d1_0*vaddvq_s16(p_0);
+        sum1 += d0_1*d1_1*vaddvq_s16(p_1);
     }
 
     sumf = sum0 + sum1;
