@@ -146,6 +146,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
                 }
     }
 
+    const ggml_type wtype2 = GGML_TYPE_F32;
+
     auto & ctx = model.ctx;
 
     size_t ctx_size = 0;
