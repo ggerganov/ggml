@@ -12,8 +12,9 @@
 #include <vector>
 #include <regex>
 
+#define QK 64
+
 size_t ggml_quantize_q4_0(float * src, void * dst, int n, int k) {
-    const int QK = 64;
     const int nb = k / QK;
     const size_t row_size = nb*(sizeof(float) + sizeof(uint8_t)*QK/2);
 
@@ -63,7 +64,6 @@ size_t ggml_quantize_q4_0(float * src, void * dst, int n, int k) {
 }
 
 size_t ggml_quantize_q4_1(float * src, void * dst, int n, int k) {
-    const int QK = 64;
     const int nb = k / QK;
     const size_t row_size = nb*(2*sizeof(float) + sizeof(uint8_t)*QK/2);
 
