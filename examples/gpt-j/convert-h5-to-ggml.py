@@ -126,8 +126,8 @@ for name in list_vars.keys():
             ftype = 0
 
     # for efficiency - transpose these matrices:
-    #  "transformer.h.*.mlp.fc_in.weight
-    #  "transformer.h.*.attn.out_proj.weight
+    #  "transformer.h.*.mlp.fc_in.weight"
+    #  "transformer.h.*.attn.out_proj.weight"
     #  "transformer.h.*.attn.q_proj.weight"
     #  "transformer.h.*.attn.k_proj.weight"
     #  "transformer.h.*.attn.v_proj.weight"
