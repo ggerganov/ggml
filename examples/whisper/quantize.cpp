@@ -270,11 +270,11 @@ bool whisper_model_quantize(const std::string & fname_inp, const std::string & f
         size_t total_size_org = 0;
         size_t total_size_new = 0;
 
-        std::vector<float> data;
         std::vector<float> work;
 
-        std::vector<uint8_t> data_u8;
+        std::vector<uint8_t>     data_u8;
         std::vector<ggml_fp16_t> data_f16;
+        std::vector<float>       data_f32;
 
         while (true) {
             int32_t n_dims;
@@ -333,13 +333,13 @@ bool whisper_model_quantize(const std::string & fname_inp, const std::string & f
                 if (ftype == 1) {
                     data_f16.resize(nelements);
                     finp.read(reinterpret_cast<char *>(data_f16.data()), nelements * sizeof(ggml_fp16_t));
-                    data.resize(nelements);
+                    data_f32.resize(nelements);
                     for (int i = 0; i < nelements; ++i) {
-                        data[i] = ggml_fp16_to_fp32(data_f16[i]);
+                        data_f32[i] = ggml_fp16_to_fp32(data_f16[i]);
                     }
                 } else {
-                    data.resize(nelements);
-                    finp.read(reinterpret_cast<char *>(data.data()), nelements * sizeof(float));
+                    data_f32.resize(nelements);
+                    finp.read(reinterpret_cast<char *>(data_f32.data()), nelements * sizeof(float));
                 }
 
                 ftype = itype;
@@ -367,11 +367,11 @@ bool whisper_model_quantize(const std::string & fname_inp, const std::string & f
                 switch (type) {
                     case GGML_TYPE_Q4_0:
                         {
-                            cur_size = ggml_quantize_q4_0(data.data(), work.data(), nelements, ne[0]);
+                            cur_size = ggml_quantize_q4_0(data_f32.data(), work.data(), nelements, ne[0]);
                         } break;
                     case GGML_TYPE_Q4_1:
                         {
-                            cur_size = ggml_quantize_q4_1(data.data(), work.data(), nelements, ne[0]);
+                            cur_size = ggml_quantize_q4_1(data_f32.data(), work.data(), nelements, ne[0]);
                         } break;
                     default:
                         {
