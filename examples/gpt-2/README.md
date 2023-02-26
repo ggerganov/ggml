@@ -94,7 +94,7 @@ Done! Model '117M' saved in 'models/gpt-2-117M/'
 
 Run the convert-ckpt-to-ggml.py script to convert the model to ggml format.
 
-  python /Users/john/ggml/examples/gpt-2/convert-ckpt-to-ggml.py models/gpt-2-117M/
+  python /Users/john/ggml/examples/gpt-2/convert-ckpt-to-ggml.py models/gpt-2-117M/ 1
 
 ```
 
