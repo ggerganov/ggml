@@ -184,8 +184,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         ctx_size += n_layer*(4*n_embd*n_embd*ggml_type_sizef(wtype));         // c_mlp_proj_w
         ctx_size += n_layer*(         n_embd*ggml_type_sizef(GGML_TYPE_F32)); // c_mlp_proj_b
 
-        ctx_size += n_ctx*n_layer*n_embd*ggml_type_sizef(GGML_TYPE_F16); // memory_k
-        ctx_size += n_ctx*n_layer*n_embd*ggml_type_sizef(GGML_TYPE_F16); // memory_v
+        ctx_size += n_ctx*n_layer*n_embd*ggml_type_sizef(GGML_TYPE_F32); // memory_k
+        ctx_size += n_ctx*n_layer*n_embd*ggml_type_sizef(GGML_TYPE_F32); // memory_v
 
         ctx_size += (6 + 12*n_layer)*256; // object overhead
 
@@ -283,8 +283,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         const int n_mem      = n_layer*n_ctx;
         const int n_elements = n_embd*n_mem;
 
-        model.memory_k = ggml_new_tensor_1d(ctx, GGML_TYPE_F16, n_elements);
-        model.memory_v = ggml_new_tensor_1d(ctx, GGML_TYPE_F16, n_elements);
+        model.memory_k = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_elements);
+        model.memory_v = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_elements);
 
         const size_t memory_size = ggml_nbytes(model.memory_k) + ggml_nbytes(model.memory_v);
 
