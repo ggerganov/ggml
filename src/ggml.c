@@ -1943,6 +1943,10 @@ size_t ggml_type_size(enum ggml_type type) {
     return GGML_TYPE_SIZE[type];
 }
 
+float ggml_type_sizef(enum ggml_type type) {
+    return ((float)(GGML_TYPE_SIZE[type]))/GGML_BLCK_SIZE[type];
+}
+
 size_t ggml_element_size(const struct ggml_tensor * tensor) {
     return GGML_TYPE_SIZE[tensor->type];
 }
