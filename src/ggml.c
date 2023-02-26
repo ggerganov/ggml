@@ -393,9 +393,9 @@ void quantize_row_q4_0(const float * restrict x, void * restrict y, int k) {
         pd[i] = d;
 
         for (int l = 0; l < 8; l++) {
-            const float32x4_t v = vmulq_n_f32(srcv[l], id);
+            const float32x4_t v  = vmulq_n_f32(srcv[l], id);
             const float32x4_t vf = vaddq_f32(v, vdupq_n_f32(8.5f));
-            const int32x4_t vi = vcvtq_s32_f32(vf);
+            const int32x4_t   vi = vcvtq_s32_f32(vf);
 
             pp[2*l + 0] = vgetq_lane_s32(vi, 0) | (vgetq_lane_s32(vi, 1) << 4);
             pp[2*l + 1] = vgetq_lane_s32(vi, 2) | (vgetq_lane_s32(vi, 3) << 4);
@@ -457,37 +457,36 @@ void quantize_row_q4_1(const float * restrict x, void * restrict y, int k) {
         float min = FLT_MAX;
         float max = -FLT_MAX;
 
-        {
-            for (int l = 0; l < QK; l++) {
-                const float v = x[i*QK + l];
-                if (v < min) min = v;
-                if (v > max) max = v;
-            }
-
-            const float d = (max - min) / ((1 << 4) - 1);
-            const float id = d ? 1.0f/d : 0.0f;
-
-            pm[i] = min;
-            pd[i] = d;
-
-            for (int l = 0; l < QK; l += 2) {
-                const float v0 = (x[i*QK + l + 0] - min)*id;
-                const float v1 = (x[i*QK + l + 1] - min)*id;
-
-                const uint8_t vi0 = round(v0);
-                const uint8_t vi1 = round(v1);
-
-                assert(vi0 >= 0 && vi0 < 16);
-                assert(vi1 >= 0 && vi1 < 16);
-
-                pp[l/2] = vi0 | (vi1 << 4);
-            }
-
-            memcpy(pb + i*QK/2, pp, sizeof(pp));
+        for (int l = 0; l < QK; l++) {
+            const float v = x[i*QK + l];
+            if (v < min) min = v;
+            if (v > max) max = v;
         }
+
+        const float d = (max - min) / ((1 << 4) - 1);
+        const float id = d ? 1.0f/d : 0.0f;
+
+        pm[i] = min;
+        pd[i] = d;
+
+        for (int l = 0; l < QK; l += 2) {
+            const float v0 = (x[i*QK + l + 0] - min)*id;
+            const float v1 = (x[i*QK + l + 1] - min)*id;
+
+            const uint8_t vi0 = round(v0);
+            const uint8_t vi1 = round(v1);
+
+            assert(vi0 >= 0 && vi0 < 16);
+            assert(vi1 >= 0 && vi1 < 16);
+
+            pp[l/2] = vi0 | (vi1 << 4);
+        }
+
+        memcpy(pb + i*QK/2, pp, sizeof(pp));
     }
 }
 
+// TODO: vectorize
 void dequantize_row_q4_0(const void * restrict x, float * restrict y, int k) {
     assert(k % QK == 0);
 
@@ -496,6 +495,7 @@ void dequantize_row_q4_0(const void * restrict x, float * restrict y, int k) {
     const float   * restrict pd = (const float *)   (x);
     const uint8_t * restrict pb = (const uint8_t *) (pd + nb);
 
+    // scalar
     for (int i = 0; i < nb; i++) {
         const float d = pd[i];
 
@@ -515,7 +515,6 @@ void dequantize_row_q4_0(const void * restrict x, float * restrict y, int k) {
 
             assert(!isnan(y[i*QK + l + 0]));
             assert(!isnan(y[i*QK + l + 1]));
-            //printf("v0 %f v1 %f, i = %d, l = %d, d = %f, vi = %d, vi0 = %d, vi1 = %d\n", v0, v1, i, l, d, vi, vi0, vi1);
         }
     }
 }
@@ -549,7 +548,6 @@ void dequantize_row_q4_1(const void * restrict x, float * restrict y, int k) {
 
             assert(!isnan(y[i*QK + l + 0]));
             assert(!isnan(y[i*QK + l + 1]));
-            //printf("v0 %f v1 %f, i = %d, l = %d, d = %f, vi = %d, vi0 = %d, vi1 = %d\n", v0, v1, i, l, d, vi, vi0, vi1);
         }
     }
 }
