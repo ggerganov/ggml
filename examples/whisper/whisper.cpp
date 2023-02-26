@@ -271,6 +271,15 @@ static const std::map<ggml_type, std::map<e_model, size_t>> MEM_REQ_MODEL = {
             { MODEL_LARGE,   940ull*MB },
         },
     },
+    { GGML_TYPE_Q4_1,
+        {
+            { MODEL_TINY,     31ull*MB },
+            { MODEL_BASE,     57ull*MB },
+            { MODEL_SMALL,   181ull*MB },
+            { MODEL_MEDIUM,  559ull*MB },
+            { MODEL_LARGE,  1122ull*MB },
+        },
+    },
 };
 
 static const std::map<e_model, size_t> MEM_REQ_KV_SELF = {
