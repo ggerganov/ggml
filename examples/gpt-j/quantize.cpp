@@ -232,8 +232,11 @@ bool gptj_model_quantize(const std::string & fname_inp, const std::string & fnam
         size_t total_size_org = 0;
         size_t total_size_new = 0;
 
-        std::vector<float> data;
         std::vector<float> work;
+
+        std::vector<uint8_t>     data_u8;
+        std::vector<ggml_fp16_t> data_f16;
+        std::vector<float>       data_f32;
 
         while (true) {
             int32_t n_dims;
@@ -263,14 +266,6 @@ bool gptj_model_quantize(const std::string & fname_inp, const std::string & fnam
                 printf("%48s - [%5d, %5d], type = %6s ", name.data(), ne[0], ne[1], ftype_str[ftype]);
             }
 
-            if (ftype != 0) {
-                fprintf(stderr, "%s: unsupported ftype %d for integer quantization\n", __func__, ftype);
-                return false;
-            }
-
-            data.resize(nelements);
-            finp.read(reinterpret_cast<char *>(data.data()), nelements * sizeof(float));
-
             // regexes of tensor names to be quantized
             const std::vector<std::string> k_names = {
                 ".*weight",
@@ -282,14 +277,35 @@ bool gptj_model_quantize(const std::string & fname_inp, const std::string & fnam
                     quantize = true;
                     break;
                 }
-
             }
 
             // quantize only 2D tensors
             quantize &= (n_dims == 2);
 
             if (quantize) {
+                if (ftype != 0 && ftype != 1) {
+                    fprintf(stderr, "%s: unsupported ftype %d for integer quantization\n", __func__, ftype);
+                    return false;
+                }
+
+                if (ftype == 1) {
+                    data_f16.resize(nelements);
+                    finp.read(reinterpret_cast<char *>(data_f16.data()), nelements * sizeof(ggml_fp16_t));
+                    data_f32.resize(nelements);
+                    for (int i = 0; i < nelements; ++i) {
+                        data_f32[i] = ggml_fp16_to_fp32(data_f16[i]);
+                    }
+                } else {
+                    data_f32.resize(nelements);
+                    finp.read(reinterpret_cast<char *>(data_f32.data()), nelements * sizeof(float));
+                }
+
                 ftype = itype;
+            } else {
+                const int bpe = (ftype == 0) ? sizeof(float) : sizeof(uint16_t);
+
+                data_u8.resize(nelements*bpe);
+                finp.read(reinterpret_cast<char *>(data_u8.data()), nelements * bpe);
             }
 
             fout.write(reinterpret_cast<char *>(&n_dims), sizeof(n_dims));
@@ -309,11 +325,11 @@ bool gptj_model_quantize(const std::string & fname_inp, const std::string & fnam
                 switch (type) {
                     case GGML_TYPE_Q4_0:
                         {
-                            cur_size = ggml_quantize_q4_0(data.data(), work.data(), nelements, ne[0]);
+                            cur_size = ggml_quantize_q4_0(data_f32.data(), work.data(), nelements, ne[0]);
                         } break;
                     case GGML_TYPE_Q4_1:
                         {
-                            cur_size = ggml_quantize_q4_1(data.data(), work.data(), nelements, ne[0]);
+                            cur_size = ggml_quantize_q4_1(data_f32.data(), work.data(), nelements, ne[0]);
                         } break;
                     default:
                         {
@@ -327,9 +343,9 @@ bool gptj_model_quantize(const std::string & fname_inp, const std::string & fnam
 
                 printf("size = %8.2f MB -> %8.2f MB\n", nelements * sizeof(float)/1024.0/1024.0, cur_size/1024.0/1024.0);
             } else {
-                printf("\n");
-                fout.write(reinterpret_cast<char *>(data.data()), nelements * sizeof(float));
-                total_size_new += nelements * sizeof(float);
+                printf("size = %8.3f MB\n", data_u8.size()/1024.0/1024.0);
+                fout.write(reinterpret_cast<char *>(data_u8.data()), data_u8.size());
+                total_size_new += data_u8.size();
             }
 
             total_size_org += nelements * sizeof(float);
