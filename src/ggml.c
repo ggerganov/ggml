@@ -13,6 +13,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <float.h>
 
 // if C99 - static_assert is noop
 // ref: https://stackoverflow.com/a/53923785/4039976
@@ -1980,7 +1981,7 @@ static inline bool ggml_is_contiguous(const struct ggml_tensor * tensor) {
 
     return
         tensor->nb[0] == GGML_TYPE_SIZE[tensor->type] &&
-        tensor->nb[1] == tensor->nb[0]*tensor->ne[0] &&
+        tensor->nb[1] == (tensor->nb[0]*tensor->ne[0])/GGML_BLCK_SIZE[tensor->type] &&
         tensor->nb[2] == tensor->nb[1]*tensor->ne[1] &&
         tensor->nb[3] == tensor->nb[2]*tensor->ne[2];
 }
@@ -5384,7 +5385,7 @@ static void ggml_compute_forward_mul_mat_f16_f32(
             }
         }
 
-        //printf("CBLAS = %f ms, %d x %d x %d x %d\n", (ggml_perf_time_us() - t0)/1000.0, ne0, ne1, ne2, ne3);
+        /*printf("CBLAS F16 = %f ms, %d x %d x %d x %d\n", (ggml_perf_time_us() - t0)/1000.0, ne0, ne1, ne2, ne3);*/
 
         return;
     }
@@ -5692,7 +5693,7 @@ static void ggml_compute_forward_mul_mat_q4_0_f32(
             }
         }
 
-        //printf("CBLAS = %f ms, %d x %d x %d x %d\n", (ggml_perf_time_us() - t0)/1000.0, ne0, ne1, ne2, ne3);
+        /*printf("CBLAS Q4_0 = %f ms, %d x %d x %d x %d\n", (ggml_perf_time_us() - t0)/1000.0, ne0, ne1, ne2, ne3);*/
 
         return;
     }
