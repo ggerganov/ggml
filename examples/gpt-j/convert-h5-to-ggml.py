@@ -136,6 +136,11 @@ for name in list_vars.keys():
             print("  Converting to float32")
             data = data.astype(np.float32)
             ftype_cur = 0
+    else:
+        if data.dtype != np.float32:
+            print("  Converting to float32")
+            data = data.astype(np.float32)
+            ftype_cur = 0
 
     # for efficiency - transpose these matrices:
     # (note - with latest ggml this is no longer more efficient, so disabling it)
