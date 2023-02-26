@@ -367,36 +367,76 @@ void quantize_row_q4_0(const float * restrict x, void * restrict y, int k) {
 
     uint8_t pp[QK/2];
 
+#if __ARM_NEON
+#if QK == 32
     for (int i = 0; i < nb; i++) {
         float amax = 0.0f; // absolute max
 
-        {
-            for (int l = 0; l < QK; l++) {
-                const float v = x[i*QK + l];
-                amax = MAX(amax, fabsf(v));
-            }
+        float32x4_t srcv [8];
+        float32x4_t asrcv[8];
+        float32x4_t amaxv[8];
 
-            const float d = amax / ((1 << 3) - 1);
-            const float id = d ? 1.0f/d : 0.0f;
+        for (int l = 0; l < 8; l++) srcv[l]  = vld1q_f32(x + i*32 + 4*l);
+        for (int l = 0; l < 8; l++) asrcv[l] = vabsq_f32(srcv[l]);
 
-            pd[i] = d;
+        for (int l = 0; l < 4; l++) amaxv[2*l] = vmaxq_f32(asrcv[2*l], asrcv[2*l+1]);
+        for (int l = 0; l < 2; l++) amaxv[4*l] = vmaxq_f32(amaxv[4*l], amaxv[4*l+2]);
+        for (int l = 0; l < 1; l++) amaxv[8*l] = vmaxq_f32(amaxv[8*l], amaxv[8*l+4]);
 
-            for (int l = 0; l < QK; l += 2) {
-                const float v0 = x[i*QK + l + 0]*id;
-                const float v1 = x[i*QK + l + 1]*id;
+        amax = MAX(
+                MAX(vgetq_lane_f32(amaxv[0], 0), vgetq_lane_f32(amaxv[0], 1)),
+                MAX(vgetq_lane_f32(amaxv[0], 2), vgetq_lane_f32(amaxv[0], 3)));
 
-                const uint8_t vi0 = ((int8_t) (round(v0))) + 8;
-                const uint8_t vi1 = ((int8_t) (round(v1))) + 8;
+        const float d = amax / ((1 << 3) - 1);
+        const float id = d ? 1.0/d : 0.0;
 
-                assert(vi0 >= 0 && vi0 < 16);
-                assert(vi1 >= 0 && vi1 < 16);
+        pd[i] = d;
 
-                pp[l/2] = vi0 | (vi1 << 4);
-            }
+        for (int l = 0; l < 8; l++) {
+            const float32x4_t v = vmulq_n_f32(srcv[l], id);
+            const float32x4_t vf = vaddq_f32(v, vdupq_n_f32(8.5f));
+            const int32x4_t vi = vcvtq_s32_f32(vf);
 
-            memcpy(pb + i*QK/2, pp, sizeof(pp));
+            pp[2*l + 0] = vgetq_lane_s32(vi, 0) | (vgetq_lane_s32(vi, 1) << 4);
+            pp[2*l + 1] = vgetq_lane_s32(vi, 2) | (vgetq_lane_s32(vi, 3) << 4);
         }
+
+        memcpy(pb + i*16, pp, sizeof(pp));
     }
+#else
+#error "not implemented for QK"
+#endif
+#else
+    // scalar
+    for (int i = 0; i < nb; i++) {
+        float amax = 0.0f; // absolute max
+
+        for (int l = 0; l < QK; l++) {
+            const float v = x[i*QK + l];
+            amax = MAX(amax, fabsf(v));
+        }
+
+        const float d = amax / ((1 << 3) - 1);
+        const float id = d ? 1.0f/d : 0.0f;
+
+        pd[i] = d;
+
+        for (int l = 0; l < QK; l += 2) {
+            const float v0 = x[i*QK + l + 0]*id;
+            const float v1 = x[i*QK + l + 1]*id;
+
+            const uint8_t vi0 = ((int8_t) (round(v0))) + 8;
+            const uint8_t vi1 = ((int8_t) (round(v1))) + 8;
+
+            assert(vi0 >= 0 && vi0 < 16);
+            assert(vi1 >= 0 && vi1 < 16);
+
+            pp[l/2] = vi0 | (vi1 << 4);
+        }
+
+        memcpy(pb + i*QK/2, pp, sizeof(pp));
+    }
+#endif
 }
 
 // method 4
