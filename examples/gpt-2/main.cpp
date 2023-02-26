@@ -130,7 +130,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         }
     }
 
-    // for the big tensors, we have the option to store the data in 16-bit floats
+    // for the big tensors, we have the option to store the data in 16-bit floats or quantized
     // in order to save memory and also to speed up the computation
     ggml_type wtype = GGML_TYPE_COUNT;
     switch (model.hparams.f16) {
@@ -239,13 +239,13 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             layer.ln_2_g             = ggml_new_tensor_1d(ctx, GGML_TYPE_F32,   n_embd);
             layer.ln_2_b             = ggml_new_tensor_1d(ctx, GGML_TYPE_F32,   n_embd);
 
-            layer.c_attn_attn_w      = ggml_new_tensor_2d(ctx, wtype,         3*n_embd, n_embd);
+            layer.c_attn_attn_w      = ggml_new_tensor_2d(ctx, wtype,           n_embd, 3*n_embd);
             layer.c_attn_attn_b      = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 3*n_embd);
 
             layer.c_attn_proj_w      = ggml_new_tensor_2d(ctx, wtype,           n_embd, n_embd);
             layer.c_attn_proj_b      = ggml_new_tensor_1d(ctx, GGML_TYPE_F32,   n_embd);
 
-            layer.c_mlp_fc_w         = ggml_new_tensor_2d(ctx, wtype,         4*n_embd, n_embd);
+            layer.c_mlp_fc_w         = ggml_new_tensor_2d(ctx, wtype,           n_embd, 4*n_embd);
             layer.c_mlp_fc_b         = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 4*n_embd);
 
             layer.c_mlp_proj_w_trans = ggml_new_tensor_2d(ctx, wtype,         4*n_embd, n_embd);
@@ -463,7 +463,7 @@ bool gpt2_eval(
         // [2304, N]
         {
             cur = ggml_mul_mat(ctx0,
-                    ggml_transpose(ctx0, model.layers[il].c_attn_attn_w),
+                    model.layers[il].c_attn_attn_w,
                     cur);
 
             cur = ggml_add(ctx0,
@@ -570,7 +570,7 @@ bool gpt2_eval(
         // [768, N]
         {
             cur = ggml_mul_mat(ctx0,
-                    ggml_transpose(ctx0, model.layers[il].c_attn_proj_w),
+                    model.layers[il].c_attn_proj_w,
                     cur);
 
             cur = ggml_add(ctx0,
@@ -607,7 +607,7 @@ bool gpt2_eval(
             // cur = fc_w*cur + fc_b
             // [3072, N]
             cur = ggml_mul_mat(ctx0,
-                    ggml_transpose(ctx0, model.layers[il].c_mlp_fc_w),
+                    model.layers[il].c_mlp_fc_w,
                     cur);
 
             cur = ggml_add(ctx0,

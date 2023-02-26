@@ -53,8 +53,10 @@ def convert_to_ftype(data, ftype):
 
     assert False, "Invalid ftype: " + str(ftype)
 
-if len(sys.argv) < 2:
-    print("Usage: convert-ckpt-to-ggml.py dir-model [use-f32]\n")
+if len(sys.argv) < 3:
+    print("Usage: convert-ckpt-to-ggml.py dir-model ftype\n")
+    print("  ftype == 0 -> float32")
+    print("  ftype == 1 -> float16")
     sys.exit(1)
 
 # output in the same directory as the model
@@ -70,8 +72,6 @@ with open(dir_model + "/hparams.json", "r") as f:
 # possible data types
 #   ftype == 0 -> float32
 #   ftype == 1 -> float16
-#   ftype == 2 -> qint4_0
-#   ftype == 3 -> qint4_1
 #
 # map from ftype to string
 ftype_str = ["f32", "f16"]
@@ -113,7 +113,14 @@ for name, shape in list_vars:
     n_dims = len(data.shape);
 
     # for efficiency - transpose the projection matrices
-    if name[-13:] == "/mlp/c_proj/w":
+    # "model/h.*/attn/c_attn/w"
+    # "model/h.*/attn/c_proj/w"
+    # "model/h.*/mlp/c_fc/w"
+    # "model/h.*/mlp/c_proj/w"
+    if name[-14:] == "/attn/c_attn/w" or \
+       name[-14:] == "/attn/c_proj/w" or \
+       name[-11:] == "/mlp/c_fc/w" or \
+       name[-13:] == "/mlp/c_proj/w":
         print("  Transposing")
         data = data.transpose()
 
