@@ -2,6 +2,9 @@
 
 Tensor library for machine learning
 
+***Note that this project is under development and not ready for production use. \
+Some of the development is currently happening in the [whisper.cpp](https://github.com/ggerganov/whisper.cpp) repo***
+
 ## Features
 
 - Written in C
@@ -13,9 +16,14 @@ Tensor library for machine learning
 - No third-party dependencies
 - Zero memory allocations during runtime
 
-***Note that this project is under development and not ready for production use.
-Most of the development is currently happening in the [whisper.cpp](https://github.com/ggerganov/whisper.cpp) repo,
-so if you are interested in this project, make sure to follow what is happening there.***
+## Roadmap
+
+- [X] Example of GPT-2 inference [examples/gpt-2](https://github.com/ggerganov/ggml/tree/master/examples/gpt-2)
+- [X] Example of GPT-J inference [examples/gpt-j](https://github.com/ggerganov/ggml/tree/master/examples/gpt-j)
+- [X] Example of Whisper inference [examples/whisper](https://github.com/ggerganov/ggml/tree/master/examples/whisper)
+- [ ] Support 4-bit integer quantization https://github.com/ggerganov/ggml/pull/27
+- [ ] Example of FLAN-T5 inference https://github.com/ggerganov/ggml/pull/12
+- [ ] Example of LLaMA inference
 
 ## Whisper inference (example)
 
