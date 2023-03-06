@@ -82,3 +82,9 @@ gpt_vocab::id gpt_sample_top_k_top_p(
         double temp,
         std::mt19937 & rng);
 
+//
+// Quantization
+//
+
+size_t ggml_quantize_q4_0(float * src, void * dst, int n, int k, int qk, int64_t * hist);
+size_t ggml_quantize_q4_1(float * src, void * dst, int n, int k, int qk, int64_t * hist);

@@ -12,111 +12,8 @@
 #include <vector>
 #include <regex>
 
+// TODO: move somewhere else
 #define QK 32
-
-size_t ggml_quantize_q4_0(float * src, void * dst, int n, int k) {
-    const int nb = k / QK;
-    const size_t row_size = nb*(sizeof(float) + sizeof(uint8_t)*QK/2);
-
-    assert(k % QK == 0);
-
-    uint8_t pp[QK/2];
-
-    char * pdst = (char *) dst;
-
-    for (int j = 0; j < n; j += k) {
-        float   * pd = (float *)   (pdst + (j/k)*row_size);
-        uint8_t * pb = (uint8_t *) (pd + nb);
-
-        for (int i = 0; i < nb; i++) {
-            float amax = 0.0f; // absolute max
-
-            {
-                for (int l = 0; l < QK; l++) {
-                    const float v = src[j + i*QK + l];
-                    amax = std::max(amax, fabsf(v));
-                }
-
-                const float d = amax / ((1 << 3) - 1);
-                const float id = d ? 1.0f/d : 0.0f;
-
-                pd[i] = d;
-
-                for (int l = 0; l < QK; l += 2) {
-                    const float v0 = (src[j + i*QK + l + 0])*id;
-                    const float v1 = (src[j + i*QK + l + 1])*id;
-
-                    const uint8_t vi0 = ((int8_t) (round(v0))) + 8;
-                    const uint8_t vi1 = ((int8_t) (round(v1))) + 8;
-
-                    assert(vi0 >= 0 && vi0 < 16);
-                    assert(vi1 >= 0 && vi1 < 16);
-
-                    pp[l/2] = vi0 | (vi1 << 4);
-                }
-
-                memcpy(pb + i*QK/2, pp, sizeof(pp));
-            }
-        }
-    }
-
-    return (n/k)*row_size;
-}
-
-size_t ggml_quantize_q4_1(float * src, void * dst, int n, int k) {
-    const int nb = k / QK;
-    const size_t row_size = nb*(2*sizeof(float) + sizeof(uint8_t)*QK/2);
-
-    assert(k % QK == 0);
-
-    uint8_t pp[QK/2];
-
-    char * pdst = (char *) dst;
-
-    for (int j = 0; j < n; j += k) {
-        float   * pm = (float *)   (pdst + (j/k)*row_size);
-        float   * pd = (float *)   (pm + nb);
-        uint8_t * pb = (uint8_t *) (pd + nb);
-
-        //printf("n = %d, k = %d, nb = %d, row_size = %d, j = %d, pm = %p, pd = %p, pb = %p\n", n, k, nb, row_size, j, pm, pd, pb);
-
-        for (int i = 0; i < nb; i++) {
-            float min = std::numeric_limits<float>::max();
-            float max = std::numeric_limits<float>::min();
-
-            {
-                for (int l = 0; l < QK; l++) {
-                    const float v = src[j + i*QK + l];
-                    if (v < min) min = v;
-                    if (v > max) max = v;
-                }
-
-                const float d = (max - min) / ((1 << 4) - 1);
-                const float id = d ? 1.0f/d : 0.0f;
-
-                pm[i] = min;
-                pd[i] = d;
-
-                for (int l = 0; l < QK; l += 2) {
-                    const float v0 = (src[j + i*QK + l + 0] - min)*id;
-                    const float v1 = (src[j + i*QK + l + 1] - min)*id;
-
-                    const uint8_t vi0 = round(v0);
-                    const uint8_t vi1 = round(v1);
-
-                    assert(vi0 >= 0 && vi0 < 16);
-                    assert(vi1 >= 0 && vi1 < 16);
-
-                    pp[l/2] = vi0 | (vi1 << 4);
-                }
-
-                memcpy(pb + i*QK/2, pp, sizeof(pp));
-            }
-        }
-    }
-
-    return (n/k)*row_size;
-}
 
 // default hparams (GPT-J 6B)
 struct gptj_hparams {
@@ -238,6 +135,8 @@ bool gptj_model_quantize(const std::string & fname_inp, const std::string & fnam
         std::vector<ggml_fp16_t> data_f16;
         std::vector<float>       data_f32;
 
+        std::vector<int64_t> hist_all(1 << 4, 0);
+
         while (true) {
             int32_t n_dims;
             int32_t length;
@@ -321,15 +220,16 @@ bool gptj_model_quantize(const std::string & fname_inp, const std::string & fnam
                 work.resize(nelements); // for quantization
 
                 size_t cur_size = 0;
+                std::vector<int64_t> hist_cur(1 << 4, 0);
 
                 switch (type) {
                     case GGML_TYPE_Q4_0:
                         {
-                            cur_size = ggml_quantize_q4_0(data_f32.data(), work.data(), nelements, ne[0]);
+                            cur_size = ggml_quantize_q4_0(data_f32.data(), work.data(), nelements, ne[0], QK, hist_cur.data());
                         } break;
                     case GGML_TYPE_Q4_1:
                         {
-                            cur_size = ggml_quantize_q4_1(data_f32.data(), work.data(), nelements, ne[0]);
+                            cur_size = ggml_quantize_q4_1(data_f32.data(), work.data(), nelements, ne[0], QK, hist_cur.data());
                         } break;
                     default:
                         {
@@ -341,7 +241,15 @@ bool gptj_model_quantize(const std::string & fname_inp, const std::string & fnam
                 fout.write(reinterpret_cast<char *>(work.data()), cur_size);
                 total_size_new += cur_size;
 
-                printf("size = %8.2f MB -> %8.2f MB\n", nelements * sizeof(float)/1024.0/1024.0, cur_size/1024.0/1024.0);
+                printf("size = %8.2f MB -> %8.2f MB | hist: ", nelements * sizeof(float)/1024.0/1024.0, cur_size/1024.0/1024.0);
+                for (int i = 0; i < hist_cur.size(); ++i) {
+                    hist_all[i] += hist_cur[i];
+                }
+
+                for (int i = 0; i < hist_cur.size(); ++i) {
+                    printf("%5.3f ", hist_cur[i] / (float)nelements);
+                }
+                printf("\n");
             } else {
                 printf("size = %8.3f MB\n", data_u8.size()/1024.0/1024.0);
                 fout.write(reinterpret_cast<char *>(data_u8.data()), data_u8.size());
@@ -353,6 +261,19 @@ bool gptj_model_quantize(const std::string & fname_inp, const std::string & fnam
 
         printf("%s: model size  = %8.2f MB\n", __func__, total_size_org/1024.0/1024.0);
         printf("%s: quant size  = %8.2f MB\n", __func__, total_size_new/1024.0/1024.0);
+
+        {
+            int64_t sum_all = 0;
+            for (int i = 0; i < hist_all.size(); ++i) {
+                sum_all += hist_all[i];
+            }
+
+            printf("%s: hist: ", __func__);
+            for (int i = 0; i < hist_all.size(); ++i) {
+                printf("%5.3f ", hist_all[i] / (float)sum_all);
+            }
+            printf("\n");
+        }
     }
 
     finp.close();
