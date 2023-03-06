@@ -133,12 +133,6 @@ if (APPLE AND NOT GGML_NO_ACCELERATE)
     endif()
 endif()
 
-# use OpenBLAS
-if (OPENBLAS)
-    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DGGML_USE_OPENBLAS -I/usr/local/include/openblas")
-    set(CMAKE_LD_FLAGS  "${CMAKE_LD_FLAGS} -lopenblas")
-endif()
-
 if (GGML_PERF)
     set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_PERF)
 endif()
