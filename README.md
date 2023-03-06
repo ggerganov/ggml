@@ -24,6 +24,7 @@ Some of the development is currently happening in the [whisper.cpp](https://gith
 - [ ] Support 4-bit integer quantization https://github.com/ggerganov/ggml/pull/27
 - [ ] Example of FLAN-T5 inference https://github.com/ggerganov/ggml/pull/12
 - [ ] Example of LLaMA inference
+- [ ] Example of RWKV inference
 
 ## Whisper inference (example)
 
