@@ -208,11 +208,11 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         model.wpe = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, n_embd, n_ctx);
 
         // map by name
-        model.tensors["model/ln_f/g"] = model.ln_f_g;
-        model.tensors["model/ln_f/b"] = model.ln_f_b;
+        model.tensors["ln_f.weight"] = model.ln_f_g;
+        model.tensors["ln_f.bias"] = model.ln_f_b;
 
-        model.tensors["model/wte"] = model.wte;
-        model.tensors["model/wpe"] = model.wpe;
+        model.tensors["wte.weight"] = model.wte;
+        model.tensors["wpe.weight"] = model.wpe;
 
         for (int i = 0; i < n_layer; ++i) {
             auto & layer = model.layers[i];
@@ -236,23 +236,23 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             layer.c_mlp_proj_b       = ggml_new_tensor_1d(ctx, GGML_TYPE_F32,   n_embd);
 
             // map by name
-            model.tensors["model/h" + std::to_string(i) + "/ln_1/g"]        = layer.ln_1_g;
-            model.tensors["model/h" + std::to_string(i) + "/ln_1/b"]        = layer.ln_1_b;
+            model.tensors["h." + std::to_string(i) + ".ln_1.weight"]      = layer.ln_1_g;
+            model.tensors["h." + std::to_string(i) + ".ln_1.bias"]        = layer.ln_1_b;
 
-            model.tensors["model/h" + std::to_string(i) + "/ln_2/g"]        = layer.ln_2_g;
-            model.tensors["model/h" + std::to_string(i) + "/ln_2/b"]        = layer.ln_2_b;
+            model.tensors["h." + std::to_string(i) + ".ln_2.weight"]      = layer.ln_2_g;
+            model.tensors["h." + std::to_string(i) + ".ln_2.bias"]        = layer.ln_2_b;
 
-            model.tensors["model/h" + std::to_string(i) + "/attn/c_attn/w"] = layer.c_attn_attn_w;
-            model.tensors["model/h" + std::to_string(i) + "/attn/c_attn/b"] = layer.c_attn_attn_b;
+            model.tensors["h." + std::to_string(i) + ".attn.c_attn.weight"] = layer.c_attn_attn_w;
+            model.tensors["h." + std::to_string(i) + ".attn.c_attn.bias"] = layer.c_attn_attn_b;
 
-            model.tensors["model/h" + std::to_string(i) + "/attn/c_proj/w"] = layer.c_attn_proj_w;
-            model.tensors["model/h" + std::to_string(i) + "/attn/c_proj/b"] = layer.c_attn_proj_b;
+            model.tensors["h." + std::to_string(i) + ".attn.c_proj.weight"] = layer.c_attn_proj_w;
+            model.tensors["h." + std::to_string(i) + ".attn.c_proj.bias"] = layer.c_attn_proj_b;
 
-            model.tensors["model/h" + std::to_string(i) + "/mlp/c_fc/w"]    = layer.c_mlp_fc_w;
-            model.tensors["model/h" + std::to_string(i) + "/mlp/c_fc/b"]    = layer.c_mlp_fc_b;
+            model.tensors["h." + std::to_string(i) + ".mlp.c_fc.weight"]    = layer.c_mlp_fc_w;
+            model.tensors["h." + std::to_string(i) + ".mlp.c_fc.bias"]    = layer.c_mlp_fc_b;
 
-            model.tensors["model/h" + std::to_string(i) + "/mlp/c_proj/w"]  = layer.c_mlp_proj_w_trans;
-            model.tensors["model/h" + std::to_string(i) + "/mlp/c_proj/b"]  = layer.c_mlp_proj_b;
+            model.tensors["h." + std::to_string(i) + ".mlp.c_proj.weight"]  = layer.c_mlp_proj_w_trans;
+            model.tensors["h." + std::to_string(i) + ".mlp.c_proj.bias"]  = layer.c_mlp_proj_b;
         }
     }
 

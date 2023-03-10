@@ -20,9 +20,10 @@
 import sys
 import struct
 import json
+import torch
 import numpy as np
 
-from transformers import GPT2LMHeadModel
+from transformers import GPT2Model
 
 # ref: https://github.com/openai/gpt-2/blob/master/src/encoder.py
 def bytes_to_unicode():
@@ -69,8 +70,8 @@ if len(sys.argv) > 2:
     use_f16 = False
     fname_out = sys.argv[1] + "/ggml-model-f32.bin"
 
-model = GPT2LMHeadModel.from_pretrained(dir_model, low_cpu_mem_usage=True)
-# print (model)
+model = GPT2Model.from_pretrained(dir_model, low_cpu_mem_usage=True)
+#print (model)
 
 list_vars = model.state_dict()
 #print (list_vars)
@@ -83,7 +84,7 @@ fout.write(struct.pack("i", hparams["n_positions"]))
 fout.write(struct.pack("i", hparams["n_embd"]))
 fout.write(struct.pack("i", hparams["n_head"]))
 fout.write(struct.pack("i", hparams["n_layer"]))
-# fout.write(struct.pack("i", hparams["rotary_dim"]))
+#fout.write(struct.pack("i", hparams["rotary_dim"]))
 fout.write(struct.pack("i", use_f16))
 
 byte_encoder = bytes_to_unicode()
@@ -125,16 +126,8 @@ for name in list_vars.keys():
             ftype = 0
 
     # for efficiency - transpose these matrices:
-    #  "transformer.h.*.mlp.fc_in.weight
-    #  "transformer.h.*.attn.out_proj.weight
-    #  "transformer.h.*.attn.q_proj.weight"
-    #  "transformer.h.*.attn.k_proj.weight"
-    #  "transformer.h.*.attn.v_proj.weight"
-    if name.endswith(".mlp.fc_in.weight")     or \
-       name.endswith(".attn.out_proj.weight") or \
-       name.endswith(".attn.q_proj.weight")   or \
-       name.endswith(".attn.k_proj.weight")   or \
-       name.endswith(".attn.v_proj.weight"):
+    #  "transformer.h.*.mlp.c_proj.weight
+    if name.endswith(".mlp.c_proj.weight"):
         print("  Transposing")
         data = data.transpose()
 
