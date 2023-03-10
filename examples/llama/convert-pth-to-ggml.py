@@ -73,17 +73,25 @@ fout.write(struct.pack("i", hparams["dim"]))
 fout.write(struct.pack("i", hparams["multiple_of"]))
 fout.write(struct.pack("i", hparams["n_heads"]))
 fout.write(struct.pack("i", hparams["n_layers"]))
+fout.write(struct.pack("i", 64)) # rot
 fout.write(struct.pack("i", ftype))
 
 # Is this correct??
 for i in range(32000):
-    text = tokenizer.decode(i)
+    # TODO: this is probably wrong - not sure how this tokenizer works
+    text = tokenizer.decode([29889, i]).encode('utf-8')
+    # remove the first byte (it's always '.')
+    text = text[1:]
     fout.write(struct.pack("i", len(text)))
-    fout.write(text.encode('utf-8'))
+    fout.write(text)
 
 for k, v in model.items():
     name = k
     shape = v.shape
+
+    # skip layers.X.attention.inner_attention.rope.freqs
+    if name[-5:] == "freqs":
+        continue
 
     print("Processing variable: " + name + " with shape: ", shape, " and type: ", v.dtype)
 
@@ -107,7 +115,7 @@ for k, v in model.items():
 
     # default type is fp16
     ftype_cur = 1
-    if ftype == 0:
+    if ftype == 0 or n_dims == 1:
         print("  Converting to float32")
         data = data.astype(np.float32)
         ftype_cur = 0

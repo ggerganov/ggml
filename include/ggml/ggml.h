@@ -228,6 +228,7 @@ enum ggml_op {
     GGML_OP_STEP,
     GGML_OP_RELU,
     GGML_OP_GELU,
+    GGML_OP_SILU,
     GGML_OP_NORM, // normalize
 
     GGML_OP_MUL_MAT,
@@ -468,6 +469,10 @@ struct ggml_tensor * ggml_relu(
 
 // TODO: double-check this computation is correct
 struct ggml_tensor * ggml_gelu(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a);
+
+struct ggml_tensor * ggml_silu(
         struct ggml_context * ctx,
         struct ggml_tensor  * a);
 

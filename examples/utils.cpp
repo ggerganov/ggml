@@ -230,6 +230,38 @@ std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::stri
     return tokens;
 }
 
+std::vector<gpt_vocab::id> llama_tokenize(const gpt_vocab & vocab, const std::string & text, bool bos) {
+    std::vector<gpt_vocab::id> res;
+
+    if (bos) {
+        res.push_back(1); // TODO: replace with vocab.bos
+    }
+
+    // find the longest token that matches the text
+    int pos = 0;
+    while (true) {
+        int l = 0;
+        int t = 0;
+        for (const auto & kv : vocab.id_to_token) {
+            if (kv.second.size() < l) continue;
+            if (kv.second.size() > text.size() - pos) continue;
+            if (text.substr(pos, kv.second.size()) == kv.second) {
+                l = kv.second.size();
+                t = kv.first;
+            }
+        }
+
+        if (l == 0) {
+            break;
+        }
+
+        res.push_back(t);
+        pos += l;
+    }
+
+    return res;
+}
+
 bool gpt_vocab_init(const std::string & fname, gpt_vocab & vocab) {
     printf("%s: loading vocab from '%s'\n", __func__, fname.c_str());
 
