@@ -84,7 +84,6 @@ fout.write(struct.pack("i", hparams["n_positions"]))
 fout.write(struct.pack("i", hparams["n_embd"]))
 fout.write(struct.pack("i", hparams["n_head"]))
 fout.write(struct.pack("i", hparams["n_layer"]))
-#fout.write(struct.pack("i", hparams["rotary_dim"]))
 fout.write(struct.pack("i", use_f16))
 
 byte_encoder = bytes_to_unicode()
@@ -102,44 +101,33 @@ for key in encoder_added:
     fout.write(struct.pack("i", len(text)))
     fout.write(text)
 
-for name in list_vars.keys():
-    data = list_vars[name].squeeze().numpy()
-    print("Processing variable: " + name + " with shape: ", data.shape)
+name = "wte.weight"
+data = list_vars[name].squeeze().numpy()
+print("Processing variable: " + name + " with shape: ", data.shape)
 
-    # we don't need these
-    if name.endswith("attn.masked_bias") or name.endswith(".attn.bias"):
-        print("  Skipping variable: " + name)
-        continue
+n_dims = len(data.shape);
 
-    n_dims = len(data.shape);
+# ftype == 0 -> float32, ftype == 1 -> float16
+ftype = 0;
+if use_f16:
+    if name[-7:] == ".weight" and n_dims == 2:
+        print("  Converting to float16")
+        data = data.astype(np.float16)
+        ftype = 1
+    else:
+        print("  Converting to float32")
+        data = data.astype(np.float32)
+        ftype = 0
 
-    # ftype == 0 -> float32, ftype == 1 -> float16
-    ftype = 0;
-    if use_f16:
-        if name[-7:] == ".weight" and n_dims == 2:
-            print("  Converting to float16")
-            data = data.astype(np.float16)
-            ftype = 1
-        else:
-            print("  Converting to float32")
-            data = data.astype(np.float32)
-            ftype = 0
-
-    # for efficiency - transpose these matrices:
-    #  "transformer.h.*.mlp.c_proj.weight
-    if name.endswith(".mlp.c_proj.weight"):
-        print("  Transposing")
-        data = data.transpose()
-
-    # header
-    str = name.encode('utf-8')
-    fout.write(struct.pack("iii", n_dims, len(str), ftype))
-    for i in range(n_dims):
+# header
+str = name.encode('utf-8')
+fout.write(struct.pack("iii", n_dims, len(str), ftype))
+for i in range(n_dims):
         fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
-    fout.write(str);
+fout.write(str);
 
-    # data
-    data.tofile(fout)
+# data
+data.tofile(fout)
 
 fout.close()
 
