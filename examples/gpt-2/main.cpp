@@ -10,6 +10,8 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <iostream>
+#include <unistd.h>
 
 // default hparams (GPT-2 117M)
 struct gpt2_hparams {
@@ -673,7 +675,14 @@ int main(int argc, char ** argv) {
 
     std::mt19937 rng(params.seed);
     if (params.prompt.empty()) {
-        params.prompt = gpt_random_prompt(rng);
+        if( !isatty(STDIN_FILENO) ){
+            std::string line;
+            while( std::getline(std::cin, line) ){
+                params.prompt = params.prompt + "\n" + line;
+            }
+        } else {
+            params.prompt = gpt_random_prompt(rng);
+        }
     }
 
     int64_t t_load_us = 0;
