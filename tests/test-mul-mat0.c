@@ -232,7 +232,17 @@ int main(int argc, const char ** argv) {
 
     int ne[4];
 
-    for (int iter = 0; iter < 500; ++iter) {
+    // original loop: 500
+    int niter = 500;
+    const char *env = getenv("GGML_NLOOP");
+    if (env != NULL) {
+        niter = atoi(env);
+    }
+    if (argc > 1) {
+        niter = atoi(argv[1]);
+    }
+    for (int iter = 0; iter < niter; ++iter) {
+        printf("test-mul-mat0: iter:%d/%d\n", iter, niter);
         struct ggml_context * ctx0 = ggml_init(params);
 
         get_random_dims(ne, 4);
