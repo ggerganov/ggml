@@ -34,7 +34,7 @@ endif()
 if (NOT UNAME_M)
     execute_process(COMMAND uname -m OUTPUT_VARIABLE UNAME_M)
 endif()
-message(STATUS "UNAME_S: ${UNAME_S}  UNAME_P: ${UNAME_P}  UNAME_M: ${UNAME_M}")
+#message(STATUS "UNAME_S: ${UNAME_S}  UNAME_P: ${UNAME_P}  UNAME_M: ${UNAME_M}")
 
 # Mac OS + Arm can report x86_64
 # ref: https://github.com/ggerganov/whisper.cpp/issues/66#issuecomment-1282546789
@@ -68,7 +68,7 @@ else()
             set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfma")
         endif()
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mf16c")
-elseif (UNAME_S MATCHES "Linux")
+    elseif (UNAME_S MATCHES "Linux")
         message(STATUS "Linux detected")
 	execute_process(COMMAND grep "avx " /proc/cpuinfo OUTPUT_VARIABLE AVX1_M)
         if (AVX1_M MATCHES "avx")
@@ -90,26 +90,24 @@ elseif (UNAME_S MATCHES "Linux")
 	if (SSE3_M MATCHES "sse3")
             set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse3")
         endif()
-	message(STATUS "CMAKE_C_FLAGS: ${CMAKE_C_FLAGS}")
-elseif (UNAME_S MATCHES "Haiku")
+    elseif (UNAME_S MATCHES "Haiku")
 	message(STATUS "Haiku detected")
-	execute_process(COMMAND sysinfo -cpu | grep "AVX " OUTPUT_VARIABLE AVX1_M)
+	execute_process(COMMAND sysinfo -cpu COMMAND grep "AVX " OUTPUT_VARIABLE AVX1_M)
         if (AVX1_M MATCHES "avx")
             set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx")
         endif()
-	execute_process(COMMAND sysinfo -cpu | grep "AVX2 " OUTPUT_VARIABLE AVX2_M)
+	execute_process(COMMAND sysinfo -cpu COMMAND grep "AVX2 " OUTPUT_VARIABLE AVX2_M)
         if (AVX2_M MATCHES "avx2")
             set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx2")
         endif()
-	execute_process(COMMAND sysinfo -cpu | grep "FMA " OUTPUT_VARIABLE FMA_M)
+	execute_process(COMMAND sysinfo -cpu COMMAND grep "FMA " OUTPUT_VARIABLE FMA_M)
 	if (FMA_M MATCHES "fma")
             set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfma")
         endif()
-	execute_process(COMMAND sysinfo -cpu | grep "F16C " OUTPUT_VARIABLE F16C_M)
+	execute_process(COMMAND sysinfo -cpu COMMAND grep "F16C " OUTPUT_VARIABLE F16C_M)
 	if (F16C_M MATCHES "f16c")
             set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mf16c")
         endif()
-	message(STATUS "CMAKE_C_FLAGS: ${CMAKE_C_FLAGS}")
     else()
         set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -mfma -mf16c -mavx -mavx2")
     endif()
@@ -133,6 +131,31 @@ if (APPLE AND NOT GGML_NO_ACCELERATE)
     endif()
 endif()
 
+if (GGML_OPENBLAS)
+    set(OPENBLAS_INCLUDE_SEARCH_PATHS
+        /usr/include
+        /usr/include/openblas
+        /usr/include/openblas-base
+        /usr/local/include
+        /usr/local/include/openblas
+        /usr/local/include/openblas-base
+        /opt/OpenBLAS/include
+        $ENV{OpenBLAS_HOME}
+        $ENV{OpenBLAS_HOME}/include
+        )
+    find_path(OPENBLAS_INC NAMES cblas.h PATHS ${OPENBLAS_INCLUDE_SEARCH_PATHS})
+    find_library(OPENBLAS_LIB NAMES openblas libopenblas)
+    if (OPENBLAS_LIB)
+        message(STATUS "OpenBLAS found")
+
+        set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${OPENBLAS_LIB})
+        set(GGML_EXTRA_INCS  ${GGML_EXTRA_INCS}  ${OPENBLAS_INC})
+	set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_OPENBLAS)
+    else()
+        message(WARNING "OpenBLAS not found")
+    endif()
+endif()
+
 if (GGML_PERF)
     set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_PERF)
 endif()
@@ -145,6 +168,7 @@ target_include_directories(${TARGET} PUBLIC
     .
     ../include
     ../include/ggml
+    ${GGML_EXTRA_INCS}
     )
 
 if (MSVC)
