@@ -97,10 +97,17 @@ void mul_mat_vec_f32_2(
             __m256 b1 = _mm256_loadu_ps(src1 + j + 8);
             __m256 b2 = _mm256_loadu_ps(src1 + j + 16);
             __m256 b3 = _mm256_loadu_ps(src1 + j + 24);
+#if defined(__FMA__)
             sum0 = _mm256_fmadd_ps(a0, b0, sum0);
             sum1 = _mm256_fmadd_ps(a1, b1, sum1);
             sum2 = _mm256_fmadd_ps(a2, b2, sum2);
             sum3 = _mm256_fmadd_ps(a3, b3, sum3);
+#else
+            sum0 = _mm256_add_ps(_mm256_mul_ps(a0, b0), sum0);
+            sum1 = _mm256_add_ps(_mm256_mul_ps(a1, b1), sum1);
+            sum2 = _mm256_add_ps(_mm256_mul_ps(a2, b2), sum2);
+            sum3 = _mm256_add_ps(_mm256_mul_ps(a3, b3), sum3);
+#endif
         }
         dst[i] = reduce_vector8_0(_mm256_add_ps(_mm256_add_ps(sum0, sum1), _mm256_add_ps(sum2, sum3)));
 
@@ -314,7 +321,11 @@ void mul_mat_vec_f16_0(
         for (int j = 0; j < ncols8; j += 8) {
             __m256 a = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)(src0_row + j)));
             __m256 b = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)(src1 + j)));
+#if defined(__FMA__)
             sum = _mm256_fmadd_ps(a, b, sum);
+#else
+            sum = _mm256_add_ps(_mm256_mul_ps(a, b), sum);
+#endif
         }
         dst[i] = reduce_vector8_0(sum);
 
@@ -343,8 +354,13 @@ void mul_mat_vec_f16_1(
             __m256 a1 = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)(src0_row + j + 8)));
             __m256 b0 = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)(src1 + j)));
             __m256 b1 = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)(src1 + j + 8)));
+#if defined(__FMA__)
             sum0 = _mm256_fmadd_ps(a0, b0, sum0);
             sum1 = _mm256_fmadd_ps(a1, b1, sum1);
+#else
+            sum0 = _mm256_add_ps(_mm256_mul_ps(a0, b0), sum0);
+            sum1 = _mm256_add_ps(_mm256_mul_ps(a1, b1), sum1);
+#endif
         }
         dst[i] = reduce_vector8_0(sum0) + reduce_vector8_0(sum1);
 
@@ -379,10 +395,17 @@ void mul_mat_vec_f16_2(
             __m256 b1 = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)(src1 + j + 8)));
             __m256 b2 = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)(src1 + j + 16)));
             __m256 b3 = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)(src1 + j + 24)));
+#if defined(__FMA__)
             sum0 = _mm256_fmadd_ps(a0, b0, sum0);
             sum1 = _mm256_fmadd_ps(a1, b1, sum1);
             sum2 = _mm256_fmadd_ps(a2, b2, sum2);
             sum3 = _mm256_fmadd_ps(a3, b3, sum3);
+#else
+            sum0 = _mm256_add_ps(_mm256_mul_ps(a0, b0), sum0);
+            sum1 = _mm256_add_ps(_mm256_mul_ps(a1, b1), sum1);
+            sum2 = _mm256_add_ps(_mm256_mul_ps(a2, b2), sum2);
+            sum3 = _mm256_add_ps(_mm256_mul_ps(a3, b3), sum3);
+#endif
         }
         dst[i] = reduce_vector8_0(sum0) + reduce_vector8_0(sum1) + reduce_vector8_0(sum2) + reduce_vector8_0(sum3);
 
@@ -417,10 +440,17 @@ void mul_mat_vec_f16_3(
             __m256 b1 = _mm256_loadu_ps(src1 + j + 8);
             __m256 b2 = _mm256_loadu_ps(src1 + j + 16);
             __m256 b3 = _mm256_loadu_ps(src1 + j + 24);
+#if defined(__FMA__)
             sum0 = _mm256_fmadd_ps(a0, b0, sum0);
             sum1 = _mm256_fmadd_ps(a1, b1, sum1);
             sum2 = _mm256_fmadd_ps(a2, b2, sum2);
             sum3 = _mm256_fmadd_ps(a3, b3, sum3);
+#else
+            sum0 = _mm256_add_ps(_mm256_mul_ps(a0, b0), sum0);
+            sum1 = _mm256_add_ps(_mm256_mul_ps(a1, b1), sum1);
+            sum2 = _mm256_add_ps(_mm256_mul_ps(a2, b2), sum2);
+            sum3 = _mm256_add_ps(_mm256_mul_ps(a3, b3), sum3);
+#endif
         }
         dst[i] = reduce_vector8_0(sum0) + reduce_vector8_0(sum1) + reduce_vector8_0(sum2) + reduce_vector8_0(sum3);
 
