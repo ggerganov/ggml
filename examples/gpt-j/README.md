@@ -211,6 +211,10 @@ make -j4 gpt-j
 
 # Run the inference (requires 16GB of CPU RAM)
 ./bin/gpt-j -m models/gpt-j-6B/ggml-model.bin -p "This is an example"
+
+# Input prompt through pipe and run the inference.
+echo "This is an example" > prompt.txt
+cat prompt.txt | ./bin/gpt-j -m models/gpt-j-6B/ggml-model.bin
 ```
 
 To run the `gpt-j` tool, you need the 12GB `ggml-model.bin` file which contains the GPT-J model in
