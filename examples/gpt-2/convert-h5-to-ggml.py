@@ -20,8 +20,8 @@
 import sys
 import struct
 import json
-import torch
 import numpy as np
+import re
 
 from transformers import GPT2Model
 
@@ -84,6 +84,7 @@ fout.write(struct.pack("i", hparams["n_positions"]))
 fout.write(struct.pack("i", hparams["n_embd"]))
 fout.write(struct.pack("i", hparams["n_head"]))
 fout.write(struct.pack("i", hparams["n_layer"]))
+#fout.write(struct.pack("i", hparams["rotary_dim"]))
 fout.write(struct.pack("i", use_f16))
 
 byte_encoder = bytes_to_unicode()
@@ -101,33 +102,92 @@ for key in encoder_added:
     fout.write(struct.pack("i", len(text)))
     fout.write(text)
 
-name = "wte.weight"
-data = list_vars[name].squeeze().numpy()
-print("Processing variable: " + name + " with shape: ", data.shape)
+for name in list_vars.keys():
+    data = list_vars[name].squeeze().numpy()
+    print("Processing variable: " + name + " with shape: ", data.shape)
 
-n_dims = len(data.shape);
+    # we don't need these
+    if name.endswith("attn.masked_bias") or name.endswith(".attn.bias"):
+        print("  Skipping variable: " + name)
+        continue
 
-# ftype == 0 -> float32, ftype == 1 -> float16
-ftype = 0;
-if use_f16:
-    if name[-7:] == ".weight" and n_dims == 2:
-        print("  Converting to float16")
-        data = data.astype(np.float16)
-        ftype = 1
+    n_dims = len(data.shape);
+
+    # ftype == 0 -> float32, ftype == 1 -> float16
+    ftype = 0;
+    if use_f16:
+        if name[-7:] == ".weight" and n_dims == 2:
+            print("  Converting to float16")
+            data = data.astype(np.float16)
+            ftype = 1
+        else:
+            print("  Converting to float32")
+            data = data.astype(np.float32)
+            ftype = 0
+
+    # for efficiency - transpose these matrices:
+    #  "transformer.h.*.mlp.c_proj.weight
+    if name.endswith(".mlp.c_proj.weight"):
+        print("  Transposing")
+        data = data.transpose()
+
+    # rename headers to keep compatibility
+    if name == "ln_f.weight":
+        name = "model/ln_f/g"
+    elif name == "ln_f.bias":
+        name = "model/ln_f/b"
+    elif name == "wte.weight":
+        name = "model/wte"
+    elif name == "wpe.weight":
+        name = "model/wpe"
+    elif re.match(r'h\.\d+\.ln_1\.weight', name):
+        i = re.findall("\d+", name)[0]
+        name = f"model/h{i}/ln_1/g"
+    elif re.match(r"h\.\d+\.ln_1\.bias", name):
+        i = re.findall("\d+", name)[0]
+        name = f"model/h{i}/ln_1/b"
+    elif re.match(r"h\.\d+\.attn\.c_attn\.weight", name):
+        i = re.findall("\d+", name)[0]
+        name = f"model/h{i}/attn/c_attn/w"
+    elif re.match(r"h\.\d+\.attn\.c_attn\.bias", name):
+        i = re.findall("\d+", name)[0]
+        name = f"model/h{i}/attn/c_attn/b"
+    elif re.match(r"h\.\d+\.attn\.c_proj\.weight", name):
+        i = re.findall("\d+", name)[0]
+        name = f"model/h{i}/attn/c_proj/w"
+    elif re.match(r"h.\d+.attn.c_proj.bias", name):
+        i = re.findall("\d+", name)[0]
+        name = f"model/h{i}/attn/c_proj/b"
+    elif re.match(r"h.\d+.ln_2.weight", name):
+        i = re.findall("\d+", name)[0]
+        name = f"model/h{i}/ln_2/g"
+    elif re.match(r"h.\d+.ln_2.bias", name):
+        i = re.findall("\d+", name)[0]
+        name = f"model/h{i}/ln_2/b"
+    elif re.match(r"h.\d+.mlp.c_fc.weight", name):
+        i = re.findall("\d+", name)[0]
+        name = f"model/h{i}/mlp/c_fc/w"
+    elif re.match(r"h.\d+.mlp.c_fc.bias", name):
+        i = re.findall("\d+", name)[0]
+        name = f"model/h{i}/mlp/c_fc/b"
+    elif re.match(r"h.\d+.mlp.c_proj.weight", name):
+        i = re.findall("\d+", name)[0]
+        name = f"model/h{i}/mlp/c_proj/w"
+    elif re.match(r"h.\d+.mlp.c_proj.bias", name):
+        i = re.findall("\d+", name)[0]
+        name = f"model/h{i}/mlp/c_proj/b"
     else:
-        print("  Converting to float32")
-        data = data.astype(np.float32)
-        ftype = 0
+        print("Unrecognized variable name. %s", name)
 
-# header
-str = name.encode('utf-8')
-fout.write(struct.pack("iii", n_dims, len(str), ftype))
-for i in range(n_dims):
+    str = name.encode('utf-8')
+
+    fout.write(struct.pack("iii", n_dims, len(str), ftype))
+    for i in range(n_dims):
         fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
-fout.write(str);
+    fout.write(str);
 
-# data
-data.tofile(fout)
+    # data
+    data.tofile(fout)
 
 fout.close()
 
