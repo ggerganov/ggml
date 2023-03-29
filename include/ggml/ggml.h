@@ -228,7 +228,9 @@ enum ggml_op {
     GGML_OP_STEP,
     GGML_OP_RELU,
     GGML_OP_GELU,
+    GGML_OP_SILU,
     GGML_OP_NORM, // normalize
+    GGML_OP_RMS_NORM,
 
     GGML_OP_MUL_MAT,
 
@@ -340,6 +342,9 @@ void ggml_free(struct ggml_context * ctx);
 size_t ggml_used_mem(const struct ggml_context * ctx);
 
 size_t ggml_set_scratch(struct ggml_context * ctx, struct ggml_scratch scratch);
+
+bool ggml_mlock_supported(void);
+bool ggml_mlock(struct ggml_context * ctx, char ** err_p);
 
 struct ggml_tensor * ggml_new_tensor(
         struct ggml_context * ctx,
@@ -471,9 +476,17 @@ struct ggml_tensor * ggml_gelu(
         struct ggml_context * ctx,
         struct ggml_tensor  * a);
 
+struct ggml_tensor * ggml_silu(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a);
+
 // normalize along rows
 // TODO: eps is hardcoded to 1e-5 for now
 struct ggml_tensor * ggml_norm(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a);
+
+struct ggml_tensor * ggml_rms_norm(
         struct ggml_context * ctx,
         struct ggml_tensor  * a);
 
@@ -730,6 +743,13 @@ enum ggml_opt_result ggml_opt(
         struct ggml_context * ctx,
         struct ggml_opt_params params,
         struct ggml_tensor * f);
+
+//
+// quantization
+//
+
+size_t ggml_quantize_q4_0(const float * src, void * dst, int n, int k, int64_t * hist);
+size_t ggml_quantize_q4_1(const float * src, void * dst, int n, int k, int64_t * hist);
 
 //
 // system info

@@ -12,9 +12,6 @@
 #include <vector>
 #include <regex>
 
-// TODO: move somewhere else
-#define QK 32
-
 // default hparams (Whisper tiny)
 struct whisper_hparams {
     int32_t n_vocab       = 51864;
@@ -267,11 +264,11 @@ bool whisper_model_quantize(const std::string & fname_inp, const std::string & f
                 switch (type) {
                     case GGML_TYPE_Q4_0:
                         {
-                            cur_size = ggml_quantize_q4_0(data_f32.data(), work.data(), nelements, ne[0], QK, hist_cur.data());
+                            cur_size = ggml_quantize_q4_0(data_f32.data(), work.data(), nelements, ne[0], hist_cur.data());
                         } break;
                     case GGML_TYPE_Q4_1:
                         {
-                            cur_size = ggml_quantize_q4_1(data_f32.data(), work.data(), nelements, ne[0], QK, hist_cur.data());
+                            cur_size = ggml_quantize_q4_1(data_f32.data(), work.data(), nelements, ne[0], hist_cur.data());
                         } break;
                     default:
                         {
