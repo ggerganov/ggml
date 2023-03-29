@@ -45,8 +45,18 @@ def bytes_to_unicode():
     cs = [chr(n) for n in cs]
     return dict(zip(bs, cs))
 
-if len(sys.argv) < 2:
-    print("Usage: convert-ckpt-to-ggml.py dir-model [use-f32]\n")
+# helper method to convert a numpy array to different float types
+def convert_to_ftype(data, ftype):
+    # fp16
+    if ftype == 1:
+        return data.astype(np.float16)
+
+    assert False, "Invalid ftype: " + str(ftype)
+
+if len(sys.argv) < 3:
+    print("Usage: convert-ckpt-to-ggml.py dir-model ftype\n")
+    print("  ftype == 0 -> float32")
+    print("  ftype == 1 -> float16")
     sys.exit(1)
 
 # output in the same directory as the model
@@ -59,11 +69,20 @@ with open(dir_model + "/encoder.json", "r") as f:
 with open(dir_model + "/hparams.json", "r") as f:
     hparams = json.load(f)
 
-# use 16-bit or 32-bit floats
-use_f16 = True
+# possible data types
+#   ftype == 0 -> float32
+#   ftype == 1 -> float16
+#
+# map from ftype to string
+ftype_str = ["f32", "f16"]
+
+ftype = 1
 if len(sys.argv) > 2:
-    use_f16 = False
-    fname_out = sys.argv[1] + "/ggml-model-f32.bin"
+    ftype = int(sys.argv[2])
+    if ftype < 0 or ftype > 1:
+        print("Invalid ftype: " + str(ftype))
+        sys.exit(1)
+    fname_out = sys.argv[1] + "/ggml-model-" + ftype_str[ftype] + ".bin"
 
 list_vars = tf.train.list_variables(dir_model)
 
@@ -75,7 +94,7 @@ fout.write(struct.pack("i", hparams["n_ctx"]))
 fout.write(struct.pack("i", hparams["n_embd"]))
 fout.write(struct.pack("i", hparams["n_head"]))
 fout.write(struct.pack("i", hparams["n_layer"]))
-fout.write(struct.pack("i", use_f16))
+fout.write(struct.pack("i", ftype))
 
 byte_encoder = bytes_to_unicode()
 byte_decoder = {v:k for k, v in byte_encoder.items()}
@@ -93,9 +112,22 @@ for name, shape in list_vars:
     data = tf.train.load_variable(dir_model, name).squeeze()
     n_dims = len(data.shape);
 
-    # ftype == 0 -> float32, ftype == 1 -> float16
-    ftype = 0;
-    if use_f16:
+    # for efficiency - transpose the projection matrices
+    # "model/h.*/attn/c_attn/w"
+    # "model/h.*/attn/c_proj/w"
+    # "model/h.*/mlp/c_fc/w"
+    # "model/h.*/mlp/c_proj/w"
+    if name[-14:] == "/attn/c_attn/w" or \
+       name[-14:] == "/attn/c_proj/w" or \
+       name[-11:] == "/mlp/c_fc/w" or \
+       name[-13:] == "/mlp/c_proj/w":
+        print("  Transposing")
+        data = data.transpose()
+
+    dshape = data.shape
+
+    ftype_cur = 0
+    if ftype != 0:
         # match name:
         #  "model/wte"
         #  "model/h.*/attn/c_attn/w"
@@ -103,24 +135,19 @@ for name, shape in list_vars:
         #  "model/h.*/mlp/c_fc/w"
         #  "model/h.*/mlp/c_proj/w"
         if name == "model/wte" or name[-2:] == "/w":
-            print("  Converting to float16")
-            data = data.astype(np.float16)
-            ftype = 1
+            print("  Converting to " + ftype_str[ftype])
+            data = convert_to_ftype(data, ftype)
+            ftype_cur = ftype
         else:
             print("  Converting to float32")
             data = data.astype(np.float32)
-            ftype = 0
-
-    # for efficiency - transpose the projection matrices
-    if name[-13:] == "/mlp/c_proj/w":
-        print("  Transposing")
-        data = data.transpose()
+            ftype_cur = 0
 
     # header
     str = name.encode('utf-8')
-    fout.write(struct.pack("iii", n_dims, len(str), ftype))
+    fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
     for i in range(n_dims):
-        fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
+        fout.write(struct.pack("i", dshape[n_dims - 1 - i]))
     fout.write(str);
 
     # data

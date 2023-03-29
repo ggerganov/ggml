@@ -20,7 +20,7 @@ struct gpt_params {
     // sampling parameters
     int32_t top_k = 40;
     float   top_p = 0.9f;
-    float   temp  = 1.0f;
+    float   temp  = 0.9f;
 
     int32_t n_batch = 8; // batch size for prompt processing
 
@@ -81,4 +81,3 @@ gpt_vocab::id gpt_sample_top_k_top_p(
         double top_p,
         double temp,
         std::mt19937 & rng);
-

@@ -31,7 +31,7 @@ option(GGML_NO_ACCELERATE           "ggml: disable Accelerate framework" OFF)
 # sanitizers
 
 if (GGML_SANITIZE_THREAD)
-    set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -fsanitize=thread")
+    set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fsanitize=thread")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=thread")
 endif()
 

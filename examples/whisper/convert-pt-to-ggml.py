@@ -303,8 +303,9 @@ for name in list_vars.keys():
             data = data.astype(np.float32)
             ftype = 0
     else:
-        data = data.astype(np.float32)
-        ftype = 0
+        if n_dims < 3 and data.dtype != np.float32:
+            data = data.astype(np.float32)
+            ftype = 0
 
     #if name.startswith("encoder"):
     #    if name.endswith("mlp.0.weight") or \
