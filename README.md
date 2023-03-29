@@ -3,12 +3,13 @@
 Tensor library for machine learning
 
 ***Note that this project is under development and not ready for production use. \
-Some of the development is currently happening in the [whisper.cpp](https://github.com/ggerganov/whisper.cpp) repo***
+Some of the development is currently happening in the [llama.cpp](https://github.com/ggerganov/llama.cpp) and [whisper.cpp](https://github.com/ggerganov/whisper.cpp) repos***
 
 ## Features
 
 - Written in C
 - 16-bit float support
+- 4-bit integer quantization support
 - Automatic differentiation (WIP in progress)
 - ADAM and L-BFGS optimizers
 - Optimized for Apple silicon via NEON intrinsics and Accelerate framework
@@ -21,9 +22,9 @@ Some of the development is currently happening in the [whisper.cpp](https://gith
 - [X] Example of GPT-2 inference [examples/gpt-2](https://github.com/ggerganov/ggml/tree/master/examples/gpt-2)
 - [X] Example of GPT-J inference [examples/gpt-j](https://github.com/ggerganov/ggml/tree/master/examples/gpt-j)
 - [X] Example of Whisper inference [examples/whisper](https://github.com/ggerganov/ggml/tree/master/examples/whisper)
-- [ ] Support 4-bit integer quantization https://github.com/ggerganov/ggml/pull/27
+- [X] Support 4-bit integer quantization https://github.com/ggerganov/ggml/pull/27
 - [ ] Example of FLAN-T5 inference https://github.com/ggerganov/ggml/pull/12
-- [ ] Example of LLaMA inference
+- [X] Example of LLaMA inference [llama.cpp](https://github.com/ggerganov/llama.cpp)
 - [ ] Example of RWKV inference
 
 ## Whisper inference (example)
