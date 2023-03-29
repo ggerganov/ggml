@@ -17,6 +17,7 @@
 struct gpt2_hparams {
     int32_t n_vocab = 50257;
     int32_t n_ctx   = 1024;
+    int32_t n_ffn   = 1024;
     int32_t n_embd  = 768;
     int32_t n_head  = 12;
     int32_t n_layer = 12;
@@ -55,6 +56,7 @@ struct gpt2_model {
 
     struct ggml_tensor * wte; // position embedding
     struct ggml_tensor * wpe; //    token embedding
+    struct ggml_tensor * lm_head; // position embedding
 
     std::vector<gpt2_layer> layers;
 
@@ -93,6 +95,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
         fin.read((char *) &hparams.n_vocab, sizeof(hparams.n_vocab));
         fin.read((char *) &hparams.n_ctx,   sizeof(hparams.n_ctx));
+        fin.read((char *) &hparams.n_ffn,   sizeof(hparams.n_ffn));
         fin.read((char *) &hparams.n_embd,  sizeof(hparams.n_embd));
         fin.read((char *) &hparams.n_head,  sizeof(hparams.n_head));
         fin.read((char *) &hparams.n_layer, sizeof(hparams.n_layer));
@@ -100,6 +103,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
         printf("%s: n_vocab = %d\n", __func__, hparams.n_vocab);
         printf("%s: n_ctx   = %d\n", __func__, hparams.n_ctx);
+        printf("%s: n_ffn   = %d\n", __func__, hparams.n_ffn);
         printf("%s: n_embd  = %d\n", __func__, hparams.n_embd);
         printf("%s: n_head  = %d\n", __func__, hparams.n_head);
         printf("%s: n_layer = %d\n", __func__, hparams.n_layer);
@@ -150,7 +154,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         ctx_size += n_embd*ggml_type_size(GGML_TYPE_F32); // ln_f_b
 
         ctx_size += n_vocab*n_embd*ggml_type_size(wtype);         // wte
-        ctx_size +=   n_ctx*n_embd*ggml_type_size(GGML_TYPE_F32); // wpe
+        ctx_size +=   n_ctx*n_embd*ggml_type_size(wtype); // wpe
+        ctx_size += n_vocab*n_embd*ggml_type_size(wtype);         // lm_head
 
         ctx_size += n_layer*(n_embd*ggml_type_size(GGML_TYPE_F32)); // ln_1_g
         ctx_size += n_layer*(n_embd*ggml_type_size(GGML_TYPE_F32)); // ln_1_b
@@ -173,7 +178,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         ctx_size += n_ctx*n_layer*n_embd*ggml_type_size(GGML_TYPE_F32); // memory_k
         ctx_size += n_ctx*n_layer*n_embd*ggml_type_size(GGML_TYPE_F32); // memory_v
 
-        ctx_size += (6 + 12*n_layer)*256; // object overhead
+        ctx_size += (7 + 12*n_layer)*256; // object overhead
 
         printf("%s: ggml ctx size = %6.2f MB\n", __func__, ctx_size/(1024.0*1024.0));
     }
@@ -206,15 +211,17 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         model.ln_f_g = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
         model.ln_f_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
 
-        model.wte = ggml_new_tensor_2d(ctx, wtype,         n_embd, n_vocab);
-        model.wpe = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, n_embd, n_ctx);
+        model.wte     = ggml_new_tensor_2d(ctx, wtype, n_embd, n_vocab);
+        model.wpe     = ggml_new_tensor_2d(ctx, wtype, n_embd, n_ctx);
+        model.lm_head = ggml_new_tensor_2d(ctx, wtype, n_embd, n_vocab);
 
         // map by name
-        model.tensors["model/ln_f/g"] = model.ln_f_g;
-        model.tensors["model/ln_f/b"] = model.ln_f_b;
+        model.tensors["transformer.ln_f.weight"] = model.ln_f_g;
+        model.tensors["transformer.ln_f.bias"] = model.ln_f_b;
 
-        model.tensors["model/wte"] = model.wte;
-        model.tensors["model/wpe"] = model.wpe;
+        model.tensors["transformer.wte.weight"] = model.wte;
+        model.tensors["transformer.wpe.weight"] = model.wpe;
+        model.tensors["lm_head.weight"] = model.lm_head;
 
         for (int i = 0; i < n_layer; ++i) {
             auto & layer = model.layers[i];
@@ -238,23 +245,23 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             layer.c_mlp_proj_b       = ggml_new_tensor_1d(ctx, GGML_TYPE_F32,   n_embd);
 
             // map by name
-            model.tensors["model/h" + std::to_string(i) + "/ln_1/g"]        = layer.ln_1_g;
-            model.tensors["model/h" + std::to_string(i) + "/ln_1/b"]        = layer.ln_1_b;
+            model.tensors["transformer.h." + std::to_string(i) + ".ln_1.weight"]        = layer.ln_1_g;
+            model.tensors["transformer.h." + std::to_string(i) + ".ln_1.bias"]        = layer.ln_1_b;
 
-            model.tensors["model/h" + std::to_string(i) + "/ln_2/g"]        = layer.ln_2_g;
-            model.tensors["model/h" + std::to_string(i) + "/ln_2/b"]        = layer.ln_2_b;
+            model.tensors["transformer.h." + std::to_string(i) + ".ln_2.weight"]        = layer.ln_2_g;
+            model.tensors["transformer.h." + std::to_string(i) + ".ln_2.bias"]        = layer.ln_2_b;
 
-            model.tensors["model/h" + std::to_string(i) + "/attn/c_attn/w"] = layer.c_attn_attn_w;
-            model.tensors["model/h" + std::to_string(i) + "/attn/c_attn/b"] = layer.c_attn_attn_b;
+            model.tensors["transformer.h." + std::to_string(i) + ".attn.c_attn.weight"] = layer.c_attn_attn_w;
+            model.tensors["transformer.h." + std::to_string(i) + ".attn.c_attn.bias"] = layer.c_attn_attn_b;
 
-            model.tensors["model/h" + std::to_string(i) + "/attn/c_proj/w"] = layer.c_attn_proj_w;
-            model.tensors["model/h" + std::to_string(i) + "/attn/c_proj/b"] = layer.c_attn_proj_b;
+            model.tensors["transformer.h." + std::to_string(i) + ".attn.c_proj.weight"] = layer.c_attn_proj_w;
+            model.tensors["transformer.h." + std::to_string(i) + ".attn.c_proj.bias"] = layer.c_attn_proj_b;
 
-            model.tensors["model/h" + std::to_string(i) + "/mlp/c_fc/w"]    = layer.c_mlp_fc_w;
-            model.tensors["model/h" + std::to_string(i) + "/mlp/c_fc/b"]    = layer.c_mlp_fc_b;
+            model.tensors["transformer.h." + std::to_string(i) + ".mlp.c_fc.weight"]    = layer.c_mlp_fc_w;
+            model.tensors["transformer.h." + std::to_string(i) + ".mlp.c_fc.bias"]    = layer.c_mlp_fc_b;
 
-            model.tensors["model/h" + std::to_string(i) + "/mlp/c_proj/w"]  = layer.c_mlp_proj_w_trans;
-            model.tensors["model/h" + std::to_string(i) + "/mlp/c_proj/b"]  = layer.c_mlp_proj_b;
+            model.tensors["transformer.h." + std::to_string(i) + ".mlp.c_proj.weight"]  = layer.c_mlp_proj_w_trans;
+            model.tensors["transformer.h." + std::to_string(i) + ".mlp.c_proj.bias"]  = layer.c_mlp_proj_b;
         }
     }
 
@@ -626,7 +633,7 @@ bool gpt2_eval(
     // inpL = WTE * inpL
     // [ 768, 50257] - model.wte
     // [ 768, N]     - inpL
-    inpL = ggml_mul_mat(ctx0, model.wte, inpL);
+    inpL = ggml_mul_mat(ctx0, model.lm_head, inpL);
 
     // logits -> probs
     //inpL = ggml_soft_max(ctx0, inpL);

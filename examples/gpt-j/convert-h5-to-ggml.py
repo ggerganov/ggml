@@ -23,7 +23,7 @@ import json
 import torch
 import numpy as np
 
-from transformers import GPTJForCausalLM
+from transformers import GPTJForCausalLM, AutoModelForCausalLM
 
 # ref: https://github.com/openai/gpt-2/blob/master/src/encoder.py
 def bytes_to_unicode():
@@ -58,9 +58,6 @@ fname_out = sys.argv[1] + "/ggml-model.bin"
 with open(dir_model + "/vocab.json", "r") as f:
     encoder = json.load(f)
 
-with open(dir_model + "/added_tokens.json", "r") as f:
-    encoder_added = json.load(f)
-
 with open(dir_model + "/config.json", "r") as f:
     hparams = json.load(f)
 
@@ -70,34 +67,31 @@ if len(sys.argv) > 2:
     use_f16 = False
     fname_out = sys.argv[1] + "/ggml-model-f32.bin"
 
-model = GPTJForCausalLM.from_pretrained(dir_model, low_cpu_mem_usage=True)
+model = AutoModelForCausalLM.from_pretrained(dir_model, low_cpu_mem_usage=True)
 #print (model)
 
 list_vars = model.state_dict()
 #print (list_vars)
+
+print(hparams)
 
 fout = open(fname_out, "wb")
 
 fout.write(struct.pack("i", 0x67676d6c)) # magic: ggml in hex
 fout.write(struct.pack("i", hparams["vocab_size"]))
 fout.write(struct.pack("i", hparams["n_positions"]))
+fout.write(struct.pack("i", hparams["n_inner"])) # n_ffn
 fout.write(struct.pack("i", hparams["n_embd"]))
 fout.write(struct.pack("i", hparams["n_head"]))
 fout.write(struct.pack("i", hparams["n_layer"]))
-fout.write(struct.pack("i", hparams["rotary_dim"]))
 fout.write(struct.pack("i", use_f16))
 
 byte_encoder = bytes_to_unicode()
 byte_decoder = {v:k for k, v in byte_encoder.items()}
 
-fout.write(struct.pack("i", len(encoder) + len(encoder_added)))
+fout.write(struct.pack("i", len(encoder)))
 
 for key in encoder:
-    text = bytearray([byte_decoder[c] for c in key])
-    fout.write(struct.pack("i", len(text)))
-    fout.write(text)
-
-for key in encoder_added:
     text = bytearray([byte_decoder[c] for c in key])
     fout.write(struct.pack("i", len(text)))
     fout.write(text)
@@ -131,11 +125,7 @@ for name in list_vars.keys():
     #  "transformer.h.*.attn.q_proj.weight"
     #  "transformer.h.*.attn.k_proj.weight"
     #  "transformer.h.*.attn.v_proj.weight"
-    if name.endswith(".mlp.fc_in.weight")     or \
-       name.endswith(".attn.out_proj.weight") or \
-       name.endswith(".attn.q_proj.weight")   or \
-       name.endswith(".attn.k_proj.weight")   or \
-       name.endswith(".attn.v_proj.weight"):
+    if name.endswith(".mlp.c_proj.weight"):
         print("  Transposing")
         data = data.transpose()
 
