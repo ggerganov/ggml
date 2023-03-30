@@ -118,7 +118,7 @@ python ../examples/gpt-2/convert-cerebras-to-ggml.py models/Cerebras-GPT-111M/
 
 ```
 
-## Downloading the ggml model directly
+## Downloading the ggml model directly (GPT-2)
 
 For convenience, I will be hosting the converted ggml model files in order to make it easier to run the examples. This
 way, you can directly download a single binary file and start using it. No python or Tensorflow is required.
