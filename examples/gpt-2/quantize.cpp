@@ -162,6 +162,7 @@ bool gpt2_model_quantize(const std::string & fname_inp, const std::string & fnam
             // regexes of tensor names to be quantized
             const std::vector<std::string> k_names = {
                 "model/wte",
+                "model/lm_head",
                 "model/h.*/attn/c_attn/w",
                 "model/h.*/attn/c_proj/w",
                 "model/h.*/mlp/c_fc/w",
