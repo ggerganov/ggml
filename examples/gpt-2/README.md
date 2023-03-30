@@ -4,7 +4,9 @@ This is a C++ example running GPT-2 inference using the [ggml](https://github.co
 
 The program runs on the CPU - no video card is required.
 
-The example supports the following models:
+The [Cerebras-GPT](https://huggingface.co/cerebras) models are also supported.
+
+The example supports the following GPT-2 models:
 
 | Model | Description  | Disk Size |
 | ---   | ---          | ---       |
@@ -21,6 +23,8 @@ Sample performance on MacBook M1 Pro:
 | GPT-2 |  345M |  12 ms |
 | GPT-2 |  774M |  23 ms |
 | GPT-2 | 1558M |  42 ms |
+
+*TODO: add tables for Cerebras-GPT models*
 
 Sample output:
 
@@ -70,7 +74,7 @@ main:  predict time =   506.40 ms / 5.06 ms per token
 main:    total time =   629.84 ms
 ```
 
-## Downloading and converting the original models
+## Downloading and converting the original models (GPT-2)
 
 You can download the original model files using the [download-model.sh](download-model.sh) Bash script. The models are
 in Tensorflow format, so in order to use them with ggml, you need to convert them to appropriate format. This is done
@@ -101,6 +105,19 @@ Run the convert-ckpt-to-ggml.py script to convert the model to ggml format.
 This conversion requires that you have python and Tensorflow installed on your computer. Still, if you want to avoid
 this, you can download the already converted ggml models as described below.
 
+## Downloading and converting the original models (Cerebras-GPT)
+
+Clone the respective repository from here: https://huggingface.co/cerebras
+
+Use the [convert-cerebras-to-ggml.py](convert-cerebras-to-ggml.py) script to convert the model to `ggml` format:
+
+```
+cd ggml/build
+git clone https://huggingface.co/cerebras/Cerebras-GPT-111M models/
+python ../examples/gpt-2/convert-cerebras-to-ggml.py models/Cerebras-GPT-111M/
+
+```
+
 ## Downloading the ggml model directly
 
 For convenience, I will be hosting the converted ggml model files in order to make it easier to run the examples. This
@@ -122,3 +139,20 @@ You can now use it like this:
 ```
 
 At some point, I might decide to stop hosting these models. So in that case, simply revert to the manual process above.
+
+## Quantizing the models
+
+You can also try to quantize the `ggml` models via 4-bit integer quantization.
+Keep in mind that for smaller models, this will render them completely useless.
+You generally want to quantize larger models.
+
+```
+# quantize GPT-2 F16 to Q4_0 (faster but less precise)
+./bin/gpt-2-quantize models/gpt-2-1558M/ggml-model-f16.bin models/gpt-2-1558M/ggml-model-q4_0.bin 2
+./bin/gpt-2 -m models/gpt-2-1558M/ggml-model-q4_0.bin -p "This is an example"
+
+# quantize Cerebras F16 to Q4_1 (slower but more precise)
+./bin/gpt-2-quantize models/Cerebras-GPT-6.7B/ggml-model-f16.bin models/Cerebras-GPT-6.7B/ggml-model-q4_1.bin 3
+./bin/gpt-2 -m models/Cerebras-GPT-6.7B/ggml-model-q4_1.bin -p "This is an example"
+
+```

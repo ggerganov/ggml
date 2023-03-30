@@ -53,8 +53,9 @@ struct gpt2_model {
     struct ggml_tensor * ln_f_g;
     struct ggml_tensor * ln_f_b;
 
-    struct ggml_tensor * wte; // position embedding
-    struct ggml_tensor * wpe; //    token embedding
+    struct ggml_tensor * wte;     // position embedding
+    struct ggml_tensor * wpe;     //    token embedding
+    struct ggml_tensor * lm_head; // language model head
 
     std::vector<gpt2_layer> layers;
 
@@ -165,6 +166,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
         ctx_size += n_vocab*n_embd*ggml_type_sizef(wtype);         // wte
         ctx_size +=   n_ctx*n_embd*ggml_type_sizef(GGML_TYPE_F32); // wpe
+        ctx_size += n_vocab*n_embd*ggml_type_sizef(wtype);         // lm_head
 
         ctx_size += n_layer*(n_embd*ggml_type_sizef(GGML_TYPE_F32)); // ln_1_g
         ctx_size += n_layer*(n_embd*ggml_type_sizef(GGML_TYPE_F32)); // ln_1_b
@@ -220,15 +222,17 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         model.ln_f_g = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
         model.ln_f_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
 
-        model.wte = ggml_new_tensor_2d(ctx, wtype,         n_embd, n_vocab);
-        model.wpe = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, n_embd, n_ctx);
+        model.wte     = ggml_new_tensor_2d(ctx, wtype,         n_embd, n_vocab);
+        model.wpe     = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, n_embd, n_ctx);
+        model.lm_head = ggml_new_tensor_2d(ctx, wtype,         n_embd, n_vocab);
 
         // map by name
         model.tensors["model/ln_f/g"] = model.ln_f_g;
         model.tensors["model/ln_f/b"] = model.ln_f_b;
 
-        model.tensors["model/wte"] = model.wte;
-        model.tensors["model/wpe"] = model.wpe;
+        model.tensors["model/wte"]     = model.wte;
+        model.tensors["model/wpe"]     = model.wpe;
+        model.tensors["model/lm_head"] = model.lm_head;
 
         for (int i = 0; i < n_layer; ++i) {
             auto & layer = model.layers[i];
@@ -294,6 +298,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
     // load weights
     {
         size_t total_size = 0;
+
+        bool has_lm_head = false;
 
         while (true) {
             int32_t n_dims;
@@ -361,6 +367,15 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             }
 
             fin.read(reinterpret_cast<char *>(tensor->data), ggml_nbytes(tensor));
+
+            // GPT-2 models share the WTE tensor as the LM head
+            if (name == "model/wte" && has_lm_head == false) {
+                memcpy(model.lm_head->data, tensor->data, ggml_nbytes(tensor));
+            }
+
+            if (name == "model/lm_head") {
+                has_lm_head = true;
+            }
 
             total_size += ggml_nbytes(tensor);
         }
@@ -656,9 +671,9 @@ bool gpt2_eval(
     }
 
     // inpL = WTE * inpL
-    // [ 768, 50257] - model.wte
+    // [ 768, 50257] - model.lm_head
     // [ 768, N]     - inpL
-    inpL = ggml_mul_mat(ctx0, model.wte, inpL);
+    inpL = ggml_mul_mat(ctx0, model.lm_head, inpL);
 
     // logits -> probs
     //inpL = ggml_soft_max(ctx0, inpL);

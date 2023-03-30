@@ -23,6 +23,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [X] Example of GPT-J inference [examples/gpt-j](https://github.com/ggerganov/ggml/tree/master/examples/gpt-j)
 - [X] Example of Whisper inference [examples/whisper](https://github.com/ggerganov/ggml/tree/master/examples/whisper)
 - [X] Support 4-bit integer quantization https://github.com/ggerganov/ggml/pull/27
+- [X] Example of Cerebras-GPT inference [examples/gpt-2](https://github.com/ggerganov/ggml/tree/master/examples/gpt-2)
 - [ ] Example of FLAN-T5 inference https://github.com/ggerganov/ggml/pull/12
 - [X] Example of LLaMA inference [llama.cpp](https://github.com/ggerganov/llama.cpp)
 - [ ] Example of RWKV inference
@@ -62,6 +63,11 @@ make -j4 gpt-2 gpt-j
 # Run the GPT-J 6B model (requires 12GB disk space and 16GB CPU RAM)
 ../examples/gpt-j/download-ggml-model.sh 6B
 ./bin/gpt-j -m models/gpt-j-6B/ggml-model.bin -p "This is an example"
+
+# Run the Cerebras-GPT 111M model
+# Download from: https://huggingface.co/cerebras
+python3 ./examples/gpt-2/convert-cerebras-to-ggml.py /path/to/Cerebras-GPT-111M/
+./bin/gpt-2 -m /path/to/Cerebras-GPT-111M/ggml-model-f16.bin -p "This is an example"
 ```
 
 The inference speeds that I get for the different models on my 32GB MacBook M1 Pro are as follows:
