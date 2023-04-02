@@ -18,7 +18,17 @@ int main(int argc, const char ** argv) {
     struct ggml_opt_params opt_params = ggml_opt_default_params(GGML_OPT_LBFGS);
     //struct ggml_opt_params opt_params = ggml_opt_default_params(GGML_OPT_ADAM);
 
-    opt_params.n_threads = (argc > 1) ? atoi(argv[1]) : 8;
+    // original nthreads: 8
+    int nthreads = 8;
+    const char *env = getenv("GGML_NTHREADS");
+    if (env != NULL) {
+        nthreads = atoi(env);
+    }
+    if (argc > 1) {
+        nthreads = atoi(argv[1]);
+    }
+    opt_params.n_threads = nthreads;
+    printf("test3: n_threads:%d\n", opt_params.n_threads);
 
     const int NP = 1 << 12;
     const int NF = 1 << 8;
