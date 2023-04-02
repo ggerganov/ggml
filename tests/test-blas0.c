@@ -10,9 +10,14 @@
 
 #include <sys/time.h>
 
+#ifdef __ARM_NEON
 #include <arm_neon.h>
 
 #include <Accelerate/Accelerate.h>
+#else
+// x86_64
+#include <cblas.h>
+#endif
 
 uint64_t get_time_us() {
     struct timeval tv;
