@@ -116,7 +116,13 @@ for name in list_vars.keys():
     # ftype == 0 -> float32, ftype == 1 -> float16
     ftype = 0;
     if use_f16:
-        if name[-7:] == ".weight" and n_dims == 2:
+        # match name:
+        #  "wte.weight"
+        #  "transformer.h.*.mlp.c_proj.weight"
+        #  "transformer.h.*.mlp.c_fc.weight
+        #  "transformer.h.*.attn.c_attn.weight
+        #  "transformer.h.*.attn.c_proj.weight
+        if name[-7:] == ".weight" and name[-10:] != 'wpe' and n_dims == 2:
             print("  Converting to float16")
             data = data.astype(np.float16)
             ftype = 1
@@ -126,8 +132,14 @@ for name in list_vars.keys():
             ftype = 0
 
     # for efficiency - transpose these matrices:
-    #  "transformer.h.*.mlp.c_proj.weight
-    if name.endswith(".mlp.c_proj.weight"):
+    #  "transformer.h.*.mlp.c_proj.weight"
+    #  "transformer.h.*.mlp.c_fc.weight
+    #  "transformer.h.*.attn.c_attn.weight
+    #  "transformer.h.*.attn.c_proj.weight
+    if name.endswith(".mlp.c_proj.weight") or  \
+       name.endswith(".mlp.c_fc.weight") or    \
+       name.endswith('.attn.c_attn.weight') or \
+       name.endswith('.attn.c_proj.weight'):
         print("  Transposing")
         data = data.transpose()
 
