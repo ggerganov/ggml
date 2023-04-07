@@ -25,8 +25,9 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [X] Support 4-bit integer quantization https://github.com/ggerganov/ggml/pull/27
 - [X] Example of Cerebras-GPT inference [examples/gpt-2](https://github.com/ggerganov/ggml/tree/master/examples/gpt-2)
 - [ ] Example of FLAN-T5 inference https://github.com/ggerganov/ggml/pull/12
-- [X] Example of LLaMA inference [llama.cpp](https://github.com/ggerganov/llama.cpp)
-- [ ] Example of RWKV inference
+- [X] Example of LLaMA inference [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp)
+- [X] Example of RWKV inference [saharNooby/rwkv.cpp](https://github.com/saharNooby/rwkv.cpp)
+- [ ] Example of [SAM](https://github.com/facebookresearch/segment-anything) inference
 
 ## Whisper inference (example)
 
