@@ -4077,7 +4077,8 @@ struct ggml_tensor * ggml_mul_mat(
         struct ggml_tensor  * a,
         struct ggml_tensor  * b) {
     GGML_ASSERT(ggml_can_mul_mat(a, b));
-    GGML_ASSERT(!ggml_is_transposed(a));
+    // doesn't make sense. nxm `mul_mat` mxk where  m > n and m > k
+    // GGML_ASSERT(!ggml_is_transposed(a));
 
     bool is_node = false;
 
@@ -4905,8 +4906,9 @@ static void ggml_compute_forward_add_f32(
     GGML_ASSERT(nb00 == sizeof(float));
 
     if (nb10 == sizeof(float)) {
-        const int j0 = (n/nth)*ith;
-        const int j1 = ith == nth - 1 ? n : (n/nth)*(ith + 1);
+        const int nnth = nth == 0 ? 0 : (n/nth);
+        const int j0 = nnth*ith;
+        const int j1 = ith == nth - 1 ? n : nnth*(ith + 1);
 
         for (int j = j0; j < j1; j++) {
             ggml_vec_add_f32(nc,
@@ -5663,7 +5665,7 @@ static void ggml_compute_forward_gelu_f32(
     const int nr = ggml_nrows(src0);
 
     // rows per thread
-    const int dr = (nr + nth - 1)/nth;
+    const int dr = nth == 0 ? 0 : (nr + nth - 1)/nth;
 
     // row range for this thread
     const int ir0 = dr*ith;
@@ -5730,7 +5732,7 @@ static void ggml_compute_forward_silu_f32(
     const int nr = ggml_nrows(src0);
 
     // rows per thread
-    const int dr = (nr + nth - 1)/nth;
+    const int dr = nth == 0 ? 0 : (nr + nth - 1)/nth;
 
     // row range for this thread
     const int ir0 = dr*ith;
@@ -6090,7 +6092,7 @@ static void ggml_compute_forward_mul_mat_f32(
     const int nr = ne01*ne02*ne03;
 
     // rows per thread
-    const int dr = (nr + nth - 1)/nth;
+    const int dr = nth == 0 ? 0 : (nr + nth - 1)/nth;
 
     // row range for this thread
     const int ir0 = dr*ith;
@@ -6281,7 +6283,7 @@ static void ggml_compute_forward_mul_mat_f16_f32(
     const int nr = ne01*ne02*ne03;
 
     // rows per thread
-    const int dr = (nr + nth - 1)/nth;
+    const int dr = nth == 0 ? 0 : (nr + nth - 1)/nth;
 
     // row range for this thread
     const int ir0 = dr*ith;
@@ -6489,7 +6491,7 @@ static void ggml_compute_forward_mul_mat_q_f32(
     const int nr = ne01*ne02*ne03;
 
     // rows per thread
-    const int dr = (nr + nth - 1)/nth;
+    const int dr = nth == 0 ? 0 : (nr + nth - 1)/nth;
 
     // row range for this thread
     const int ir0 = dr*ith;
@@ -6619,7 +6621,7 @@ static void ggml_compute_forward_scale_f32(
     const int nr = ggml_nrows(src0);
 
     // rows per thread
-    const int dr = (nr + nth - 1)/nth;
+    const int dr = nth == 0 ? 0 : (nr + nth - 1)/nth;
 
     // row range for this thread
     const int ir0 = dr*ith;
@@ -6921,7 +6923,7 @@ static void ggml_compute_forward_soft_max_f32(
     const int nr = ggml_nrows(src0);
 
     // rows per thread
-    const int dr = (nr + nth - 1)/nth;
+    const int dr = nth == 0 ? 0 : (nr + nth - 1)/nth;
 
     // row range for this thread
     const int ir0 = dr*ith;
@@ -7233,7 +7235,7 @@ static void ggml_compute_forward_conv_1d_1s_f16_f32(
     const int nr = ne02;
 
     // rows per thread
-    const int dr = (nr + nth - 1)/nth;
+    const int dr = nth == 0 ? 0 : (nr + nth - 1)/nth;
 
     // row range for this thread
     const int ir0 = dr*ith;
@@ -7353,7 +7355,7 @@ static void ggml_compute_forward_conv_1d_1s_f32(
     const int nr = ne02;
 
     // rows per thread
-    const int dr = (nr + nth - 1)/nth;
+    const int dr = nth == 0 ? 0 : (nr + nth - 1)/nth;
 
     // row range for this thread
     const int ir0 = dr*ith;
@@ -7501,7 +7503,7 @@ static void ggml_compute_forward_conv_1d_2s_f16_f32(
     const int nr = ne02;
 
     // rows per thread
-    const int dr = (nr + nth - 1)/nth;
+    const int dr = nth == 0 ? 0 : (nr + nth - 1)/nth;
 
     // row range for this thread
     const int ir0 = dr*ith;
@@ -7621,7 +7623,7 @@ static void ggml_compute_forward_conv_1d_2s_f32(
     const int nr = ne02;
 
     // rows per thread
-    const int dr = (nr + nth - 1)/nth;
+    const int dr = nth == 0 ? 0 : (nr + nth - 1)/nth;
 
     // row range for this thread
     const int ir0 = dr*ith;
@@ -7767,7 +7769,7 @@ static void ggml_compute_forward_flash_attn_f32(
     const int nr = neq1*neq2*neq3;
 
     // rows per thread
-    const int dr = (nr + nth - 1)/nth;
+    const int dr = nth == 0 ? 0 : (nr + nth - 1)/nth;
 
     // row range for this thread
     const int ir0 = dr*ith;
@@ -7976,7 +7978,7 @@ static void ggml_compute_forward_flash_attn_f16(
     const int nr = neq1*neq2*neq3;
 
     // rows per thread
-    const int dr = (nr + nth - 1)/nth;
+    const int dr = nth == 0 ? 0 : (nr + nth - 1)/nth;
 
     // row range for this thread
     const int ir0 = dr*ith;
@@ -8274,7 +8276,7 @@ static void ggml_compute_forward_flash_ff_f16(
     const int nr = nea1*nea2*nea3;
 
     // rows per thread
-    const int dr = (nr + nth - 1)/nth;
+    const int dr = nth == 0 ? 0 : (nr + nth - 1)/nth;
 
     // row range for this thread
     const int ir0 = dr*ith;
