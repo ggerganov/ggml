@@ -63,10 +63,10 @@ if len(sys.argv) < 3:
 dir_model = sys.argv[1]
 fname_out = sys.argv[1] + "/ggml-model.bin"
 
-with open(dir_model + "/encoder.json", "r") as f:
+with open(dir_model + "/encoder.json", "r", encoding="utf-8") as f:
     encoder = json.load(f)
 
-with open(dir_model + "/hparams.json", "r") as f:
+with open(dir_model + "/hparams.json", "r", encoding="utf-8") as f:
     hparams = json.load(f)
 
 # possible data types
