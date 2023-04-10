@@ -13,6 +13,7 @@ int main(int argc, const char ** argv) {
     struct ggml_init_params params = {
         .mem_size   = 1024*1024*1024,
         .mem_buffer = NULL,
+        .no_alloc   = false,
     };
 
     struct ggml_opt_params opt_params = ggml_opt_default_params(GGML_OPT_LBFGS);

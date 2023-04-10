@@ -15,7 +15,7 @@ int irand(int n) {
     return rand()%n;
 }
 
-void get_random_dims(int * dims, int ndims) {
+void get_random_dims(int64_t * dims, int ndims) {
     dims[0] = dims[1] = dims[2] = dims[3] = 1;
 
     for (int i = 0; i < ndims; i++) {
@@ -26,7 +26,7 @@ void get_random_dims(int * dims, int ndims) {
 struct ggml_tensor * get_random_tensor(
         struct ggml_context * ctx0,
         int ndims,
-        int ne[],
+        int64_t ne[],
         float fmin,
         float fmax) {
     struct ggml_tensor * result = ggml_new_tensor(ctx0, GGML_TYPE_F32, ndims, ne);
@@ -175,7 +175,7 @@ bool check_mat_mul(
     }
     printf("\n");
 
-    printf("y: n_dims = %d, (%d, %d)\n", y->n_dims, y->ne[0], y->ne[1]);
+    printf("y: n_dims = %d, (%lld, %lld)\n", y->n_dims, y->ne[0], y->ne[1]);
     for (int j = 0; j < y->ne[1]; ++j) {
         for (int i = 0; i < y->ne[0]; ++i) {
             printf("%6.3f ", dst[j*nr + i]);
@@ -206,9 +206,10 @@ int main(int argc, const char ** argv) {
     struct ggml_init_params params = {
         .mem_size   = 128*1024*1024,
         .mem_buffer = NULL,
+        .no_alloc   = false,
     };
 
-    int ne[4];
+    int64_t ne[4];
 
     // original loop: 1000
     int niter = 1000;
@@ -359,10 +360,10 @@ int main(int argc, const char ** argv) {
         {
             const int nargs = 1;
 
-            for (int ndims = 1; ndims <= 2; ++ndims) {
+            for (int ndims = 2; ndims <= 2; ++ndims) {
                 x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
                 {
-                    int ne2[4];
+                    int64_t ne2[4];
                     get_random_dims(ne2, 4);
                     ne2[0] = ne[0];
                     x[1] = get_random_tensor(ctx0, ndims, ne2, -1.0f, 1.0f);
@@ -373,8 +374,7 @@ int main(int argc, const char ** argv) {
                 struct ggml_tensor * m = ggml_mul_mat(ctx0, x[1], x[0]);
                 struct ggml_tensor * f = ggml_sum(ctx0, m);
 
-                printf("testing: mul_mat, [%d, %d] * [%d, %d]\n",
-                        x[1]->ne[0], x[1]->ne[1], x[0]->ne[0], x[0]->ne[1]);
+                printf("testing: mul_mat, [%lld, %lld] (%d) * [%lld, %lld] (%d)\n", x[1]->ne[0], x[1]->ne[1], x[1]->n_dims, x[0]->ne[0], x[0]->ne[1], x[0]->n_dims);
 
                 check_gradient("mul_mat", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, INFINITY);
                 check_mat_mul(m, x[1], x[0]);

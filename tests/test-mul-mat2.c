@@ -1888,23 +1888,23 @@ void vec_dot_gq_5(const int n, float * restrict s, const void * restrict x, cons
         const uint8_t * restrict p1 = pb1 + i*QK/2;
 
         const int8x16_t m4b = vdupq_n_s8(0xf);
-        const int8x16_t  s8b = vdupq_n_s8(0x8);
+        const int8x16_t s8b = vdupq_n_s8(0x8);
 
-        const int8x16_t v0_0 = vld1q_s8(p0);
-        const int8x16_t v0_1 = vld1q_s8(p0 + 16);
-        const int8x16_t v1_0 = vld1q_s8(p1);
-        const int8x16_t v1_1 = vld1q_s8(p1 + 16);
+        const uint8x16_t v0_0 = vld1q_u8(p0);
+        const uint8x16_t v0_1 = vld1q_u8(p0 + 16);
+        const uint8x16_t v1_0 = vld1q_u8(p1);
+        const uint8x16_t v1_1 = vld1q_u8(p1 + 16);
 
         // 4-bit -> 8-bit
-        const int8x16_t v0_0l = vandq_s8(v0_0, m4b);
-        const int8x16_t v0_1l = vandq_s8(v0_1, m4b);
-        const int8x16_t v1_0l = vandq_s8(v1_0, m4b);
-        const int8x16_t v1_1l = vandq_s8(v1_1, m4b);
+        const int8x16_t v0_0l = vreinterpretq_s8_u8(vandq_u8(v0_0, m4b));
+        const int8x16_t v0_1l = vreinterpretq_s8_u8(vandq_u8(v0_1, m4b));
+        const int8x16_t v1_0l = vreinterpretq_s8_u8(vandq_u8(v1_0, m4b));
+        const int8x16_t v1_1l = vreinterpretq_s8_u8(vandq_u8(v1_1, m4b));
 
-        const int8x16_t v0_0h = vshrq_n_s8(v0_0, 4);
-        const int8x16_t v0_1h = vshrq_n_s8(v0_1, 4);
-        const int8x16_t v1_0h = vshrq_n_s8(v1_0, 4);
-        const int8x16_t v1_1h = vshrq_n_s8(v1_1, 4);
+        const int8x16_t v0_0h = vreinterpretq_s8_u8(vshrq_n_u8(v0_0, 4));
+        const int8x16_t v0_1h = vreinterpretq_s8_u8(vshrq_n_u8(v0_1, 4));
+        const int8x16_t v1_0h = vreinterpretq_s8_u8(vshrq_n_u8(v1_0, 4));
+        const int8x16_t v1_1h = vreinterpretq_s8_u8(vshrq_n_u8(v1_1, 4));
 
         // sub 8
         const int8x16_t v0_0ls = vsubq_s8(v0_0l, s8b);
@@ -2281,25 +2281,25 @@ void vec_dot_gq_6(const int n, float * restrict s, const void * restrict x, cons
         const uint8_t * restrict p1 = pb1 + i*16;
 
         const int8x16_t m4b = vdupq_n_s8(0xf);
-        const int8x16_t  s8b = vdupq_n_s8(0x8);
+        const int8x16_t s8b = vdupq_n_s8(0x8);
 
-        const int8x16_t v0_0 = vld1q_s8(p0);
-        const int8x16_t v0_1 = vld1q_s8(p0 + 16);
-        const int8x16_t v1_0 = vld1q_s8(p1);
-        const int8x16_t v1_1 = vld1q_s8(p1 + 16);
+        const uint8x16_t v0_0 = vld1q_u8(p0);
+        const uint8x16_t v0_1 = vld1q_u8(p0 + 16);
+        const uint8x16_t v1_0 = vld1q_u8(p1);
+        const uint8x16_t v1_1 = vld1q_u8(p1 + 16);
 
         // 4-bit -> 8-bit
-        const int8x16_t v0_0l = vandq_s8(v0_0, m4b);
-        const int8x16_t v1_0l = vandq_s8(v1_0, m4b);
+        const int8x16_t v0_0l = vreinterpretq_s8_u8(vandq_u8(v0_0, m4b));
+        const int8x16_t v1_0l = vreinterpretq_s8_u8(vandq_u8(v1_0, m4b));
 
-        const int8x16_t v0_0h = vshrq_n_s8(v0_0, 4);
-        const int8x16_t v1_0h = vshrq_n_s8(v1_0, 4);
+        const int8x16_t v0_0h = vreinterpretq_s8_u8(vshrq_n_u8(v0_0, 4));
+        const int8x16_t v1_0h = vreinterpretq_s8_u8(vshrq_n_u8(v1_0, 4));
 
-        const int8x16_t v0_1l = vandq_s8(v0_1, m4b);
-        const int8x16_t v1_1l = vandq_s8(v1_1, m4b);
+        const int8x16_t v0_1l = vreinterpretq_s8_u8(vandq_u8(v0_1, m4b));
+        const int8x16_t v1_1l = vreinterpretq_s8_u8(vandq_u8(v1_1, m4b));
 
-        const int8x16_t v0_1h = vshrq_n_s8(v0_1, 4);
-        const int8x16_t v1_1h = vshrq_n_s8(v1_1, 4);
+        const int8x16_t v0_1h = vreinterpretq_s8_u8(vshrq_n_u8(v0_1, 4));
+        const int8x16_t v1_1h = vreinterpretq_s8_u8(vshrq_n_u8(v1_1, 4));
 
         // sub 8
         const int8x16_t v0_0ls = vsubq_s8(v0_0l, s8b);
@@ -2376,7 +2376,7 @@ int main(int argc, const char ** argv) {
 
     // needed to initialize f16 tables
     {
-        struct ggml_init_params params = { 0, NULL };
+        struct ggml_init_params params = { 0, NULL, false };
         struct ggml_context * ctx = ggml_init(params);
         ggml_free(ctx);
     }

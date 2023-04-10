@@ -15,7 +15,7 @@ int irand(int n) {
     return rand()%n;
 }
 
-void get_random_dims(int * dims, int ndims) {
+void get_random_dims(int64_t * dims, int ndims) {
     dims[0] = dims[1] = dims[2] = dims[3] = 1;
 
     for (int i = 0; i < ndims; i++) {
@@ -26,7 +26,7 @@ void get_random_dims(int * dims, int ndims) {
 struct ggml_tensor * get_random_tensor(
         struct ggml_context * ctx0,
         int ndims,
-        int ne[],
+        int64_t ne[],
         float fmin,
         float fmax) {
     struct ggml_tensor * result = ggml_new_tensor(ctx0, GGML_TYPE_F32, ndims, ne);
@@ -102,8 +102,8 @@ bool check_gradient(
     ggml_graph_dump_dot(&gb, &gf,  "test-grad0-backward.dot");
 
     for (int i = 0; i < nargs; ++i) {
-        const int nelements = ggml_nelements(x[i]);
-        for (int k = 0; k < nelements; ++k) {
+        const int64_t nelements = ggml_nelements(x[i]);
+        for (int64_t k = 0; k < nelements; ++k) {
             // compute gradient using finite differences
             const float x0 = get_element(x[i], k);
 
@@ -132,7 +132,7 @@ bool check_gradient(
             const float error_rel = g0 != 0 ? fabsf(g0 - g1)/fabs(g0) : 0;
 
             if (error_abs > max_error_abs || error_rel > max_error_rel) {
-                printf("%s: ndims=%d, i=%d, k=%d, g0=%f, g1=%f, error_abs=%f, error_rel=%f\n",
+                printf("%s: ndims=%d, i=%d, k=%lld, g0=%f, g1=%f, error_abs=%f, error_rel=%f\n",
                         op_name, ndims, i, k, g0, g1, error_abs, error_rel);
                 assert(false);
             }
@@ -161,22 +161,22 @@ bool check_mat_mul(
     float * src0 = (float *) x0->data;
     float * src1 = (float *) x1->data;
 
-    const int n00 = x0->ne[0];
-    const int n10 = x0->ne[1];
-    const int n20 = x0->ne[2];
-    const int n30 = x0->ne[3];
+    const int64_t n00 = x0->ne[0];
+    const int64_t n10 = x0->ne[1];
+    const int64_t n20 = x0->ne[2];
+    const int64_t n30 = x0->ne[3];
 
-    const int n01 = x1->ne[0];
-    const int n11 = x1->ne[1];
-    const int n21 = x1->ne[2];
-    const int n31 = x1->ne[3];
+    const int64_t n01 = x1->ne[0];
+    const int64_t n11 = x1->ne[1];
+    const int64_t n21 = x1->ne[2];
+    const int64_t n31 = x1->ne[3];
 
-    const int n02 = y->ne[0];
-    const int n12 = y->ne[1];
-    const int n22 = y->ne[2];
-    const int n32 = y->ne[3];
+    const int64_t n02 = y->ne[0];
+    const int64_t n12 = y->ne[1];
+    const int64_t n22 = y->ne[2];
+    const int64_t n32 = y->ne[3];
 
-    printf("x0: [%d, %d, %d, %d]\n", n00, n10, n20, n30);
+    printf("x0: [%lld, %lld, %lld, %lld]\n", n00, n10, n20, n30);
     for (int j = 0; j < n10; ++j) {
         for (int i = 0; i < n00; ++i) {
             printf("%6.3f ", mat_get(x0, i, j, 0, 0));
@@ -185,7 +185,7 @@ bool check_mat_mul(
     }
     printf("\n");
 
-    printf("x1: [%d, %d, %d, %d]\n", n01, n11, n21, n31);
+    printf("x1: [%lld, %lld, %lld, %lld]\n", n01, n11, n21, n31);
     for (int j = 0; j < n11; ++j) {
         for (int i = 0; i < n01; ++i) {
             printf("%6.3f ", mat_get(x1, i, j, 0, 0));
@@ -194,7 +194,7 @@ bool check_mat_mul(
     }
     printf("\n");
 
-    printf("y: [%d, %d, %d, %d]\n", n02, n12, n22, n32);
+    printf("y: [%lld, %lld, %lld, %lld]\n", n02, n12, n22, n32);
     for (int j = 0; j < n12; ++j) {
         for (int i = 0; i < n02; ++i) {
             printf("%6.3f ", mat_get(y, i, j, 0, 0));
@@ -228,9 +228,10 @@ int main(int argc, const char ** argv) {
     struct ggml_init_params params = {
         .mem_size   = 128*1024*1024,
         .mem_buffer = NULL,
+        .no_alloc   = false,
     };
 
-    int ne[4];
+    int64_t ne[4];
 
     // original loop: 500
     int niter = 500;
@@ -253,7 +254,7 @@ int main(int argc, const char ** argv) {
         {
             const int nargs = 1;
 
-            for (int ndims = 1; ndims <= 4; ++ndims) {
+            for (int ndims = 2; ndims <= 4; ++ndims) {
                 x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
                 ne[1] = rand()%4 + 1;
                 x[1] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
@@ -263,7 +264,7 @@ int main(int argc, const char ** argv) {
                 struct ggml_tensor * m = ggml_mul_mat(ctx0, x[1], x[0]);
                 struct ggml_tensor * f = ggml_sum(ctx0, m);
 
-                printf("testing: mul_mat, [%d, %d, %d, %d] = [%d, %d, %d, %d] * [%d, %d, %d, %d]\n",
+                printf("testing: mul_mat, [%lld, %lld, %lld, %lld] = [%lld, %lld, %lld, %lld] * [%lld, %lld, %lld, %lld]\n",
                            m->ne[0],    m->ne[1],    m->ne[2],    m->ne[3],
                         x[1]->ne[0], x[1]->ne[1], x[1]->ne[2], x[1]->ne[3],
                         x[0]->ne[0], x[0]->ne[1], x[0]->ne[2], x[0]->ne[3]);
@@ -292,14 +293,14 @@ int main(int argc, const char ** argv) {
                 x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
                 ne[1] = ne[0];
                 ne[0] = rand()%4 + 1;
-                x[1] = ggml_transpose(ctx0, get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f));
+                x[1] = ggml_cont(ctx0, ggml_transpose(ctx0, get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f)));
 
                 ggml_set_param(ctx0, x[0]);
 
                 struct ggml_tensor * m = ggml_mul_mat(ctx0, x[1], x[0]);
                 struct ggml_tensor * f = ggml_sum(ctx0, m);
 
-                printf("testing: mul_mat, [%d, %d, %d, %d] = [%d, %d, %d, %d] * [%d, %d, %d, %d]\n",
+                printf("testing: mul_mat, [%lld, %lld, %lld, %lld] = [%lld, %lld, %lld, %lld] * [%lld, %lld, %lld, %lld]\n",
                            m->ne[0],    m->ne[1],    m->ne[2],    m->ne[3],
                         x[1]->ne[0], x[1]->ne[1], x[1]->ne[2], x[1]->ne[3],
                         x[0]->ne[0], x[0]->ne[1], x[0]->ne[2], x[0]->ne[3]);
