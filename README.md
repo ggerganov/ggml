@@ -68,7 +68,7 @@ make -j4 gpt-2 gpt-j
 
 # Run the Cerebras-GPT 111M model
 # Download from: https://huggingface.co/cerebras
-python3 ./examples/gpt-2/convert-cerebras-to-ggml.py /path/to/Cerebras-GPT-111M/
+python3 ../examples/gpt-2/convert-cerebras-to-ggml.py /path/to/Cerebras-GPT-111M/
 ./bin/gpt-2 -m /path/to/Cerebras-GPT-111M/ggml-model-f16.bin -p "This is an example"
 ```
 
