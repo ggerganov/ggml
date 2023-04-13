@@ -14,7 +14,7 @@
 #include <unistd.h>
 #include <time.h>
 
-// default hparams 
+// default hparams
 struct mnist_hparams {
     int32_t n_input = 784;
     int32_t n_hidden = 500;
@@ -84,6 +84,7 @@ bool mnist_model_load(const std::string & fname, mnist_model & model) {
         struct ggml_init_params params = {
             .mem_size   = ctx_size + 1024*1024,
             .mem_buffer = NULL,
+            .no_alloc   = false,
         };
 
         model.ctx = ggml_init(params);
@@ -91,7 +92,7 @@ bool mnist_model_load(const std::string & fname, mnist_model & model) {
             fprintf(stderr, "%s: ggml_init() failed\n", __func__);
             return false;
         }
-    }  
+    }
 
     // Read FC1 layer 1
     {
@@ -141,8 +142,8 @@ bool mnist_model_load(const std::string & fname, mnist_model & model) {
         for (int i = 0; i < n_dims; ++i) {
             fin.read(reinterpret_cast<char *>(&ne_bias[i]), sizeof(ne_bias[i]));
         }
-        model.fc2_bias     = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, model.hparams.n_classes);  
-        fin.read(reinterpret_cast<char *>(model.fc2_bias->data), ggml_nbytes(model.fc2_bias));   
+        model.fc2_bias     = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, model.hparams.n_classes);
+        fin.read(reinterpret_cast<char *>(model.fc2_bias->data), ggml_nbytes(model.fc2_bias));
     }
     fin.close();
 
@@ -162,9 +163,9 @@ int mnist_eval(
         ) {
 
     const auto & hparams = model.hparams;
- 
+
     static size_t buf_size = hparams.n_input * sizeof(float) * 4;
-    static void * buf = malloc(buf_size);  
+    static void * buf = malloc(buf_size);
 
     struct ggml_init_params params = {
         .mem_size   = buf_size,
@@ -180,18 +181,18 @@ int mnist_eval(
     // fc1 MLP = Ax + b
     ggml_tensor * fc1 = ggml_add(ctx0, ggml_mul_mat(ctx0, model.fc1_weight, input), model.fc1_bias);
     ggml_tensor * fc2 = ggml_add(ctx0, ggml_mul_mat(ctx0, model.fc2_weight, ggml_relu(ctx0, fc1)), model.fc2_bias);
-    
+
     // soft max
     ggml_tensor * final = ggml_soft_max(ctx0, fc2);
-   
+
     // run the computation
     ggml_build_forward_expand(&gf, final);
     ggml_graph_compute       (ctx0, &gf);
 
-    ggml_graph_print   (&gf);
+    //ggml_graph_print   (&gf);
     ggml_graph_dump_dot(&gf, NULL, "mnist.dot");
     float* finalData = ggml_get_data_f32(final);
-  
+
     int prediction = std::max_element(finalData, finalData + 10) - finalData;
     ggml_free(ctx0);
     return prediction;
@@ -223,19 +224,19 @@ int main(int argc, char ** argv) {
             fprintf(stderr, "%s: failed to open '%s'\n", __func__, argv[2]);
             return 1;
         }
-    
+
         unsigned char buf[784];
         srand(time(NULL));
         // Seek to a random digit: 16-byte header + 28*28 * (random 0 - 10000)
         fin.seekg(16 + 784 * (rand() % 10000));
         fin.read((char *) &buf, sizeof(buf));
         digit.resize(sizeof(buf));
-        
+
         // render the digit in ASCII
         for(int row = 0; row < 28; row++) {
             for (int col = 0; col < 28; col++) {
-               fprintf(stderr, "%c ", (float)buf[row*28 + col] > 230 ? '*' : '_');
-                            digit[row*28+col]=((float)buf[row*28+col]);
+                fprintf(stderr, "%c ", (float)buf[row*28 + col] > 230 ? '*' : '_');
+                digit[row*28+col]=((float)buf[row*28+col]);
 
             }
             fprintf(stderr, "\n");
@@ -245,7 +246,7 @@ int main(int argc, char ** argv) {
         t_load_us = ggml_time_us() - t_start_us;
     }
 
-    
+
     fprintf(stdout, "Predicted digit is %d\n", mnist_eval(model, 1, digit));
     ggml_free(model.ctx);
 
