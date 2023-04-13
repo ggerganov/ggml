@@ -66,6 +66,7 @@ int main(int argc, const char ** argv) {
     struct ggml_init_params params = {
         .mem_size   = 2048ul*1024*1024,
         .mem_buffer = NULL,
+        .no_alloc   = false,
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
