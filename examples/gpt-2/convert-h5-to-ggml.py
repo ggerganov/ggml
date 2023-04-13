@@ -55,13 +55,13 @@ if len(sys.argv) < 2:
 dir_model = sys.argv[1]
 fname_out = sys.argv[1] + "/ggml-model.bin"
 
-with open(dir_model + "/vocab.json", "r") as f:
+with open(dir_model + "/vocab.json", "r", encoding="utf-8") as f:
     encoder = json.load(f)
 
-with open(dir_model + "/added_tokens.json", "r") as f:
+with open(dir_model + "/added_tokens.json", "r", encoding="utf-8") as f:
     encoder_added = json.load(f)
 
-with open(dir_model + "/config.json", "r") as f:
+with open(dir_model + "/config.json", "r", encoding="utf-8") as f:
     hparams = json.load(f)
 
 # use 16-bit or 32-bit floats
