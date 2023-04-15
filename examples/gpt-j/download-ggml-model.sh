@@ -8,7 +8,7 @@
 #src="https://ggml.ggerganov.com"
 #pfx="ggml-model-gpt-j"
 
-src="https://huggingface.co/datasets/ggerganov/ggml"
+src="https://huggingface.co/ggerganov/ggml"
 pfx="resolve/main/ggml-model-gpt-j"
 
 ggml_path=$(dirname $(realpath $0))

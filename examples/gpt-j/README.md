@@ -222,7 +222,7 @@ To run the `gpt-j` tool, you need the 12GB `ggml-model.bin` file which contains 
 is downloaded from my repository on Hugging Face using the [download-ggml-model.sh](download-ggml-model.sh) script.
 You can also, download the file manually from this link:
 
-https://huggingface.co/datasets/ggerganov/ggml/tree/main
+https://huggingface.co/ggerganov/ggml/tree/main
 
 ---
 
