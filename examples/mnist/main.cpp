@@ -13,6 +13,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <time.h>
+#include <algorithm>
 
 // default hparams
 struct mnist_hparams {
