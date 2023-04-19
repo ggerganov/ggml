@@ -6026,11 +6026,6 @@ static void ggml_compute_forward_dup_f32(
         // TODO: simplify
         if (nb00 == sizeof(float)) {
             if (dst->type == GGML_TYPE_F32) {
-                // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                // TODO: this is broken for multiple threads
-                //       but I don't see why. found this while working on StableLM
-                // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
                 size_t id = 0;
                 const size_t rs = ne00 * nb00;
                 char * dst_ptr = (char *) dst->data;
@@ -10862,12 +10857,7 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
                 case GGML_OP_CPY:
                 case GGML_OP_DUP:
                     {
-                        //node->n_tasks = n_threads;
-
-                        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        // TODO: temporary singl-thread until bug in forward function is fixed
-                        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        node->n_tasks = 1;
+                        node->n_tasks = n_threads;
 
                         size_t cur = 0;
                         if (ggml_is_quantized(node->type)) {

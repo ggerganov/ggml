@@ -30,8 +30,14 @@ struct stablelm_layer {
     struct ggml_tensor * ln_1_b;
 
     // attention
-    struct ggml_tensor * c_attn_attn_w;
-    struct ggml_tensor * c_attn_attn_b;
+    //struct ggml_tensor * c_attn_attn_w;
+    //struct ggml_tensor * c_attn_attn_b;
+    struct ggml_tensor * c_attn_q_proj_w;
+    struct ggml_tensor * c_attn_q_proj_b;
+    struct ggml_tensor * c_attn_k_proj_w;
+    struct ggml_tensor * c_attn_k_proj_b;
+    struct ggml_tensor * c_attn_v_proj_w;
+    struct ggml_tensor * c_attn_v_proj_b;
 
     struct ggml_tensor * c_attn_proj_w;
     struct ggml_tensor * c_attn_proj_b;
@@ -171,8 +177,14 @@ bool stablelm_model_load(const std::string & fname, stablelm_model & model, gpt_
         ctx_size += n_layer*(n_embd*ggml_type_sizef(GGML_TYPE_F32)); // ln_1_g
         ctx_size += n_layer*(n_embd*ggml_type_sizef(GGML_TYPE_F32)); // ln_1_b
 
-        ctx_size += n_layer*(3*n_embd*n_embd*ggml_type_sizef(wtype));         // c_attn_attn_w
-        ctx_size += n_layer*(       3*n_embd*ggml_type_sizef(GGML_TYPE_F32)); // c_attn_attn_b
+        //ctx_size += n_layer*(3*n_embd*n_embd*ggml_type_sizef(wtype));         // c_attn_attn_w
+        //ctx_size += n_layer*(       3*n_embd*ggml_type_sizef(GGML_TYPE_F32)); // c_attn_attn_b
+        ctx_size += n_layer*(n_embd*n_embd*ggml_type_sizef(wtype));         // c_attn_q_proj_w
+        ctx_size += n_layer*(       n_embd*ggml_type_sizef(GGML_TYPE_F32)); // c_attn_q_proj_b
+        ctx_size += n_layer*(n_embd*n_embd*ggml_type_sizef(wtype));         // c_attn_k_proj_w
+        ctx_size += n_layer*(       n_embd*ggml_type_sizef(GGML_TYPE_F32)); // c_attn_k_proj_b
+        ctx_size += n_layer*(n_embd*n_embd*ggml_type_sizef(wtype));         // c_attn_v_proj_w
+        ctx_size += n_layer*(       n_embd*ggml_type_sizef(GGML_TYPE_F32)); // c_attn_v_proj_b
 
         ctx_size += n_layer*(n_embd*n_embd*ggml_type_sizef(wtype));         // c_attn_proj_w
         ctx_size += n_layer*(n_embd*n_embd*ggml_type_sizef(GGML_TYPE_F32)); // c_attn_proj_b
@@ -186,10 +198,10 @@ bool stablelm_model_load(const std::string & fname, stablelm_model & model, gpt_
         ctx_size += n_layer*(4*n_embd*n_embd*ggml_type_sizef(wtype));         // c_mlp_proj_w
         ctx_size += n_layer*(         n_embd*ggml_type_sizef(GGML_TYPE_F32)); // c_mlp_proj_b
 
-        ctx_size += n_ctx*n_layer*n_embd*ggml_type_sizef(GGML_TYPE_F16); // memory_k
-        ctx_size += n_ctx*n_layer*n_embd*ggml_type_sizef(GGML_TYPE_F16); // memory_v
+        ctx_size += n_ctx*n_layer*n_embd*ggml_type_sizef(GGML_TYPE_F32); // memory_k
+        ctx_size += n_ctx*n_layer*n_embd*ggml_type_sizef(GGML_TYPE_F32); // memory_v
 
-        ctx_size += (6 + 12*n_layer)*256; // object overhead
+        ctx_size += (6 + 16*n_layer)*256; // object overhead
 
         printf("%s: ggml ctx size = %6.2f MB\n", __func__, ctx_size/(1024.0*1024.0));
     }
@@ -243,8 +255,14 @@ bool stablelm_model_load(const std::string & fname, stablelm_model & model, gpt_
             layer.ln_1_g          = ggml_new_tensor_1d(ctx, GGML_TYPE_F32,   n_embd);
             layer.ln_1_b          = ggml_new_tensor_1d(ctx, GGML_TYPE_F32,   n_embd);
 
-            layer.c_attn_attn_w   = ggml_new_tensor_2d(ctx, wtype,           n_embd, 3*n_embd);
-            layer.c_attn_attn_b   = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 3*n_embd);
+            //layer.c_attn_attn_w   = ggml_new_tensor_2d(ctx, wtype,           n_embd, 3*n_embd);
+            //layer.c_attn_attn_b   = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 3*n_embd);
+            layer.c_attn_q_proj_w   = ggml_new_tensor_2d(ctx, wtype,         n_embd, n_embd);
+            layer.c_attn_q_proj_b   = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
+            layer.c_attn_k_proj_w   = ggml_new_tensor_2d(ctx, wtype,         n_embd, n_embd);
+            layer.c_attn_k_proj_b   = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
+            layer.c_attn_v_proj_w   = ggml_new_tensor_2d(ctx, wtype,         n_embd, n_embd);
+            layer.c_attn_v_proj_b   = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
 
             layer.c_attn_proj_w   = ggml_new_tensor_2d(ctx, wtype,           n_embd,   n_embd);
             layer.c_attn_proj_b   = ggml_new_tensor_1d(ctx, GGML_TYPE_F32,   n_embd);
@@ -262,8 +280,14 @@ bool stablelm_model_load(const std::string & fname, stablelm_model & model, gpt_
             model.tensors["gpt_neox.layers." + std::to_string(i) + ".input_layernorm.weight"] = layer.ln_1_g;
             model.tensors["gpt_neox.layers." + std::to_string(i) + ".input_layernorm.bias"]   = layer.ln_1_b;
 
-            model.tensors["gpt_neox.layers." + std::to_string(i) + ".attention.query_key_value.weight"] = layer.c_attn_attn_w;
-            model.tensors["gpt_neox.layers." + std::to_string(i) + ".attention.query_key_value.bias"]   = layer.c_attn_attn_b;
+            //model.tensors["gpt_neox.layers." + std::to_string(i) + ".attention.query_key_value.weight"] = layer.c_attn_attn_w;
+            //model.tensors["gpt_neox.layers." + std::to_string(i) + ".attention.query_key_value.bias"]   = layer.c_attn_attn_b;
+            model.tensors["gpt_neox.layers." + std::to_string(i) + ".attention.query.weight"] = layer.c_attn_q_proj_w;
+            model.tensors["gpt_neox.layers." + std::to_string(i) + ".attention.query.bias"]   = layer.c_attn_q_proj_b;
+            model.tensors["gpt_neox.layers." + std::to_string(i) + ".attention.key.weight"]   = layer.c_attn_k_proj_w;
+            model.tensors["gpt_neox.layers." + std::to_string(i) + ".attention.key.bias"]     = layer.c_attn_k_proj_b;
+            model.tensors["gpt_neox.layers." + std::to_string(i) + ".attention.value.weight"] = layer.c_attn_v_proj_w;
+            model.tensors["gpt_neox.layers." + std::to_string(i) + ".attention.value.bias"]   = layer.c_attn_v_proj_b;
 
             model.tensors["gpt_neox.layers." + std::to_string(i) + ".attention.dense.weight"] = layer.c_attn_proj_w;
             model.tensors["gpt_neox.layers." + std::to_string(i) + ".attention.dense.bias"]   = layer.c_attn_proj_b;
@@ -454,12 +478,11 @@ bool stablelm_eval(
         struct ggml_tensor * cur;
 
         // self-attention
+        // TODO: this implementation is not optimal
         {
-            // norm
             {
                 cur = ggml_norm(ctx0, inpL);
 
-                // cur = ln_1_g*cur + ln_1_b
                 cur = ggml_add(ctx0,
                         ggml_mul(ctx0,
                             ggml_repeat(ctx0, model.layers[il].ln_1_g, cur),
@@ -467,27 +490,19 @@ bool stablelm_eval(
                         ggml_repeat(ctx0, model.layers[il].ln_1_b, cur));
             }
 
-            // compute QKV
-            {
-                cur = ggml_mul_mat(ctx0,
-                        model.layers[il].c_attn_attn_w,
-                        cur);
+            struct ggml_tensor * Qcur = ggml_mul_mat(ctx0, model.layers[il].c_attn_q_proj_w, cur);
+            struct ggml_tensor * Kcur = ggml_mul_mat(ctx0, model.layers[il].c_attn_k_proj_w, cur);
+            struct ggml_tensor * Vcur = ggml_mul_mat(ctx0, model.layers[il].c_attn_v_proj_w, cur);
 
-                cur = ggml_add(ctx0,
-                        ggml_repeat(ctx0, model.layers[il].c_attn_attn_b, cur),
-                        cur);
-            }
+            Qcur = ggml_add(ctx0, Qcur, ggml_repeat(ctx0, model.layers[il].c_attn_q_proj_b, Qcur));
+            Kcur = ggml_add(ctx0, Kcur, ggml_repeat(ctx0, model.layers[il].c_attn_k_proj_b, Kcur));
+            Vcur = ggml_add(ctx0, Vcur, ggml_repeat(ctx0, model.layers[il].c_attn_v_proj_b, Vcur));
 
-            struct ggml_tensor * Qcur = ggml_cont(ctx0, ggml_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 0*sizeof(float)*n_embd));
-            struct ggml_tensor * Kcur = ggml_cont(ctx0, ggml_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 1*sizeof(float)*n_embd));
-            struct ggml_tensor * Vcur = ggml_cont(ctx0, ggml_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 2*sizeof(float)*n_embd));
-
-            // TODO: using mode = 2 for GPTNeoX mode, but not sure if this is correct
             Qcur = ggml_rope(ctx0, ggml_reshape_3d(ctx0, Qcur, n_embd/n_head, n_head, N), n_past, n_rot, 2);
             Kcur = ggml_rope(ctx0, ggml_reshape_3d(ctx0, Kcur, n_embd/n_head, n_head, N), n_past, n_rot, 2);
 
             // store key and value to memory
-            {
+            if (N >= 1) {
                 Vcur = ggml_transpose(ctx0, Vcur);
 
                 struct ggml_tensor * k = ggml_view_1d(ctx0, model.memory_k, N*n_embd, (ggml_element_size(model.memory_k)*n_embd)*(il*n_ctx + n_past));
@@ -554,9 +569,7 @@ bool stablelm_eval(
                         model.layers[il].c_attn_proj_w,
                         cur);
 
-                cur = ggml_add(ctx0,
-                        ggml_repeat(ctx0, model.layers[il].c_attn_proj_b, cur),
-                        cur);
+                cur = ggml_add(ctx0, ggml_repeat(ctx0, model.layers[il].c_attn_proj_b, cur), cur);
             }
         }
 
@@ -715,7 +728,7 @@ int main(int argc, char ** argv) {
 
     printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
     for (int i = 0; i < embd_inp.size(); i++) {
-        printf("%s: token[%d] = %s\n", __func__, i, vocab.id_to_token.at(embd_inp[i]).c_str());
+        printf("%s: token[%d] = %6d, %s\n", __func__, i, embd_inp[i], vocab.id_to_token.at(embd_inp[i]).c_str());
     }
     printf("\n");
 

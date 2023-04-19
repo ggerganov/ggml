@@ -1,22 +1,3 @@
-# Convert GPT-J-6B h5 transformer model to ggml format
-#
-# Load the model using GPTJForCausalLM.
-# Iterate over all variables and write them to a binary file.
-#
-# For each variable, write the following:
-#   - Number of dimensions (int)
-#   - Name length (int)
-#   - Dimensions (int[n_dims])
-#   - Name (char[name_length])
-#   - Data (float[n_dims])
-#
-# By default, the bigger matrices are converted to 16-bit floats.
-# This can be disabled by adding the "use-f32" CLI argument.
-#
-# At the start of the ggml file we write the model parameters
-# and vocabulary.
-#
-
 import sys
 import struct
 import json
@@ -61,6 +42,8 @@ tokenizer = AutoTokenizer.from_pretrained(dir_model)
 model = AutoModelForCausalLM.from_pretrained(dir_model, low_cpu_mem_usage=True)
 #print (model)
 
+#print(tokenizer.encode('I believe the meaning of life is'))
+
 list_vars = model.state_dict()
 for name in list_vars.keys():
     print(name, list_vars[name].shape, list_vars[name].dtype)
@@ -87,6 +70,94 @@ for i in range(hparams["vocab_size"]):
     fout.write(struct.pack("i", len(text)))
     fout.write(text)
 
+# Taken from:
+#   https://github.com/NolanoOrg/cformers/blob/master/cformers/cpp/converters/convert_gptneox_to_ggml.py
+#
+# All the `gpt_neox.layers.<LAYER_ID>.attention.query_key_value.weight` layers
+# Should be split into 3 layers:
+#  gpt_neox.layers.<LAYER_ID>.attention.query.weight
+#  gpt_neox.layers.<LAYER_ID>.attention.key.weight
+#  gpt_neox.layers.<LAYER_ID>.attention.value.weight
+# Similarly split `gpt_neox.layers.<LAYER_ID>.attention.query_key_value.bias`.
+new_list_vars = list_vars.copy()
+with torch.no_grad():
+    for layer in range(hparams["num_hidden_layers"]):
+        weight_key = "gpt_neox.layers." + str(layer) + ".attention.query_key_value.weight"
+        bias_key = "gpt_neox.layers." + str(layer) + ".attention.query_key_value.bias"
+
+        # Reverse engineering: https://github.com/huggingface/transformers/blob/c07a02a4b7892edfee22cbe57d3cdd9e10ae7a4d/src/transformers/models/gpt_neox/modeling_gpt_neox.py#LL115-L125
+        # "View" in pytorch makes it hard to simply extract q, k, v from the matrix.
+        qkv_matrix = list_vars[weight_key]
+        qkv_bias = list_vars[bias_key]
+        qkv_linear = torch.nn.Linear(hparams["hidden_size"], hparams["hidden_size"] * 3)
+        qkv_linear.weight.data = qkv_matrix.float()
+        qkv_linear.bias.data = qkv_bias.float()
+        head_size = hparams["hidden_size"] // hparams["num_attention_heads"]
+
+        # Get Wq_x_plus_bq, Wk_x_plus_bk, Wv_x_plus_bv
+        identityMatrix = torch.eye(hparams["hidden_size"]) # pylint: disable=no-member
+        qkv = qkv_linear(identityMatrix).unsqueeze(0)
+        new_qkv_shape = qkv.size()[:-1] + (hparams["num_attention_heads"], 3 * head_size)
+        qkv = qkv.view(*new_qkv_shape)
+        Wq_x_plus_bq = qkv[..., :head_size]
+        Wk_x_plus_bk = qkv[..., head_size:2*head_size]
+        Wv_x_plus_bv = qkv[..., 2*head_size:]
+
+        #   [batch, seq_len, num_heads, 3 * head_size] -> [batch, seq_len, (num_heads * 3 * head_size)]
+        new_shape = Wq_x_plus_bq.size()[:-2] + (Wq_x_plus_bq.size(-2) * Wq_x_plus_bq.size(-1),)
+        Wq_x_plus_bq = Wq_x_plus_bq.contiguous().view(*new_shape).squeeze(0)
+        Wk_x_plus_bk = Wk_x_plus_bk.contiguous().view(*new_shape).squeeze(0)
+        Wv_x_plus_bv = Wv_x_plus_bv.contiguous().view(*new_shape).squeeze(0)
+
+        # Get bq, bk, bv
+        zeroMatrix = torch.zeros(hparams["hidden_size"], hparams["hidden_size"]) # pylint: disable=no-member
+        qkv = qkv_linear(zeroMatrix).unsqueeze(0)
+        new_qkv_shape = qkv.size()[:-1] + (hparams["num_attention_heads"], 3 * head_size)
+        qkv = qkv.view(*new_qkv_shape)
+        bq = qkv[..., :head_size]
+        bk = qkv[..., head_size:2*head_size]
+        bv = qkv[..., 2*head_size:]
+
+        #   [batch, seq_len, num_heads, 3 * head_size] -> [batch, seq_len, (num_heads * 3 * head_size)]
+        new_shape = bq.size()[:-2] + (bq.size(-2) * bq.size(-1),)
+        bq = bq.contiguous().view(*new_shape)[0, 0, :]
+        bk = bk.contiguous().view(*new_shape)[0, 0, :]
+        bv = bv.contiguous().view(*new_shape)[0, 0, :]
+
+        # Get Wq_x, Wk_x, Wv_x
+        Wq_x = (Wq_x_plus_bq - bq).T
+        Wk_x = (Wk_x_plus_bk - bk).T
+        Wv_x = (Wv_x_plus_bv - bv).T
+
+        # Sanity check that the split is correct
+        dummy_linear = torch.nn.Linear(hparams["hidden_size"], hparams["hidden_size"])
+
+        dummy_linear.weight.data = Wq_x.float()
+        dummy_linear.bias.data = bq.float()
+        assert torch.allclose(Wq_x_plus_bq, dummy_linear(identityMatrix).unsqueeze(0))
+
+        dummy_linear.weight.data = Wk_x.float()
+        dummy_linear.bias.data = bk.float()
+        assert torch.allclose(Wk_x_plus_bk, dummy_linear(identityMatrix).unsqueeze(0))
+
+        dummy_linear.weight.data = Wv_x.float()
+        dummy_linear.bias.data = bv.float()
+        assert torch.allclose(Wv_x_plus_bv, dummy_linear(identityMatrix).unsqueeze(0))
+
+        # Save the new weights and biases
+        new_list_vars["gpt_neox.layers." + str(layer) + ".attention.query.weight"] = Wq_x
+        new_list_vars["gpt_neox.layers." + str(layer) + ".attention.key.weight"] = Wk_x
+        new_list_vars["gpt_neox.layers." + str(layer) + ".attention.value.weight"] = Wv_x
+        new_list_vars["gpt_neox.layers." + str(layer) + ".attention.query.bias"] = bq
+        new_list_vars["gpt_neox.layers." + str(layer) + ".attention.key.bias"] = bk
+        new_list_vars["gpt_neox.layers." + str(layer) + ".attention.value.bias"] = bv
+
+        # Delete the old weights and biases
+        del new_list_vars[weight_key]
+        del new_list_vars[bias_key]
+
+list_vars = new_list_vars
+
 for name in list_vars.keys():
     data = list_vars[name].squeeze().numpy()
     print("Processing variable: " + name + " with shape: ", data.shape)
@@ -97,10 +168,6 @@ for name in list_vars.keys():
        name.endswith(".attention.rotary_emb.inv_freq"):
         print("  Skipping variable: " + name)
         continue
-
-    #if name.endswith(".attention.dense.weight"):
-    #    print("  Transposing")
-    #    data = data.transpose()
 
     n_dims = len(data.shape);
 
@@ -120,21 +187,6 @@ for name in list_vars.keys():
             print("  Converting to float32")
             data = data.astype(np.float32)
             ftype_cur = 0
-
-    # for efficiency - transpose these matrices:
-    # (note - with latest ggml this is no longer more efficient, so disabling it)
-    #  "transformer.h.*.mlp.fc_in.weight"
-    #  "transformer.h.*.attn.out_proj.weight"
-    #  "transformer.h.*.attn.q_proj.weight"
-    #  "transformer.h.*.attn.k_proj.weight"
-    #  "transformer.h.*.attn.v_proj.weight"
-    #if name.endswith(".mlp.fc_in.weight")     or \
-    #   name.endswith(".attn.out_proj.weight") or \
-    #   name.endswith(".attn.q_proj.weight")   or \
-    #   name.endswith(".attn.k_proj.weight")   or \
-    #   name.endswith(".attn.v_proj.weight"):
-    #    print("  Transposing")
-    #    data = data.transpose()
 
     # header
     str = name.encode('utf-8')
