@@ -1,8 +1,8 @@
 # StableLM
 
+Transformer architecture: GPTNeoX
+
 Ref: https://github.com/stability-AI/stableLM/#stablelm-alpha
-
-
 
 ## Usage
 
@@ -54,7 +54,11 @@ main:     load time =  2118.55 ms
 main:   sample time =     9.59 ms
 main:  predict time =  4474.07 ms / 63.92 ms per token
 main:    total time =  6911.26 ms
+```
 
+## Run in 4-bit integer quantization mode
+
+```
 # quantize the model to 4-bits using Q4_3 quantization
 ./bin/stablelm-quantize ./stablelm-base-alpha-3b/ggml-model-f16.bin ./stablelm-base-alpha-3b/ggml-model-q4_3.bin 6
 
@@ -98,4 +102,6 @@ main:    total time =  4177.68 ms
 ## Notes
 
 - No guarantees for correctness
+- The tokenizer is currently hacked - probably works only for English
+- Non-parallel residual is not supported
 - Contributions and improvements are welcome
