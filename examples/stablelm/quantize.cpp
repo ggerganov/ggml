@@ -31,10 +31,11 @@ bool stablelm_model_quantize(const std::string & fname_inp, const std::string & 
         case 2: type = GGML_TYPE_Q4_0; break;
         case 3: type = GGML_TYPE_Q4_1; break;
         case 5: type = GGML_TYPE_Q4_2; break;
+        case 6: type = GGML_TYPE_Q4_3; break;
         default: fprintf(stderr, "%s: invalid quantization type %d\n", __func__, itype); return 1;
     };
 
-    if (type != GGML_TYPE_Q4_0 && type != GGML_TYPE_Q4_1 && type != GGML_TYPE_Q4_2) {
+    if (!ggml_is_quantized(type)) {
         fprintf(stderr, "%s: invalid quantization type %d\n", __func__, type);
         return false;
     }
@@ -152,7 +153,7 @@ bool stablelm_model_quantize(const std::string & fname_inp, const std::string & 
 
             {
                 static const char * ftype_str[] = { "f32", "f16", "q4_0", "q4_1", "q4_2" };
-                printf("%48s - [%5d, %5d], type = %6s ", name.data(), ne[0], ne[1], ftype_str[ftype]);
+                printf("%64s - [%5d, %5d], type = %6s ", name.data(), ne[0], ne[1], ftype_str[ftype]);
             }
 
             // regexes of tensor names to be quantized
@@ -225,6 +226,10 @@ bool stablelm_model_quantize(const std::string & fname_inp, const std::string & 
                         {
                             cur_size = ggml_quantize_q4_2(data_f32.data(), work.data(), nelements, ne[0], hist_cur.data());
                         } break;
+                    case GGML_TYPE_Q4_3:
+                        {
+                            cur_size = ggml_quantize_q4_3(data_f32.data(), work.data(), nelements, ne[0], hist_cur.data());
+                        } break;
                     default:
                         {
                             fprintf(stderr, "%s: unsupported quantization type %d\n", __func__, type);
@@ -285,6 +290,7 @@ int main(int argc, char ** argv) {
         fprintf(stderr, "  type = 2 - q4_0\n");
         fprintf(stderr, "  type = 3 - q4_1\n");
         fprintf(stderr, "  type = 5 - q4_2\n");
+        fprintf(stderr, "  type = 6 - q4_3\n");
         return 1;
     }
 

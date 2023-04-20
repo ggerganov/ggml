@@ -138,6 +138,7 @@ bool stablelm_model_load(const std::string & fname, stablelm_model & model, gpt_
         case 2: wtype = GGML_TYPE_Q4_0; break;
         case 3: wtype = GGML_TYPE_Q4_1; break;
         case 5: wtype = GGML_TYPE_Q4_2; break;
+        case 6: wtype = GGML_TYPE_Q4_3; break;
         default:
                 {
                     fprintf(stderr, "%s: invalid model file '%s' (bad ftype value %d)\n",
@@ -358,6 +359,7 @@ bool stablelm_model_load(const std::string & fname, stablelm_model & model, gpt_
                 case 2: bpe = ggml_type_size(GGML_TYPE_Q4_0); assert(ne[0] % 64 == 0); break;
                 case 3: bpe = ggml_type_size(GGML_TYPE_Q4_1); assert(ne[0] % 64 == 0); break;
                 case 5: bpe = ggml_type_size(GGML_TYPE_Q4_2); assert(ne[0] % 64 == 0); break;
+                case 6: bpe = ggml_type_size(GGML_TYPE_Q4_3); assert(ne[0] % 64 == 0); break;
                 default:
                         {
                             fprintf(stderr, "%s: unknown ftype %d in model file\n", __func__, ftype);
