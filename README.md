@@ -29,7 +29,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [X] Example of RWKV inference [saharNooby/rwkv.cpp](https://github.com/saharNooby/rwkv.cpp)
 - [ ] Example of [SAM](https://github.com/facebookresearch/segment-anything) inference
 - [ ] Idea for GPU support: https://github.com/ggerganov/llama.cpp/discussions/915
-- [X] Example of StableLM (GPTNeoX) inference [examples/stablelm](https://github.com/ggerganov/ggml/tree/master/examples/stablelm)
+- [X] Example of StableLM (GPT-NeoX) inference [examples/stablelm](https://github.com/ggerganov/ggml/tree/master/examples/stablelm)
 
 ## Whisper inference (example)
 

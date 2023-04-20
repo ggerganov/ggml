@@ -1,6 +1,6 @@
 # StableLM
 
-Transformer architecture: GPTNeoX
+Transformer architecture: GPT-NeoX
 
 Ref: https://github.com/stability-AI/stableLM/#stablelm-alpha
 
