@@ -56,9 +56,9 @@ main:  predict time =  4474.07 ms / 63.92 ms per token
 main:    total time =  6911.26 ms
 ```
 
-## Run in 4-bit integer quantization mode
+## 4-bit integer quantization mode
 
-```
+```bash
 # quantize the model to 4-bits using Q4_3 quantization
 ./bin/stablelm-quantize ./stablelm-base-alpha-3b/ggml-model-f16.bin ./stablelm-base-alpha-3b/ggml-model-q4_3.bin 6
 
