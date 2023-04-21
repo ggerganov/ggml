@@ -2386,9 +2386,9 @@ int main(int argc, const char ** argv) {
         method = atoi(argv[1]);
     }
 
-    float * src0 = (float *)malloc(sizeof(float)*M*K);
-    float * src1 = (float *)malloc(sizeof(float)*N*K);
-    float * dst  = (float *)malloc(sizeof(float)*M*N);
+    float * src0 = malloc(sizeof(float)*M*K);
+    float * src1 = malloc(sizeof(float)*N*K);
+    float * dst  = malloc(sizeof(float)*M*N);
 
     // allocate aligned memory
     //float * src0 = (float *)aligned_alloc(32, sizeof(float)*M*K);

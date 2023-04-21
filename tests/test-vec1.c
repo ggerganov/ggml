@@ -467,9 +467,9 @@ uint64_t get_time_us() {
 }
 
 int main(int argc, const char ** argv) {
-    float * src0 = (float *)malloc(sizeof(float)*N*M);
-    float * src1 = (float *)malloc(sizeof(float)*M);
-    float * dst  = (float *)malloc(sizeof(float)*N);
+    float * src0 = malloc(sizeof(float)*N*M);
+    float * src1 = malloc(sizeof(float)*M);
+    float * dst  = malloc(sizeof(float)*N);
 
     //float * src0 = (float *)(aligned_alloc(64, sizeof(float)*N*M));
     //float * src1 = (float *)(aligned_alloc(64, sizeof(float)*M));

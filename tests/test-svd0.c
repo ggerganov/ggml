@@ -30,8 +30,8 @@ int main(int argc, const char ** argv) {
     int m = 10;
     int n = 5;
 
-    float * A  = (float *) malloc(n * m * sizeof(float));
-    float * A0 = (float *) malloc(n * m * sizeof(float));
+    float * A  = malloc(n * m * sizeof(float));
+    float * A0 = malloc(n * m * sizeof(float));
 
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < m; ++j) {
@@ -47,7 +47,7 @@ int main(int argc, const char ** argv) {
     }
 
     // average vector
-    //float * M = (float *) malloc(m * sizeof(float));
+    //float * M = malloc(m * sizeof(float));
 
     //{
     //    for (int j = 0; j < m; ++j) {
@@ -86,9 +86,9 @@ int main(int argc, const char ** argv) {
     // SVD
     // A = U * S * V^T
 
-    float * U = (float *) malloc(n * m * sizeof(float));
-    float * S = (float *) malloc(n * sizeof(float));
-    float * V = (float *) malloc(n * n * sizeof(float));
+    float * U = malloc(n * m * sizeof(float));
+    float * S = malloc(n * sizeof(float));
+    float * V = malloc(n * n * sizeof(float));
 
     int lda = m;
     int ldu = m;
@@ -104,7 +104,7 @@ int main(int argc, const char ** argv) {
 
     printf("work_size = %f, info = %d, lwork = %d\n", work_size, info, lwork);
 
-    float * work = (float *) malloc(lwork * sizeof(float));
+    float * work = malloc(lwork * sizeof(float));
 
     sgesvd_("S", "S", &m, &n, A, &lda, S, U, &ldu, V, &ldvt, work, &lwork, &info);
 
@@ -192,7 +192,7 @@ int main(int argc, const char ** argv) {
 
 
     // project A0 onto U
-    float * A1 = (float *) malloc(n * n * sizeof(float));
+    float * A1 = malloc(n * n * sizeof(float));
 
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {

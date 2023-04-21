@@ -83,9 +83,9 @@ void mul_mat_vec_f32_2(
 }
 
 int main(int argc, const char ** argv) {
-    //float * src0 = (float *)malloc(sizeof(float)*N*M);
-    //float * src1 = (float *)malloc(sizeof(float)*M);
-    //float * dst  = (float *)malloc(sizeof(float)*N);
+    //float * src0 = malloc(sizeof(float)*N*M);
+    //float * src1 = malloc(sizeof(float)*M);
+    //float * dst  = malloc(sizeof(float)*N);
 
     afloat * src0 = (float *)(aligned_alloc(32, sizeof(float)*N*M));
     afloat * src1 = (float *)(aligned_alloc(32, sizeof(float)*M));
