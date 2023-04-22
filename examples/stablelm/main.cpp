@@ -347,7 +347,7 @@ bool stablelm_model_load(const std::string & fname, stablelm_model & model, gpt_
             }
 
             if (0) {
-                static const char * ftype_str[] = { "f32", "f16", "q4_0", "q4_1", "q4_2", };
+                static const char * ftype_str[] = { "f32", "f16", "q4_0", "q4_1", "q4_2", "q4_3" };
                 printf("%24s - [%5d, %5d], type = %6s, %6.2f MB, %9zu bytes\n", name.data(), ne[0], ne[1], ftype_str[ftype], ggml_nbytes(tensor)/1024.0/1024.0, ggml_nbytes(tensor));
             }
 

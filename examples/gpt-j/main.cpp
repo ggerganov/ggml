@@ -140,6 +140,8 @@ bool gptj_model_load(const std::string & fname, gptj_model & model, gpt_vocab & 
         case 1: wtype = GGML_TYPE_F16;  break;
         case 2: wtype = GGML_TYPE_Q4_0; break;
         case 3: wtype = GGML_TYPE_Q4_1; break;
+        case 5: wtype = GGML_TYPE_Q4_2; break;
+        case 6: wtype = GGML_TYPE_Q4_3; break;
         default:
                 {
                     fprintf(stderr, "%s: invalid model file '%s' (bad f16 value %d)\n",
@@ -341,7 +343,7 @@ bool gptj_model_load(const std::string & fname, gptj_model & model, gpt_vocab & 
             }
 
             if (0) {
-                static const char * ftype_str[] = { "f32", "f16", "q4_0", "q4_1", };
+                static const char * ftype_str[] = { "f32", "f16", "q4_0", "q4_1", "q4_2", "q4_3" };
                 printf("%24s - [%5lld, %5lld], type = %6s, %6.2f MB, %9zu bytes\n", name.data(), ne[0], ne[1], ftype_str[ftype], ggml_nbytes(tensor)/1024.0/1024.0, ggml_nbytes(tensor));
             }
 
@@ -352,6 +354,8 @@ bool gptj_model_load(const std::string & fname, gptj_model & model, gpt_vocab & 
                 case 1: bpe = ggml_type_size(GGML_TYPE_F16);  break;
                 case 2: bpe = ggml_type_size(GGML_TYPE_Q4_0); assert(ne[0] % 64 == 0); break;
                 case 3: bpe = ggml_type_size(GGML_TYPE_Q4_1); assert(ne[0] % 64 == 0); break;
+                case 5: bpe = ggml_type_size(GGML_TYPE_Q4_2); assert(ne[0] % 64 == 0); break;
+                case 6: bpe = ggml_type_size(GGML_TYPE_Q4_3); assert(ne[0] % 64 == 0); break;
                 default:
                         {
                             fprintf(stderr, "%s: unknown ftype %d in model file\n", __func__, ftype);
