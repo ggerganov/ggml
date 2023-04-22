@@ -1242,9 +1242,9 @@ static void quantize_row_q4_2(const float * restrict x, void * restrict vy, int 
 
     block_q4_2 * restrict y = vy;
 
-    quantize_row_q4_2_reference(x, y, k);
+    //quantize_row_q4_2_reference(x, y, k);
     // This produces the exact same format, just better match to the input floats ("better" as measured by RMSE)
-    //quantize_row_q4_2_rmse(x, y, k);
+    quantize_row_q4_2_rmse(x, y, k);
 }
 
 static void quantize_row_q4_3_reference(const float * restrict x, block_q4_3 * restrict y, int k) {
@@ -7991,6 +7991,9 @@ static void ggml_compute_forward_mul_mat_q_f32(
         }
         else if (type == GGML_TYPE_Q4_2) {
             dequantize_row_q_cuda = dequantize_row_q4_2_cuda;
+        }
+        else if (type == GGML_TYPE_Q4_3) {
+            dequantize_row_q_cuda = dequantize_row_q4_3_cuda;
         }
         else {
             GGML_ASSERT(false);
