@@ -10,4 +10,4 @@ target_link_libraries(${TEST_TARGET} PRIVATE ggml common)
 
 set(TEST_TARGET gpt-2-quantize)
 add_executable(${TEST_TARGET} quantize.cpp)
-target_link_libraries(${TEST_TARGET} PRIVATE ggml common)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml common common-ggml)
