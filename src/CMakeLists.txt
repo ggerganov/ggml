@@ -156,13 +156,39 @@ if (GGML_OPENBLAS)
     endif()
 endif()
 
+if (GGML_CUBLAS)
+    cmake_minimum_required(VERSION 3.17)
+
+    find_package(CUDAToolkit)
+    if (CUDAToolkit_FOUND)
+        message(STATUS "cuBLAS found")
+
+        enable_language(CUDA)
+
+        set(GGML_CUDA_SOURCES ggml-cuda.cu ggml-cuda.h)
+
+        add_compile_definitions(GGML_USE_CUBLAS)
+
+        if (GGML_STATIC)
+            set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} CUDA::cudart_static CUDA::cublas_static CUDA::cublasLt_static)
+        else()
+            set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} CUDA::cudart CUDA::cublas CUDA::cublasLt)
+        endif()
+
+    else()
+        message(WARNING "cuBLAS not found")
+    endif()
+endif()
+
+
 if (GGML_PERF)
     set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_PERF)
 endif()
 
 add_library(${TARGET}
     ggml.c
-    )
+    ../include/ggml/ggml.h
+    ${GGML_CUDA_SOURCES})
 
 target_include_directories(${TARGET} PUBLIC
     .
@@ -195,6 +221,13 @@ if (MINGW)
     target_link_libraries(${TARGET} PUBLIC
         stdc++
         )
+endif()
+
+if (GGML_CUDA_SOURCES)
+    message(STATUS "GGML CUDA sources found, configuring CUDA architecture")
+    set_property(TARGET ggml  PROPERTY CUDA_ARCHITECTURES OFF)
+    set_property(TARGET ggml  PROPERTY CUDA_SELECT_NVCC_ARCH_FLAGS "Auto")
+    target_link_libraries(ggml PUBLIC stdc++)
 endif()
 
 install(TARGETS ${TARGET}

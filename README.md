@@ -85,3 +85,10 @@ The inference speeds that I get for the different models on my 32GB MacBook M1 P
 | GPT-J |    6B | 125 ms |
 
 For more information, checkout the corresponding programs in the [examples](examples) folder.
+
+## Using cuBLAS
+
+```bash
+# fix the path to point to your CUDA compiler
+cmake -DGGML_CUBLAS=ON -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.1/bin/nvcc ..
+```
