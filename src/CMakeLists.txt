@@ -227,7 +227,7 @@ if (GGML_CUDA_SOURCES)
     message(STATUS "GGML CUDA sources found, configuring CUDA architecture")
     set_property(TARGET ggml  PROPERTY CUDA_ARCHITECTURES OFF)
     set_property(TARGET ggml  PROPERTY CUDA_SELECT_NVCC_ARCH_FLAGS "Auto")
-    set_property(TARGET llama PROPERTY CUDA_ARCHITECTURES OFF)
+    target_link_libraries(ggml PUBLIC stdc++)
 endif()
 
 install(TARGETS ${TARGET}
