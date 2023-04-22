@@ -10,8 +10,8 @@ target_link_libraries(whisper-cpp PRIVATE
     )
 
 set(TEST_TARGET whisper)
-add_executable(${TEST_TARGET} main.cpp common.cpp)
-target_link_libraries(${TEST_TARGET} PRIVATE whisper-cpp)
+add_executable(${TEST_TARGET} main.cpp)
+target_link_libraries(${TEST_TARGET} PRIVATE whisper-cpp common)
 target_include_directories(${TEST_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 #
@@ -19,4 +19,4 @@ target_include_directories(${TEST_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..
 
 set(TEST_TARGET whisper-quantize)
 add_executable(${TEST_TARGET} quantize.cpp)
-target_link_libraries(${TEST_TARGET} PRIVATE ggml ggml_utils)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml common)

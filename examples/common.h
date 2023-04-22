@@ -8,6 +8,8 @@
 #include <random>
 #include <thread>
 
+#define COMMON_SAMPLE_RATE 16000
+
 //
 // CLI argument parsing
 //
@@ -38,6 +40,13 @@ std::string gpt_random_prompt(std::mt19937 & rng);
 // Vocab utils
 //
 
+std::string trim(const std::string & s);
+
+std::string replace(
+        const std::string & s,
+        const std::string & from,
+        const std::string & to);
+
 struct gpt_vocab {
     using id    = int32_t;
     using token = std::string;
@@ -45,8 +54,6 @@ struct gpt_vocab {
     std::map<token, id> token_to_id;
     std::map<id, token> id_to_token;
 };
-
-void replace(std::string & str, const std::string & needle, const std::string & replacement);
 
 // poor-man's JSON parsing
 std::map<std::string, int32_t> json_parse(const std::string & fname);
@@ -81,3 +88,33 @@ gpt_vocab::id gpt_sample_top_k_top_p(
         double top_p,
         double temp,
         std::mt19937 & rng);
+
+//
+// Audio utils
+//
+
+// Read WAV audio file and store the PCM data into pcmf32
+// The sample rate of the audio must be equal to COMMON_SAMPLE_RATE
+// If stereo flag is set and the audio has 2 channels, the pcmf32s will contain 2 channel PCM
+bool read_wav(
+        const std::string & fname,
+        std::vector<float> & pcmf32,
+        std::vector<std::vector<float>> & pcmf32s,
+        bool stereo);
+
+// Apply a high-pass frequency filter to PCM audio
+// Suppresses frequencies below cutoff Hz
+void high_pass_filter(
+        std::vector<float> & data,
+        float cutoff,
+        float sample_rate);
+
+// Basic voice activity detection (VAD) using audio energy adaptive threshold
+bool vad_simple(
+        std::vector<float> & pcmf32,
+        int   sample_rate,
+        int   last_ms,
+        float vad_thold,
+        float freq_thold,
+        bool  verbose);
+
