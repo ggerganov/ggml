@@ -23,6 +23,7 @@ struct gpt_params {
     int32_t top_k = 40;
     float   top_p = 0.9f;
     float   temp  = 0.9f;
+    float   repetition_penalty = 1.2f;
 
     int32_t n_batch = 8; // batch size for prompt processing
 
@@ -87,6 +88,7 @@ gpt_vocab::id gpt_sample_top_k_top_p(
         int    top_k,
         double top_p,
         double temp,
+        double repetition_penalty,
         std::mt19937 & rng);
 
 //

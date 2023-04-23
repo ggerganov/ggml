@@ -696,6 +696,7 @@ int main(int argc, char ** argv) {
             const int   top_k = params.top_k;
             const float top_p = params.top_p;
             const float temp  = params.temp;
+            const float repetition_penalty  = params.repetition_penalty;
 
             const int n_vocab = model.hparams.n_vocab;
 
@@ -704,7 +705,7 @@ int main(int argc, char ** argv) {
             {
                 const int64_t t_start_sample_us = ggml_time_us();
 
-                id = gpt_sample_top_k_top_p(vocab, logits.data() + (logits.size() - n_vocab), top_k, top_p, temp, rng);
+                id = gpt_sample_top_k_top_p(vocab, logits.data() + (logits.size() - n_vocab), top_k, top_p, temp, repetition_penalty, rng);
 
                 t_sample_us += ggml_time_us() - t_start_sample_us;
             }
