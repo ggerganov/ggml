@@ -58,10 +58,10 @@ int main(int argc, const char ** argv) {
 
     printf("M = %d, N = %d, K = %d\n", M, N, K);
 
-    float * src0 = (float *)malloc(sizeof(float)*M*K);
-    float * src1 = (float *)malloc(sizeof(float)*N*K);
-    float * dst0 = (float *)malloc(sizeof(float)*M*N); // naive
-    float * dst1 = (float *)malloc(sizeof(float)*M*N); // blas
+    float * src0 = malloc(sizeof(float)*M*K);
+    float * src1 = malloc(sizeof(float)*N*K);
+    float * dst0 = malloc(sizeof(float)*M*N); // naive
+    float * dst1 = malloc(sizeof(float)*M*N); // blas
 
     struct ggml_init_params params = {
         .mem_size   = 2048ul*1024*1024,

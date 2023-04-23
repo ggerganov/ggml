@@ -213,9 +213,9 @@ void mul_mat_f8_0(
 }
 
 int main(int argc, const char ** argv) {
-    float * src0 = (float *)malloc(sizeof(float)*M*K);
-    float * src1 = (float *)malloc(sizeof(float)*N*K);
-    float * dst  = (float *)malloc(sizeof(float)*M*N);
+    float * src0 = malloc(sizeof(float)*M*K);
+    float * src1 = malloc(sizeof(float)*N*K);
+    float * dst  = malloc(sizeof(float)*M*N);
 
     for (int i = 0; i < M*K; i++) {
         src0[i] = rand() / (float)RAND_MAX;
