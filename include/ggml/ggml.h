@@ -216,7 +216,6 @@ extern "C" {
     struct ggml_context;
 
     enum ggml_type {
-        // explicitly numbered values are used in llama.cpp files
         GGML_TYPE_F32  = 0,
         GGML_TYPE_F16  = 1,
         GGML_TYPE_Q4_0 = 2,
@@ -296,14 +295,14 @@ extern "C" {
     struct ggml_tensor {
         enum ggml_type type;
 
-        int    n_dims;
+        int     n_dims;
         int64_t ne[GGML_MAX_DIMS]; // number of elements
         size_t  nb[GGML_MAX_DIMS]; // stride in bytes:
                                    // nb[0] = sizeof(type)
                                    // nb[1] = nb[0]   * ne[0] + padding
                                    // nb[i] = nb[i-1] * ne[i-1]
 
-                                   // compute data
+        // compute data
         enum ggml_op op;
 
         bool is_param;
@@ -358,66 +357,70 @@ extern "C" {
         bool   no_alloc;   // don't allocate memory for the tensor data
     };
 
+    // misc
+
     GGML_API void    ggml_time_init(void); // call this once at the beginning of the program
     GGML_API int64_t ggml_time_ms(void);
     GGML_API int64_t ggml_time_us(void);
     GGML_API int64_t ggml_cycles(void);
     GGML_API int64_t ggml_cycles_per_ms(void);
 
-    GGML_API void ggml_print_object (const struct ggml_object * obj);
-    GGML_API void ggml_print_objects(const struct ggml_context * ctx);
+    GGML_API void    ggml_print_object (const struct ggml_object * obj);
+    GGML_API void    ggml_print_objects(const struct ggml_context * ctx);
 
     GGML_API int64_t ggml_nelements(const struct ggml_tensor * tensor);
     GGML_API size_t  ggml_nbytes   (const struct ggml_tensor * tensor);
 
-    GGML_API int    ggml_blck_size (enum ggml_type type);
-    GGML_API size_t ggml_type_size (enum ggml_type type); // size in bytes for all elements in a block
-    GGML_API float  ggml_type_sizef(enum ggml_type type); // ggml_type_size()/ggml_blck_size() as float
+    GGML_API int     ggml_blck_size (enum ggml_type type);
+    GGML_API size_t  ggml_type_size (enum ggml_type type); // size in bytes for all elements in a block
+    GGML_API float   ggml_type_sizef(enum ggml_type type); // ggml_type_size()/ggml_blck_size() as float
 
     GGML_API const char * ggml_type_name(enum ggml_type type);
 
-    GGML_API size_t ggml_element_size(const struct ggml_tensor * tensor);
+    GGML_API size_t  ggml_element_size(const struct ggml_tensor * tensor);
 
-    GGML_API bool ggml_is_quantized(enum ggml_type type);
+    GGML_API bool    ggml_is_quantized(enum ggml_type type);
+
+    // main
 
     GGML_API struct ggml_context * ggml_init(struct ggml_init_params params);
-    GGML_API void ggml_free(struct ggml_context * ctx);
+    GGML_API void    ggml_free(struct ggml_context * ctx);
 
-    GGML_API size_t ggml_used_mem(const struct ggml_context * ctx);
+    GGML_API size_t  ggml_used_mem(const struct ggml_context * ctx);
 
-    GGML_API size_t ggml_set_scratch(struct ggml_context * ctx, struct ggml_scratch scratch);
+    GGML_API size_t  ggml_set_scratch(struct ggml_context * ctx, struct ggml_scratch scratch);
 
     GGML_API struct ggml_tensor * ggml_new_tensor(
-             struct ggml_context * ctx,
-             enum   ggml_type type,
-             int    n_dims,
-             const int64_t *ne);
+            struct ggml_context * ctx,
+            enum   ggml_type type,
+            int    n_dims,
+            const int64_t *ne);
 
     GGML_API struct ggml_tensor * ggml_new_tensor_1d(
-             struct ggml_context * ctx,
-             enum   ggml_type type,
-             int64_t ne0);
+            struct ggml_context * ctx,
+            enum   ggml_type type,
+            int64_t ne0);
 
     GGML_API struct ggml_tensor * ggml_new_tensor_2d(
-             struct ggml_context * ctx,
-             enum   ggml_type type,
-             int64_t ne0,
-             int64_t ne1);
+            struct ggml_context * ctx,
+            enum   ggml_type type,
+            int64_t ne0,
+            int64_t ne1);
 
     GGML_API struct ggml_tensor * ggml_new_tensor_3d(
-             struct ggml_context * ctx,
-             enum   ggml_type type,
-             int64_t ne0,
-             int64_t ne1,
-             int64_t ne2);
+            struct ggml_context * ctx,
+            enum   ggml_type type,
+            int64_t ne0,
+            int64_t ne1,
+            int64_t ne2);
 
     GGML_API struct ggml_tensor * ggml_new_tensor_4d(
-             struct ggml_context * ctx,
-             enum   ggml_type type,
-             int64_t ne0,
-             int64_t ne1,
-             int64_t ne2,
-             int64_t ne3);
+            struct ggml_context * ctx,
+            enum   ggml_type type,
+            int64_t ne0,
+            int64_t ne1,
+            int64_t ne2,
+            int64_t ne3);
 
     GGML_API struct ggml_tensor * ggml_new_i32(struct ggml_context * ctx, int32_t value);
     GGML_API struct ggml_tensor * ggml_new_f32(struct ggml_context * ctx, float value);
@@ -432,10 +435,10 @@ extern "C" {
     GGML_API int32_t ggml_get_i32_1d(const struct ggml_tensor * tensor, int i);
     GGML_API void    ggml_set_i32_1d(const struct ggml_tensor * tensor, int i, int32_t value);
 
-    GGML_API float ggml_get_f32_1d(const struct ggml_tensor * tensor, int i);
-    GGML_API void  ggml_set_f32_1d(const struct ggml_tensor * tensor, int i, float value);
+    GGML_API float   ggml_get_f32_1d(const struct ggml_tensor * tensor, int i);
+    GGML_API void    ggml_set_f32_1d(const struct ggml_tensor * tensor, int i, float value);
 
-    GGML_API void * ggml_get_data    (const struct ggml_tensor * tensor);
+    GGML_API void *  ggml_get_data    (const struct ggml_tensor * tensor);
     GGML_API float * ggml_get_data_f32(const struct ggml_tensor * tensor);
 
     //
@@ -450,7 +453,6 @@ extern "C" {
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             struct ggml_tensor  * b);
-
 
     GGML_API struct ggml_tensor * ggml_add_inplace(
             struct ggml_context * ctx,
@@ -837,21 +839,21 @@ extern "C" {
     // system info
     //
 
-    GGML_API int ggml_cpu_has_avx(void);
-    GGML_API int ggml_cpu_has_avx2(void);
-    GGML_API int ggml_cpu_has_avx512(void);
+    GGML_API int ggml_cpu_has_avx        (void);
+    GGML_API int ggml_cpu_has_avx2       (void);
+    GGML_API int ggml_cpu_has_avx512     (void);
     GGML_API int ggml_cpu_has_avx512_vbmi(void);
     GGML_API int ggml_cpu_has_avx512_vnni(void);
-    GGML_API int ggml_cpu_has_fma(void);
-    GGML_API int ggml_cpu_has_neon(void);
-    GGML_API int ggml_cpu_has_arm_fma(void);
-    GGML_API int ggml_cpu_has_f16c(void);
-    GGML_API int ggml_cpu_has_fp16_va(void);
-    GGML_API int ggml_cpu_has_wasm_simd(void);
-    GGML_API int ggml_cpu_has_blas(void);
-    GGML_API int ggml_cpu_has_cublas(void);
-    GGML_API int ggml_cpu_has_sse3(void);
-    GGML_API int ggml_cpu_has_vsx(void);
+    GGML_API int ggml_cpu_has_fma        (void);
+    GGML_API int ggml_cpu_has_neon       (void);
+    GGML_API int ggml_cpu_has_arm_fma    (void);
+    GGML_API int ggml_cpu_has_f16c       (void);
+    GGML_API int ggml_cpu_has_fp16_va    (void);
+    GGML_API int ggml_cpu_has_wasm_simd  (void);
+    GGML_API int ggml_cpu_has_blas       (void);
+    GGML_API int ggml_cpu_has_cublas     (void);
+    GGML_API int ggml_cpu_has_sse3       (void);
+    GGML_API int ggml_cpu_has_vsx        (void);
 
 
     //
