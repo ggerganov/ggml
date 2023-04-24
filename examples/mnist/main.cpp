@@ -1,6 +1,7 @@
 #include "ggml/ggml.h"
 
 #include "common.h"
+#include "common-ggml.h"
 
 #include <cmath>
 #include <cstdio>
@@ -203,6 +204,8 @@ int mnist_eval(
     const float * probs_data = ggml_get_data_f32(probs);
 
     const int prediction = std::max_element(probs_data, probs_data + 10) - probs_data;
+
+    ggml_graph_export(&gf, "mnist.ggml");
 
     ggml_free(ctx0);
 
