@@ -436,7 +436,11 @@ static const size_t CACHE_LINE_SIZE_F32 = CACHE_LINE_SIZE/sizeof(float);
 static inline __m128i bytes_from_nibbles_16(const uint8_t * rsi)
 {
     // Load 8 bytes from memory
+#ifdef _mm_loadu_si64 // gcc >= 9
     __m128i tmp = _mm_loadu_si64( ( const __m128i* )rsi );
+#else
+    __m128i tmp = _mm_loadl_epi64( ( const __m128i* )rsi );
+#endif
 
     // Expand bytes into uint16_t values
     __m128i bytes = _mm_cvtepu8_epi16( tmp );
