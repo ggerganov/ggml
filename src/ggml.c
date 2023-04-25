@@ -366,11 +366,17 @@ void ggml_time_init(void) {
     timer_freq = frequency.QuadPart;
 }
 int64_t ggml_time_ms(void) {
+    if (timer_freq == 0) {
+        ggml_time_init();
+    }
     LARGE_INTEGER t;
     QueryPerformanceCounter(&t);
     return (t.QuadPart * 1000) / timer_freq;
 }
 int64_t ggml_time_us(void) {
+    if (timer_freq == 0) {
+        ggml_time_init();
+    }
     LARGE_INTEGER t;
     QueryPerformanceCounter(&t);
     return (t.QuadPart * 1000000) / timer_freq;

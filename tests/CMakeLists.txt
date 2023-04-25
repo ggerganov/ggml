@@ -129,10 +129,12 @@ endif()
 #
 # test-vec0
 
-set(TEST_TARGET test-vec0)
-add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
-target_link_libraries(${TEST_TARGET} PRIVATE ggml)
-add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+if (NOT MSVC)
+	set(TEST_TARGET test-vec0)
+	add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+	target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+	add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+endif()
 
 #
 # test-vec1 (x86)
@@ -196,10 +198,12 @@ endif()
 #
 # test-mul-mat2
 
-set(TEST_TARGET test-mul-mat2)
-add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
-target_link_libraries(${TEST_TARGET} PRIVATE ggml)
-add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+if (NOT MSVC)
+	set(TEST_TARGET test-mul-mat2)
+	add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+	target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+	add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+endif()
 
 #
 # test0

@@ -199,6 +199,7 @@ target_include_directories(${TARGET} PUBLIC
 
 if (MSVC)
     target_link_libraries(${TARGET} PUBLIC ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
+	target_compile_features(${TARGET} PUBLIC cxx_std_20)
 else()
     target_link_libraries(${TARGET} PUBLIC m ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 endif()
