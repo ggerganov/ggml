@@ -1,6 +1,7 @@
 #include "ggml/ggml.h"
 
 #include "common.h"
+#include "common-ggml.h"
 
 #include <cassert>
 #include <cmath>
@@ -131,23 +132,12 @@ bool stablelm_model_load(const std::string & fname, stablelm_model & model, gpt_
 
     // for the big tensors, we have the option to store the data in 16-bit floats or quantized
     // in order to save memory and also to speed up the computation
-    ggml_type wtype = GGML_TYPE_COUNT;
-    switch (model.hparams.ftype) {
-        case 0: wtype = GGML_TYPE_F32;  break;
-        case 1: wtype = GGML_TYPE_F16;  break;
-        case 2: wtype = GGML_TYPE_Q4_0; break;
-        case 3: wtype = GGML_TYPE_Q4_1; break;
-        case 5: wtype = GGML_TYPE_Q4_2; break;
-        case 6: wtype = GGML_TYPE_Q4_3; break;
-        default:
-                {
-                    fprintf(stderr, "%s: invalid model file '%s' (bad ftype value %d)\n",
-                            __func__, fname.c_str(), model.hparams.ftype);
-                    return false;
-                }
+    ggml_type wtype = ggml_ftype_to_ggml_type((ggml_ftype) (model.hparams.ftype));
+    if (wtype == GGML_TYPE_COUNT) {
+        fprintf(stderr, "%s: invalid model file '%s' (bad ftype value %d)\n",
+                __func__, fname.c_str(), model.hparams.ftype);
+        return false;
     }
-
-    const ggml_type wtype2 = GGML_TYPE_F32;
 
     auto & ctx = model.ctx;
 
