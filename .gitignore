@@ -7,6 +7,8 @@ compile_commands.json
 .exrc
 .cache
 .DS_Store
+.stablelm
+.gpt-2
 
 src/arm_neon.h
 tests/arm_neon.h
