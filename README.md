@@ -30,6 +30,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [ ] Example of [SAM](https://github.com/facebookresearch/segment-anything) inference
 - [ ] Idea for GPU support: https://github.com/ggerganov/llama.cpp/discussions/915
 - [X] Example of StableLM (GPT-NeoX) inference [examples/stablelm](https://github.com/ggerganov/ggml/tree/master/examples/stablelm)
+- [X] Example of BERT inference [skeskinen/bert.cpp](https://github.com/skeskinen/bert.cpp)
 
 ## Whisper inference (example)
 
