@@ -9,6 +9,7 @@ if (GGML_ALL_WARNINGS)
             -Wcast-qual                     \
             -Wstrict-prototypes             \
             -Wpointer-arith                 \
+            -Wdouble-promotion              \
             -Wno-unused-function            \
         ")
     else()
