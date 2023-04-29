@@ -212,6 +212,10 @@ if (BUILD_SHARED_LIBS)
     target_compile_definitions(${TARGET} PUBLIC
         GGML_SHARED
         )
+
+    target_compile_definitions(${TARGET} PRIVATE
+        GGML_BUILD
+        )
 endif()
 
 target_compile_definitions(${TARGET} PUBLIC
