@@ -1981,14 +1981,17 @@ quantize_fns_t ggml_internal_get_quantize_fn(size_t i) {
 #define GGML_F32x8_MUL     _mm256_mul_ps
 #define GGML_F32x8_REDUCE(res, x)                                 \
 {                                                                 \
-    for (int i = 0; i < GGML_F32_ARR/2; ++i) {                    \
-        x[2*i] = _mm256_add_ps(x[2*i], x[2*i+1]);                 \
+    int offset = GGML_F32_ARR >> 1;                               \
+    for (int i = 0; i < offset; ++i) {                            \
+        x[i] = _mm256_add_ps(x[i], x[offset+i]);                  \
     }                                                             \
-    for (int i = 0; i < GGML_F32_ARR/4; ++i) {                    \
-        x[4*i] = _mm256_add_ps(x[4*i], x[4*i+2]);                 \
+    offset >>= 1;                                                 \
+    for (int i = 0; i < offset; ++i) {                            \
+        x[i] = _mm256_add_ps(x[i], x[offset+i]);                  \
     }                                                             \
-    for (int i = 0; i < GGML_F32_ARR/8; ++i) {                    \
-        x[8*i] = _mm256_add_ps(x[8*i], x[8*i+4]);                 \
+    offset >>= 1;                                                 \
+    for (int i = 0; i < offset; ++i) {                            \
+        x[i] = _mm256_add_ps(x[i], x[offset+i]);                  \
     }                                                             \
     const __m128 t0 = _mm_add_ps(_mm256_castps256_ps128(x[0]),    \
                                  _mm256_extractf128_ps(x[0], 1)); \
@@ -2077,14 +2080,17 @@ static inline void __avx_f32cx8_store(ggml_fp16_t *x, __m256 y) {
 #define GGML_F32x4_MUL          vec_mul
 #define GGML_F32x4_REDUCE(res, x)              \
 {                                              \
-    for (int i = 0; i < GGML_F32_ARR/2; ++i) { \
-        x[2*i] = vec_add(x[2*i], x[2*i+1]);    \
+    int offset = GGML_F32_ARR >> 1;            \
+    for (int i = 0; i < offset; ++i) {         \
+        x[i] = vec_add(x[i], x[offset+i]);     \
     }                                          \
-    for (int i = 0; i < GGML_F32_ARR/4; ++i) { \
-        x[4*i] = vec_add(x[4*i], x[4*i+2]);    \
+    offset >>= 1;                              \
+    for (int i = 0; i < offset; ++i) {         \
+        x[i] = vec_add(x[i], x[offset+i]);     \
     }                                          \
-    for (int i = 0; i < GGML_F32_ARR/8; ++i) { \
-        x[8*i] = vec_add(x[8*i], x[8*i+4]);    \
+    offset >>= 1;                              \
+    for (int i = 0; i < offset; ++i) {         \
+        x[i] = vec_add(x[i], x[offset+i]);     \
     }                                          \
     res = vec_extract(x[0], 0) +               \
           vec_extract(x[0], 1) +               \
@@ -2140,14 +2146,17 @@ static inline void __avx_f32cx8_store(ggml_fp16_t *x, __m256 y) {
 #define GGML_F32x4_MUL          wasm_f32x4_mul
 #define GGML_F32x4_REDUCE(res, x)                  \
 {                                                  \
-    for (int i = 0; i < GGML_F32_ARR/2; ++i) {     \
-        x[2*i] = wasm_f32x4_add(x[2*i], x[2*i+1]); \
+    int offset = GGML_F32_ARR >> 1;                \
+    for (int i = 0; i < offset; ++i) {             \
+        x[i] = wasm_f32x4_add(x[i], x[offset+i]);  \
     }                                              \
-    for (int i = 0; i < GGML_F32_ARR/4; ++i) {     \
-        x[4*i] = wasm_f32x4_add(x[4*i], x[4*i+2]); \
+    offset >>= 1;                                  \
+    for (int i = 0; i < offset; ++i) {             \
+        x[i] = wasm_f32x4_add(x[i], x[offset+i]);  \
     }                                              \
-    for (int i = 0; i < GGML_F32_ARR/8; ++i) {     \
-        x[8*i] = wasm_f32x4_add(x[8*i], x[8*i+4]); \
+    offset >>= 1;                                  \
+    for (int i = 0; i < offset; ++i) {             \
+        x[i] = wasm_f32x4_add(x[i], x[offset+i]);  \
     }                                              \
     res = wasm_f32x4_extract_lane(x[0], 0) +       \
           wasm_f32x4_extract_lane(x[0], 1) +       \
@@ -2202,14 +2211,17 @@ inline static void __wasm_f16x4_store(ggml_fp16_t * p, v128_t x) {
 #define GGML_F16x4_MUL         wasm_f32x4_mul
 #define GGML_F16x4_REDUCE(res, x)                  \
 {                                                  \
-    for (int i = 0; i < GGML_F16_ARR/2; ++i) {     \
-        x[2*i] = wasm_f32x4_add(x[2*i], x[2*i+1]); \
+    int offset = GGML_F16_ARR >> 1;                \
+    for (int i = 0; i < offset; ++i) {             \
+        x[i] = wasm_f32x4_add(x[i], x[offset+i]);  \
     }                                              \
-    for (int i = 0; i < GGML_F16_ARR/4; ++i) {     \
-        x[4*i] = wasm_f32x4_add(x[4*i], x[4*i+2]); \
+    offset >>= 1;                                  \
+    for (int i = 0; i < offset; ++i) {             \
+        x[i] = wasm_f32x4_add(x[i], x[offset+i]);  \
     }                                              \
-    for (int i = 0; i < GGML_F16_ARR/8; ++i) {     \
-        x[8*i] = wasm_f32x4_add(x[8*i], x[8*i+4]); \
+    offset >>= 1;                                  \
+    for (int i = 0; i < offset; ++i) {             \
+        x[i] = wasm_f32x4_add(x[i], x[offset+i]);  \
     }                                              \
     res = wasm_f32x4_extract_lane(x[0], 0) +       \
           wasm_f32x4_extract_lane(x[0], 1) +       \
@@ -2251,14 +2263,17 @@ inline static void __wasm_f16x4_store(ggml_fp16_t * p, v128_t x) {
 #define GGML_F32x4_MUL     _mm_mul_ps
 #define GGML_F32x4_REDUCE(res, x)                                 \
 {                                                                 \
-    for (int i = 0; i < GGML_F32_ARR/2; ++i) {                    \
-        x[2*i] = _mm_add_ps(x[2*i], x[2*i+1]);                    \
+    int offset = GGML_F32_ARR >> 1;                               \
+    for (int i = 0; i < offset; ++i) {                            \
+        x[i] = _mm_add_ps(x[i], x[offset+i]);                     \
     }                                                             \
-    for (int i = 0; i < GGML_F32_ARR/4; ++i) {                    \
-        x[4*i] = _mm_add_ps(x[4*i], x[4*i+2]);                    \
+    offset >>= 1;                                                 \
+    for (int i = 0; i < offset; ++i) {                            \
+        x[i] = _mm_add_ps(x[i], x[offset+i]);                     \
     }                                                             \
-    for (int i = 0; i < GGML_F32_ARR/8; ++i) {                    \
-        x[8*i] = _mm_add_ps(x[8*i], x[8*i+4]);                    \
+    offset >>= 1;                                                 \
+    for (int i = 0; i < offset; ++i) {                            \
+        x[i] = _mm_add_ps(x[i], x[offset+i]);                     \
     }                                                             \
     const __m128 t0 = _mm_hadd_ps(x[0], x[0]);                    \
     res = _mm_cvtss_f32(_mm_hadd_ps(t0, t0));                     \
