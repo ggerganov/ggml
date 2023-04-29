@@ -6,7 +6,6 @@ static const std::map<std::string, enum ggml_ftype> GGML_FTYPE_MAP = {
     {"q4_0", GGML_FTYPE_MOSTLY_Q4_0},
     {"q4_1", GGML_FTYPE_MOSTLY_Q4_1},
     {"q4_2", GGML_FTYPE_MOSTLY_Q4_2},
-    {"q4_3", GGML_FTYPE_MOSTLY_Q4_3},
     {"q5_0", GGML_FTYPE_MOSTLY_Q5_0},
     {"q5_1", GGML_FTYPE_MOSTLY_Q5_1},
     {"q8_0", GGML_FTYPE_MOSTLY_Q8_0},
@@ -43,7 +42,6 @@ enum ggml_type ggml_ftype_to_ggml_type(const enum ggml_ftype ftype) {
         case GGML_FTYPE_MOSTLY_Q4_0:          wtype = GGML_TYPE_Q4_0;  break;
         case GGML_FTYPE_MOSTLY_Q4_1:          wtype = GGML_TYPE_Q4_1;  break;
         case GGML_FTYPE_MOSTLY_Q4_2:          wtype = GGML_TYPE_Q4_2;  break;
-        case GGML_FTYPE_MOSTLY_Q4_3:          wtype = GGML_TYPE_Q4_3;  break;
         case GGML_FTYPE_MOSTLY_Q5_0:          wtype = GGML_TYPE_Q5_0;  break;
         case GGML_FTYPE_MOSTLY_Q5_1:          wtype = GGML_TYPE_Q5_1;  break;
         case GGML_FTYPE_MOSTLY_Q8_0:          wtype = GGML_TYPE_Q8_0;  break;
@@ -71,7 +69,6 @@ bool ggml_common_quantize_0(
         case GGML_FTYPE_MOSTLY_Q4_0: qtype = GGML_TYPE_Q4_0; break;
         case GGML_FTYPE_MOSTLY_Q4_1: qtype = GGML_TYPE_Q4_1; break;
         case GGML_FTYPE_MOSTLY_Q4_2: qtype = GGML_TYPE_Q4_2; break;
-        case GGML_FTYPE_MOSTLY_Q4_3: qtype = GGML_TYPE_Q4_3; break;
         case GGML_FTYPE_MOSTLY_Q5_0: qtype = GGML_TYPE_Q5_0; break;
         case GGML_FTYPE_MOSTLY_Q5_1: qtype = GGML_TYPE_Q5_1; break;
         case GGML_FTYPE_MOSTLY_Q8_0: qtype = GGML_TYPE_Q8_0; break;
@@ -199,10 +196,6 @@ bool ggml_common_quantize_0(
                 case GGML_TYPE_Q4_2:
                     {
                         cur_size = ggml_quantize_q4_2(data_f32.data(), work.data(), nelements, ne[0], hist_cur.data());
-                    } break;
-                case GGML_TYPE_Q4_3:
-                    {
-                        cur_size = ggml_quantize_q4_3(data_f32.data(), work.data(), nelements, ne[0], hist_cur.data());
                     } break;
                 case GGML_TYPE_Q5_0:
                     {
