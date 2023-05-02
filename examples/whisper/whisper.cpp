@@ -284,11 +284,11 @@ static const std::map<ggml_type, std::map<e_model, size_t>> MEM_REQ_MODEL = {
     },
     { GGML_TYPE_Q4_1,
         {
-            { MODEL_TINY,     31ull*MB },
-            { MODEL_BASE,     57ull*MB },
-            { MODEL_SMALL,   181ull*MB },
-            { MODEL_MEDIUM,  559ull*MB },
-            { MODEL_LARGE,  1122ull*MB },
+            { MODEL_TINY,     32ull*MB },
+            { MODEL_BASE,     58ull*MB },
+            { MODEL_SMALL,   182ull*MB },
+            { MODEL_MEDIUM,  562ull*MB },
+            { MODEL_LARGE,  1124ull*MB },
         },
     },
     { GGML_TYPE_Q4_2,
@@ -300,22 +300,31 @@ static const std::map<ggml_type, std::map<e_model, size_t>> MEM_REQ_MODEL = {
             { MODEL_LARGE,   940ull*MB },
         },
     },
-    { GGML_TYPE_Q5_0, // TODO: fix
+    { GGML_TYPE_Q5_0,
         {
-            { MODEL_TINY,     31ull*MB },
-            { MODEL_BASE,     57ull*MB },
-            { MODEL_SMALL,   181ull*MB },
-            { MODEL_MEDIUM,  559ull*MB },
-            { MODEL_LARGE,  1122ull*MB },
+            { MODEL_TINY,     30ull*MB },
+            { MODEL_BASE,     54ull*MB },
+            { MODEL_SMALL,   170ull*MB },
+            { MODEL_MEDIUM,  516ull*MB },
+            { MODEL_LARGE,  1034ull*MB },
         },
     },
     { GGML_TYPE_Q5_1,
         {
-            { MODEL_TINY,     31ull*MB },
-            { MODEL_BASE,     57ull*MB },
-            { MODEL_SMALL,   181ull*MB },
-            { MODEL_MEDIUM,  559ull*MB },
-            { MODEL_LARGE,  1122ull*MB },
+            { MODEL_TINY,     32ull*MB },
+            { MODEL_BASE,     58ull*MB },
+            { MODEL_SMALL,   182ull*MB },
+            { MODEL_MEDIUM,  562ull*MB },
+            { MODEL_LARGE,  1124ull*MB },
+        },
+    },
+    { GGML_TYPE_Q8_0,
+        {
+            { MODEL_TINY,     45ull*MB },
+            { MODEL_BASE,     84ull*MB },
+            { MODEL_SMALL,   268ull*MB },
+            { MODEL_MEDIUM,  834ull*MB },
+            { MODEL_LARGE,  1674ull*MB },
         },
     },
 };
@@ -1333,7 +1342,7 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
             }
 
             int32_t nelements = 1;
-            int32_t ne[3] = { 1, 1, 1 };
+            int32_t ne[4] = { 1, 1, 1, 1 };
             for (int i = 0; i < n_dims; ++i) {
                 read_safe(loader, ne[i]);
                 nelements *= ne[i];
@@ -1352,6 +1361,8 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
             auto tensor = model.tensors[name.data()];
             if (ggml_nelements(tensor) != nelements) {
                 fprintf(stderr, "%s: tensor '%s' has wrong size in model file\n", __func__, name.data());
+                fprintf(stderr, "%s: shape: [%d, %d, %d], expected: [%d, %d, %d]\n",
+                        __func__, ne[0], ne[1], ne[2], (int) tensor->ne[0], (int) tensor->ne[1], (int) tensor->ne[2]);
                 return false;
             }
 
@@ -3301,6 +3312,7 @@ struct whisper_full_params whisper_full_default_params(enum whisper_sampling_str
         /*.prompt_n_tokens  =*/ 0,
 
         /*.language         =*/ "en",
+        /*.detect_language  =*/ false,
 
         /*.suppress_blank   =*/ true,
         /*.suppress_non_speech_tokens =*/ false,
@@ -3887,7 +3899,7 @@ int whisper_full_with_state(
     }
 
     // auto-detect language if not specified
-    if (params.language == nullptr || strlen(params.language) == 0 || strcmp(params.language, "auto") == 0) {
+    if (params.language == nullptr || strlen(params.language) == 0 || strcmp(params.language, "auto") == 0 || params.detect_language) {
         std::vector<float> probs(whisper_lang_max_id() + 1, 0.0f);
 
         const auto lang_id = whisper_lang_auto_detect_with_state(ctx, state, 0, params.n_threads, probs.data());
@@ -3899,6 +3911,9 @@ int whisper_full_with_state(
         params.language = whisper_lang_str(lang_id);
 
         fprintf(stderr, "%s: auto-detected language: %s (p = %f)\n", __func__, params.language, probs[whisper_lang_id(params.language)]);
+        if (params.detect_language) {
+            return 0;
+        }
     }
 
     if (params.token_timestamps) {
@@ -4816,48 +4831,50 @@ WHISPER_API const char * whisper_bench_memcpy_str(int n_threads) {
 
     ggml_time_init();
 
-    size_t n    = 50;
-    size_t arr  = n_threads > 0 ? 1024 : n_threads; // trick to avoid compiler optimizations
+    size_t n    = 20;
+    size_t arr  = n_threads > 0 ? 1024llu : n_threads; // trick to avoid compiler optimizations
 
-    // 1 GB array
+    // 1GB MB array
     const size_t size = arr*1024llu*1024llu;
 
-    char * src = (char *) malloc(size);
-    char * dst = (char *) malloc(size);
-
-    for (size_t i = 0; i < size; i++) src[i] = i;
-
-    memcpy(dst, src, size); // heat-up
-
-    double tsum = 0.0;
-
-    for (size_t i = 0; i < n; i++) {
-        const int64_t t0 = ggml_time_us();
-
-        memcpy(dst, src, size);
-
-        const int64_t t1 = ggml_time_us();
-
-        tsum += (t1 - t0)*1e-6;
-
-        src[0] = rand();
-    }
-
-    snprintf(strbuf, sizeof(strbuf), "memcpy: %.2f GB/s\n", (double) (n*size)/(tsum*1024llu*1024llu*1024llu));
-    s += strbuf;
-
-    // needed to prevent the compile from optimizing the memcpy away
+    // single-thread
     {
-        double sum = 0.0;
+        char * src = (char *) malloc(size);
+        char * dst = (char *) malloc(size);
 
-        for (size_t i = 0; i < size; i++) sum += dst[i];
+        for (size_t i = 0; i < size; i++) src[i] = i;
 
-        snprintf(strbuf, sizeof(strbuf), "sum:    %s %f\n", sum == -536870910.00 ? "ok" : "error", sum);
+        memcpy(dst, src, size); // heat-up
+
+        double tsum = 0.0;
+        double sum  = 0.0;
+
+        for (size_t i = 0; i < n; i++) {
+            const int64_t t0 = ggml_time_us();
+
+            memcpy(dst, src, size);
+
+            const int64_t t1 = ggml_time_us();
+
+            tsum += (t1 - t0)*1e-6;
+
+            src[rand() % size] = rand() % 256;
+        }
+
+        snprintf(strbuf, sizeof(strbuf), "memcpy: %.2f GB/s (1 thread)\n", (double) (n*size)/(tsum*1024llu*1024llu*1024llu));
         s += strbuf;
-    }
 
-    free(src);
-    free(dst);
+        // needed to prevent the compiler from optimizing the memcpy away
+        {
+            for (size_t i = 0; i < size; i++) sum += dst[i];
+
+            snprintf(strbuf, sizeof(strbuf), "sum:    %f\n", sum);
+            s += strbuf;
+        }
+
+        free(src);
+        free(dst);
+    }
 
     return s.c_str();
 }
@@ -4894,26 +4911,37 @@ WHISPER_API const char * whisper_bench_ggml_mul_mat_str(int n_threads) {
     for (int j = 0; j < (int) sizes.size(); j++) {
         int n_q4_0 = 0;
         int n_q4_1 = 0;
+        int n_q4_2 = 0;
+        int n_q5_0 = 0;
+        int n_q5_1 = 0;
+        int n_q8_0 = 0;
         int n_fp16 = 0;
         int n_fp32 = 0;
 
         // GFLOPS/s
         double s_q4_0 = 0.0;
         double s_q4_1 = 0.0;
+        double s_q4_2 = 0.0;
+        double s_q5_0 = 0.0;
+        double s_q5_1 = 0.0;
+        double s_q8_0 = 0.0;
         double s_fp16 = 0.0;
         double s_fp32 = 0.0;
 
         const size_t N = sizes[j];
 
-        for (int k = 0; k < 4; ++k) {
+        for (int k = 0; k < 8; ++k) {
             const ggml_type wtype =
                 k == 0 ? GGML_TYPE_Q4_0 :
                 k == 1 ? GGML_TYPE_Q4_1 :
-                k == 2 ? GGML_TYPE_F16  :
-                         GGML_TYPE_F32;
+                k == 2 ? GGML_TYPE_Q4_2 :
+                k == 3 ? GGML_TYPE_Q5_0 :
+                k == 4 ? GGML_TYPE_Q5_1 :
+                k == 5 ? GGML_TYPE_Q8_0 :
+                k == 6 ? GGML_TYPE_F16  : GGML_TYPE_F32;
 
-            double & s = k == 0 ? s_q4_0 : k == 1 ? s_q4_1 : k == 2 ? s_fp16 : s_fp32;
-            int    & n = k == 0 ? n_q4_0 : k == 1 ? n_q4_1 : k == 2 ? n_fp16 : n_fp32;
+            double & s = k == 0 ? s_q4_0 : k == 1 ? s_q4_1 : k == 2 ? s_q4_2 : k == 3 ? s_q5_0 : k == 4 ? s_q5_1 : k == 5 ? s_q8_0 : k == 6 ? s_fp16 : /*k == 7*/ s_fp32;
+            int    & n = k == 0 ? n_q4_0 : k == 1 ? n_q4_1 : k == 2 ? n_q4_2 : k == 3 ? n_q5_0 : k == 4 ? n_q5_1 : k == 5 ? n_q8_0 : k == 6 ? n_fp16 : /*k == 7*/ n_fp32;
 
             struct ggml_init_params gparams = {
                 /*.mem_size   =*/ buf.size(),
@@ -4957,8 +4985,19 @@ WHISPER_API const char * whisper_bench_ggml_mul_mat_str(int n_threads) {
             s = ((2.0*N*N*N*n)/tsum)*1e-9;
         }
 
-        snprintf(strbuf, sizeof(strbuf), "ggml_mul_mat: %4zu x %4zu: Q4_0 %7.1f GFLOPS (%3d runs) / Q4_1 %7.1f GFLOPS (%3d runs) / F16 %7.1f GFLOPS (%3d runs) / F32 %7.1f GFLOPS (%3d runs)\n",
-                N, N, s_q4_0, n_q4_0, s_q4_1, n_q4_1, s_fp16, n_fp16, s_fp32, n_fp32);
+        // Q4_0 | Q4_1 | Q4_2
+        snprintf(strbuf, sizeof(strbuf), "%4zu x %4zu: Q4_0 %7.1f GFLOPS (%3d runs) | Q4_1 %7.1f GFLOPS (%3d runs) | Q4_2 %7.1f GFLOPS (%3d runs)\n",
+                N, N, s_q4_0, n_q4_0, s_q4_1, n_q4_1, s_q4_2, n_q4_2);
+        s += strbuf;
+
+        // Q5_0 | Q5_1 | Q8_0
+        snprintf(strbuf, sizeof(strbuf), "%4zu x %4zu: Q5_0 %7.1f GFLOPS (%3d runs) | Q5_1 %7.1f GFLOPS (%3d runs) | Q8_0 %7.1f GFLOPS (%3d runs)\n",
+                N, N, s_q5_0, n_q5_0, s_q5_1, n_q5_1, s_q8_0, n_q8_0);
+        s += strbuf;
+
+        // F16 | F32
+        snprintf(strbuf, sizeof(strbuf), "%4zu x %4zu: F16  %7.1f GFLOPS (%3d runs) | F32  %7.1f GFLOPS (%3d runs)\n",
+                N, N, s_fp16, n_fp16, s_fp32, n_fp32);
         s += strbuf;
     }
 
