@@ -104,7 +104,7 @@ main:    total time =  6187.27 ms
 ./bin/dollyv2-quantize ./dolly-v2-3b/ggml-model-f16.bin ./dolly-v2-3b/ggml-model-q5_0.bin 8
 
 # run the quantized model
-./bin/dolly-v2 -m ./dolly-v2-3b/ggml-model-q5_0.bin -p "State the meaning of life." -t 6 -n 64
+./bin/dollyv2 -m ./dolly-v2-3b/ggml-model-q5_0.bin -p "State the meaning of life." -t 6 -n 64
 
 main: seed = 1683218518
 dollyv2_model_load: loading model from './dolly-v2-3b/ggml-model-q5_0.bin' - please wait ...
