@@ -21,7 +21,6 @@ struct redpajama_hparams {
     int32_t n_embd  = 2560; // model.config.hidden_size
     int32_t n_head  = 32; // model.config.num_attention_heads
     int32_t n_layer = 32; // model.config.num_hidden_layers
-    int32_t n_rot   = 32; // rotary_pct * (n_embd / n_head)
     int32_t n_rot   = 80; // rotary_pct[100%] * (n_embd / n_head)
     int32_t ftype   = GGML_FTYPE_MOSTLY_F16;
 };

@@ -13,19 +13,19 @@
 #include <vector>
 #include <regex>
 
-// default hparams (StableLM 3B)
-struct stablelm_hparams {
-    int32_t n_vocab = 50257;
-    int32_t n_ctx   = 4096;
-    int32_t n_embd  = 4096;
-    int32_t n_head  = 32;
-    int32_t n_layer = 16;
-    int32_t n_rot   = 32; // 0.25 * (n_embd / n_head)
-    int32_t ftype   = 1;
+// default hparams (RedPajama 3B)
+struct redpajama_hparams {
+    int32_t n_vocab = 50254; // tokenizer.vocab_size
+    int32_t n_ctx   = 2048; // model.config.max_position_embeddings
+    int32_t n_embd  = 2560; // model.config.hidden_size
+    int32_t n_head  = 32; // model.config.num_attention_heads
+    int32_t n_layer = 32; // model.config.num_hidden_layers
+    int32_t n_rot   = 80; // rotary_pct[100%] * (n_embd / n_head)
+    int32_t ftype   = GGML_FTYPE_MOSTLY_F16;
 };
 
 // quantize a model
-bool stablelm_model_quantize(const std::string & fname_inp, const std::string & fname_out, ggml_ftype ftype) {
+bool redpajama_model_quantize(const std::string & fname_inp, const std::string & fname_out, ggml_ftype ftype) {
     gpt_vocab vocab;
 
     printf("%s: loading model from '%s'\n", __func__, fname_inp.c_str());
@@ -54,7 +54,7 @@ bool stablelm_model_quantize(const std::string & fname_inp, const std::string & 
         fout.write((char *) &magic, sizeof(magic));
     }
 
-    stablelm_hparams hparams;
+    redpajama_hparams hparams;
 
     // load hparams
     {
@@ -118,11 +118,11 @@ bool stablelm_model_quantize(const std::string & fname_inp, const std::string & 
 }
 
 // usage:
-//  ./stablelm2-quantize models/stablelm2-117M/ggml-model.bin models/stablelm2-117M/ggml-model-quant.bin type
+//  ./redpajama2-quantize models/redpajama2-117M/ggml-model.bin models/redpajama2-117M/ggml-model-quant.bin type
 //
 int main(int argc, char ** argv) {
     if (argc != 4) {
-        fprintf(stderr, "usage: %s model-f32.bin model-quant.bin type\n", argv[0]);
+        fprintf(stderr, "usage: %s model-f16.bin model-quant.bin type\n", argv[0]);
         ggml_print_ftypes(stderr);
         return 1;
     }
@@ -147,7 +147,7 @@ int main(int argc, char ** argv) {
     {
         const int64_t t_start_us = ggml_time_us();
 
-        if (!stablelm_model_quantize(fname_inp, fname_out, ggml_ftype(ftype))) {
+        if (!redpajama_model_quantize(fname_inp, fname_out, ggml_ftype(ftype))) {
             fprintf(stderr, "%s: failed to quantize model from '%s'\n", __func__, fname_inp.c_str());
             return 1;
         }
