@@ -529,17 +529,19 @@ bool redpajama_eval(
 
                 cur = ggml_add(ctx0, ggml_repeat(ctx0, model.layers[il].c_attn_proj_b, cur), cur);
             }
+
         }
+
+        // layer input + Attn
+        cur  = ggml_add(ctx0, cur, inpL);
 
         struct ggml_tensor * inpFF = cur;
 
         // feed-forward network
-        // this is independent of the self-attention result, so it could be done in parallel to the self-attention
         {
             // post attention layer norm
-            // note here we pass inpL instead of cur
             {
-                cur = ggml_norm(ctx0, inpL);
+                cur = ggml_norm(ctx0, cur);
 
                 cur = ggml_add(ctx0,
                     ggml_mul(ctx0,
@@ -571,10 +573,7 @@ bool redpajama_eval(
         }
 
         // layer input + FF
-        cur  = ggml_add(ctx0, cur, inpFF);
-
-        // input for next layer
-        inpL = ggml_add(ctx0, cur, inpL);
+        inpL = ggml_add(ctx0, cur, inpFF);
     }
 
     // norm
@@ -631,7 +630,7 @@ int main(int argc, char ** argv) {
     const int64_t t_main_start_us = ggml_time_us();
 
     gpt_params params;
-    params.model = "models/RedPajama-INCITE-Base-3b-v1/ggml-model-f16.bin";
+    params.model = "models/RedPajama-INCITE-Base-3B-v1/ggml-model-f16.bin";
 
     if (gpt_params_parse(argc, argv, params) == false) {
         return 1;
