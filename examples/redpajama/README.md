@@ -14,7 +14,7 @@ mkdir build && cd build
 cmake ..
 make -j
 
-# get the StableLM 3B Alpha model
+# get the RedPajama 3B Base model
 git clone https://huggingface.co/togethercomputer/RedPajama-INCITE-Base-3B-v1
 
 # convert model to FP16
