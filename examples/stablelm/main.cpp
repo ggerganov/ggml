@@ -22,6 +22,7 @@ struct stablelm_hparams {
     int32_t n_head  = 32;
     int32_t n_layer = 16;
     int32_t n_rot   = 32; // rotary_pct * (n_embd / n_head)
+    int32_t par_res = 1; // 1 = true, 0 = false
     int32_t ftype   = 1;
 };
 
@@ -102,6 +103,7 @@ bool stablelm_model_load(const std::string & fname, stablelm_model & model, gpt_
         fin.read((char *) &hparams.n_head,  sizeof(hparams.n_head));
         fin.read((char *) &hparams.n_layer, sizeof(hparams.n_layer));
         fin.read((char *) &hparams.n_rot,   sizeof(hparams.n_rot));
+        fin.read((char *) &hparams.par_res, sizeof(hparams.par_res));
         fin.read((char *) &hparams.ftype,   sizeof(hparams.ftype));
 
         printf("%s: n_vocab = %d\n", __func__, hparams.n_vocab);
@@ -368,6 +370,43 @@ bool stablelm_model_load(const std::string & fname, stablelm_model & model, gpt_
     return true;
 }
 
+
+// feed-forward network
+ggml_tensor * stablelm_ff(
+        const stablelm_layer &layer,
+        ggml_context * ctx0,
+        ggml_tensor * inp) {
+    ggml_tensor * cur = ggml_norm(ctx0, inp);
+
+    cur = ggml_add(ctx0,
+        ggml_mul(ctx0,
+            ggml_repeat(ctx0, layer.ln_2_g, cur),
+            cur),
+        ggml_repeat(ctx0, layer.ln_2_b, cur));
+
+    cur = ggml_mul_mat(ctx0,
+            layer.c_mlp_fc_w,
+            cur);
+
+    cur = ggml_add(ctx0,
+            ggml_repeat(ctx0, layer.c_mlp_fc_b, cur),
+            cur);
+
+    // GELU activation
+    cur = ggml_gelu(ctx0, cur);
+
+    // projection
+    // cur = proj_w*cur + proj_b
+    cur = ggml_mul_mat(ctx0,
+            layer.c_mlp_proj_w,
+            cur);
+
+    cur = ggml_add(ctx0,
+            ggml_repeat(ctx0, layer.c_mlp_proj_b, cur),
+            cur);
+    return cur;
+}
+
 // evaluate the transformer
 //
 //   - model:     the model
@@ -532,50 +571,26 @@ bool stablelm_eval(
             }
         }
 
-        struct ggml_tensor * inpFF = cur;
+        if (hparams.par_res == 0) {
+            struct ggml_tensor * inpFF = ggml_add(ctx0, cur, inpL);
 
-        // feed-forward network
-        // this is independent of the self-attention result, so it could be done in parallel to the self-attention
-        {
-            // post attention layer norm
+            cur = stablelm_ff(model.layers[il], ctx0, inpFF);
+
+            // input for next layer
+            inpL = ggml_add(ctx0, cur, inpFF);
+        } else {
+            struct ggml_tensor * inpFF = cur;
+
+            // this is independent of the self-attention result, so it could be done in parallel to the self-attention
             // note here we pass inpL instead of cur
-            {
-                cur = ggml_norm(ctx0, inpL);
+            cur = stablelm_ff(model.layers[il], ctx0, inpL);
 
-                cur = ggml_add(ctx0,
-                    ggml_mul(ctx0,
-                        ggml_repeat(ctx0, model.layers[il].ln_2_g, cur),
-                        cur),
-                    ggml_repeat(ctx0, model.layers[il].ln_2_b, cur));
-            }
+            // layer input + FF
+            cur  = ggml_add(ctx0, cur, inpFF);
 
-            cur = ggml_mul_mat(ctx0,
-                    model.layers[il].c_mlp_fc_w,
-                    cur);
-
-            cur = ggml_add(ctx0,
-                    ggml_repeat(ctx0, model.layers[il].c_mlp_fc_b, cur),
-                    cur);
-
-            // GELU activation
-            cur = ggml_gelu(ctx0, cur);
-
-            // projection
-            // cur = proj_w*cur + proj_b
-            cur = ggml_mul_mat(ctx0,
-                    model.layers[il].c_mlp_proj_w,
-                    cur);
-
-            cur = ggml_add(ctx0,
-                    ggml_repeat(ctx0, model.layers[il].c_mlp_proj_b, cur),
-                    cur);
+            // input for next layer
+            inpL = ggml_add(ctx0, cur, inpL);
         }
-
-        // layer input + FF
-        cur  = ggml_add(ctx0, cur, inpFF);
-
-        // input for next layer
-        inpL = ggml_add(ctx0, cur, inpL);
     }
 
     // norm
