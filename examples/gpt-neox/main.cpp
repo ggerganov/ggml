@@ -15,7 +15,7 @@
 #include <unistd.h>
 
 // default hparams (StableLM 3B)
-struct stablelm_hparams {
+struct gpt_neox_hparams {
     int32_t n_vocab = 50257;
     int32_t n_ctx   = 4096;
     int32_t n_embd  = 4096;
@@ -26,7 +26,7 @@ struct stablelm_hparams {
     int32_t ftype   = 1;
 };
 
-struct stablelm_layer {
+struct gpt_neox_layer {
     // pre normalization
     struct ggml_tensor * ln_1_g;
     struct ggml_tensor * ln_1_b;
@@ -50,8 +50,8 @@ struct stablelm_layer {
     struct ggml_tensor * c_mlp_proj_b;
 };
 
-struct stablelm_model {
-    stablelm_hparams hparams;
+struct gpt_neox_model {
+    gpt_neox_hparams hparams;
 
     // normalization
     struct ggml_tensor * ln_f_g;
@@ -62,7 +62,7 @@ struct stablelm_model {
     struct ggml_tensor * lmh_g; // language model head
     //struct ggml_tensor * lmh_b; // language model bias
 
-    std::vector<stablelm_layer> layers;
+    std::vector<gpt_neox_layer> layers;
 
     // key + value memory
     struct ggml_tensor * memory_k;
@@ -74,7 +74,7 @@ struct stablelm_model {
 };
 
 // load the model's weights from a file
-bool stablelm_model_load(const std::string & fname, stablelm_model & model, gpt_vocab & vocab) {
+bool gpt_neox_model_load(const std::string & fname, gpt_neox_model & model, gpt_vocab & vocab) {
     printf("%s: loading model from '%s' - please wait ...\n", __func__, fname.c_str());
 
     auto fin = std::ifstream(fname, std::ios::binary);
@@ -112,6 +112,7 @@ bool stablelm_model_load(const std::string & fname, stablelm_model & model, gpt_
         printf("%s: n_head  = %d\n", __func__, hparams.n_head);
         printf("%s: n_layer = %d\n", __func__, hparams.n_layer);
         printf("%s: n_rot   = %d\n", __func__, hparams.n_rot);
+        printf("%s: par_res = %d\n", __func__, hparams.par_res);
         printf("%s: ftype   = %d\n", __func__, hparams.ftype);
     }
 
@@ -372,8 +373,8 @@ bool stablelm_model_load(const std::string & fname, stablelm_model & model, gpt_
 
 
 // feed-forward network
-ggml_tensor * stablelm_ff(
-        const stablelm_layer &layer,
+ggml_tensor * gpt_neox_ff(
+        const gpt_neox_layer &layer,
         ggml_context * ctx0,
         ggml_tensor * inp) {
     ggml_tensor * cur = ggml_norm(ctx0, inp);
@@ -415,8 +416,8 @@ ggml_tensor * stablelm_ff(
 //   - embd_inp:  the embeddings of the tokens in the context
 //   - embd_w:    the predicted logits for the next token
 //
-bool stablelm_eval(
-        const stablelm_model & model,
+bool gpt_neox_eval(
+        const gpt_neox_model & model,
         const int n_threads,
         const int n_past,
         const std::vector<gpt_vocab::id> & embd_inp,
@@ -574,7 +575,7 @@ bool stablelm_eval(
         if (hparams.par_res == 0) {
             struct ggml_tensor * inpFF = ggml_add(ctx0, cur, inpL);
 
-            cur = stablelm_ff(model.layers[il], ctx0, inpFF);
+            cur = gpt_neox_ff(model.layers[il], ctx0, inpFF);
 
             // input for next layer
             inpL = ggml_add(ctx0, cur, inpFF);
@@ -583,7 +584,7 @@ bool stablelm_eval(
 
             // this is independent of the self-attention result, so it could be done in parallel to the self-attention
             // note here we pass inpL instead of cur
-            cur = stablelm_ff(model.layers[il], ctx0, inpL);
+            cur = gpt_neox_ff(model.layers[il], ctx0, inpL);
 
             // layer input + FF
             cur  = ggml_add(ctx0, cur, inpFF);
@@ -647,7 +648,7 @@ int main(int argc, char ** argv) {
     const int64_t t_main_start_us = ggml_time_us();
 
     gpt_params params;
-    params.model = "models/stablelm-base-alpha-3b/ggml-model-f16.bin";
+    params.model = "models/gpt_neox-base-alpha-3b/ggml-model-f16.bin";
 
     if (gpt_params_parse(argc, argv, params) == false) {
         return 1;
@@ -674,13 +675,13 @@ int main(int argc, char ** argv) {
     int64_t t_load_us = 0;
 
     gpt_vocab vocab;
-    stablelm_model model;
+    gpt_neox_model model;
 
     // load the model
     {
         const int64_t t_start_us = ggml_time_us();
 
-        if (!stablelm_model_load(params.model, model, vocab)) {
+        if (!gpt_neox_model_load(params.model, model, vocab)) {
             fprintf(stderr, "%s: failed to load model from '%s'\n", __func__, params.model.c_str());
             return 1;
         }
@@ -710,14 +711,14 @@ int main(int argc, char ** argv) {
 
     // determine the required inference memory per token:
     size_t mem_per_token = 0;
-    stablelm_eval(model, params.n_threads, 0, { 0, 1, 2, 3 }, logits, mem_per_token);
+    gpt_neox_eval(model, params.n_threads, 0, { 0, 1, 2, 3 }, logits, mem_per_token);
 
     for (int i = embd.size(); i < embd_inp.size() + params.n_predict; i++) {
         // predict
         if (embd.size() > 0) {
             const int64_t t_start_us = ggml_time_us();
 
-            if (!stablelm_eval(model, params.n_threads, n_past, embd, logits, mem_per_token)) {
+            if (!gpt_neox_eval(model, params.n_threads, n_past, embd, logits, mem_per_token)) {
                 printf("Failed to predict\n");
                 return 1;
             }

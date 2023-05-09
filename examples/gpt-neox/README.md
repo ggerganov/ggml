@@ -1,4 +1,4 @@
-# StableLM
+# GPT-NeoX
 
 Transformer architecture: GPT-NeoX
 
@@ -15,27 +15,27 @@ cmake ..
 make -j
 
 # get the StableLM 3B Alpha model
-git clone https://huggingface.co/stabilityai/stablelm-base-alpha-3b
+git clone https://huggingface.co/stabilityai/gpt_neox-base-alpha-3b
 
 # convert model to FP16
-python3 ../examples/stablelm/convert-h5-to-ggml.py ./stablelm-base-alpha-3b/ 1
+python3 ../examples/gpt_neox/convert-h5-to-ggml.py ./stablelm-base-alpha-3b/ 1
 
 # run inference using FP16 precision
-make -j && ./bin/stablelm -m ./stablelm-base-alpha-3b/ggml-model-f16.bin -p "I believe the meaning of life is" -t 8 -n 64
+make -j && ./bin/gpt_neox -m ./stablelm-base-alpha-3b/ggml-model-f16.bin -p "I believe the meaning of life is" -t 8 -n 64
 
 main: seed = 1681940611
-stablelm_model_load: loading model from 'models/stablelm-base-alpha-3b/ggml-model-f16.bin' - please wait ...
-stablelm_model_load: n_vocab = 50688
-stablelm_model_load: n_ctx   = 4096
-stablelm_model_load: n_embd  = 4096
-stablelm_model_load: n_head  = 32
-stablelm_model_load: n_layer = 16
-stablelm_model_load: n_rot   = 32
-stablelm_model_load: ftype   = 1
-stablelm_model_load: ggml ctx size = 10011.10 MB
-stablelm_model_load: memory_size =  2048.00 MB, n_mem = 65536
-stablelm_model_load: ................................ done
-stablelm_model_load: model size =  6939.28 MB / num tensors = 260
+gpt_neox_model_load: loading model from 'models/stablelm-base-alpha-3b/ggml-model-f16.bin' - please wait ...
+gpt_neox_model_load: n_vocab = 50688
+gpt_neox_model_load: n_ctx   = 4096
+gpt_neox_model_load: n_embd  = 4096
+gpt_neox_model_load: n_head  = 32
+gpt_neox_model_load: n_layer = 16
+gpt_neox_model_load: n_rot   = 32
+gpt_neox_model_load: ftype   = 1
+gpt_neox_model_load: ggml ctx size = 10011.10 MB
+gpt_neox_model_load: memory_size =  2048.00 MB, n_mem = 65536
+gpt_neox_model_load: ................................ done
+gpt_neox_model_load: model size =  6939.28 MB / num tensors = 260
 main: number of tokens in prompt = 7
 main: token[0] =     42, I
 main: token[1] =   2868,  believe
@@ -60,24 +60,24 @@ main:    total time =  6911.26 ms
 
 ```bash
 # quantize the model to 4-bits using Q4_3 quantization
-./bin/stablelm-quantize ./stablelm-base-alpha-3b/ggml-model-f16.bin ./stablelm-base-alpha-3b/ggml-model-q4_3.bin 6
+./bin/gpt_neox-quantize ./stablelm-base-alpha-3b/ggml-model-f16.bin ./stablelm-base-alpha-3b/ggml-model-q4_3.bin 6
 
 # run the quantized model
-./bin/stablelm -m ./stablelm-base-alpha-3b/ggml-model-q4_3.bin -p "I believe the meaning of life is" -t 8 -n 64
+./bin/gpt_neox -m ./stablelm-base-alpha-3b/ggml-model-q4_3.bin -p "I believe the meaning of life is" -t 8 -n 64
 
 main: seed = 1682021489
-stablelm_model_load: loading model from 'models/stablelm-base-alpha-3b/ggml-model-q4_3.bin' - please wait ...
-stablelm_model_load: n_vocab = 50688
-stablelm_model_load: n_ctx   = 4096
-stablelm_model_load: n_embd  = 4096
-stablelm_model_load: n_head  = 32
-stablelm_model_load: n_layer = 16
-stablelm_model_load: n_rot   = 32
-stablelm_model_load: ftype   = 6
-stablelm_model_load: ggml ctx size = 5676.10 MB
-stablelm_model_load: memory_size =  1024.00 MB, n_mem = 65536
-stablelm_model_load: ........................ done
-stablelm_model_load: model size =  2604.28 MB / num tensors = 196
+gpt_neox_model_load: loading model from 'models/stablelm-base-alpha-3b/ggml-model-q4_3.bin' - please wait ...
+gpt_neox_model_load: n_vocab = 50688
+gpt_neox_model_load: n_ctx   = 4096
+gpt_neox_model_load: n_embd  = 4096
+gpt_neox_model_load: n_head  = 32
+gpt_neox_model_load: n_layer = 16
+gpt_neox_model_load: n_rot   = 32
+gpt_neox_model_load: ftype   = 6
+gpt_neox_model_load: ggml ctx size = 5676.10 MB
+gpt_neox_model_load: memory_size =  1024.00 MB, n_mem = 65536
+gpt_neox_model_load: ........................ done
+gpt_neox_model_load: model size =  2604.28 MB / num tensors = 196
 main: number of tokens in prompt = 7
 main: token[0] =     42, I
 main: token[1] =   2868,  believe
