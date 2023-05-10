@@ -1,3 +1,4 @@
+from pathlib import Path
 import sys
 import struct
 import json
@@ -21,7 +22,7 @@ with open(dir_model + "/config.json", "r", encoding="utf-8") as f:
     hparams = json.load(f)
 
 sp_proto = model.ModelProto()
-sp_proto.ParseFromString(open("/Users/lmoeller/Downloads/spiece.model", "rb").read())
+sp_proto.ParseFromString(open(Path(sys.argv[1]) / "spiece.model", "rb").read())
 
 
 # possible data types
