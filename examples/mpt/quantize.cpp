@@ -94,10 +94,6 @@ bool mpt_model_quantize(const std::string &fname_inp,
       word.resize(len);
       finp.read((char *)word.data(), len);
       fout.write((char *)word.data(), len);
-
-      float prob;
-      finp.read((char *)&prob, sizeof(prob));
-      fout.write((char *)&prob, sizeof(prob));
     }
   }
 
@@ -121,8 +117,8 @@ bool mpt_model_quantize(const std::string &fname_inp,
 }
 
 // usage:
-//  ./replit-quantize models/replit/ggml-model.bin
-//  models/replit/ggml-model-quant.bin type
+//  ./mpt-quantize models/mpt/ggml-model.bin
+//  models/mpt/ggml-model-quant.bin type
 //
 int main(int argc, char **argv) {
   if (argc != 4) {

@@ -120,6 +120,7 @@ auto replit_tokenizer_tokenize(replit_tokenizer &tokenizer,
     -> std::vector<std::size_t> {
   std::vector<std::size_t> tokens;
   auto normalized_text = replace_all(text, " ", ws_symbol);
+  normalized_text = replace_all(normalized_text, "\\n", "\n");
   auto tokenized = encode_word(normalized_text, tokenizer.piece_map);
 
   return tokenized.first;
@@ -137,7 +138,7 @@ auto replit_tokenizer_detokenize(replit_tokenizer &tokenizer,
 }
 
 // no defaults for now
-struct replit_hparams {
+struct mpt_hparams {
   int32_t d_model = 0;
   int32_t max_seq_len = 0;
   int32_t n_heads = 0;
@@ -165,7 +166,7 @@ struct replit_layer {
 };
 
 struct replit_model {
-  replit_hparams hparams;
+  mpt_hparams hparams;
 
   struct ggml_tensor *wte_weight;  // position embedding
   struct ggml_tensor *ln_f_weight; // language model head
