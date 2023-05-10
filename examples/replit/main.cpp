@@ -138,10 +138,8 @@ auto replit_tokenizer_detokenize(replit_tokenizer &tokenizer,
 
 // no defaults for now
 struct replit_hparams {
-  int32_t alibi_bias_max = 0;
   int32_t d_model = 0;
   int32_t max_seq_len = 0;
-  int32_t mlp_ratio = 0;
   int32_t n_heads = 0;
   int32_t n_layers = 0;
   int32_t n_vocab = 0;
@@ -209,19 +207,15 @@ bool replit_model_load(const std::string &fname, replit_model &model,
   {
     auto &hparams = model.hparams;
 
-    fin.read((char *)&hparams.alibi_bias_max, sizeof(hparams.alibi_bias_max));
     fin.read((char *)&hparams.d_model, sizeof(hparams.d_model));
     fin.read((char *)&hparams.max_seq_len, sizeof(hparams.max_seq_len));
-    fin.read((char *)&hparams.mlp_ratio, sizeof(hparams.mlp_ratio));
     fin.read((char *)&hparams.n_heads, sizeof(hparams.n_heads));
     fin.read((char *)&hparams.n_layers, sizeof(hparams.n_layers));
     fin.read((char *)&hparams.n_vocab, sizeof(hparams.n_vocab));
     fin.read((char *)&hparams.ftype, sizeof(hparams.ftype));
 
-    printf("%s: alibi_bias_max = %d\n", __func__, hparams.alibi_bias_max);
     printf("%s: d_model       = %d\n", __func__, hparams.d_model);
     printf("%s: max_seq_len   = %d\n", __func__, hparams.max_seq_len);
-    printf("%s: mlp_ratio     = %d\n", __func__, hparams.mlp_ratio);
     printf("%s: n_heads       = %d\n", __func__, hparams.n_heads);
     printf("%s: n_layers      = %d\n", __func__, hparams.n_layers);
     printf("%s: n_vocab      = %d\n", __func__, hparams.n_vocab);

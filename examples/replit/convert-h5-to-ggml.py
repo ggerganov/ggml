@@ -58,10 +58,8 @@ fout = open(fname_out, "wb")
 print(hparams)
 
 fout.write(struct.pack("i", 0x67676D6C))  # magic: ggml in hex
-fout.write(struct.pack("i", hparams["alibi_bias_max"]))
 fout.write(struct.pack("i", hparams["d_model"]))
 fout.write(struct.pack("i", hparams["max_seq_len"]))
-fout.write(struct.pack("i", hparams["mlp_ratio"]))
 fout.write(struct.pack("i", hparams["n_heads"]))
 fout.write(struct.pack("i", hparams["n_layers"]))
 fout.write(struct.pack("i", hparams["vocab_size"]))
