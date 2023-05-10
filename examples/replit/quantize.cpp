@@ -73,19 +73,12 @@ bool replit_model_quantize(const std::string &fname_inp,
     printf("%s: n_vocab = %d\n", __func__, hparams.n_vocab);
     printf("%s: ftype = %d\n", __func__, hparams.ftype);
 
-    printf("ok\n");
     fout.write((char *)&hparams.d_model, sizeof(hparams.d_model));
-    printf("ok 1\n");
     fout.write((char *)&hparams.max_seq_len, sizeof(hparams.max_seq_len));
-    printf("ok 2\n");
     fout.write((char *)&hparams.n_heads, sizeof(hparams.n_heads));
-    printf("ok 3\n");
     fout.write((char *)&hparams.n_layers, sizeof(hparams.n_layers));
-    printf("ok 4\n");
     fout.write((char *)&hparams.n_vocab, sizeof(hparams.n_vocab));
-    printf("ok 5\n");
     fout.write((char *)&ftype, sizeof(hparams.ftype));
-    printf("ok 6\n");
   }
 
   // load vocab
