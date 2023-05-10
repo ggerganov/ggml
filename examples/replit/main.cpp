@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -13,51 +14,76 @@
 #include <stdint.h>
 #include <string>
 #include <unistd.h>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
-struct replit_tokenizer_trie {
-  std::map<char, replit_tokenizer_trie *> children;
-  std::size_t id = -1;
-};
-
-auto trie_insert(replit_tokenizer_trie *root, const std::string &word,
-                 std::size_t id) -> void {
-  auto *node = root;
-  for (const auto &c : word) {
-    if (node->children.count(c) == 0) {
-      node->children[c] = new replit_tokenizer_trie();
-    }
-    node = node->children[c];
-  }
-  node->id = id;
-}
-
-auto trie_lookup_longest_prefix(replit_tokenizer_trie *root,
-                                const std::string &word) -> std::size_t {
-  auto *node = root;
-  std::size_t id = -1;
-  for (const auto &c : word) {
-    if (node->children.count(c) == 0) {
-      break;
-    }
-    node = node->children[c];
-    if (node->id != -1) {
-      id = node->id;
-    }
-  }
-  return id;
-}
+using piece_t = std::pair<std::size_t, float>;
+using piece_map_t = std::unordered_map<std::string, piece_t>;
 
 struct replit_tokenizer {
   gpt_vocab raw_vocab;
-  replit_tokenizer_trie trie;
+  piece_map_t piece_map;
   std::vector<std::string> vocab;
 };
+
+std::pair<std::vector<std::size_t>, float>
+encode_word(const std::string &word, const piece_map_t &model) {
+  std::vector<int> best_segmentations_starts(word.length() + 1, -1);
+  best_segmentations_starts[0] = 0;
+
+  std::vector<float> best_segmentations_scores(
+      word.length() + 1, -std::numeric_limits<float>::infinity());
+  best_segmentations_scores[0] = 1.0;
+
+  for (int start_idx = 0; start_idx < word.length(); ++start_idx) {
+    float best_score_at_start = best_segmentations_scores[start_idx];
+    for (int end_idx = start_idx + 1; end_idx <= word.length(); ++end_idx) {
+      std::string token = word.substr(start_idx, end_idx - start_idx);
+      if (model.count(token) &&
+          best_score_at_start != -std::numeric_limits<float>::infinity()) {
+        float token_score = model.at(token).second;
+        float score = token_score + best_score_at_start;
+        if (best_segmentations_scores[end_idx] ==
+                -std::numeric_limits<float>::infinity() ||
+            best_segmentations_scores[end_idx] > score) {
+          best_segmentations_starts[end_idx] = start_idx;
+          best_segmentations_scores[end_idx] = score;
+        }
+      }
+    }
+  }
+
+  // print segmentation
+  for (int i = 0; i < word.length() + 1; ++i) {
+    printf("%d %f\n", i, best_segmentations_scores[i]);
+  }
+
+  if (best_segmentations_scores.back() ==
+      -std::numeric_limits<float>::infinity()) {
+    return std::make_tuple(std::vector<std::size_t>{0}, 0.0);
+  }
+
+  float score = best_segmentations_scores.back();
+  int start = best_segmentations_starts.back();
+  int end = word.length();
+  std::vector<std::size_t> tokens;
+  while (start != 0) {
+    const auto token_id = model.at(word.substr(start, end - start)).first;
+    tokens.insert(tokens.begin(), token_id);
+    int next_start = best_segmentations_starts[start];
+    end = start;
+    start = next_start;
+  }
+  const auto token_id = model.at(word.substr(start, end - start)).first;
+  tokens.insert(tokens.begin(), token_id);
+  return std::make_tuple(tokens, score);
+}
 
 auto replit_tokenizer_load(replit_tokenizer &tokenizer, std::istream &fin,
                            int max_vocab_size) -> bool {
 
-  for (int i = 0; i < max_vocab_size; i++) {
+  for (std::size_t i = 0; i < max_vocab_size; i++) {
 
     uint32_t len;
     fin.read((char *)&len, sizeof(len));
@@ -66,37 +92,53 @@ auto replit_tokenizer_load(replit_tokenizer &tokenizer, std::istream &fin,
     word.resize(len);
     fin.read((char *)word.data(), len);
 
-    trie_insert(&tokenizer.trie, word, i);
-    tokenizer.vocab.push_back(word);
+    float score;
+    fin.read((char *)&score, sizeof(score));
 
+    tokenizer.piece_map[word] = std::make_pair(i, -score);
     tokenizer.raw_vocab.id_to_token[i] = word;
   }
 
   return true;
 }
 
+std::string replace_all(const std::string &str,    // where to work
+                        const std::string &find,   // substitute 'find'
+                        const std::string &replace //      by 'replace'
+) {
+  using namespace std;
+  string result;
+  size_t find_len = find.size();
+  size_t pos, from = 0;
+  while (string::npos != (pos = str.find(find, from))) {
+    result.append(str, from, pos - from);
+    result.append(replace);
+    from = pos + find_len;
+  }
+  result.append(str, from, string::npos);
+  return result;
+}
+
+std::string ws_symbol = "\342\226\201";
 auto replit_tokenizer_tokenize(replit_tokenizer &tokenizer,
                                const std::string &text)
     -> std::vector<std::size_t> {
   std::vector<std::size_t> tokens;
+  auto normalized_text = replace_all(text, " ", ws_symbol);
+  auto tokenized = encode_word(normalized_text, tokenizer.piece_map);
 
-  // Call trie lookup, incrementing the start index each time
-  std::size_t start = 0;
-  while (start < text.size()) {
-    auto id = trie_lookup_longest_prefix(&tokenizer.trie, text.substr(start));
-    printf("%s: id = %zu\n", __func__, id);
-    if (id == -1) {
-      fprintf(stderr, "%s: failed to tokenize '%s'\n", __func__, text.c_str());
-      return {};
-    }
-    tokens.push_back(id);
-    auto length = tokenizer.vocab[id].size();
-    start += length;
+  return tokenized.first;
+}
 
-    printf("%s: start = %zu\n", __func__, start);
+auto replit_tokenizer_detokenize(replit_tokenizer &tokenizer,
+                                 const std::vector<std::size_t> &tokens)
+    -> std::string {
+  std::string text;
+  for (auto token : tokens) {
+    text += tokenizer.raw_vocab.id_to_token[token];
   }
-
-  return tokens;
+  auto denormalized_text = replace_all(text, ws_symbol, " ");
+  return denormalized_text;
 }
 
 // no defaults for now
@@ -714,10 +756,8 @@ int main(int argc, char **argv) {
   std::vector<float> logits;
 
   // tokenize the prompt
-  // std::vector<std::size_t> embd_inp =
-  //     replit_tokenizer_tokenize(vocab, params.prompt);
-  std::vector<std::size_t> embd_inp = {356, 147, 1445, 215, 324, 2714,
-                                       193, 151, 211,  352, 43};
+  std::vector<std::size_t> embd_inp =
+      replit_tokenizer_tokenize(vocab, params.prompt);
 
   printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
 
@@ -788,7 +828,9 @@ int main(int argc, char **argv) {
 
     // display text
     for (auto id : embd) {
-      printf("%s", vocab.raw_vocab.id_to_token[id].c_str());
+      printf("%s",
+             replit_tokenizer_detokenize(vocab, {static_cast<std::size_t>(id)})
+                 .c_str());
     }
     fflush(stdout);
 

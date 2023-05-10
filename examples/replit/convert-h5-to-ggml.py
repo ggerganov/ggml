@@ -1,6 +1,7 @@
 import sys
 import struct
 import json
+import torch
 import numpy as np
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import sentencepiece.sentencepiece_model_pb2 as model
@@ -19,6 +20,9 @@ fname_out = sys.argv[1] + "/ggml-model.bin"
 
 with open(dir_model + "/config.json", "r", encoding="utf-8") as f:
     hparams = json.load(f)
+
+sp_proto = model.ModelProto()
+sp_proto.ParseFromString(open("/Users/lmoeller/Downloads/spiece.model", "rb").read())
 
 
 # possible data types
@@ -61,7 +65,6 @@ fout.write(struct.pack("i", hparams["mlp_ratio"]))
 fout.write(struct.pack("i", hparams["n_heads"]))
 fout.write(struct.pack("i", hparams["n_layers"]))
 fout.write(struct.pack("i", hparams["vocab_size"]))
-# hidden_size
 fout.write(struct.pack("i", ftype))
 
 
