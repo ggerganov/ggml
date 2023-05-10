@@ -54,11 +54,6 @@ encode_word(const std::string &word, const piece_map_t &model) {
     }
   }
 
-  // print segmentation
-  for (int i = 0; i < word.length() + 1; ++i) {
-    printf("%d %f\n", i, best_segmentations_scores[i]);
-  }
-
   if (best_segmentations_scores.back() ==
       -std::numeric_limits<float>::infinity()) {
     return std::make_tuple(std::vector<std::size_t>{0}, 0.0);
