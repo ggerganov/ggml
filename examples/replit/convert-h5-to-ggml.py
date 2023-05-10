@@ -1,7 +1,6 @@
 import sys
 import struct
 import json
-import torch
 import numpy as np
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import sentencepiece.sentencepiece_model_pb2 as model
