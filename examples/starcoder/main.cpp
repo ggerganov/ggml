@@ -821,7 +821,7 @@ int main(int argc, char ** argv) {
         fflush(stdout);
 
         // end of text token
-        if (embd.back() == 50256) { //TODO:
+        if (embd.back() == 0) { //TODO: this is only for starcoder
             break;
         }
     }
