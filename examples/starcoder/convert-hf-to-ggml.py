@@ -1,6 +1,4 @@
-# Convert Cerebras models to ggml format
-#
-# ref: https://www.cerebras.net/blog/cerebras-gpt-a-family-of-open-compute-efficient-large-language-models/
+# Convert HF models to ggml format
 #
 
 import sys
@@ -36,13 +34,6 @@ def bytes_to_unicode():
     cs = [chr(n) for n in cs]
     return dict(zip(bs, cs))
 
-# if len(sys.argv) < 2:
-#     print("Usage: convert-h5-to-ggml.py dir-model [use-f32]\n")
-#     sys.exit(1)
-
-# output in the same directory as the model
-# dir_model = sys.argv[1]
-# fname_out = sys.argv[1] + "/ggml-model-f16.bin"
 
 # model_name = "bigcode/gpt_bigcode-santacoder"
 # dir_model = "santacoder-ggml"
@@ -59,9 +50,6 @@ os.makedirs(dir_model, exist_ok=True)
 
 # use 16-bit or 32-bit floats
 use_f16 = True
-# if len(sys.argv) > 2:
-#     use_f16 = False
-#     fname_out = sys.argv[1] + "/ggml-model-f32.bin"
 
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
