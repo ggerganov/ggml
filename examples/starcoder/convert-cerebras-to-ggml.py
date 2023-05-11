@@ -49,7 +49,7 @@ dir_model = "santacoder-ggml"
 fname_out = f"{dir_model}/santacoder-ggml.bin2"
 # model_name = "gpt2"
 # dir_model = "gpt2-ggml"
-# fname_out = f"{dir_model}/santacoder-ggml.bin2"
+# fname_out = f"{dir_model}/gpt2-ggml.bin"
 os.makedirs(dir_model, exist_ok=True)
 
 
@@ -194,6 +194,35 @@ for name in list_vars.keys():
     #     print("  Transposing")
     #     data = data.transpose()
 
+    # for efficiency - transpose the projection matrices
+    "model/h.*/attn/c_attn/w"
+    "model/h.*/attn/c_proj/w"
+    "model/h.*/mlp/c_fc/w"
+    "model/h.*/mlp/c_proj/w"
+    if name[-14:] == "/attn/c_attn/w" or name[-14:] == "/attn/c_attn/b":
+        print("  Duplicate K,V heads to use MHA instead of MQA")
+
+        # self.embed_dim = config.hidden_size
+        # self.num_heads = config.num_attention_heads
+        # self.head_dim = self.embed_dim // self.num_heads
+        # self.kv_heads = 1 if self.multi_query else self.num_heads
+        # self.kv_dim = self.kv_heads * self.head_dim
+        embed_dim = hparams["n_embd"]
+        head_dim = embed_dim // hparams["n_head"]
+
+        # ((n_heads + 2) * head_dim, hidden_dim) -> (3 * n_heads * head_dim, hidden_dim)
+        q, k ,v = np.split(data, (hparams["n_head"] * head_dim, (hparams["n_head"] + 1) * head_dim), axis=0)
+        # duplicate k, v along the first axis (head_dim, hidden_dim) -> (n_heads * head_dim, hidden_dim)
+        if len(k.shape) == 2:
+            k = np.tile(k, (hparams["n_head"], 1))
+            v = np.tile(v, (hparams["n_head"], 1))
+        elif len(k.shape) == 1:
+            k = np.tile(k, (hparams["n_head"]))
+            v = np.tile(v, (hparams["n_head"]))
+        # concat q, k, v along the first axis (n_heads * head_dim, hidden_dim) -> (3 * n_heads * head_dim, hidden_dim)
+        data = np.concatenate((q, k, v), axis=0)
+
+        ##TODO: bias
     # header
     str = name.encode('utf-8')
     fout.write(struct.pack("iii", n_dims, len(str), ftype))

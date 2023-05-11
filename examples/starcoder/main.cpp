@@ -215,7 +215,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
         // MQA
         const int head_dim = n_embd / hparams.n_head;
-        const int kv_heads = 1;
+        const int kv_heads = hparams.n_head; // 1 if MQA else hparams.n_head
         const int kv_dim   = kv_heads * head_dim;
 
         model.layers.resize(n_layer);
@@ -821,7 +821,7 @@ int main(int argc, char ** argv) {
         fflush(stdout);
 
         // end of text token
-        if (embd.back() == 50256) {
+        if (embd.back() == 50256) { //TODO:
             break;
         }
     }
