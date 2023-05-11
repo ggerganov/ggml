@@ -15,11 +15,11 @@
 
 // default hparams (GPT-2 117M)
 struct gpt2_hparams {
-    int32_t n_vocab = 50257;
-    int32_t n_ctx   = 1024;
-    int32_t n_embd  = 768;
-    int32_t n_head  = 12;
-    int32_t n_layer = 12;
+    int32_t n_vocab = 49280;
+    int32_t n_ctx   = 2048;
+    int32_t n_embd  = 2048;
+    int32_t n_head  = 16;
+    int32_t n_layer = 24;
     int32_t f16     = 1;
 };
 
