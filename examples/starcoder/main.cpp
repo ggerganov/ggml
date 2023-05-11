@@ -130,6 +130,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
             vocab.token_to_id[word] = i;
             vocab.id_to_token[i] = word;
+
+            // if (i < 10) fprintf(stderr, "%.s: vocab[%d] = '%s'\n", __func__, i, word.c_str());
         }
     }
 

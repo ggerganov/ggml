@@ -95,7 +95,8 @@ byte_decoder = {v:k for k, v in byte_encoder.items()}
 fout.write(struct.pack("i", vocab_size))
 
 counter = 0
-for key in encoder:
+# sort by value
+for key in sorted(encoder, key=encoder.get):
     text = bytearray([byte_decoder[c] for c in key])
     fout.write(struct.pack("i", len(text)))
     fout.write(text)
