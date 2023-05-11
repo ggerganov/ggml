@@ -50,6 +50,9 @@ fname_out = f"{dir_model}/santacoder-ggml.bin2"
 # model_name = "gpt2"
 # dir_model = "gpt2-ggml"
 # fname_out = f"{dir_model}/gpt2-ggml.bin"
+model_name = "bigcode/starcoder"
+dir_model = "starcoder-ggml"
+fname_out = f"{dir_model}/{dir_model}.bin2"
 os.makedirs(dir_model, exist_ok=True)
 
 
@@ -194,7 +197,6 @@ for name in list_vars.keys():
     #     print("  Transposing")
     #     data = data.transpose()
 
-    # for efficiency - transpose the projection matrices
     "model/h.*/attn/c_attn/w"
     "model/h.*/attn/c_proj/w"
     "model/h.*/mlp/c_fc/w"
@@ -202,11 +204,6 @@ for name in list_vars.keys():
     if name[-14:] == "/attn/c_attn/w" or name[-14:] == "/attn/c_attn/b":
         print("  Duplicate K,V heads to use MHA instead of MQA")
 
-        # self.embed_dim = config.hidden_size
-        # self.num_heads = config.num_attention_heads
-        # self.head_dim = self.embed_dim // self.num_heads
-        # self.kv_heads = 1 if self.multi_query else self.num_heads
-        # self.kv_dim = self.kv_heads * self.head_dim
         embed_dim = hparams["n_embd"]
         head_dim = embed_dim // hparams["n_head"]
 
@@ -222,7 +219,6 @@ for name in list_vars.keys():
         # concat q, k, v along the first axis (n_heads * head_dim, hidden_dim) -> (3 * n_heads * head_dim, hidden_dim)
         data = np.concatenate((q, k, v), axis=0)
 
-        ##TODO: bias
     # header
     str = name.encode('utf-8')
     fout.write(struct.pack("iii", n_dims, len(str), ftype))
