@@ -9,8 +9,10 @@ import json
 import torch
 import numpy as np
 import re
+import os
 
 from transformers import AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig, BloomForCausalLM
 
 # ref: https://github.com/openai/gpt-2/blob/master/src/encoder.py
 def bytes_to_unicode():
@@ -34,38 +36,53 @@ def bytes_to_unicode():
     cs = [chr(n) for n in cs]
     return dict(zip(bs, cs))
 
-if len(sys.argv) < 2:
-    print("Usage: convert-h5-to-ggml.py dir-model [use-f32]\n")
-    sys.exit(1)
+# if len(sys.argv) < 2:
+#     print("Usage: convert-h5-to-ggml.py dir-model [use-f32]\n")
+#     sys.exit(1)
 
 # output in the same directory as the model
-dir_model = sys.argv[1]
-fname_out = sys.argv[1] + "/ggml-model-f16.bin"
+# dir_model = sys.argv[1]
+# fname_out = sys.argv[1] + "/ggml-model-f16.bin"
 
-with open(dir_model + "/vocab.json", "r", encoding="utf-8") as f:
-    encoder = json.load(f)
+model_name = "bigcode/gpt_bigcode-santacoder"
+dir_model = "santacoder-ggml"
+fname_out = f"{dir_model}/santacoder-ggml.bin2"
+# model_name = "gpt2"
+# dir_model = "gpt2-ggml"
+# fname_out = f"{dir_model}/santacoder-ggml.bin2"
+os.makedirs(dir_model, exist_ok=True)
 
-with open(dir_model + "/config.json", "r", encoding="utf-8") as f:
-    hparams = json.load(f)
+
 
 # use 16-bit or 32-bit floats
 use_f16 = True
-if len(sys.argv) > 2:
-    use_f16 = False
-    fname_out = sys.argv[1] + "/ggml-model-f32.bin"
+# if len(sys.argv) > 2:
+#     use_f16 = False
+#     fname_out = sys.argv[1] + "/ggml-model-f32.bin"
 
-model = AutoModelForCausalLM.from_pretrained(dir_model, low_cpu_mem_usage=True)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+hparams = config.to_dict()
+print("Loading model: ", model_name)
+model = AutoModelForCausalLM.from_pretrained(model_name, config=config, torch_dtype=torch.float16 if use_f16 else torch.float32, low_cpu_mem_usage=True, trust_remote_code=True)
+print("Model loaded: ", model_name)
+
 #print (model)
 
 list_vars = model.state_dict()
 #print (list_vars)
 
+encoder = tokenizer.vocab
+# Add added_tokens (special tokens) to the encoder
+encoder.update(tokenizer.get_added_vocab())
 print(hparams)
 
 fout = open(fname_out, "wb")
 
 fout.write(struct.pack("i", 0x67676d6c)) # magic: ggml in hex
-fout.write(struct.pack("i", hparams["vocab_size"]))
+vocab_size = hparams["vocab_size"]
+fout.write(struct.pack("i", vocab_size))
+# fout.write(struct.pack("i", len(encoder)))
 fout.write(struct.pack("i", hparams["n_positions"]))
 fout.write(struct.pack("i", hparams["n_embd"]))
 fout.write(struct.pack("i", hparams["n_head"]))
@@ -75,12 +92,21 @@ fout.write(struct.pack("i", use_f16))
 byte_encoder = bytes_to_unicode()
 byte_decoder = {v:k for k, v in byte_encoder.items()}
 
-fout.write(struct.pack("i", len(encoder)))
+fout.write(struct.pack("i", vocab_size))
 
+counter = 0
 for key in encoder:
     text = bytearray([byte_decoder[c] for c in key])
     fout.write(struct.pack("i", len(text)))
     fout.write(text)
+    counter += 1
+
+# TODO: Repeat last token until vocab_size
+while counter < vocab_size:
+    fout.write(struct.pack("i", len(text)))
+    fout.write(text)
+    counter += 1
+# assert counter == config.vocab_size
 
 for name in list_vars.keys():
     data = list_vars[name].squeeze().numpy()
@@ -160,12 +186,12 @@ for name in list_vars.keys():
     # "model/h.*/attn/c_proj/w"
     # "model/h.*/mlp/c_fc/w"
     # "model/h.*/mlp/c_proj/w"
-    if name[-14:] == "/attn/c_attn/w" or \
-       name[-14:] == "/attn/c_proj/w" or \
-       name[-11:] == "/mlp/c_fc/w" or \
-       name[-13:] == "/mlp/c_proj/w":
-        print("  Transposing")
-        data = data.transpose()
+    # if name[-14:] == "/attn/c_attn/w" or \
+    #    name[-14:] == "/attn/c_proj/w" or \
+    #    name[-11:] == "/mlp/c_fc/w" or \
+    #    name[-13:] == "/mlp/c_proj/w":
+    #     print("  Transposing")
+    #     data = data.transpose()
 
     # header
     str = name.encode('utf-8')
