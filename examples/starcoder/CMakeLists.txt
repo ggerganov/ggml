@@ -1,13 +1,13 @@
 #
-# gpt-2
+# starcoder
 
-set(TEST_TARGET gpt-2)
+set(TEST_TARGET starcoder)
 add_executable(${TEST_TARGET} main.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml common common-ggml)
 
 #
-# gpt-2-quantize
+# starcoder-quantize
 
-set(TEST_TARGET gpt-2-quantize)
+set(TEST_TARGET starcoder-quantize)
 add_executable(${TEST_TARGET} quantize.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml common common-ggml)
