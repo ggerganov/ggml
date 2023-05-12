@@ -1,36 +1,24 @@
-# gpt-2
+# 💫 StarCoder
 
-This is a C++ example running GPT-2 inference using the [ggml](https://github.com/ggerganov/ggml) library.
+This is a C++ example running 💫 StarCoder inference using the [ggml](https://github.com/ggerganov/ggml) library.
 
 The program runs on the CPU - no video card is required.
 
-The [Cerebras-GPT](https://huggingface.co/cerebras) models are also supported.
+The example supports the following 💫 StarCoder models:
 
-The example supports the following GPT-2 models:
-
-| Model | Description  | Disk Size |
-| ---   | ---          | ---       |
-| 117M  | Small model  | 240 MB    |
-| 345M  | Medium model | 680 MB    |
-| 774M  | Large model  | 1.5 GB    |
-| 1558M | XL model     | 3.0 GB    |
+- `bigcode/starcoder`
+- `bigcode/gpt_bigcode-santacoder` aka the smol StarCoder
 
 Sample performance on MacBook M1 Pro:
 
-| Model | Size  | Time / Token |
-| ---   | ---   | ---    |
-| GPT-2 |  117M |   5 ms |
-| GPT-2 |  345M |  12 ms |
-| GPT-2 |  774M |  23 ms |
-| GPT-2 | 1558M |  42 ms |
+TODO
 
-*TODO: add tables for Cerebras-GPT models*
 
 Sample output:
 
 ```
-$ ./bin/gpt-2 -h
-usage: ./bin/gpt-2 [options]
+$ ./bin/starcoder -h
+usage: ./bin/starcoder [options]
 
 options:
   -h, --help            show this help message and exit
@@ -44,115 +32,76 @@ options:
   --temp N              temperature (default: 1.0)
   -b N, --batch_size N  batch size for prompt processing (default: 8)
   -m FNAME, --model FNAME
-                        model path (default: models/gpt-2-117M/ggml-model.bin)
+                        model path (default: models/starcoder-117M/ggml-model.bin)
 
-$ ./bin/gpt-2
-gpt2_model_load: loading model from 'models/gpt-2-117M/ggml-model.bin'
-gpt2_model_load: n_vocab = 50257
-gpt2_model_load: n_ctx   = 1024
-gpt2_model_load: n_embd  = 768
-gpt2_model_load: n_head  = 12
-gpt2_model_load: n_layer = 12
-gpt2_model_load: f16     = 1
-gpt2_model_load: ggml ctx size = 311.12 MB
-gpt2_model_load: memory size =    72.00 MB, n_mem = 12288
-gpt2_model_load: model size  =   239.08 MB
-main: number of tokens in prompt = 1
+$ ./bin/starcoder -m ../models/bigcode/gpt_bigcode-santacoder-ggml-q4_1.bin -p "def fibonnaci(" -t 4 --top_k 0 --top_p 0.95 --temp 0.2      
+main: seed = 1683881276
+gpt2_model_load: loading model from '../models/bigcode/gpt_bigcode-santacoder-ggml-q4_1.bin'
+gpt2_model_load: n_vocab = 49280
+gpt2_model_load: n_ctx   = 2048
+gpt2_model_load: n_embd  = 2048
+gpt2_model_load: n_head  = 16
+gpt2_model_load: n_layer = 24
+gpt2_model_load: ftype   = 3
+gpt2_model_load: ggml ctx size = 1794.90 MB
+gpt2_model_load: memory size =   768.00 MB, n_mem = 49152
+gpt2_model_load: model size  =  1026.83 MB
+main: prompt: 'def fibonnaci('
+main: number of tokens in prompt = 7, first 8 tokens: 563 24240 78 2658 64 2819 7 
 
-So this is going to be the end of the line for us.
+def fibonnaci(n):
+    if n == 0:
+        return 0
+    elif n == 1:
+        return 1
+    else:
+        return fibonacci(n-1) + fibonacci(n-2)
 
-If the Dolphins continue to do their business, it's possible that the team could make a bid to bring in new defensive coordinator Scott Linehan.
+print(fibo(10))
 
-Linehan's job is a little daunting, but he's a great coach and an excellent coach. I don't believe we're going to make the playoffs.
-
-We're going to have to work hard to keep our heads down and get ready to go.<|endoftext|>
-
-main: mem per token =  2048612 bytes
-main:     load time =   106.32 ms
-main:   sample time =     7.10 ms
-main:  predict time =   506.40 ms / 5.06 ms per token
-main:    total time =   629.84 ms
+main: mem per token =  9597928 bytes
+main:     load time =   480.43 ms
+main:   sample time =    26.21 ms
+main:  predict time =  3987.95 ms / 19.36 ms per token
+main:    total time =  4580.56 ms
 ```
 
-## Downloading and converting the original models (GPT-2)
+## Quick start
+```bash
+git clone https://github.com/ggerganov/ggml
+cd ggml
 
-You can download the original model files using the [download-model.sh](download-model.sh) Bash script. The models are
-in Tensorflow format, so in order to use them with ggml, you need to convert them to appropriate format. This is done
-via the [convert-ckpt-to-ggml.py](convert-ckpt-to-ggml.py) python script.
+# Convert HF model to ggml
+python examples/starcoder/convert-hf-to-ggml.py bigcode/gpt_bigcode-santacoder
 
-Here is the entire process for the GPT-2 117M model (download from official site + conversion):
+# Build ggml + examples
+mkdir build && cd build
+cmake .. && make -j4 starcoder starcoder-quantize
 
-```
-cd ggml/build
-../examples/gpt-2/download-model.sh 117M
+# quantize the model
+./bin/starcoder-quantize ../models/bigcode/gpt_bigcode-santacoder-ggml.bin ../models/bigcode/gpt_bigcode-santacoder-ggml-q4_1.bin 3
 
-Downloading model 117M ...
-models/gpt-2-117M/checkpoint                      100%[=============================>]      77  --.-KB/s    in 0s
-models/gpt-2-117M/encoder.json                    100%[=============================>]   1018K  1.20MB/s    in 0.8s
-models/gpt-2-117M/hparams.json                    100%[=============================>]      90  --.-KB/s    in 0s
-models/gpt-2-117M/model.ckpt.data-00000-of-00001  100%[=============================>] 474.70M  1.21MB/s    in 8m 39s
-models/gpt-2-117M/model.ckpt.index                100%[=============================>]   5.09K  --.-KB/s    in 0s
-models/gpt-2-117M/model.ckpt.meta                 100%[=============================>] 460.11K   806KB/s    in 0.6s
-models/gpt-2-117M/vocab.bpe                       100%[=============================>] 445.62K   799KB/s    in 0.6s
-Done! Model '117M' saved in 'models/gpt-2-117M/'
-
-Run the convert-ckpt-to-ggml.py script to convert the model to ggml format.
-
-  python /Users/john/ggml/examples/gpt-2/convert-ckpt-to-ggml.py models/gpt-2-117M/ 1
-
+# run inference
+./bin/starcoder -m ../models/bigcode/gpt_bigcode-santacoder-ggml-q4_1.bin -p "def fibonnaci(" --top_k 0 --top_p 0.95 --temp 0.2
 ```
 
-This conversion requires that you have python and Tensorflow installed on your computer. Still, if you want to avoid
-this, you can download the already converted ggml models as described below.
 
-## Downloading and converting the original models (Cerebras-GPT)
+## Downloading and converting the original models (💫 StarCoder)
 
-Clone the respective repository from here: https://huggingface.co/cerebras
-
-Use the [convert-cerebras-to-ggml.py](convert-cerebras-to-ggml.py) script to convert the model to `ggml` format:
+You can download the original model and convert it to `ggml` format using the script `convert-hf-to-ggml.py`:
 
 ```
-cd ggml/build
-git clone https://huggingface.co/cerebras/Cerebras-GPT-111M models/
-python ../examples/gpt-2/convert-cerebras-to-ggml.py models/Cerebras-GPT-111M/
-
+# Convert HF model to ggml
+python examples/starcoder/convert-hf-to-ggml.py bigcode/gpt_bigcode-santacoder
 ```
 
-## Downloading the ggml model directly (GPT-2)
-
-For convenience, I will be hosting the converted ggml model files in order to make it easier to run the examples. This
-way, you can directly download a single binary file and start using it. No python or Tensorflow is required.
-
-Here is how to get the 117M ggml model:
-
-```
-cd ggml/build
-../examples/gpt-2/download-ggml-model.sh 117M
-
-Downloading ggml model 117M ...
-models/gpt-2-117M/ggml-model.bin         100%[===============================>] 239.58M  8.52MB/s    in 28s
-Done! Model '117M' saved in 'models/gpt-2-117M/ggml-model.bin'
-You can now use it like this:
-
-  $ ./bin/gpt-2 -m models/gpt-2-117M/ggml-model.bin -p "This is an example"
-
-```
-
-At some point, I might decide to stop hosting these models. So in that case, simply revert to the manual process above.
+This conversion requires that you have python and Transformers installed on your computer.
 
 ## Quantizing the models
 
 You can also try to quantize the `ggml` models via 4-bit integer quantization.
-Keep in mind that for smaller models, this will render them completely useless.
-You generally want to quantize larger models.
 
 ```
-# quantize GPT-2 F16 to Q4_0 (faster but less precise)
-./bin/gpt-2-quantize models/gpt-2-1558M/ggml-model-f16.bin models/gpt-2-1558M/ggml-model-q4_0.bin 2
-./bin/gpt-2 -m models/gpt-2-1558M/ggml-model-q4_0.bin -p "This is an example"
-
-# quantize Cerebras F16 to Q4_1 (slower but more precise)
-./bin/gpt-2-quantize models/Cerebras-GPT-6.7B/ggml-model-f16.bin models/Cerebras-GPT-6.7B/ggml-model-q4_1.bin 3
-./bin/gpt-2 -m models/Cerebras-GPT-6.7B/ggml-model-q4_1.bin -p "This is an example"
-
+# quantize the model
+./bin/starcoder-quantize ../models/bigcode/gpt_bigcode-santacoder-ggml.bin ../models/bigcode/gpt_bigcode-santacoder-ggml-q4_1.bin 3
 ```
