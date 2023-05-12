@@ -105,3 +105,8 @@ You can also try to quantize the `ggml` models via 4-bit integer quantization.
 # quantize the model
 ./bin/starcoder-quantize ../models/bigcode/gpt_bigcode-santacoder-ggml.bin ../models/bigcode/gpt_bigcode-santacoder-ggml-q4_1.bin 3
 ```
+
+| Model | Original size | Quantized size | Quantization type |
+| --- | --- | --- | --- |
+| `bigcode/gpt_bigcode-santacoder` | 5396.45 MB | 1026.83 MB | 4-bit integer (q4_1) |
+| `bigcode/starcoder` | 71628.23 MB | 13596.23 MB | 4-bit integer (q4_1) |

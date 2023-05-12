@@ -174,18 +174,6 @@ for name in list_vars.keys():
             data = data.astype(np.float32)
             ftype = 0
 
-    # for efficiency - transpose the projection matrices
-    # "model/h.*/attn/c_attn/w"
-    # "model/h.*/attn/c_proj/w"
-    # "model/h.*/mlp/c_fc/w"
-    # "model/h.*/mlp/c_proj/w"
-    # if name[-14:] == "/attn/c_attn/w" or \
-    #    name[-14:] == "/attn/c_proj/w" or \
-    #    name[-11:] == "/mlp/c_fc/w" or \
-    #    name[-13:] == "/mlp/c_proj/w":
-    #     print("  Transposing")
-    #     data = data.transpose()
-
     "model/h.*/attn/c_attn/w"
     "model/h.*/attn/c_proj/w"
     "model/h.*/mlp/c_fc/w"
