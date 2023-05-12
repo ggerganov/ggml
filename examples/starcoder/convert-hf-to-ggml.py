@@ -34,27 +34,27 @@ def bytes_to_unicode():
     cs = [chr(n) for n in cs]
     return dict(zip(bs, cs))
 
+if len(sys.argv) < 2:
+    print("Usage: python convert-hf-to-ggml.py hf-model-name [use-f32]")
+    print("Example: python convert-hf-to-ggml.py bigcode/gpt_bigcode-santacoder")
+    print("Example: python convert-hf-to-ggml.py bigcode/starcoder")
+    sys.exit(1)
 
-# model_name = "bigcode/gpt_bigcode-santacoder"
-# dir_model = "santacoder-ggml"
-# fname_out = f"{dir_model}/santacoder-ggml.bin"
-# model_name = "gpt2"
-# dir_model = "gpt2-ggml"
-# fname_out = f"{dir_model}/gpt2-ggml.bin"
-model_name = "bigcode/starcoder"
-dir_model = "starcoder-ggml"
-fname_out = f"{dir_model}/{dir_model}.bin"
-os.makedirs(dir_model, exist_ok=True)
+model_name = sys.argv[1].strip()
+fname_out = "models/" + sys.argv[1].strip() + "-ggml.bin"
+os.makedirs(os.path.dirname(fname_out), exist_ok=True)
 
 
 
 # use 16-bit or 32-bit floats
 use_f16 = True
+if len(sys.argv) > 2:
+    use_f16 = False
 
+print("Loading model: ", model_name)
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
 hparams = config.to_dict()
-print("Loading model: ", model_name)
 model = AutoModelForCausalLM.from_pretrained(model_name, config=config, torch_dtype=torch.float16 if use_f16 else torch.float32, low_cpu_mem_usage=True, trust_remote_code=True, offload_state_dict=True)
 print("Model loaded: ", model_name)
 
@@ -68,6 +68,7 @@ encoder = tokenizer.vocab
 encoder.update(tokenizer.get_added_vocab())
 print(hparams)
 
+print("Saving ggml model to: ", fname_out)
 fout = open(fname_out, "wb")
 
 fout.write(struct.pack("i", 0x67676d6c)) # magic: ggml in hex
