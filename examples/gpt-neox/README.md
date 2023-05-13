@@ -56,17 +56,17 @@ main:  predict time =  4474.07 ms / 63.92 ms per token
 main:    total time =  6911.26 ms
 ```
 
-## 4-bit integer quantization mode
+## 5-bit integer quantization mode
 
 ```bash
-# quantize the model to 4-bits using Q4_3 quantization
-./bin/gpt_neox-quantize ./stablelm-base-alpha-3b/ggml-model-f16.bin ./stablelm-base-alpha-3b/ggml-model-q4_3.bin 6
+# quantize the model to 5-bits using Q5_0 quantization
+./bin/gpt_neox-quantize ./stablelm-base-alpha-3b/ggml-model-f16.bin ./stablelm-base-alpha-3b/ggml-model-q5_0.bin q5_0
 
 # run the quantized model
-./bin/gpt_neox -m ./stablelm-base-alpha-3b/ggml-model-q4_3.bin -p "I believe the meaning of life is" -t 8 -n 64
+./bin/gpt_neox -m ./stablelm-base-alpha-3b/ggml-model-q5_0.bin -p "I believe the meaning of life is" -t 8 -n 64
 
 main: seed = 1682021489
-gpt_neox_model_load: loading model from 'models/stablelm-base-alpha-3b/ggml-model-q4_3.bin' - please wait ...
+gpt_neox_model_load: loading model from 'models/stablelm-base-alpha-3b/ggml-model-q5_0.bin' - please wait ...
 gpt_neox_model_load: n_vocab = 50688
 gpt_neox_model_load: n_ctx   = 4096
 gpt_neox_model_load: n_embd  = 4096
@@ -105,40 +105,3 @@ main:    total time =  4177.68 ms
 - The tokenizer is currently hacked - probably works only for English
 - Non-parallel residual is not supported
 - Contributions and improvements are welcome
-
-## Note about possible bug
-
-**There might be some issue with this implementation - not 100% sure.
-The embeddings magnitude increases after each layer which is unexpected.
-To observe this, uncomment the following line:**
-
-https://github.com/ggerganov/ggml/blob/abea4b7609c14b837015ab625e3ac36c4708dd03/src/ggml.c#L9208
-
-```
-...
-p[  0] =  65.5842
-p[  1] =  61.6951
-p[  2] =  59.3500
-p[  3] =  61.2421
-p[  4] =  65.9653
-p[  5] =  59.4936
-p[  6] =  58.4164
-p[  0] = -209.6351
-p[  1] = -214.0987
-p[  2] = -217.0928
-p[  3] = -215.0267
-p[  4] = -208.2430
-p[  5] = -215.3692
-p[  6] = -214.1981
-p[  0] = -301.0286
-p[  1] = -308.6521
-p[  2] = -310.7513
-p[  3] = -307.0832
-p[  4] = -299.9238
-p[  5] = -306.0667
-p[  6] = -302.1777
-...
-```
-
-**Instead, I think the magnitude should remain around `1`.
-See https://github.com/ggerganov/llama.cpp/issues/1063#issuecomment-1527730562 for more analysis**
