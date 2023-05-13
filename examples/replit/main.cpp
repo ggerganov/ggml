@@ -116,20 +116,18 @@ std::string replace_all(const std::string & str,    // where to work
 }
 
 std::string ws_symbol = "\342\226\201";
-auto replit_tokenizer_tokenize(replit_tokenizer & tokenizer,
-                               const std::string & text)
-    -> std::vector<std::size_t> {
+std::vector<std::size_t> replit_tokenizer_tokenize(replit_tokenizer & tokenizer,
+                                                   const std::string & text) {
     std::vector<std::size_t> tokens;
     auto normalized_text = replace_all(text, " ", ws_symbol);
-    normalized_text = replace_all(normalized_text, "\\n", "\n");
     auto tokenized = encode_word(normalized_text, tokenizer.piece_map);
 
     return tokenized.first;
 }
 
-auto replit_tokenizer_detokenize(replit_tokenizer & tokenizer,
-                                 const std::vector<std::size_t> & tokens)
-    -> std::string {
+std::string
+replit_tokenizer_detokenize(replit_tokenizer & tokenizer,
+                            const std::vector<std::size_t> & tokens) {
     std::string text;
     for (auto token : tokens) {
         text += tokenizer.raw_vocab.id_to_token[token];
