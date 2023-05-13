@@ -16,7 +16,7 @@
 
 // default hparams (GPT-2 117M)
 // https://huggingface.co/bigcode/gpt_bigcode-santacoder/blob/main/config.json
-struct gpt2_hparams {
+struct starcoder_hparams {
     int32_t n_vocab = 49280;
     int32_t n_ctx   = 2048;
     int32_t n_embd  = 2048;
@@ -25,7 +25,7 @@ struct gpt2_hparams {
     int32_t ftype   = 1;
 };
 
-struct gpt2_layer {
+struct starcoder_layer {
     // normalization
     struct ggml_tensor * ln_1_g;
     struct ggml_tensor * ln_1_b;
@@ -48,8 +48,8 @@ struct gpt2_layer {
     struct ggml_tensor * c_mlp_proj_b;
 };
 
-struct gpt2_model {
-    gpt2_hparams hparams;
+struct starcoder_model {
+    starcoder_hparams hparams;
 
     // normalization
     struct ggml_tensor * ln_f_g;
@@ -59,7 +59,7 @@ struct gpt2_model {
     struct ggml_tensor * wpe;     //    token embedding
     struct ggml_tensor * lm_head; // language model head
 
-    std::vector<gpt2_layer> layers;
+    std::vector<starcoder_layer> layers;
 
     // key + value memory
     struct ggml_tensor * memory_k;
@@ -71,7 +71,7 @@ struct gpt2_model {
 };
 
 // load the model's weights from a file
-bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & vocab) {
+bool starcoder_model_load(const std::string & fname, starcoder_model & model, gpt_vocab & vocab) {
     printf("%s: loading model from '%s'\n", __func__, fname.c_str());
 
     auto fin = std::ifstream(fname, std::ios::binary);
@@ -388,8 +388,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 //   - embd_inp:  the embeddings of the tokens in the context
 //   - embd_w:    the predicted logits for the next token
 //
-bool gpt2_eval(
-        const gpt2_model & model,
+bool starcoder_eval(
+        const starcoder_model & model,
         const int n_threads,
         const int n_past,
         const std::vector<gpt_vocab::id> & embd_inp,
@@ -729,13 +729,13 @@ int main(int argc, char ** argv) {
     int64_t t_load_us = 0;
 
     gpt_vocab vocab;
-    gpt2_model model;
+    starcoder_model model;
 
     // load the model
     {
         const int64_t t_start_us = ggml_time_us();
 
-        if (!gpt2_model_load(params.model, model, vocab)) {
+        if (!starcoder_model_load(params.model, model, vocab)) {
             fprintf(stderr, "%s: failed to load model from '%s'\n", __func__, params.model.c_str());
             return 1;
         }
@@ -768,14 +768,14 @@ int main(int argc, char ** argv) {
 
     // determine the required inference memory per token:
     size_t mem_per_token = 0;
-    gpt2_eval(model, params.n_threads, 0, { 0, 1, 2, 3 }, logits, mem_per_token);
+    starcoder_eval(model, params.n_threads, 0, { 0, 1, 2, 3 }, logits, mem_per_token);
 
     for (int i = embd.size(); i < embd_inp.size() + params.n_predict; i++) {
         // predict
         if (embd.size() > 0) {
             const int64_t t_start_us = ggml_time_us();
 
-            if (!gpt2_eval(model, params.n_threads, n_past, embd, logits, mem_per_token)) {
+            if (!starcoder_eval(model, params.n_threads, n_past, embd, logits, mem_per_token)) {
                 printf("Failed to predict\n");
                 return 1;
             }

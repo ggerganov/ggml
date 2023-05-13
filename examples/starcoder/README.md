@@ -36,16 +36,16 @@ options:
 
 $ ./bin/starcoder -m ../models/bigcode/gpt_bigcode-santacoder-ggml-q4_1.bin -p "def fibonnaci(" -t 4 --top_k 0 --top_p 0.95 --temp 0.2      
 main: seed = 1683881276
-gpt2_model_load: loading model from '../models/bigcode/gpt_bigcode-santacoder-ggml-q4_1.bin'
-gpt2_model_load: n_vocab = 49280
-gpt2_model_load: n_ctx   = 2048
-gpt2_model_load: n_embd  = 2048
-gpt2_model_load: n_head  = 16
-gpt2_model_load: n_layer = 24
-gpt2_model_load: ftype   = 3
-gpt2_model_load: ggml ctx size = 1794.90 MB
-gpt2_model_load: memory size =   768.00 MB, n_mem = 49152
-gpt2_model_load: model size  =  1026.83 MB
+starcoder_model_load: loading model from '../models/bigcode/gpt_bigcode-santacoder-ggml-q4_1.bin'
+starcoder_model_load: n_vocab = 49280
+starcoder_model_load: n_ctx   = 2048
+starcoder_model_load: n_embd  = 2048
+starcoder_model_load: n_head  = 16
+starcoder_model_load: n_layer = 24
+starcoder_model_load: ftype   = 3
+starcoder_model_load: ggml ctx size = 1794.90 MB
+starcoder_model_load: memory size =   768.00 MB, n_mem = 49152
+starcoder_model_load: model size  =  1026.83 MB
 main: prompt: 'def fibonnaci('
 main: number of tokens in prompt = 7, first 8 tokens: 563 24240 78 2658 64 2819 7 
 
