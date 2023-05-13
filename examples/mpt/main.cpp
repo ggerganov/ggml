@@ -164,9 +164,9 @@ bool mpt_model_load(const std::string & fname, mpt_model & model,
                                ggml_type_sizef(wtype)); // mlp_mlp_down_weight
 
         ctx_size += n_ctx * n_layer * n_embd *
-                    ggml_type_sizef(GGML_TYPE_F32); // memory_k
+                    ggml_type_sizef(GGML_TYPE_F16); // memory_k
         ctx_size += n_ctx * n_layer * n_embd *
-                    ggml_type_sizef(GGML_TYPE_F32); // memory_v
+                    ggml_type_sizef(GGML_TYPE_F16); // memory_v
 
         ctx_size += (6 + 16 * n_layer) * 256; // object overhead
 
