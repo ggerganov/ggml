@@ -30,7 +30,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [X] Example of RWKV inference [saharNooby/rwkv.cpp](https://github.com/saharNooby/rwkv.cpp)
 - [ ] Example of [SAM](https://github.com/facebookresearch/segment-anything) inference
 - [ ] Idea for GPU support: https://github.com/ggerganov/llama.cpp/discussions/915
-- [X] Example of StableLM (GPT-NeoX) inference [examples/gpt-neox](https://github.com/ggerganov/ggml/tree/master/examples/stablelm)
+- [X] Example of StableLM (GPT-NeoX) inference [examples/gpt-neox](https://github.com/ggerganov/ggml/tree/master/examples/gpt-neox)
 - [X] Example of BERT inference [skeskinen/bert.cpp](https://github.com/skeskinen/bert.cpp)
 - [X] Example of 💫 StarCoder inference [examples/starcoder](https://github.com/ggerganov/ggml/tree/master/examples/starcoder)
 
