@@ -209,7 +209,6 @@ bool gpt_neox_model_load(const std::string & fname, gpt_neox_model & model, gpt_
 
         const int n_embd  = hparams.n_embd;
         const int n_layer = hparams.n_layer;
-        const int n_ctx   = hparams.n_ctx;
         const int n_vocab = hparams.n_vocab;
 
         model.layers.resize(n_layer);
@@ -289,7 +288,7 @@ bool gpt_neox_model_load(const std::string & fname, gpt_neox_model & model, gpt_
 
         const size_t memory_size = ggml_nbytes(model.memory_k) + ggml_nbytes(model.memory_v);
 
-        printf("%s: memory_size = %8.2f MB, n_mem = %lld\n", __func__, memory_size/1024.0/1024.0, n_mem);
+        printf("%s: memory_size = %8.2f MB, n_mem = %ld\n", __func__, memory_size/1024.0/1024.0, n_mem);
     }
 
     // load weights

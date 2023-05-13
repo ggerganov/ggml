@@ -206,7 +206,6 @@ bool gptj_model_load(const std::string & fname, gptj_model & model, gpt_vocab & 
 
         const int n_embd  = hparams.n_embd;
         const int n_layer = hparams.n_layer;
-        const int n_ctx   = hparams.n_ctx;
         const int n_vocab = hparams.n_vocab;
 
         model.layers.resize(n_layer);
@@ -390,8 +389,6 @@ bool gptj_eval(
     const int n_head  = hparams.n_head;
     const int n_vocab = hparams.n_vocab;
     const int n_rot   = hparams.n_rot;
-
-    const int d_key = n_embd/n_head;
 
     static size_t buf_size = 256u*1024*1024;
     static void * buf = malloc(buf_size);
