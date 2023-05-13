@@ -14,7 +14,7 @@
 #include <regex>
 
 // default hparams (GPT-2 117M)
-struct gpt2_hparams {
+struct starcoder_hparams {
     int32_t n_vocab = 49280;
     int32_t n_ctx   = 2048;
     int32_t n_embd  = 2048;
@@ -24,7 +24,7 @@ struct gpt2_hparams {
 };
 
 // quantize a model
-bool gpt2_model_quantize(const std::string & fname_inp, const std::string & fname_out, ggml_ftype ftype) {
+bool starcoder_model_quantize(const std::string & fname_inp, const std::string & fname_out, ggml_ftype ftype) {
     gpt_vocab vocab;
 
     printf("%s: loading model from '%s'\n", __func__, fname_inp.c_str());
@@ -53,7 +53,7 @@ bool gpt2_model_quantize(const std::string & fname_inp, const std::string & fnam
         fout.write((char *) &magic, sizeof(magic));
     }
 
-    gpt2_hparams hparams;
+    starcoder_hparams hparams;
 
     // load hparams
     {
@@ -157,7 +157,7 @@ int main(int argc, char ** argv) {
     {
         const int64_t t_start_us = ggml_time_us();
 
-        if (!gpt2_model_quantize(fname_inp, fname_out, ggml_ftype(ftype))) {
+        if (!starcoder_model_quantize(fname_inp, fname_out, ggml_ftype(ftype))) {
             fprintf(stderr, "%s: failed to quantize model from '%s'\n", __func__, fname_inp.c_str());
             return 1;
         }
