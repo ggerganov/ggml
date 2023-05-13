@@ -55,8 +55,6 @@ bool mnist_model_load(const std::string & fname, mnist_model & model) {
         }
     }
 
-    const ggml_type wtype2 = GGML_TYPE_F32;
-
     auto & ctx = model.ctx;
     size_t ctx_size = 0;
 
@@ -206,7 +204,6 @@ int main(int argc, char ** argv) {
         fprintf(stderr, "Usage: %s models/mnist/ggml-model-f32.bin models/mnist/t10k-images.idx3-ubyte\n", argv[0]);
         exit(0);
     }
-    const int64_t t_main_start_us = ggml_time_us();
 
     mnist_hparams params;
     int64_t t_load_us = 0;

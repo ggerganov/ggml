@@ -1,3 +1,15 @@
+if (GGML_ALL_WARNINGS)
+  if (NOT MSVC)
+      set(cxx_flags
+          # TODO(marella): Add other warnings.
+          -Wunused-variable
+          -Wno-unused-function
+          -Wno-multichar
+      )
+      add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${cxx_flags}>")
+  endif()
+endif()
+
 add_library(common STATIC common.cpp)
 target_include_directories(common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
