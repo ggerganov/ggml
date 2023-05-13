@@ -76,8 +76,8 @@ encode_word(const std::string & word, const piece_map_t & model) {
     return std::make_tuple(tokens, score);
 }
 
-auto replit_tokenizer_load(replit_tokenizer & tokenizer, std::istream & fin,
-                           int max_vocab_size) -> bool {
+bool replit_tokenizer_load(replit_tokenizer & tokenizer, std::istream & fin,
+                           int max_vocab_size) {
 
     for (std::size_t i = 0; i < max_vocab_size; i++) {
 
