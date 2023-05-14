@@ -273,7 +273,6 @@ bool replit_model_load(const std::string & fname, replit_model & model, replit_t
 
         const int n_embd = hparams.d_model;
         const int n_layer = hparams.n_layers;
-        const int n_ctx = hparams.max_seq_len;
         const int n_vocab = hparams.n_vocab;
 
         model.layers.resize(n_layer);
@@ -289,13 +288,9 @@ bool replit_model_load(const std::string & fname, replit_model & model, replit_t
             auto & layer = model.layers[i];
 
             layer.ln_1_weight = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
-
             layer.c_attn_wqkv_weight = ggml_new_tensor_2d(ctx, wtype, n_embd, 3 * n_embd);
-
             layer.c_attn_out_proj_weight = ggml_new_tensor_2d(ctx, wtype, n_embd, n_embd);
-
             layer.ln_2_weight = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
-
             layer.c_mlp_mlp_up_weight = ggml_new_tensor_2d(ctx, wtype, n_embd, 4 * n_embd);
             layer.c_mlp_mlp_down_weight = ggml_new_tensor_2d(ctx, wtype, 4 * n_embd, n_embd);
 
@@ -680,7 +675,7 @@ int main(int argc, char ** argv) {
     printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
 
     for (int i = 0; i < embd_inp.size(); i++) {
-        printf("%s: token[%d] = %6d\n", __func__, i, embd_inp[i]);
+        printf("%s: token[%d] = %6lu\n", __func__, i, embd_inp[i]);
         // vocab.id_to_token.at(embd_inp[i]).c_str()
     }
     printf("\n");
