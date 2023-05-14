@@ -163,6 +163,14 @@ target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
 
 #
+# test-opt
+
+set(TEST_TARGET test-opt)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+
+#
 # test-mul-mat0
 
 set(TEST_TARGET test-mul-mat0)

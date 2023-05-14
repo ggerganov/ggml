@@ -2,6 +2,8 @@
 
 Tensor library for machine learning
 
+**⚠️ The quantization formats Q4 and Q5 have been updated: https://github.com/ggerganov/ggml/pull/154 - requantize any old models**
+
 ***Note that this project is under development and not ready for production use. \
 Some of the development is currently happening in the [llama.cpp](https://github.com/ggerganov/llama.cpp) and [whisper.cpp](https://github.com/ggerganov/whisper.cpp) repos***
 

@@ -205,7 +205,6 @@ int main(int argc, char ** argv) {
         exit(0);
     }
 
-    mnist_hparams params;
     int64_t t_load_us = 0;
 
     mnist_model model;
