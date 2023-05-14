@@ -6212,7 +6212,6 @@ struct ggml_tensor * ggml_alibi(
 
     ((int32_t *) b->data)[0] = n_past;
     ((int32_t *) b->data)[1] = n_head;
-    ((int32_t *) b->data)[2] = n_head;
     GGML_ASSERT(sizeof(float) == sizeof(int32_t));
     (((float *) b->data)[2]) = bias_max;
     
