@@ -51,7 +51,7 @@ std::pair<std::vector<std::size_t>, float> encode_word(const std::string & word,
     }
 
     if (best_segmentations_scores.back() == -std::numeric_limits<float>::infinity()) {
-        return std::make_tuple(std::vector<std::size_t>{0}, 0.0);
+        return std::make_pair(std::vector<std::size_t>{0}, 0.0f);
     }
 
     float score = best_segmentations_scores.back();
@@ -67,7 +67,7 @@ std::pair<std::vector<std::size_t>, float> encode_word(const std::string & word,
     }
     const auto token_id = model.at(word.substr(start, end - start)).first;
     tokens.insert(tokens.begin(), token_id);
-    return std::make_tuple(tokens, score);
+    return std::make_pair(tokens, score);
 }
 
 bool replit_tokenizer_load(replit_tokenizer & tokenizer, std::istream & fin, int max_vocab_size) {
