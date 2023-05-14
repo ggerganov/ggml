@@ -582,7 +582,7 @@ bool gptj_eval(
 
     //if (n_past%100 == 0) {
     //    ggml_graph_print   (&gf);
-    //    ggml_graph_dump_dot(&gf, NULL, "gpt-2.dot");
+    //    ggml_graph_dump_dot(&gf, NULL, "gpt-j.dot");
     //}
 
     //embd_w.resize(n_vocab*N);
