@@ -13,19 +13,18 @@
 #include <vector>
 #include <regex>
 
-// default hparams (StableLM 3B)
-struct stablelm_hparams {
-    int32_t n_vocab = 50257;
-    int32_t n_ctx   = 4096;
-    int32_t n_embd  = 4096;
-    int32_t n_head  = 32;
-    int32_t n_layer = 16;
-    int32_t n_rot   = 32; // 0.25 * (n_embd / n_head)
+// default hparams (GPT-2 117M)
+struct starcoder_hparams {
+    int32_t n_vocab = 49280;
+    int32_t n_ctx   = 2048;
+    int32_t n_embd  = 2048;
+    int32_t n_head  = 16;
+    int32_t n_layer = 24;
     int32_t ftype   = 1;
 };
 
 // quantize a model
-bool stablelm_model_quantize(const std::string & fname_inp, const std::string & fname_out, ggml_ftype ftype) {
+bool starcoder_model_quantize(const std::string & fname_inp, const std::string & fname_out, ggml_ftype ftype) {
     gpt_vocab vocab;
 
     printf("%s: loading model from '%s'\n", __func__, fname_inp.c_str());
@@ -54,7 +53,7 @@ bool stablelm_model_quantize(const std::string & fname_inp, const std::string & 
         fout.write((char *) &magic, sizeof(magic));
     }
 
-    stablelm_hparams hparams;
+    starcoder_hparams hparams;
 
     // load hparams
     {
@@ -63,28 +62,40 @@ bool stablelm_model_quantize(const std::string & fname_inp, const std::string & 
         finp.read((char *) &hparams.n_embd,  sizeof(hparams.n_embd));
         finp.read((char *) &hparams.n_head,  sizeof(hparams.n_head));
         finp.read((char *) &hparams.n_layer, sizeof(hparams.n_layer));
-        finp.read((char *) &hparams.n_rot,   sizeof(hparams.n_rot));
         finp.read((char *) &hparams.ftype,   sizeof(hparams.ftype));
 
-        printf("%s: n_vocab = %d\n", __func__, hparams.n_vocab);
-        printf("%s: n_ctx   = %d\n", __func__, hparams.n_ctx);
-        printf("%s: n_embd  = %d\n", __func__, hparams.n_embd);
-        printf("%s: n_head  = %d\n", __func__, hparams.n_head);
-        printf("%s: n_layer = %d\n", __func__, hparams.n_layer);
-        printf("%s: ftype   = %d\n", __func__, hparams.ftype);
+        const int32_t qntvr_src =    hparams.ftype / GGML_QNT_VERSION_FACTOR;
+        const int32_t ftype_dst = GGML_QNT_VERSION * GGML_QNT_VERSION_FACTOR + ftype;
+
+        printf("%s: n_vocab     = %d\n", __func__, hparams.n_vocab);
+        printf("%s: n_ctx       = %d\n", __func__, hparams.n_ctx);
+        printf("%s: n_embd      = %d\n", __func__, hparams.n_embd);
+        printf("%s: n_head      = %d\n", __func__, hparams.n_head);
+        printf("%s: n_layer     = %d\n", __func__, hparams.n_layer);
+        printf("%s: ftype (src) = %d\n", __func__, hparams.ftype);
+        printf("%s: qntvr (src) = %d\n", __func__, qntvr_src);
+        printf("%s: ftype (dst) = %d\n", __func__, ftype_dst);
+        printf("%s: qntvr (dst) = %d\n", __func__, GGML_QNT_VERSION);
 
         fout.write((char *) &hparams.n_vocab, sizeof(hparams.n_vocab));
         fout.write((char *) &hparams.n_ctx,   sizeof(hparams.n_ctx));
         fout.write((char *) &hparams.n_embd,  sizeof(hparams.n_embd));
         fout.write((char *) &hparams.n_head,  sizeof(hparams.n_head));
         fout.write((char *) &hparams.n_layer, sizeof(hparams.n_layer));
-        fout.write((char *) &hparams.n_rot,   sizeof(hparams.n_rot));
-        fout.write((char *) &ftype,           sizeof(hparams.ftype));
+        fout.write((char *) &ftype_dst,       sizeof(ftype_dst));
     }
 
     // load vocab
     {
-        const int32_t n_vocab = hparams.n_vocab;
+        int32_t n_vocab = 0;
+        finp.read ((char *) &n_vocab, sizeof(n_vocab));
+        fout.write((char *) &n_vocab, sizeof(n_vocab));
+
+        if (n_vocab != hparams.n_vocab) {
+            fprintf(stderr, "%s: invalid model file '%s' (bad vocab size %d != %d)\n",
+                    __func__, fname_inp.c_str(), n_vocab, hparams.n_vocab);
+            return false;
+        }
 
         std::string word;
         for (int i = 0; i < n_vocab; i++) {
@@ -103,7 +114,12 @@ bool stablelm_model_quantize(const std::string & fname_inp, const std::string & 
 
     // regexes of tensor names to be quantized
     const std::vector<std::string> to_quant = {
-        ".*weight",
+        "model/wte",
+        "model/lm_head",
+        "model/h.*/attn/c_attn/w",
+        "model/h.*/attn/c_proj/w",
+        "model/h.*/mlp/c_fc/w",
+        "model/h.*/mlp/c_proj/w",
     };
 
     if (!ggml_common_quantize_0(finp, fout, ftype, to_quant, {})) {
@@ -118,7 +134,7 @@ bool stablelm_model_quantize(const std::string & fname_inp, const std::string & 
 }
 
 // usage:
-//  ./stablelm2-quantize models/stablelm2-117M/ggml-model.bin models/stablelm2-117M/ggml-model-quant.bin type
+//  ./gpt-2-quantize models/gpt-2-117M/ggml-model.bin models/gpt-2-117M/ggml-model-quant.bin type
 //
 int main(int argc, char ** argv) {
     if (argc != 4) {
@@ -147,7 +163,7 @@ int main(int argc, char ** argv) {
     {
         const int64_t t_start_us = ggml_time_us();
 
-        if (!stablelm_model_quantize(fname_inp, fname_out, ggml_ftype(ftype))) {
+        if (!starcoder_model_quantize(fname_inp, fname_out, ggml_ftype(ftype))) {
             fprintf(stderr, "%s: failed to quantize model from '%s'\n", __func__, fname_inp.c_str());
             return 1;
         }

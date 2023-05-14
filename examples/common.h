@@ -55,7 +55,7 @@ struct gpt_vocab {
     std::map<id, token> id_to_token;
     std::vector<std::string> special_tokens;
 
-    void add_special_token(const std::string &token);
+    void add_special_token(const std::string & token);
 };
 
 // poor-man's JSON parsing
@@ -121,3 +121,5 @@ bool vad_simple(
         float freq_thold,
         bool  verbose);
 
+// compute similarity between two strings using Levenshtein distance
+float similarity(const std::string & s0, const std::string & s1);

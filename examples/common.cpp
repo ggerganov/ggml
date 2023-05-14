@@ -38,6 +38,20 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
         } else if (arg == "-h" || arg == "--help") {
             gpt_print_usage(argc, argv, params);
             exit(0);
+        } else if (arg == "-f" || arg == "--file") {
+            if (++i > argc) {
+                fprintf(stderr, "Invalid file param");
+                break;
+            }
+            std::ifstream file(argv[i]);
+            if (!file) {
+                fprintf(stderr, "error: failed to open file '%s'\n", argv[i]);
+                break;
+            }
+            std::copy(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>(), back_inserter(params.prompt));
+            if (params.prompt.back() == '\n') {
+                params.prompt.pop_back();
+            }
         } else {
             fprintf(stderr, "error: unknown argument: %s\n", arg.c_str());
             gpt_print_usage(argc, argv, params);
@@ -48,7 +62,7 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
     return true;
 }
 
-void gpt_print_usage(int argc, char ** argv, const gpt_params & params) {
+void gpt_print_usage(int /*argc*/, char ** argv, const gpt_params & params) {
     fprintf(stderr, "usage: %s [options]\n", argv[0]);
     fprintf(stderr, "\n");
     fprintf(stderr, "options:\n");
@@ -57,6 +71,8 @@ void gpt_print_usage(int argc, char ** argv, const gpt_params & params) {
     fprintf(stderr, "  -t N, --threads N     number of threads to use during computation (default: %d)\n", params.n_threads);
     fprintf(stderr, "  -p PROMPT, --prompt PROMPT\n");
     fprintf(stderr, "                        prompt to start generation with (default: random)\n");
+    fprintf(stderr, "  -f FNAME, --file FNAME\n");
+    fprintf(stderr, "                        load prompt from a file\n");
     fprintf(stderr, "  -n N, --n_predict N   number of tokens to predict (default: %d)\n", params.n_predict);
     fprintf(stderr, "  --top_k N             top-k sampling (default: %d)\n", params.top_k);
     fprintf(stderr, "  --top_p N             top-p sampling (default: %.1f)\n", params.top_p);
@@ -192,7 +208,7 @@ std::map<std::string, int32_t> json_parse(const std::string & fname) {
     return result;
 }
 
-void gpt_vocab::add_special_token(const std::string &token) {
+void gpt_vocab::add_special_token(const std::string & token) {
     special_tokens.push_back(token);
 }
 
@@ -200,7 +216,6 @@ void gpt_vocab::add_special_token(const std::string &token) {
 std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::string & text) {
     std::vector<std::string> words;
 
- 
     // first split the text into words
     {
         std::string str = text;
@@ -209,7 +224,7 @@ std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::stri
         // Generate the subpattern from the special_tokens vector if it's not empty
         if (!vocab.special_tokens.empty()) {
             std::string special_tokens_subpattern;
-            for (const auto &token : vocab.special_tokens) {
+            for (const auto & token : vocab.special_tokens) {
                 if (!special_tokens_subpattern.empty()) {
                     special_tokens_subpattern += "|";
                 }
@@ -498,4 +513,28 @@ bool vad_simple(std::vector<float> & pcmf32, int sample_rate, int last_ms, float
     }
 
     return true;
+}
+
+float similarity(const std::string & s0, const std::string & s1) {
+    const size_t len0 = s0.size() + 1;
+    const size_t len1 = s1.size() + 1;
+
+    std::vector<int> col(len1, 0);
+    std::vector<int> prevCol(len1, 0);
+
+    for (size_t i = 0; i < len1; i++) {
+        prevCol[i] = i;
+    }
+
+    for (size_t i = 0; i < len0; i++) {
+        col[0] = i;
+        for (size_t j = 1; j < len1; j++) {
+            col[j] = std::min(std::min(1 + col[j - 1], 1 + prevCol[j]), prevCol[j - 1] + (i > 0 && s0[i - 1] == s1[j - 1] ? 0 : 1));
+        }
+        col.swap(prevCol);
+    }
+
+    const float dist = prevCol[len1 - 1];
+
+    return 1.0f - (dist / std::max(s0.size(), s1.size()));
 }

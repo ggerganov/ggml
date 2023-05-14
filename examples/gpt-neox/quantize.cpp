@@ -13,19 +13,20 @@
 #include <vector>
 #include <regex>
 
-// default hparams (GPT-J 6B)
-struct gptj_hparams {
-    int32_t n_vocab = 50400;
-    int32_t n_ctx   = 2048;
+// default hparams (StableLM 3B)
+struct gpt_neox_hparams {
+    int32_t n_vocab = 50257;
+    int32_t n_ctx   = 4096;
     int32_t n_embd  = 4096;
-    int32_t n_head  = 16;
-    int32_t n_layer = 28;
-    int32_t n_rot   = 64;
+    int32_t n_head  = 32;
+    int32_t n_layer = 16;
+    int32_t n_rot   = 32; // 0.25 * (n_embd / n_head)
+    int32_t par_res = 1; // 1 = true, 0 = false
     int32_t ftype   = 1;
 };
 
 // quantize a model
-bool gptj_model_quantize(const std::string & fname_inp, const std::string & fname_out, ggml_ftype ftype) {
+bool gpt_neox_model_quantize(const std::string & fname_inp, const std::string & fname_out, ggml_ftype ftype) {
     gpt_vocab vocab;
 
     printf("%s: loading model from '%s'\n", __func__, fname_inp.c_str());
@@ -54,7 +55,7 @@ bool gptj_model_quantize(const std::string & fname_inp, const std::string & fnam
         fout.write((char *) &magic, sizeof(magic));
     }
 
-    gptj_hparams hparams;
+    gpt_neox_hparams hparams;
 
     // load hparams
     {
@@ -64,6 +65,7 @@ bool gptj_model_quantize(const std::string & fname_inp, const std::string & fnam
         finp.read((char *) &hparams.n_head,  sizeof(hparams.n_head));
         finp.read((char *) &hparams.n_layer, sizeof(hparams.n_layer));
         finp.read((char *) &hparams.n_rot,   sizeof(hparams.n_rot));
+        finp.read((char *) &hparams.par_res, sizeof(hparams.par_res));
         finp.read((char *) &hparams.ftype,   sizeof(hparams.ftype));
 
         const int32_t qntvr_src =    hparams.ftype / GGML_QNT_VERSION_FACTOR;
@@ -74,6 +76,7 @@ bool gptj_model_quantize(const std::string & fname_inp, const std::string & fnam
         printf("%s: n_embd      = %d\n", __func__, hparams.n_embd);
         printf("%s: n_head      = %d\n", __func__, hparams.n_head);
         printf("%s: n_layer     = %d\n", __func__, hparams.n_layer);
+        printf("%s: par_res     = %d\n", __func__, hparams.par_res);
         printf("%s: ftype (src) = %d\n", __func__, hparams.ftype);
         printf("%s: qntvr (src) = %d\n", __func__, qntvr_src);
         printf("%s: ftype (dst) = %d\n", __func__, ftype_dst);
@@ -85,20 +88,13 @@ bool gptj_model_quantize(const std::string & fname_inp, const std::string & fnam
         fout.write((char *) &hparams.n_head,  sizeof(hparams.n_head));
         fout.write((char *) &hparams.n_layer, sizeof(hparams.n_layer));
         fout.write((char *) &hparams.n_rot,   sizeof(hparams.n_rot));
+        fout.write((char *) &hparams.par_res, sizeof(hparams.par_res));
         fout.write((char *) &ftype_dst,       sizeof(ftype_dst));
     }
 
     // load vocab
     {
-        int32_t n_vocab = 0;
-        finp.read ((char *) &n_vocab, sizeof(n_vocab));
-        fout.write((char *) &n_vocab, sizeof(n_vocab));
-
-        if (n_vocab != hparams.n_vocab) {
-            fprintf(stderr, "%s: invalid model file '%s' (bad vocab size %d != %d)\n",
-                    __func__, fname_inp.c_str(), n_vocab, hparams.n_vocab);
-            return false;
-        }
+        const int32_t n_vocab = hparams.n_vocab;
 
         std::string word;
         for (int i = 0; i < n_vocab; i++) {
@@ -132,7 +128,7 @@ bool gptj_model_quantize(const std::string & fname_inp, const std::string & fnam
 }
 
 // usage:
-//  ./gpt-2-quantize models/gpt-2-117M/ggml-model.bin models/gpt-2-117M/ggml-model-quant.bin type
+//  ./gpt-neox-quantize models/stalellm2-117M/ggml-model.bin models/stablelm2-117M/ggml-model-quant.bin type
 //
 int main(int argc, char ** argv) {
     if (argc != 4) {
@@ -161,7 +157,7 @@ int main(int argc, char ** argv) {
     {
         const int64_t t_start_us = ggml_time_us();
 
-        if (!gptj_model_quantize(fname_inp, fname_out, ggml_ftype(ftype))) {
+        if (!gpt_neox_model_quantize(fname_inp, fname_out, ggml_ftype(ftype))) {
             fprintf(stderr, "%s: failed to quantize model from '%s'\n", __func__, fname_inp.c_str());
             return 1;
         }

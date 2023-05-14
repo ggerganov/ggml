@@ -55,8 +55,6 @@ bool mnist_model_load(const std::string & fname, mnist_model & model) {
         }
     }
 
-    const ggml_type wtype2 = GGML_TYPE_F32;
-
     auto & ctx = model.ctx;
     size_t ctx_size = 0;
 
@@ -174,7 +172,8 @@ int mnist_eval(
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
-    struct ggml_cgraph gf = { .n_threads = n_threads };
+    struct ggml_cgraph gf = {};
+    gf.n_threads = n_threads;
 
     struct ggml_tensor * input = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, hparams.n_input);
     memcpy(input->data, digit.data(), ggml_nbytes(input));
@@ -205,7 +204,6 @@ int main(int argc, char ** argv) {
         fprintf(stderr, "Usage: %s models/mnist/ggml-model-f32.bin models/mnist/t10k-images.idx3-ubyte\n", argv[0]);
         exit(0);
     }
-    const int64_t t_main_start_us = ggml_time_us();
 
     mnist_hparams params;
     int64_t t_load_us = 0;

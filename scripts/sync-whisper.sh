@@ -6,6 +6,8 @@ cp -rpv ../whisper.cpp/ggml-cuda.cu                   src/ggml-cuda.cu
 cp -rpv ../whisper.cpp/ggml-opencl.h                  src/ggml-opencl.h
 cp -rpv ../whisper.cpp/ggml-opencl.c                  src/ggml-opencl.c
 cp -rpv ../whisper.cpp/ggml.h                         include/ggml/ggml.h
+cp -rpv ../whisper.cpp/examples/common.h              examples/common.h
+cp -rpv ../whisper.cpp/examples/common.cpp            examples/common.cpp
 cp -rpv ../whisper.cpp/examples/common-ggml.h         examples/common-ggml.h
 cp -rpv ../whisper.cpp/examples/common-ggml.cpp       examples/common-ggml.cpp
 cp -rpv ../whisper.cpp/whisper.h                      examples/whisper/whisper.h

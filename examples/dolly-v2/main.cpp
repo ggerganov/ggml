@@ -17,21 +17,21 @@
 // default hparams (Dolly-V2 3B)
 struct dollyv2_hparams {
     int32_t n_vocab = 50254; // tokenizer.vocab_size
-    int32_t n_ctx   = 2048; // model.config.max_position_embeddings
-    int32_t n_embd  = 2560; // model.config.hidden_size
-    int32_t n_head  = 32; // model.config.num_attention_heads
-    int32_t n_layer = 32; // model.config.num_hidden_layers
-    int32_t n_rot   = 20; // rotary_pct[25%] * (n_embd / n_head)
+    int32_t n_ctx   = 2048;  // model.config.max_position_embeddings
+    int32_t n_embd  = 2560;  // model.config.hidden_size
+    int32_t n_head  = 32;    // model.config.num_attention_heads
+    int32_t n_layer = 32;    // model.config.num_hidden_layers
+    int32_t n_rot   = 20;    // rotary_pct[25%] * (n_embd / n_head)
     int32_t ftype   = GGML_FTYPE_MOSTLY_F16;
 };
 
 const std::string INSTRUCTION_KEY = "### Instruction:";
-const std::string RESPONSE_KEY = "### Response:";
-const std::string END_KEY = "### End";
-const std::string INTRO_BLURB = "Below is an instruction that describes a task. Write a response that appropriately completes the request.";
+const std::string RESPONSE_KEY    = "### Response:";
+const std::string END_KEY         = "### End";
+const std::string INTRO_BLURB     = "Below is an instruction that describes a task. Write a response that appropriately completes the request.";
 
 // dollyv2 prompt format
-std::string promptForGenerationFormat(const std::string& instruction) {
+std::string prompt_for_generation(const std::string& instruction) {
     return INTRO_BLURB + "\n\n" + INSTRUCTION_KEY + "\n" + instruction + "\n\n" + RESPONSE_KEY + "\n";
 }
 
@@ -114,6 +114,8 @@ bool dollyv2_model_load(const std::string & fname, dollyv2_model & model, gpt_vo
         fin.read((char *) &hparams.n_rot,   sizeof(hparams.n_rot));
         fin.read((char *) &hparams.ftype,   sizeof(hparams.ftype));
 
+        const int32_t qntvr = hparams.ftype / GGML_QNT_VERSION_FACTOR;
+
         printf("%s: n_vocab = %d\n", __func__, hparams.n_vocab);
         printf("%s: n_ctx   = %d\n", __func__, hparams.n_ctx);
         printf("%s: n_embd  = %d\n", __func__, hparams.n_embd);
@@ -121,6 +123,9 @@ bool dollyv2_model_load(const std::string & fname, dollyv2_model & model, gpt_vo
         printf("%s: n_layer = %d\n", __func__, hparams.n_layer);
         printf("%s: n_rot   = %d\n", __func__, hparams.n_rot);
         printf("%s: ftype   = %d\n", __func__, hparams.ftype);
+        printf("%s: qntvr   = %d\n", __func__, qntvr);
+
+        hparams.ftype %= GGML_QNT_VERSION_FACTOR;
     }
 
     // load vocab
@@ -220,7 +225,6 @@ bool dollyv2_model_load(const std::string & fname, dollyv2_model & model, gpt_vo
 
         const int n_embd  = hparams.n_embd;
         const int n_layer = hparams.n_layer;
-        const int n_ctx   = hparams.n_ctx;
         const int n_vocab = hparams.n_vocab;
 
         model.layers.resize(n_layer);
@@ -303,7 +307,7 @@ bool dollyv2_model_load(const std::string & fname, dollyv2_model & model, gpt_vo
 
         const size_t memory_size = ggml_nbytes(model.memory_k) + ggml_nbytes(model.memory_v);
 
-        printf("%s: memory_size = %8.2f MB, n_mem = %lld\n", __func__, memory_size/1024.0/1024.0, n_mem);
+        printf("%s: memory_size = %8.2f MB, n_mem = %ld\n", __func__, memory_size/1024.0/1024.0, n_mem);
     }
 
     // load weights
@@ -434,7 +438,8 @@ bool dollyv2_eval(
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
-    struct ggml_cgraph gf = { .n_threads = n_threads };
+    struct ggml_cgraph gf = { };
+    gf.n_threads = n_threads;
 
     struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
     memcpy(embd->data, embd_inp.data(), N*ggml_element_size(embd));
@@ -672,7 +677,7 @@ int main(int argc, char ** argv) {
         }
     }
 
-    std::string prompt = promptForGenerationFormat(params.prompt);
+    const std::string prompt = prompt_for_generation(params.prompt);
 
     int64_t t_load_us = 0;
 
@@ -715,7 +720,7 @@ int main(int argc, char ** argv) {
     size_t mem_per_token = 0;
     dollyv2_eval(model, params.n_threads, 0, { 0, 1, 2, 3 }, logits, mem_per_token);
 
-    int32_t end_token = vocab.token_to_id["### End"];
+    const int32_t end_token = vocab.token_to_id["### End"];
 
     for (int i = embd.size(); i < embd_inp.size() + params.n_predict; i++) {
         // predict
@@ -775,7 +780,6 @@ int main(int argc, char ** argv) {
         if (embd.back() == 0 || (end_token > 0 && embd.back() == end_token)) {
             break;
         }
-
     }
 
     // report timing

@@ -861,6 +861,8 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
             model.type = e_model::MODEL_LARGE;
         }
 
+        hparams.ftype %= GGML_QNT_VERSION_FACTOR;
+
         // for the big tensors, we have the option to store the data in 16-bit floats or quantized
         // in order to save memory and also to speed up the computation
         wctx.wtype = ggml_ftype_to_ggml_type((ggml_ftype) (model.hparams.ftype));
@@ -870,6 +872,8 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
         }
 
         const size_t scale = model.hparams.ftype ? 1 : 2;
+
+        const int32_t qntvr = hparams.ftype / GGML_QNT_VERSION_FACTOR;
 
         fprintf(stderr, "%s: n_vocab       = %d\n", __func__, hparams.n_vocab);
         fprintf(stderr, "%s: n_audio_ctx   = %d\n", __func__, hparams.n_audio_ctx);
@@ -882,6 +886,7 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
         fprintf(stderr, "%s: n_text_layer  = %d\n", __func__, hparams.n_text_layer);
         fprintf(stderr, "%s: n_mels        = %d\n", __func__, hparams.n_mels);
         fprintf(stderr, "%s: ftype         = %d\n", __func__, model.hparams.ftype);
+        fprintf(stderr, "%s: qntvr         = %d\n", __func__, qntvr);
         fprintf(stderr, "%s: type          = %d\n", __func__, model.type);
 
         // print memory requirements
