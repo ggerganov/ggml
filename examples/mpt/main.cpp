@@ -388,7 +388,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
             // compute QKV
             cur = ggml_mul_mat(ctx0, model.layers[il].c_attn_wqkv_weight, cur);
 
-            if (model.hparams.clip_qkv >= 0.0f) {
+            if (model.hparams.clip_qkv > 0.0f) {
                 cur = ggml_clamp(ctx0, cur, -model.hparams.clip_qkv, model.hparams.clip_qkv);
             }
 
