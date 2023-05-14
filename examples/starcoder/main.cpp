@@ -828,8 +828,12 @@ int main(int argc, char ** argv) {
         }
         fflush(stdout);
 
-        // end of text token
-        if (embd.back() == 0) { //TODO: this is only for starcoder
+        // check if model is santacoder
+        if (model.hparams.n_layer <= 30 && embd.back() == 49152) {
+            break;
+        }
+        // check if model is starcoder
+        else if (embd.back() == 0) { //TODO: this is only for starcoder
             break;
         }
     }
