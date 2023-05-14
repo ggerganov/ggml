@@ -18,6 +18,8 @@
 #include <utility>
 #include <vector>
 
+int n_ctx = 4096;
+
 // no defaults for now
 struct mpt_hparams {
     int32_t d_model = 0;
@@ -25,6 +27,8 @@ struct mpt_hparams {
     int32_t n_heads = 0;
     int32_t n_layers = 0;
     int32_t n_vocab = 0;
+    float alibi_bias_max = 0;
+    float clip_qkv = 0;
     int32_t ftype = 0;
 };
 
@@ -89,14 +93,18 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
         fin.read((char *)&hparams.n_heads, sizeof(hparams.n_heads));
         fin.read((char *)&hparams.n_layers, sizeof(hparams.n_layers));
         fin.read((char *)&hparams.n_vocab, sizeof(hparams.n_vocab));
+        fin.read((char *)&hparams.alibi_bias_max, sizeof(hparams.alibi_bias_max));
+        fin.read((char *)&hparams.clip_qkv, sizeof(hparams.clip_qkv));
         fin.read((char *)&hparams.ftype, sizeof(hparams.ftype));
 
-        printf("%s: d_model       = %d\n", __func__, hparams.d_model);
-        printf("%s: max_seq_len   = %d\n", __func__, hparams.max_seq_len);
-        printf("%s: n_heads       = %d\n", __func__, hparams.n_heads);
-        printf("%s: n_layers      = %d\n", __func__, hparams.n_layers);
-        printf("%s: n_vocab      = %d\n", __func__, hparams.n_vocab);
-        printf("%s: ftype   = %d\n", __func__, hparams.ftype);
+        printf("%s: d_model        = %d\n", __func__, hparams.d_model);
+        printf("%s: max_seq_len    = %d\n", __func__, hparams.max_seq_len);
+        printf("%s: n_heads        = %d\n", __func__, hparams.n_heads);
+        printf("%s: n_layers       = %d\n", __func__, hparams.n_layers);
+        printf("%s: n_vocab        = %d\n", __func__, hparams.n_vocab);
+        printf("%s: alibi_bias_max = %f\n", __func__, hparams.alibi_bias_max);
+        printf("%s: clip_qkv       = %f\n", __func__, hparams.clip_qkv);
+        printf("%s: ftype          = %d\n", __func__, hparams.ftype);
     }
 
     // load vocab
@@ -135,10 +143,10 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
 
         const size_t n_embd = hparams.d_model;
         const size_t n_layer = hparams.n_layers;
-        const size_t n_ctx = hparams.max_seq_len;
         const size_t n_vocab = hparams.n_vocab;
 
-        ctx_size += n_embd * n_vocab * ggml_type_sizef(wtype); // wte_weifgr
+        ctx_size += n_embd * n_vocab * ggml_type_sizef(wtype); // wte_weight
+        ctx_size += n_embd * ggml_type_sizef(GGML_TYPE_F32);   // norm_f_weight
 
         ctx_size += n_layer * (n_embd * ggml_type_sizef(GGML_TYPE_F32));      // ln_1_weight
         ctx_size += n_layer * (3 * n_embd * n_embd * ggml_type_sizef(wtype)); // attn_Wqkv_weight
@@ -176,7 +184,6 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
 
         const size_t n_embd = hparams.d_model;
         const size_t n_layer = hparams.n_layers;
-        const size_t n_ctx = hparams.max_seq_len;
         const size_t n_vocab = hparams.n_vocab;
 
         model.layers.resize(n_layer);
@@ -215,7 +222,6 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
 
         const size_t n_embd = hparams.d_model;
         const size_t n_layer = hparams.n_layers;
-        const size_t n_ctx = hparams.max_seq_len;
 
         const int64_t n_mem = n_layer * n_ctx;
         const int64_t n_elements = n_embd * n_mem;
@@ -328,7 +334,6 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
 
     const int n_embd = hparams.d_model;
     const int n_layer = hparams.n_layers;
-    const int n_ctx = hparams.max_seq_len;
     const int n_head = hparams.n_heads;
     const int n_vocab = hparams.n_vocab;
 
@@ -381,7 +386,11 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
         {
 
             // compute QKV
-            { cur = ggml_mul_mat(ctx0, model.layers[il].c_attn_wqkv_weight, cur); }
+            cur = ggml_mul_mat(ctx0, model.layers[il].c_attn_wqkv_weight, cur);
+
+            // if (model.hparams.clip_qkv >= 0.0f) {
+            //     cur = ggml_clamp(ctx0, cur, -model.hparams.clip_qkv, model.hparams.clip_qkv);
+            // }
 
             struct ggml_tensor * Qcur = ggml_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 0 * sizeof(float) * n_embd);
             struct ggml_tensor * Kcur = ggml_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 1 * sizeof(float) * n_embd);
@@ -422,7 +431,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
             struct ggml_tensor * KQ_scaled =
                 ggml_scale(ctx0, KQ, ggml_new_f32(ctx0, 1.0f / sqrt(float(n_embd) / n_head)));
 
-            struct ggml_tensor * KQ_scaled_alibi = ggml_alibi(ctx0, KQ_scaled, n_past, n_head);
+            struct ggml_tensor * KQ_scaled_alibi = ggml_alibi(ctx0, KQ_scaled, n_past, n_head, 8.0f);
 
             // KQ_masked = mask_past(KQ_scaled)
             struct ggml_tensor * KQ_masked = ggml_diag_mask_inf(ctx0, KQ_scaled_alibi, n_past);
@@ -583,7 +592,7 @@ int main(int argc, char ** argv) {
     }
     printf("\n");
 
-    params.n_predict = std::min(params.n_predict, model.hparams.max_seq_len - (int)embd_inp.size());
+    params.n_predict = std::min(params.n_predict, n_ctx - (int)embd_inp.size());
 
     std::vector<gpt_vocab::id> embd;
 

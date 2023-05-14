@@ -4160,6 +4160,7 @@ static const char * GGML_OP_LABEL[GGML_OP_COUNT] = {
     "SOFT_MAX",
     "ROPE",
     "ALIBI",
+    "CLAMP",
     "CONV_1D_1S",
     "CONV_1D_2S",
 
@@ -4170,7 +4171,7 @@ static const char * GGML_OP_LABEL[GGML_OP_COUNT] = {
     "MAP_BINARY",
 };
 
-static_assert(GGML_OP_COUNT == 39, "GGML_OP_COUNT != 39");
+static_assert(GGML_OP_COUNT == 40, "GGML_OP_COUNT != 40");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -4209,6 +4210,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "soft_max(x)",
     "rope(x)",
     "alibi(x)",
+    "clamp(x)",
     "conv_1d_1s(x)",
     "conv_1d_2s(x)",
 
@@ -4219,7 +4221,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "f(x,y)",
 };
 
-static_assert(GGML_OP_COUNT == 39, "GGML_OP_COUNT != 39");
+static_assert(GGML_OP_COUNT == 40, "GGML_OP_COUNT != 40");
 
 static_assert(sizeof(struct ggml_object)%GGML_MEM_ALIGN == 0, "ggml_object size must be a multiple of GGML_MEM_ALIGN");
 static_assert(sizeof(struct ggml_tensor)%GGML_MEM_ALIGN == 0, "ggml_tensor size must be a multiple of GGML_MEM_ALIGN");
@@ -6255,7 +6257,8 @@ struct ggml_tensor * ggml_alibi(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         int                   n_past,
-        int                   n_head) {
+        int                   n_head,
+        float                 bias_max) {
     GGML_ASSERT(n_past >= 0);
     bool is_node = false;
 
@@ -6268,11 +6271,45 @@ struct ggml_tensor * ggml_alibi(
     //struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
     struct ggml_tensor * result = ggml_view_tensor(ctx, a);
 
-    struct ggml_tensor * b = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, 2);
+    struct ggml_tensor * b = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, 3);
     ((int32_t *) b->data)[0] = n_past;
     ((int32_t *) b->data)[1] = n_head;
+    ((int32_t *) b->data)[2] = n_head;
+    GGML_ASSERT(sizeof(float) == sizeof(int32_t));
+    (((float *) b->data)[2]) = bias_max;
+    
 
     result->op   = GGML_OP_ALIBI;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->src0 = a;
+    result->src1 = b;
+
+    return result;
+}
+
+// ggml_alibi
+
+struct ggml_tensor * ggml_clamp(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        float                 min,
+        float                 max) {
+    bool is_node = false;
+
+    if (a->grad) {
+        GGML_ASSERT(false); // TODO: implement backward
+        is_node = true;
+    }
+
+    // TODO: when implement backward, fix this:
+    struct ggml_tensor * result = ggml_view_tensor(ctx, a);
+
+    struct ggml_tensor * b = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, 3);
+    ((float *) b->data)[0] = min;
+    ((float *) b->data)[1] = max;
+    
+
+    result->op   = GGML_OP_CLAMP;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src0 = a;
     result->src1 = b;
@@ -9378,7 +9415,7 @@ static void ggml_compute_forward_alibi_f32(
         struct ggml_tensor * dst) {
     assert(params->ith == 0);
     assert(src1->type == GGML_TYPE_I32);
-    assert(ggml_nelements(src1) == 2);
+    assert(ggml_nelements(src1) == 3);
 
     if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
         return;
@@ -9386,6 +9423,7 @@ static void ggml_compute_forward_alibi_f32(
 
     const int n_past = ((int32_t *) src1->data)[0];
     const int n_head = ((int32_t *) src1->data)[1];
+    const float max_bias = ((float *) src1->data)[2];
 
     const int ne0 = src0->ne[0]; // all_seq_len = n_past + ne1
     const int ne1 = src0->ne[1]; // seq_len_without_past
@@ -9406,8 +9444,8 @@ static void ggml_compute_forward_alibi_f32(
     // add alibi to src0 (KQ_scaled)
     const int n_heads_log2_floor = 1 << (int) floor(log2(n_head));
 
-    const float m0 = powf(2.0f, -8.0f / n_heads_log2_floor);
-    const float m1 = powf(2.0f, -4.0f / n_heads_log2_floor);
+    const float m0 = powf(2.0f, -(max_bias) / n_heads_log2_floor);
+    const float m1 = powf(2.0f, -(max_bias / 2.0) / n_heads_log2_floor);
 
     for (int i = 0; i < ne0; i++) {
         for (int j = 0; j < ne1; j++) {
@@ -9425,7 +9463,7 @@ static void ggml_compute_forward_alibi_f32(
                     m_k = powf(m1, 2 * (k - n_heads_log2_floor) + 1);
                 }
 
-                pdst[0] = i * m_k + src[0];
+                pdst[0] = (i-ne0+1) * m_k + src[0];
             }
         }
     }
@@ -9439,7 +9477,7 @@ static void ggml_compute_forward_alibi_f16(
         struct ggml_tensor * dst) {
     assert(params->ith == 0);
     assert(src1->type == GGML_TYPE_I32);
-    assert(ggml_nelements(src1) == 2);
+    assert(ggml_nelements(src1) == 3);
 
     if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
         return;
@@ -9447,6 +9485,7 @@ static void ggml_compute_forward_alibi_f16(
 
     const int n_past = ((int32_t *) src1->data)[0];
     const int n_head = ((int32_t *) src1->data)[1];
+    const float max_bias = ((float *) src1->data)[2];
 
     const int ne0 = src0->ne[0]; // all_seq_len = n_past + ne1
     const int ne1 = src0->ne[1]; // seq_len_without_past
@@ -9467,8 +9506,8 @@ static void ggml_compute_forward_alibi_f16(
     // add alibi to src0 (KQ_scaled)
     const int n_heads_log2_floor = 1 << (int) floor(log2(n_head));
 
-    const float m0 = powf(2.0f, -8.0f / n_heads_log2_floor);
-    const float m1 = powf(2.0f, -4.0f / n_heads_log2_floor);
+    const float m0 = powf(2.0f, -(max_bias) / n_heads_log2_floor);
+    const float m1 = powf(2.0f, -(max_bias / 2.0f) / n_heads_log2_floor);
 
     for (int i = 0; i < ne0; i++) {
         for (int j = 0; j < ne1; j++) {
@@ -9487,7 +9526,7 @@ static void ggml_compute_forward_alibi_f16(
                 }
 
                 // we return F32
-                pdst[0] = i * m_k + GGML_FP16_TO_FP32(src[0]);
+                pdst[0] = (i-ne0+1) * m_k + GGML_FP16_TO_FP32(src[0]);
             }
         }
     }
@@ -9507,6 +9546,80 @@ static void ggml_compute_forward_alibi(
             {
                 ggml_compute_forward_alibi_f32(params, src0, src1, dst);
             } break;
+        case GGML_TYPE_Q4_0:
+        case GGML_TYPE_Q4_1:
+        case GGML_TYPE_Q4_2:
+        case GGML_TYPE_Q5_0:
+        case GGML_TYPE_Q5_1:
+        case GGML_TYPE_Q8_0:
+        case GGML_TYPE_Q8_1:
+        case GGML_TYPE_I8:
+        case GGML_TYPE_I16:
+        case GGML_TYPE_I32:
+        case GGML_TYPE_COUNT:
+            {
+                GGML_ASSERT(false);
+            } break;
+    }
+}
+
+
+// ggml_compute_forward_alibi
+
+static void ggml_compute_forward_clamp_f32(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src0,
+        const struct ggml_tensor * src1,
+        struct ggml_tensor * dst) {
+    assert(params->ith == 0);
+    assert(src1->type == GGML_TYPE_I32);
+    assert(ggml_nelements(src1) == 2);
+
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+        return;
+    }
+
+    const int min = ((float *) src1->data)[0];
+    const int max = ((float *) src1->data)[1];
+
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int n  = ggml_nrows(src0);
+    const int nc = src0->ne[0];
+
+    const size_t nb00 = src0->nb[0];
+    const size_t nb01 = src0->nb[1];
+
+    const size_t nb0 = dst->nb[0];
+    const size_t nb1 = dst->nb[1];
+
+    GGML_ASSERT( nb0 == sizeof(float));
+    GGML_ASSERT(nb00 == sizeof(float));
+
+    for (int j = ith; j < n; j += nth) {
+        float * dst_ptr  = (float *) ((char *) dst->data  + j*nb1);
+        float * src0_ptr = (float *) ((char *) src0->data + j*nb01);
+        for (int i = 0; i < nc; i++) {
+
+            dst_ptr[i] = MAX(MIN(src0_ptr[i], max), min);
+        }
+    }
+}
+
+
+static void ggml_compute_forward_clamp(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src0,
+        const struct ggml_tensor * src1,
+        struct ggml_tensor * dst) {
+    switch (src0->type) {
+        case GGML_TYPE_F32:
+            {
+                ggml_compute_forward_alibi_f32(params, src0, src1, dst);
+            } break;
+        case GGML_TYPE_F16:
         case GGML_TYPE_Q4_0:
         case GGML_TYPE_Q4_1:
         case GGML_TYPE_Q4_2:

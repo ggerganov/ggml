@@ -19,6 +19,8 @@ struct mpt_hparams {
     int32_t n_heads = 0;
     int32_t n_layers = 0;
     int32_t n_vocab = 0;
+    float alibi_bias_max = 0;
+    float clip_qkv = 0;
     int32_t ftype = 0;
 };
 
@@ -64,6 +66,8 @@ bool mpt_model_quantize(const std::string & fname_inp,
         finp.read((char *)&hparams.n_heads, sizeof(hparams.n_heads));
         finp.read((char *)&hparams.n_layers, sizeof(hparams.n_layers));
         finp.read((char *)&hparams.n_vocab, sizeof(hparams.n_vocab));
+        finp.read((char *)&hparams.alibi_bias_max, sizeof(hparams.alibi_bias_max));
+        finp.read((char *)&hparams.clip_qkv, sizeof(hparams.clip_qkv));
         finp.read((char *)&hparams.ftype, sizeof(hparams.ftype));
 
         printf("%s: d_model = %d\n", __func__, hparams.d_model);
@@ -71,6 +75,8 @@ bool mpt_model_quantize(const std::string & fname_inp,
         printf("%s: n_heads = %d\n", __func__, hparams.n_heads);
         printf("%s: n_layers = %d\n", __func__, hparams.n_layers);
         printf("%s: n_vocab = %d\n", __func__, hparams.n_vocab);
+        printf("%s: alibi_bias_max = %f\n", __func__, hparams.alibi_bias_max);
+        printf("%s: clip_qkv = %f\n", __func__, hparams.clip_qkv);
         printf("%s: ftype = %d\n", __func__, hparams.ftype);
 
         fout.write((char *)&hparams.d_model, sizeof(hparams.d_model));
@@ -78,6 +84,8 @@ bool mpt_model_quantize(const std::string & fname_inp,
         fout.write((char *)&hparams.n_heads, sizeof(hparams.n_heads));
         fout.write((char *)&hparams.n_layers, sizeof(hparams.n_layers));
         fout.write((char *)&hparams.n_vocab, sizeof(hparams.n_vocab));
+        fout.write((char *)&hparams.alibi_bias_max, sizeof(hparams.alibi_bias_max));
+        fout.write((char *)&hparams.clip_qkv, sizeof(hparams.clip_qkv));
         fout.write((char *)&ftype, sizeof(hparams.ftype));
     }
 
