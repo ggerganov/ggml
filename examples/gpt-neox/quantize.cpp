@@ -68,13 +68,19 @@ bool gpt_neox_model_quantize(const std::string & fname_inp, const std::string & 
         finp.read((char *) &hparams.par_res, sizeof(hparams.par_res));
         finp.read((char *) &hparams.ftype,   sizeof(hparams.ftype));
 
-        printf("%s: n_vocab = %d\n", __func__, hparams.n_vocab);
-        printf("%s: n_ctx   = %d\n", __func__, hparams.n_ctx);
-        printf("%s: n_embd  = %d\n", __func__, hparams.n_embd);
-        printf("%s: n_head  = %d\n", __func__, hparams.n_head);
-        printf("%s: n_layer = %d\n", __func__, hparams.n_layer);
-        printf("%s: par_res = %d\n", __func__, hparams.par_res);
-        printf("%s: ftype   = %d\n", __func__, hparams.ftype);
+        const int32_t qntvr_src =    hparams.ftype / GGML_QNT_VERSION_FACTOR;
+        const int32_t ftype_dst = GGML_QNT_VERSION * GGML_QNT_VERSION_FACTOR + ftype;
+
+        printf("%s: n_vocab     = %d\n", __func__, hparams.n_vocab);
+        printf("%s: n_ctx       = %d\n", __func__, hparams.n_ctx);
+        printf("%s: n_embd      = %d\n", __func__, hparams.n_embd);
+        printf("%s: n_head      = %d\n", __func__, hparams.n_head);
+        printf("%s: n_layer     = %d\n", __func__, hparams.n_layer);
+        printf("%s: par_res     = %d\n", __func__, hparams.par_res);
+        printf("%s: ftype (src) = %d\n", __func__, hparams.ftype);
+        printf("%s: qntvr (src) = %d\n", __func__, qntvr_src);
+        printf("%s: ftype (dst) = %d\n", __func__, ftype_dst);
+        printf("%s: qntvr (dst) = %d\n", __func__, GGML_QNT_VERSION);
 
         fout.write((char *) &hparams.n_vocab, sizeof(hparams.n_vocab));
         fout.write((char *) &hparams.n_ctx,   sizeof(hparams.n_ctx));
@@ -83,7 +89,7 @@ bool gpt_neox_model_quantize(const std::string & fname_inp, const std::string & 
         fout.write((char *) &hparams.n_layer, sizeof(hparams.n_layer));
         fout.write((char *) &hparams.n_rot,   sizeof(hparams.n_rot));
         fout.write((char *) &hparams.par_res, sizeof(hparams.par_res));
-        fout.write((char *) &ftype,           sizeof(hparams.ftype));
+        fout.write((char *) &ftype_dst,       sizeof(ftype_dst));
     }
 
     // load vocab

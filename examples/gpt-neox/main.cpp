@@ -106,6 +106,8 @@ bool gpt_neox_model_load(const std::string & fname, gpt_neox_model & model, gpt_
         fin.read((char *) &hparams.par_res, sizeof(hparams.par_res));
         fin.read((char *) &hparams.ftype,   sizeof(hparams.ftype));
 
+        const int32_t qntvr = hparams.ftype / GGML_QNT_VERSION_FACTOR;
+
         printf("%s: n_vocab = %d\n", __func__, hparams.n_vocab);
         printf("%s: n_ctx   = %d\n", __func__, hparams.n_ctx);
         printf("%s: n_embd  = %d\n", __func__, hparams.n_embd);
@@ -114,6 +116,9 @@ bool gpt_neox_model_load(const std::string & fname, gpt_neox_model & model, gpt_
         printf("%s: n_rot   = %d\n", __func__, hparams.n_rot);
         printf("%s: par_res = %d\n", __func__, hparams.par_res);
         printf("%s: ftype   = %d\n", __func__, hparams.ftype);
+        printf("%s: qntvr   = %d\n", __func__, qntvr);
+
+        hparams.ftype %= GGML_QNT_VERSION_FACTOR;
     }
 
     // load vocab
