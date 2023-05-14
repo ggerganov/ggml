@@ -109,7 +109,7 @@ bool whisper_model_quantize(const std::string & fname_inp, const std::string & f
         fout.write((char *) &hparams.n_text_head,   sizeof(hparams.n_text_head));
         fout.write((char *) &hparams.n_text_layer,  sizeof(hparams.n_text_layer));
         fout.write((char *) &hparams.n_mels,        sizeof(hparams.n_mels));
-        fout.write((char *) &ftype,                 sizeof(hparams.ftype));
+        fout.write((char *) &ftype_dst,             sizeof(hparams.ftype));
     }
 
     // load mel filters
