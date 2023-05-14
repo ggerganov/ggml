@@ -234,7 +234,8 @@ bool replit_model_load(const std::string & fname, replit_model & model, replit_t
         const int n_ctx = hparams.max_seq_len;
         const int n_vocab = hparams.n_vocab;
 
-        ctx_size += n_embd * n_vocab * ggml_type_sizef(wtype); // wte_weifgr
+        ctx_size += n_embd * n_vocab * ggml_type_sizef(wtype); // wte_weight
+        ctx_size += n_embd * ggml_type_sizef(GGML_TYPE_F32);   // ln_f_weight
 
         ctx_size += n_layer * (n_embd * ggml_type_sizef(GGML_TYPE_F32));      // ln_1_weight
         ctx_size += n_layer * (3 * n_embd * n_embd * ggml_type_sizef(wtype)); // attn_Wqkv_weight
