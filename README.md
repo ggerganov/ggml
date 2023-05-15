@@ -28,6 +28,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [X] Example of Cerebras-GPT inference [examples/gpt-2](https://github.com/ggerganov/ggml/tree/master/examples/gpt-2)
 - [ ] Example of FLAN-T5 inference https://github.com/ggerganov/ggml/pull/12
 - [X] Example of LLaMA inference [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp)
+- [X] Example of LLaMA training [ggerganov/llama.cpp/examples/baby-llama](https://github.com/ggerganov/llama.cpp/tree/master/examples/baby-llama)
 - [X] Example of BLOOM inference [NouamaneTazi/bloomz.cpp](https://github.com/NouamaneTazi/bloomz.cpp)
 - [X] Example of RWKV inference [saharNooby/rwkv.cpp](https://github.com/saharNooby/rwkv.cpp)
 - [ ] Example of [SAM](https://github.com/facebookresearch/segment-anything) inference
