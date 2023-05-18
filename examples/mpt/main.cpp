@@ -18,10 +18,9 @@
 #include <utility>
 #include <vector>
 
-int n_ctx = 4096;
-
 // no defaults for now
 struct mpt_hparams {
+    int32_t n_ctx = 4096;
     int32_t d_model = 0;
     int32_t max_seq_len = 0;
     int32_t n_heads = 0;
@@ -141,6 +140,7 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
     {
         const auto & hparams = model.hparams;
 
+        const int32_t n_ctx = hparams.n_ctx;
         const size_t n_embd = hparams.d_model;
         const size_t n_layer = hparams.n_layers;
         const size_t n_vocab = hparams.n_vocab;
@@ -220,6 +220,7 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
     {
         const auto & hparams = model.hparams;
 
+        const int32_t n_ctx = hparams.n_ctx;
         const size_t n_embd = hparams.d_model;
         const size_t n_layer = hparams.n_layers;
 
@@ -231,7 +232,7 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
 
         const size_t memory_size = ggml_nbytes(model.memory_k) + ggml_nbytes(model.memory_v);
 
-        printf("%s: memory_size = %8.2f MB, n_mem = %lld\n", __func__, memory_size / 1024.0 / 1024.0, n_mem);
+        printf("%s: memory_size = %8.2f MB, n_mem = %ld\n", __func__, memory_size / 1024.0 / 1024.0, n_mem);
     }
 
     // load weights
@@ -332,6 +333,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
 
     const auto & hparams = model.hparams;
 
+    const int32_t n_ctx = hparams.n_ctx;
     const int n_embd = hparams.d_model;
     const int n_layer = hparams.n_layers;
     const int n_head = hparams.n_heads;
@@ -593,6 +595,7 @@ int main(int argc, char ** argv) {
     }
     printf("\n");
 
+    const int32_t n_ctx = model.hparams.n_ctx;
     params.n_predict = std::min(params.n_predict, n_ctx - (int)embd_inp.size());
 
     std::vector<gpt_vocab::id> embd;
