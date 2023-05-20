@@ -128,7 +128,7 @@ bool dollyv2_model_quantize(const std::string & fname_inp, const std::string & f
 }
 
 // usage:
-//  ./dollyv22-quantize models/dolly-v2-3B/ggml-model.bin models/dolly-v2-3B/ggml-model-quant.bin type
+//  ./dollyv2-quantize models/dolly-v2-3B/ggml-model.bin models/dolly-v2-3B/ggml-model-quant.bin type
 //
 int main(int argc, char ** argv) {
     if (argc != 4) {
