@@ -203,7 +203,7 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
         model.tensors["transformer.wte.weight"] = model.wte_weight;
         model.tensors["transformer.norm_f.weight"] = model.norm_f_weight;
 
-        for (int i = 0; i < n_layer; ++i) {
+        for (int i = 0; i < (int)n_layer; ++i) {
             auto & layer = model.layers[i];
 
             layer.norm_1_weight = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
@@ -379,7 +379,8 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
-    struct ggml_cgraph gf = {.n_threads = n_threads};
+    struct ggml_cgraph gf = {};
+    gf.n_threads = n_threads;
 
     struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
     memcpy(embd->data, embd_inp.data(), N * ggml_element_size(embd));
