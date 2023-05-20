@@ -259,6 +259,7 @@ std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::stri
                 if (it != vocab.token_to_id.end()) {
                     tokens.push_back(it->second);
                     i = j;
+                    j = n;
                     break;
                 }
                 --j;
