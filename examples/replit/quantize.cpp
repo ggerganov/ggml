@@ -14,12 +14,12 @@
 #include <vector>
 
 struct mpt_hparams {
-    int32_t d_model = 0;
+    int32_t d_model     = 0;
     int32_t max_seq_len = 0;
-    int32_t n_heads = 0;
-    int32_t n_layers = 0;
-    int32_t n_vocab = 0;
-    int32_t ftype = 0;
+    int32_t n_heads     = 0;
+    int32_t n_layers    = 0;
+    int32_t n_vocab     = 0;
+    int32_t ftype       = 0;
 };
 
 // quantize a model
@@ -59,26 +59,32 @@ bool mpt_model_quantize(const std::string & fname_inp,
 
     // load hparams
     {
-        finp.read((char *)&hparams.d_model, sizeof(hparams.d_model));
-        finp.read((char *)&hparams.max_seq_len, sizeof(hparams.max_seq_len));
-        finp.read((char *)&hparams.n_heads, sizeof(hparams.n_heads));
-        finp.read((char *)&hparams.n_layers, sizeof(hparams.n_layers));
-        finp.read((char *)&hparams.n_vocab, sizeof(hparams.n_vocab));
-        finp.read((char *)&hparams.ftype, sizeof(hparams.ftype));
+        finp.read((char *) &hparams.d_model,     sizeof(hparams.d_model));
+        finp.read((char *) &hparams.max_seq_len, sizeof(hparams.max_seq_len));
+        finp.read((char *) &hparams.n_heads,     sizeof(hparams.n_heads));
+        finp.read((char *) &hparams.n_layers,    sizeof(hparams.n_layers));
+        finp.read((char *) &hparams.n_vocab,     sizeof(hparams.n_vocab));
+        finp.read((char *) &hparams.ftype,       sizeof(hparams.ftype));
 
-        printf("%s: d_model = %d\n", __func__, hparams.d_model);
+        const int32_t qntvr_src =    hparams.ftype / GGML_QNT_VERSION_FACTOR;
+        const int32_t ftype_dst = GGML_QNT_VERSION * GGML_QNT_VERSION_FACTOR + ftype;
+
+        printf("%s: d_model     = %d\n", __func__, hparams.d_model);
         printf("%s: max_seq_len = %d\n", __func__, hparams.max_seq_len);
-        printf("%s: n_heads = %d\n", __func__, hparams.n_heads);
-        printf("%s: n_layers = %d\n", __func__, hparams.n_layers);
-        printf("%s: n_vocab = %d\n", __func__, hparams.n_vocab);
-        printf("%s: ftype = %d\n", __func__, hparams.ftype);
+        printf("%s: n_heads     = %d\n", __func__, hparams.n_heads);
+        printf("%s: n_layers    = %d\n", __func__, hparams.n_layers);
+        printf("%s: n_vocab     = %d\n", __func__, hparams.n_vocab);
+        printf("%s: ftype (src) = %d\n", __func__, hparams.ftype);
+        printf("%s: qntvr (src) = %d\n", __func__, qntvr_src);
+        printf("%s: ftype (dst) = %d\n", __func__, ftype_dst);
+        printf("%s: qntvr (dst) = %d\n", __func__, GGML_QNT_VERSION);
 
-        fout.write((char *)&hparams.d_model, sizeof(hparams.d_model));
-        fout.write((char *)&hparams.max_seq_len, sizeof(hparams.max_seq_len));
-        fout.write((char *)&hparams.n_heads, sizeof(hparams.n_heads));
-        fout.write((char *)&hparams.n_layers, sizeof(hparams.n_layers));
-        fout.write((char *)&hparams.n_vocab, sizeof(hparams.n_vocab));
-        fout.write((char *)&ftype, sizeof(hparams.ftype));
+        fout.write((char *) &hparams.d_model,     sizeof(hparams.d_model));
+        fout.write((char *) &hparams.max_seq_len, sizeof(hparams.max_seq_len));
+        fout.write((char *) &hparams.n_heads,     sizeof(hparams.n_heads));
+        fout.write((char *) &hparams.n_layers,    sizeof(hparams.n_layers));
+        fout.write((char *) &hparams.n_vocab,     sizeof(hparams.n_vocab));
+        fout.write((char *) &ftype_dst,           sizeof(ftype_dst));
     }
 
     // load vocab
