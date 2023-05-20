@@ -14,10 +14,12 @@
 // CLI argument parsing
 //
 
-struct gpt_params {
+struct gpt_params { //default values
     int32_t seed      = -1; // RNG seed
     int32_t n_threads = std::min(4, (int32_t) std::thread::hardware_concurrency());
     int32_t n_predict = 200; // new tokens to predict
+
+    int32_t n_ctx = 2048; //default context size
 
     // sampling parameters
     int32_t top_k = 40;

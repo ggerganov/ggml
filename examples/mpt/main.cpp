@@ -18,14 +18,13 @@
 #include <utility>
 #include <vector>
 
-int n_ctx = 4096;
-
 // no defaults for now
 struct mpt_hparams {
     int32_t d_model = 0;
     int32_t max_seq_len = 0;
     int32_t n_heads = 0;
     int32_t n_layers = 0;
+    int32_t n_ctx   = 4096;
     int32_t n_vocab = 0;
     float alibi_bias_max = 0;
     float clip_qkv = 0;
@@ -65,7 +64,7 @@ struct mpt_model {
 };
 
 // load the model's weights from a file
-bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vocab) {
+bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vocab, int n_ctx) {
     printf("%s: loading model from '%s' - please wait ...\n", __func__, fname.c_str());
 
     auto fin = std::ifstream(fname, std::ios::binary);
@@ -97,11 +96,14 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
         fin.read((char *)&hparams.clip_qkv, sizeof(hparams.clip_qkv));
         fin.read((char *)&hparams.ftype, sizeof(hparams.ftype));
 
+        hparams.n_ctx = n_ctx;
+
         printf("%s: d_model        = %d\n", __func__, hparams.d_model);
         printf("%s: max_seq_len    = %d\n", __func__, hparams.max_seq_len);
         printf("%s: n_heads        = %d\n", __func__, hparams.n_heads);
         printf("%s: n_layers       = %d\n", __func__, hparams.n_layers);
         printf("%s: n_vocab        = %d\n", __func__, hparams.n_vocab);
+        printf("%s: n_ctx          = %d\n", __func__, hparams.n_ctx);
         printf("%s: alibi_bias_max = %f\n", __func__, hparams.alibi_bias_max);
         printf("%s: clip_qkv       = %f\n", __func__, hparams.clip_qkv);
         printf("%s: ftype          = %d\n", __func__, hparams.ftype);
@@ -144,6 +146,7 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
         const size_t n_embd = hparams.d_model;
         const size_t n_layer = hparams.n_layers;
         const size_t n_vocab = hparams.n_vocab;
+        const size_t n_ctx = hparams.n_ctx;
 
         ctx_size += n_embd * n_vocab * ggml_type_sizef(wtype); // wte_weight
         ctx_size += n_embd * ggml_type_sizef(GGML_TYPE_F32);   // norm_f_weight
@@ -336,6 +339,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
     const int n_layer = hparams.n_layers;
     const int n_head = hparams.n_heads;
     const int n_vocab = hparams.n_vocab;
+    const int n_ctx = hparams.n_ctx;
 
     static size_t buf_size = 256u * 1024 * 1024;
     static void * buf = malloc(buf_size);
@@ -567,7 +571,7 @@ int main(int argc, char ** argv) {
     {
         const int64_t t_start_us = ggml_time_us();
 
-        if (!mpt_model_load(params.model, model, vocab)) {
+        if (!mpt_model_load(params.model, model, vocab, params.n_ctx)) {
             fprintf(stderr, "%s: failed to load model from '%s'\n", __func__, params.model.c_str());
             return 1;
         }
@@ -593,7 +597,7 @@ int main(int argc, char ** argv) {
     }
     printf("\n");
 
-    params.n_predict = std::min(params.n_predict, n_ctx - (int)embd_inp.size());
+    params.n_predict = std::min(params.n_predict, model.hparams.n_ctx - (int)embd_inp.size());
 
     std::vector<gpt_vocab::id> embd;
 
