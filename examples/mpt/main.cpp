@@ -340,8 +340,8 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
     static size_t buf_size = 256u * 1024 * 1024;
     static void * buf = malloc(buf_size);
 
-    if (mem_per_token > 0 && mem_per_token * N > buf_size) {
-        const size_t buf_size_new = 1.1 * (mem_per_token * N); // add 10% to account for ggml object overhead
+    if (mem_per_token > 0 && mem_per_token * (n_past+N) > buf_size) {
+        const size_t buf_size_new = 1.1 * (mem_per_token * (n_past+N)); // add 10% to account for ggml object overhead
         // printf("\n%s: reallocating buffer from %zu to %zu bytes\n", __func__,
         // buf_size, buf_size_new);
 
@@ -520,9 +520,9 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
     embd_w.resize(n_vocab);
     memcpy(embd_w.data(), (float *)ggml_get_data(inpL) + (n_vocab * (N - 1)), sizeof(float) * n_vocab);
 
-    if (mem_per_token == 0) {
-        mem_per_token = ggml_used_mem(ctx0) / N;
-    }
+    // Update the memory used per token, so more memory buffer can be increased
+    // initial estimates are large and then shrink down to more accurate numbers
+    mem_per_token = ggml_used_mem(ctx0) / (n_past + N);
     // printf("used_mem = %zu\n", ggml_used_mem(ctx0));
 
     ggml_free(ctx0);
