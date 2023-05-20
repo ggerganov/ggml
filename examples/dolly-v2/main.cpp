@@ -114,7 +114,7 @@ bool dollyv2_model_load(const std::string & fname, dollyv2_model & model, gpt_vo
         fin.read((char *) &hparams.n_head,  sizeof(hparams.n_head));
         fin.read((char *) &hparams.n_layer, sizeof(hparams.n_layer));
         fin.read((char *) &hparams.n_rot,   sizeof(hparams.n_rot));
-        fin.read((char *) &hparams.par_res, sizeof(hparams.par_res));        
+        fin.read((char *) &hparams.par_res, sizeof(hparams.par_res));
         fin.read((char *) &hparams.ftype,   sizeof(hparams.ftype));
 
         const int32_t qntvr = hparams.ftype / GGML_QNT_VERSION_FACTOR;
@@ -137,12 +137,15 @@ bool dollyv2_model_load(const std::string & fname, dollyv2_model & model, gpt_vo
         const int32_t n_vocab = model.hparams.n_vocab;
 
         std::string word;
+        std::vector<char> buf(128);
+
         for (int i = 0; i < n_vocab; i++) {
             uint32_t len;
             fin.read((char *) &len, sizeof(len));
 
-            word.resize(len);
-            fin.read((char *) word.data(), len);
+            buf.resize(len);
+            fin.read((char *) buf.data(), len);
+            word.assign(buf.data(), len);
 
             vocab.token_to_id[word] = i;
             vocab.id_to_token[i] = word;
@@ -613,7 +616,7 @@ bool dollyv2_eval(
             // input for next layer
             inpL = ggml_add(ctx0, cur, inpL);
         }
-    
+
     }
 
     // norm

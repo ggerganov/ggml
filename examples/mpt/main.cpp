@@ -109,15 +109,18 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
 
     // load vocab
     {
-        int32_t n_vocab = model.hparams.n_vocab;
+        const int32_t n_vocab = model.hparams.n_vocab;
 
         std::string word;
+        std::vector<char> buf(128);
+
         for (int i = 0; i < n_vocab; i++) {
             uint32_t len;
-            fin.read((char *)&len, sizeof(len));
+            fin.read((char *) &len, sizeof(len));
 
-            word.resize(len);
-            fin.read((char *)word.data(), len);
+            buf.resize(len);
+            fin.read((char *) buf.data(), len);
+            word.assign(buf.data(), len);
 
             vocab.token_to_id[word] = i;
             vocab.id_to_token[i] = word;

@@ -71,15 +71,16 @@ std::pair<std::vector<std::size_t>, float> encode_word(const std::string & word,
 }
 
 bool replit_tokenizer_load(replit_tokenizer & tokenizer, std::istream & fin, int max_vocab_size) {
+    std::string word;
+    std::vector<char> buf(128);
 
     for (std::size_t i = 0; i < max_vocab_size; i++) {
-
         uint32_t len;
         fin.read((char *)&len, sizeof(len));
 
-        std::string word;
-        word.resize(len);
-        fin.read((char *)word.data(), len);
+        buf.resize(len);
+        fin.read((char *) buf.data(), len);
+        word.assign(buf.data(), len);
 
         float score;
         fin.read((char *)&score, sizeof(score));
