@@ -350,6 +350,14 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
     static size_t buf_size = 256u * 1024 * 1024;
     static void * buf = malloc(buf_size);
 
+    // use 2 scratch buffers
+    // TODO: very hacky solution - reimplement in a more elegant way
+    static size_t scr0_size = 256u*1024*1024;
+    static void * scr0 = malloc(scr0_size);
+
+    static size_t scr1_size = 256u*1024*1024;
+    static void * scr1 = malloc(scr1_size);
+
     if (mem_per_token > 0 && mem_per_token * N > buf_size) {
         const size_t buf_size_new = 1.1 * (mem_per_token * N); // add 10% to account for ggml object overhead
         // printf("\n%s: reallocating buffer from %zu to %zu bytes\n", __func__,
@@ -382,6 +390,8 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
 
         struct ggml_tensor * cur;
 
+        ggml_set_scratch(ctx0, { 0, scr0_size, scr0, });
+
         // a = self.ln_1(x)
         {
             cur = ggml_norm(ctx0, inpL);
@@ -394,7 +404,6 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
         //  attn_bias=attn_bias, attention_mask=attention_mask,
         //  is_causal=is_causal)
         {
-
             // compute QKV
             cur = ggml_mul_mat(ctx0, model.layers[il].c_attn_wqkv_weight, cur);
 
@@ -477,6 +486,8 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
 
         inpL = ggml_add(ctx0, inpL, cur);
 
+        ggml_set_scratch(ctx0, { 0, scr1_size, scr1, });
+
         // m = self.ln_2(x)
         {
             cur = ggml_norm(ctx0, inpL);
@@ -501,12 +512,16 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
         inpL = ggml_add(ctx0, inpL, cur);
     }
 
+    ggml_set_scratch(ctx0, { 0, scr0_size, scr0, });
+
     // norm
     {
         inpL = ggml_norm(ctx0, inpL);
         // inpL = ln_f_g*inpL
         inpL = ggml_mul(ctx0, ggml_repeat(ctx0, model.norm_f_weight, inpL), inpL);
     }
+
+    ggml_set_scratch(ctx0, { 0, 0, nullptr, });
 
     // output embedding weight tied to input embedding
     inpL = ggml_mul_mat(ctx0, model.wte_weight, inpL);
