@@ -195,6 +195,8 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
 
         ctx_size += (6 + 12*n_layer)*512; // object overhead
 
+        ctx_size += 10 * 1024 * 1024; // TODO: tune this
+
         printf("%s: ggml ctx size = %6.2f MB\n", __func__, ctx_size/(1024.0*1024.0));
     }
 
