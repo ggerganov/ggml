@@ -99,6 +99,7 @@ byte_decoder = {v:k for k, v in byte_encoder.items()}
 counter = 0
 # sort by value
 for key in sorted(encoder, key=encoder.get):
+    # workaround for key error when c = whitespace
     text=""
     for c in key:
         if c == " ":
@@ -110,6 +111,7 @@ for key in sorted(encoder, key=encoder.get):
     fout.write(text)
     counter += 1
 
+# Repeat last token until vocab_size
 while counter < vocab_size:
     fout.write(struct.pack("i", len(text)))
     fout.write(text)
