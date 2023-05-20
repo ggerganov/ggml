@@ -71,15 +71,16 @@ std::pair<std::vector<std::size_t>, float> encode_word(const std::string & word,
 }
 
 bool replit_tokenizer_load(replit_tokenizer & tokenizer, std::istream & fin, int max_vocab_size) {
+    std::string word;
+    std::vector<char> buf(128);
 
     for (std::size_t i = 0; i < max_vocab_size; i++) {
-
         uint32_t len;
         fin.read((char *)&len, sizeof(len));
 
-        std::string word;
-        word.resize(len);
-        fin.read((char *)word.data(), len);
+        buf.resize(len);
+        fin.read((char *) buf.data(), len);
+        word.assign(buf.data(), len);
 
         float score;
         fin.read((char *)&score, sizeof(score));
@@ -128,12 +129,12 @@ std::string replit_tokenizer_detokenize(replit_tokenizer & tokenizer, const std:
 
 // no defaults for now
 struct mpt_hparams {
-    int32_t d_model = 0;
+    int32_t d_model     = 0;
     int32_t max_seq_len = 0;
-    int32_t n_heads = 0;
-    int32_t n_layers = 0;
-    int32_t n_vocab = 0;
-    int32_t ftype = 0;
+    int32_t n_heads     = 0;
+    int32_t n_layers    = 0;
+    int32_t n_vocab     = 0;
+    int32_t ftype       = 0;
 };
 
 struct replit_layer {
@@ -194,19 +195,24 @@ bool replit_model_load(const std::string & fname, replit_model & model, replit_t
     {
         auto & hparams = model.hparams;
 
-        fin.read((char *)&hparams.d_model, sizeof(hparams.d_model));
-        fin.read((char *)&hparams.max_seq_len, sizeof(hparams.max_seq_len));
-        fin.read((char *)&hparams.n_heads, sizeof(hparams.n_heads));
-        fin.read((char *)&hparams.n_layers, sizeof(hparams.n_layers));
-        fin.read((char *)&hparams.n_vocab, sizeof(hparams.n_vocab));
-        fin.read((char *)&hparams.ftype, sizeof(hparams.ftype));
+        fin.read((char *) &hparams.d_model,     sizeof(hparams.d_model));
+        fin.read((char *) &hparams.max_seq_len, sizeof(hparams.max_seq_len));
+        fin.read((char *) &hparams.n_heads,     sizeof(hparams.n_heads));
+        fin.read((char *) &hparams.n_layers,    sizeof(hparams.n_layers));
+        fin.read((char *) &hparams.n_vocab,     sizeof(hparams.n_vocab));
+        fin.read((char *) &hparams.ftype,   sizeof(hparams.ftype));
 
-        printf("%s: d_model       = %d\n", __func__, hparams.d_model);
-        printf("%s: max_seq_len   = %d\n", __func__, hparams.max_seq_len);
-        printf("%s: n_heads       = %d\n", __func__, hparams.n_heads);
-        printf("%s: n_layers      = %d\n", __func__, hparams.n_layers);
-        printf("%s: n_vocab      = %d\n", __func__, hparams.n_vocab);
-        printf("%s: ftype   = %d\n", __func__, hparams.ftype);
+        const int32_t qntvr = hparams.ftype / GGML_QNT_VERSION_FACTOR;
+
+        printf("%s: d_model     = %d\n", __func__, hparams.d_model);
+        printf("%s: max_seq_len = %d\n", __func__, hparams.max_seq_len);
+        printf("%s: n_heads     = %d\n", __func__, hparams.n_heads);
+        printf("%s: n_layers    = %d\n", __func__, hparams.n_layers);
+        printf("%s: n_vocab     = %d\n", __func__, hparams.n_vocab);
+        printf("%s: ftype       = %d\n", __func__, hparams.ftype);
+        printf("%s: qntvr       = %d\n", __func__, qntvr);
+
+        hparams.ftype %= GGML_QNT_VERSION_FACTOR;
     }
 
     // load vocab
@@ -618,6 +624,8 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
 }
 
 int main(int argc, char ** argv) {
+    ggml_time_init();
+
     const int64_t t_main_start_us = ggml_time_us();
 
     gpt_params params;

@@ -20,15 +20,15 @@
 
 // no defaults for now
 struct mpt_hparams {
-    int32_t n_ctx = 4096;
-    int32_t d_model = 0;
-    int32_t max_seq_len = 0;
-    int32_t n_heads = 0;
-    int32_t n_layers = 0;
-    int32_t n_vocab = 0;
+    int32_t n_ctx        = 4096;
+    int32_t d_model      = 0;
+    int32_t max_seq_len  = 0;
+    int32_t n_heads      = 0;
+    int32_t n_layers     = 0;
+    int32_t n_vocab      = 0;
     float alibi_bias_max = 0;
-    float clip_qkv = 0;
-    int32_t ftype = 0;
+    float clip_qkv       = 0;
+    int32_t ftype        = 0;
 };
 
 struct mpt_layer {
@@ -87,14 +87,16 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
     {
         auto & hparams = model.hparams;
 
-        fin.read((char *)&hparams.d_model, sizeof(hparams.d_model));
-        fin.read((char *)&hparams.max_seq_len, sizeof(hparams.max_seq_len));
-        fin.read((char *)&hparams.n_heads, sizeof(hparams.n_heads));
-        fin.read((char *)&hparams.n_layers, sizeof(hparams.n_layers));
-        fin.read((char *)&hparams.n_vocab, sizeof(hparams.n_vocab));
-        fin.read((char *)&hparams.alibi_bias_max, sizeof(hparams.alibi_bias_max));
-        fin.read((char *)&hparams.clip_qkv, sizeof(hparams.clip_qkv));
-        fin.read((char *)&hparams.ftype, sizeof(hparams.ftype));
+        fin.read((char *) &hparams.d_model,        sizeof(hparams.d_model));
+        fin.read((char *) &hparams.max_seq_len,    sizeof(hparams.max_seq_len));
+        fin.read((char *) &hparams.n_heads,        sizeof(hparams.n_heads));
+        fin.read((char *) &hparams.n_layers,       sizeof(hparams.n_layers));
+        fin.read((char *) &hparams.n_vocab,        sizeof(hparams.n_vocab));
+        fin.read((char *) &hparams.alibi_bias_max, sizeof(hparams.alibi_bias_max));
+        fin.read((char *) &hparams.clip_qkv,       sizeof(hparams.clip_qkv));
+        fin.read((char *) &hparams.ftype,          sizeof(hparams.ftype));
+
+        const int32_t qntvr = hparams.ftype / GGML_QNT_VERSION_FACTOR;
 
         printf("%s: d_model        = %d\n", __func__, hparams.d_model);
         printf("%s: max_seq_len    = %d\n", __func__, hparams.max_seq_len);
@@ -104,19 +106,25 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
         printf("%s: alibi_bias_max = %f\n", __func__, hparams.alibi_bias_max);
         printf("%s: clip_qkv       = %f\n", __func__, hparams.clip_qkv);
         printf("%s: ftype          = %d\n", __func__, hparams.ftype);
+        printf("%s: qntvr          = %d\n", __func__, qntvr);
+
+        hparams.ftype %= GGML_QNT_VERSION_FACTOR;
     }
 
     // load vocab
     {
-        int32_t n_vocab = model.hparams.n_vocab;
+        const int32_t n_vocab = model.hparams.n_vocab;
 
         std::string word;
+        std::vector<char> buf(128);
+
         for (int i = 0; i < n_vocab; i++) {
             uint32_t len;
-            fin.read((char *)&len, sizeof(len));
+            fin.read((char *) &len, sizeof(len));
 
-            word.resize(len);
-            fin.read((char *)word.data(), len);
+            buf.resize(len);
+            fin.read((char *) buf.data(), len);
+            word.assign(buf.data(), len);
 
             vocab.token_to_id[word] = i;
             vocab.id_to_token[i] = word;
@@ -533,6 +541,8 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
 }
 
 int main(int argc, char ** argv) {
+    ggml_time_init();
+
     const int64_t t_main_start_us = ggml_time_us();
 
     gpt_params params;
