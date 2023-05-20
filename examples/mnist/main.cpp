@@ -199,6 +199,7 @@ int mnist_eval(
 }
 
 int main(int argc, char ** argv) {
+    ggml_time_init();
 
     if (argc != 3) {
         fprintf(stderr, "Usage: %s models/mnist/ggml-model-f32.bin models/mnist/t10k-images.idx3-ubyte\n", argv[0]);
