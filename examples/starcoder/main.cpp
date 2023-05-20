@@ -416,6 +416,14 @@ bool starcoder_eval(
     static size_t buf_size = 256u*1024*1024;
     static void * buf = malloc(buf_size);
 
+    // use 2 scratch buffers
+    // TODO: very hacky solution - reimplement in a more elegant way
+    static size_t scr0_size = 128u*1024*1024;
+    static void * scr0 = malloc(scr0_size);
+
+    static size_t scr1_size = 128u*1024*1024;
+    static void * scr1 = malloc(scr1_size);
+
     if (mem_per_token > 0 && mem_per_token*N > buf_size) {
         const size_t buf_size_new = 1.1*(mem_per_token*N); // add 10% to account for ggml object overhead
         //printf("\n%s: reallocating buffer from %zu to %zu bytes\n", __func__, buf_size, buf_size_new);
@@ -455,6 +463,8 @@ bool starcoder_eval(
 
     for (int il = 0; il < n_layer; ++il) {
         struct ggml_tensor * cur;
+
+        ggml_set_scratch(ctx0, { 0, scr0_size, scr0, });
 
         // norm
         {
@@ -519,7 +529,7 @@ bool starcoder_eval(
                         ggml_reshape_3d(ctx0,
                             ggml_view_1d(ctx0, model.memory_k, (n_past + N)*n_embd, il*n_ctx*ggml_element_size(model.memory_k)*n_embd),
                             n_embd/n_head, n_head, n_past + N),
-                        0, 2, 1, 3); //TODO: need to be tiled 
+                        0, 2, 1, 3); //TODO: need to be tiled
 
             // GG: flash attention
             //struct ggml_tensor * V =
@@ -602,6 +612,8 @@ bool starcoder_eval(
 
         struct ggml_tensor * inpFF = cur;
 
+        ggml_set_scratch(ctx0, { 0, scr1_size, scr1, });
+
         // feed-forward network
         {
             // norm
@@ -658,6 +670,8 @@ bool starcoder_eval(
         inpL = ggml_add(ctx0, cur, inpFF);
     }
 
+    ggml_set_scratch(ctx0, { 0, scr0_size, scr0, });
+
     // norm
     {
         // [ 768, N]
@@ -671,6 +685,8 @@ bool starcoder_eval(
                     inpL),
                 ggml_repeat(ctx0, model.ln_f_b, inpL));
     }
+
+    ggml_set_scratch(ctx0, { 0, 0, nullptr, });
 
     // inpL = WTE * inpL
     // [ 768, 50257] - model.lm_head
@@ -699,7 +715,7 @@ bool starcoder_eval(
     if (mem_per_token == 0) {
         mem_per_token = ggml_used_mem(ctx0)/N;
     }
-    //printf("used_mem = %zu\n", ggml_used_mem(ctx0));
+    //printf("used_mem = %zu MB\n", ggml_used_mem(ctx0)/(1024*1024));
 
     ggml_free(ctx0);
 
