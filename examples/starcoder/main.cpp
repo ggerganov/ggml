@@ -418,10 +418,10 @@ bool starcoder_eval(
 
     // use 2 scratch buffers
     // TODO: very hacky solution - reimplement in a more elegant way
-    static size_t scr0_size = 128u*1024*1024;
+    static size_t scr0_size = 256u*1024*1024;
     static void * scr0 = malloc(scr0_size);
 
-    static size_t scr1_size = 128u*1024*1024;
+    static size_t scr1_size = 256u*1024*1024;
     static void * scr1 = malloc(scr1_size);
 
     if (mem_per_token > 0 && mem_per_token*N > buf_size) {
