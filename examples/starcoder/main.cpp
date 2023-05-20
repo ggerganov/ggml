@@ -766,9 +766,9 @@ int main(int argc, char ** argv) {
     params.n_predict = std::min(params.n_predict, model.hparams.n_ctx - (int) embd_inp.size());
 
     printf("%s: prompt: '%s'\n", __func__, params.prompt.c_str());
-    printf("%s: number of tokens in prompt = %zu, first 8 tokens: ", __func__, embd_inp.size());
-    for (int i = 0; i < std::min(8, (int) embd_inp.size()); i++) {
-        printf("%d ", embd_inp[i]);
+    printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
+    for (int i = 0; i < embd_inp.size(); i++) {
+        printf("%s: token[%d] = %6d, %s\n", __func__, i, embd_inp[i], vocab.id_to_token.at(embd_inp[i]).c_str());
     }
     printf("\n\n");
 
