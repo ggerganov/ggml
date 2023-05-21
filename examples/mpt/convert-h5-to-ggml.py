@@ -5,6 +5,31 @@ import numpy as np
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import sentencepiece.sentencepiece_model_pb2 as model
 
+# ref: https://github.com/openai/gpt-2/blob/master/src/encoder.py
+def bytes_to_unicode():
+
+    """
+    Returns list of utf-8 byte and a corresponding list of unicode strings.
+    The reversible bpe codes work on unicode strings.
+    This means you need a large # of unicode characters in your vocab if you want to avoid UNKs.
+    When you're at something like a 10B token dataset you end up needing around 5K for decent coverage.
+    This is a signficant percentage of your normal, say, 32K bpe vocab.
+    To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
+    And avoids mapping to whitespace/control characters the bpe code barfs on.
+    """
+    bs = list(range(ord("!"), ord("~")+1))+list(range(ord("¡"), ord("¬")+1))+list(range(ord("®"), ord("ÿ")+1))
+    cs = bs[:]
+    n = 0
+    for b in range(2**8):
+        if b not in bs:
+            bs.append(b)
+            cs.append(2**8+n)
+            n += 1
+
+    cs = [chr(n) for n in cs]
+
+    return dict(zip(bs, cs))
+
 if len(sys.argv) < 3:
     print("Usage: convert-h5-to-ggml.py dir-model [use-f32]\n")
     print("  ftype == 0 -> float32")
@@ -62,15 +87,37 @@ fout.write(struct.pack("f", hparams["attn_config"]["alibi_bias_max"]))
 fout.write(struct.pack("f", hparams["attn_config"]["clip_qkv"] or 0.0))
 fout.write(struct.pack("i", ftype))
 
+vocab_size = hparams["vocab_size"]
 
-# TODO: temporary hack to not deal with implementing the tokenizer
-dot_token = tokenizer.encode(".")[0]
-for i in range(hparams["vocab_size"]):
-    text = tokenizer.decode([dot_token, i]).encode("utf-8")
-    # remove the first byte (it's always '.')
-    text = text[1:]
+encoder = tokenizer.vocab
+# Add added_tokens (special tokens) to the encoder
+encoder.update(tokenizer.get_added_vocab())
+
+byte_encoder = bytes_to_unicode()
+byte_decoder = {v:k for k, v in byte_encoder.items()}
+
+counter = 0
+# sort by value
+for key in sorted(encoder, key=encoder.get):
+    # workaround for key error when c = whitespace
+    text=""
+    for c in key:
+        if c == " ":
+            text += " "
+        else:
+            text += chr(byte_decoder[c] )
+    text = bytearray( text, encoding="utf-8" )
     fout.write(struct.pack("i", len(text)))
     fout.write(text)
+    counter += 1
+
+# Repeat last token until vocab_size
+while counter < vocab_size:
+    fout.write(struct.pack("i", len(text)))
+    fout.write(text)
+    counter += 1
+
+# assert counter == config.vocab_size
 
 for name in list_vars.keys():
     data = list_vars[name].squeeze().numpy()
