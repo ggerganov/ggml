@@ -246,20 +246,21 @@ void ggml_graph_export_leaf(const struct ggml_tensor * tensor, FILE * fout) {
     const int64_t * ne = tensor->ne;
     const size_t  * nb = tensor->nb;
 
-    fprintf(fout, "%-6s %-12s %8d %8lld %8lld %8lld %8lld %16zu %16zu %16zu %16zu %16p\n",
+    fprintf(fout, "%-6s %-12s %8d %8lld %8lld %8lld %8lld %16zu %16zu %16zu %16zu %16p %16s\n",
             ggml_type_name(tensor->type),
             ggml_op_name  (tensor->op),
             tensor->n_dims,
             ne[0], ne[1], ne[2], ne[3],
             nb[0], nb[1], nb[2], nb[3],
-            tensor->data);
+            tensor->data,
+            tensor->name);
 }
 
 void ggml_graph_export_node(const struct ggml_tensor * tensor, const char * arg, FILE * fout) {
     const int64_t * ne = tensor->ne;
     const size_t  * nb = tensor->nb;
 
-    fprintf(fout, "%-6s %-6s %-12s %8d %8lld %8lld %8lld %8lld %16zu %16zu %16zu %16zu %8d %16p\n",
+    fprintf(fout, "%-6s %-6s %-12s %8d %8lld %8lld %8lld %8lld %16zu %16zu %16zu %16zu %8d %16p %16s\n",
             arg,
             ggml_type_name(tensor->type),
             ggml_op_name  (tensor->op),
@@ -267,61 +268,84 @@ void ggml_graph_export_node(const struct ggml_tensor * tensor, const char * arg,
             ne[0], ne[1], ne[2], ne[3],
             nb[0], nb[1], nb[2], nb[3],
             tensor->n_tasks,
-            tensor->data);
+            tensor->data,
+            tensor->name);
 }
 
 void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
-    FILE * fout = stdout;
+    // print
+    {
+        FILE * fout = stdout;
 
-    fprintf(fout, "\n");
-    fprintf(fout, "%-16s %8x\n", "magic",   GGML_FILE_MAGIC);
-    fprintf(fout, "%-16s %8d\n", "version", GGML_FILE_VERSION);
-    fprintf(fout, "%-16s %8d\n", "leafs",   cgraph->n_leafs);
-    fprintf(fout, "%-16s %8d\n", "nodes",   cgraph->n_nodes);
+        fprintf(fout, "\n");
+        fprintf(fout, "%-16s %8x\n", "magic",   GGML_FILE_MAGIC);
+        fprintf(fout, "%-16s %8d\n", "version", GGML_FILE_VERSION);
+        fprintf(fout, "%-16s %8d\n", "leafs",   cgraph->n_leafs);
+        fprintf(fout, "%-16s %8d\n", "nodes",   cgraph->n_nodes);
 
-    // header
-    fprintf(fout, "\n");
-    fprintf(fout, "%-6s %-12s %8s %8s %8s %8s %8s %16s %16s %16s %16s %16s\n",
-            "TYPE", "OP", "NDIMS", "NE0", "NE1", "NE2", "NE3", "NB0", "NB1", "NB2", "NB3", "DATA");
+        // header
+        fprintf(fout, "\n");
+        fprintf(fout, "%-6s %-12s %8s %8s %8s %8s %8s %16s %16s %16s %16s %16s %16s\n",
+                "TYPE", "OP", "NDIMS", "NE0", "NE1", "NE2", "NE3", "NB0", "NB1", "NB2", "NB3", "DATA", "NAME");
 
-    for (int i = 0; i < cgraph->n_leafs; ++i) {
-        const int64_t * ne = cgraph->leafs[i]->ne;
-        const size_t  * nb = cgraph->leafs[i]->nb;
+        for (int i = 0; i < cgraph->n_leafs; ++i) {
+            ggml_graph_export_leaf(cgraph->leafs[i], fout);
 
-        ggml_graph_export_leaf(cgraph->leafs[i], fout);
-
-        GGML_ASSERT(cgraph->leafs[i]->op   == GGML_OP_NONE);
-        GGML_ASSERT(cgraph->leafs[i]->src0 == NULL);
-        GGML_ASSERT(cgraph->leafs[i]->src1 == NULL);
-    }
-
-    // header
-    fprintf(fout, "\n");
-    fprintf(fout, "%-6s %-6s %-12s %8s %8s %8s %8s %8s %16s %16s %16s %16s %8s %16s\n",
-            "ARG", "TYPE", "OP", "NDIMS", "NE0", "NE1", "NE2", "NE3", "NB0", "NB1", "NB2", "NB3", "NTASKS", "DATA");
-
-    for (int i = 0; i < cgraph->n_nodes; ++i) {
-        const int64_t * ne = cgraph->nodes[i]->ne;
-        const size_t  * nb = cgraph->nodes[i]->nb;
-
-        ggml_graph_export_node(cgraph->nodes[i], "DST", fout);
-
-        if (cgraph->nodes[i]->src0) {
-            ggml_graph_export_node(cgraph->nodes[i]->src0, "SRC0", fout);
+            GGML_ASSERT(cgraph->leafs[i]->op   == GGML_OP_NONE);
+            GGML_ASSERT(cgraph->leafs[i]->src0 == NULL);
+            GGML_ASSERT(cgraph->leafs[i]->src1 == NULL);
         }
 
-        if (cgraph->nodes[i]->src1) {
-            ggml_graph_export_node(cgraph->nodes[i]->src1, "SRC1", fout);
-        }
+        // header
+        fprintf(fout, "\n");
+        fprintf(fout, "%-6s %-6s %-12s %8s %8s %8s %8s %8s %16s %16s %16s %16s %8s %16s %16s\n",
+                "ARG", "TYPE", "OP", "NDIMS", "NE0", "NE1", "NE2", "NE3", "NB0", "NB1", "NB2", "NB3", "NTASKS", "DATA", "NAME");
 
-        for (int j = 0; j < GGML_MAX_OPT; ++j) {
-            if (cgraph->nodes[i]->opt[j]) {
-                ggml_graph_export_node(cgraph->nodes[i]->opt[j], "OPT", fout);
+        for (int i = 0; i < cgraph->n_nodes; ++i) {
+            ggml_graph_export_node(cgraph->nodes[i], "DST", fout);
+
+            if (cgraph->nodes[i]->src0) {
+                ggml_graph_export_node(cgraph->nodes[i]->src0, "SRC0", fout);
             }
+
+            if (cgraph->nodes[i]->src1) {
+                ggml_graph_export_node(cgraph->nodes[i]->src1, "SRC1", fout);
+            }
+
+            for (int j = 0; j < GGML_MAX_OPT; ++j) {
+                if (cgraph->nodes[i]->opt[j]) {
+                    ggml_graph_export_node(cgraph->nodes[i]->opt[j], "OPT", fout);
+                }
+            }
+
+            fprintf(fout, "\n");
         }
 
         fprintf(fout, "\n");
     }
 
-    fprintf(fout, "\n");
+    // write binary data
+    {
+        FILE * fout = fopen(fname, "wb");
+
+        if (!fout) {
+            fprintf(stderr, "%s: failed to open %s\n", __func__, fname);
+            return;
+        }
+
+        // header
+        {
+            uint32_t magic   = GGML_FILE_MAGIC;
+            uint32_t version = GGML_FILE_VERSION;
+            uint32_t leafs   = cgraph->n_leafs;
+            uint32_t nodes   = cgraph->n_nodes;
+
+            fwrite(&magic,   sizeof(uint32_t), 1, fout);
+            fwrite(&version, sizeof(uint32_t), 1, fout);
+            fwrite(&leafs,   sizeof(uint32_t), 1, fout);
+            fwrite(&nodes,   sizeof(uint32_t), 1, fout);
+        }
+
+        fclose(fout);
+    }
 }
