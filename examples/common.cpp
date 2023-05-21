@@ -212,7 +212,7 @@ void gpt_vocab::add_special_token(const std::string & token) {
     special_tokens.push_back(token);
 }
 
-static void utf8_to_string(std::string const &in, std::string &out) {
+void utf8_to_string(std::string const &in, std::string &out) {
     int elem_len = 1;
 
     std::string u8 = in;
