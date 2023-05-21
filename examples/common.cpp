@@ -212,26 +212,6 @@ void gpt_vocab::add_special_token(const std::string & token) {
     special_tokens.push_back(token);
 }
 
-static void append_utf8(char32_t ch, std::string & out) {
-    if (ch <= 0x7F) {
-        out.push_back(static_cast<unsigned char>(ch));
-    } else if (ch <= 0x7FF) {
-        out.push_back(static_cast<unsigned char>(0xC0 | ((ch >> 6) & 0x1F)));
-        out.push_back(static_cast<unsigned char>(0x80 | (ch & 0x3F)));
-    } else if (ch <= 0xFFFF) {
-        out.push_back(static_cast<unsigned char>(0xE0 | ((ch >> 12) & 0x0F)));
-        out.push_back(static_cast<unsigned char>(0x80 | ((ch >> 6) & 0x3F)));
-        out.push_back(static_cast<unsigned char>(0x80 | (ch & 0x3F)));
-    } else if (ch <= 0x10FFFF) {
-        out.push_back(static_cast<unsigned char>(0xF0 | ((ch >> 18) & 0x07)));
-        out.push_back(static_cast<unsigned char>(0x80 | ((ch >> 12) & 0x3F)));
-        out.push_back(static_cast<unsigned char>(0x80 | ((ch >> 6) & 0x3F)));
-        out.push_back(static_cast<unsigned char>(0x80 | (ch & 0x3F)));
-    } else {
-        printf("Invalid Unicode code point\n");
-    }
-}
-
 static void utf8_to_string(std::string const &in, std::string &out) {
 	int elem_len = 1;
 
