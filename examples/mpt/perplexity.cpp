@@ -18,8 +18,6 @@
 #include <utility>
 #include <vector>
 
-
-
 // no defaults for now
 struct mpt_hparams {
     int32_t d_model      = 0;
@@ -68,7 +66,7 @@ struct mpt_model {
 struct mpt_params {
 
     int32_t n_threads = std::min(4, (int32_t) std::thread::hardware_concurrency());
-	int32_t n_ctx = 512;
+    int32_t n_ctx = 512;
     int32_t n_batch = 8; // batch size for prompt processing
 
     std::string model = ""; // model path
@@ -614,14 +612,9 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
     // ggml_graph_dump_dot(&gf, NULL, "mpt-model.dot");
     // }
 
-
     // return result for all tokens
     embd_w.resize(n_vocab *N);
     memcpy(embd_w.data(), (float *)ggml_get_data(inpL) , sizeof(float) * n_vocab * N);
-
-    // return result for just the last token
-//    embd_w.resize(n_vocab);
-//    memcpy(embd_w.data(), (float *)ggml_get_data(inpL) + (n_vocab * (N - 1)), sizeof(float) * n_vocab);
 
     if (mem_per_token == 0) {
         mem_per_token = ggml_used_mem(ctx0) / N;
@@ -685,7 +678,6 @@ int main(int argc, char ** argv) {
         t_load_us = ggml_time_us() - t_start_us;
     }
 
-
     int64_t t_predict_us = 0;
 
     std::vector<float> logits;
@@ -708,7 +700,6 @@ int main(int argc, char ** argv) {
 
     double nll = 0.0;
     fprintf(stderr, "%s: calculating perplexity over %d chunks, batch_size=%d\n", __func__, n_chunk, n_batch);
-
 
     for (int i = 0; i < n_chunk; ++i) {
 
