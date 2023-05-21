@@ -408,6 +408,129 @@ gpt_vocab::id gpt_sample_top_k_top_p(
     return logits_id[idx].second;
 }
 
+gpt_vocab::id gpt_sample_top_k_top_p_repeat(
+        const gpt_vocab & vocab,
+        const float * logits,
+        const int32_t * last_n_tokens_data,
+        size_t last_n_tokens_data_size,
+        int    top_k,
+        double top_p,
+        double temp,
+        int repeat_last_n,
+        float repeat_penalty,
+        std::mt19937 & rng) {
+
+    int n_logits = vocab.id_to_token.size();
+
+    const auto * plogits = logits;
+
+    const auto last_n_tokens = std::vector<int32_t>(last_n_tokens_data, last_n_tokens_data + last_n_tokens_data_size);
+
+    if (temp <= 0) {
+
+        // select the token with the highest logit directly
+        float max_logit = plogits[0];
+        gpt_vocab::id max_id = 0;
+
+        for (int i = 1; i < n_logits; ++i) {
+            if (plogits[i] > max_logit) {
+                max_logit = plogits[i];
+                max_id = i;
+            }
+        }
+        return max_id;
+    }
+
+
+    std::vector<std::pair<double, gpt_vocab::id>> logits_id;
+    logits_id.reserve(n_logits);
+
+
+    {
+        const float scale = 1.0f/temp;
+        for (int i = 0; i < n_logits; ++i) {
+
+            // repetition penalty from ctrl paper (https://arxiv.org/abs/1909.05858)
+            // credit https://github.com/facebookresearch/llama/compare/main...shawwn:llama:main
+
+            if( repeat_last_n > 0 && std::find(last_n_tokens.end()-repeat_last_n, last_n_tokens.end(), i) != last_n_tokens.end() )
+            {
+                // if score < 0 then repetition penalty has to multiplied to reduce the previous token probability
+                if (plogits[i] < 0.0f) {
+                    logits_id.push_back(std::make_pair(plogits[i]*scale*repeat_penalty, i));
+                } else {
+                    logits_id.push_back(std::make_pair(plogits[i]*scale/repeat_penalty, i));
+                }
+            }
+             else
+            {
+                logits_id.push_back(std::make_pair(plogits[i]*scale, i));
+            }
+        }
+    }
+
+    // find the top K tokens
+    std::partial_sort(
+            logits_id.begin(),
+            logits_id.begin() + top_k, logits_id.end(),
+            [](const std::pair<double, gpt_vocab::id> & a, const std::pair<double, gpt_vocab::id> & b) {
+        return a.first > b.first;
+    });
+
+    logits_id.resize(top_k);
+
+    double maxl = -INFINITY;
+    for (const auto & kv : logits_id) {
+        maxl = std::max(maxl, kv.first);
+    }
+
+    // compute probs for the top K tokens
+    std::vector<double> probs;
+    probs.reserve(logits_id.size());
+
+    double sum = 0.0;
+    for (const auto & kv : logits_id) {
+        double p = exp(kv.first - maxl);
+        probs.push_back(p);
+        sum += p;
+    }
+
+    // normalize the probs
+    for (auto & p : probs) {
+        p /= sum;
+    }
+
+    if (top_p < 1.0f) {
+        double cumsum = 0.0f;
+        for (int i = 0; i < top_k; i++) {
+            cumsum += probs[i];
+            if (cumsum >= top_p) {
+                top_k = i + 1;
+                probs.resize(top_k);
+                logits_id.resize(top_k);
+                break;
+            }
+        }
+
+        cumsum = 1.0/cumsum;
+        for (int i = 0; i < (int) probs.size(); i++) {
+            probs[i] *= cumsum;
+        }
+    }
+
+//    printf("\n");
+//    for (int i = 0; i < (int) probs.size(); i++) {
+//    for (int i = 0; i < 10; i++) {
+//        printf("%d: '%s' %f\n", i, vocab.id_to_token.at(logits_id[i].second).c_str(), probs[i]);
+//    }
+
+    std::discrete_distribution<> dist(probs.begin(), probs.end());
+    int idx = dist(rng);
+
+    return logits_id[idx].second;
+
+}
+
 bool read_wav(const std::string & fname, std::vector<float>& pcmf32, std::vector<std::vector<float>>& pcmf32s, bool stereo) {
     drwav wav;
     std::vector<uint8_t> wav_data; // used for pipe input from stdin
