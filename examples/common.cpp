@@ -212,7 +212,7 @@ void gpt_vocab::add_special_token(const std::string & token) {
     special_tokens.push_back(token);
 }
 
-void append_utf8(char32_t ch, std::string & out) {
+static void append_utf8(char32_t ch, std::string & out) {
     if (ch <= 0x7F) {
         out.push_back(static_cast<unsigned char>(ch));
     } else if (ch <= 0x7FF) {
@@ -228,7 +228,6 @@ void append_utf8(char32_t ch, std::string & out) {
         out.push_back(static_cast<unsigned char>(0x80 | ((ch >> 6) & 0x3F)));
         out.push_back(static_cast<unsigned char>(0x80 | (ch & 0x3F)));
     } else {
-
         printf("Invalid Unicode code point\n");
     }
 }
@@ -238,10 +237,9 @@ std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::stri
 
     // Convert input to utf-8
     std::string utf8conv;
-    for( int w=0; w < text.size(); w++ ) {
+    for (int w = 0; w < text.size(); w++) {
         append_utf8( uint8_t(text[w]), utf8conv);
     }
-    
     
     // first split the text into words
     {
