@@ -69,7 +69,7 @@ struct mpt_params {
     int32_t n_threads = std::min(4, (int32_t) std::thread::hardware_concurrency());
     int32_t n_predict = 200; // new tokens to predict
 
-	int32_t n_ctx = 512;
+    int32_t n_ctx = 512;
 
     // sampling parameters
     int32_t top_k          = 0;
