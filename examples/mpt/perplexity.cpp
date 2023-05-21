@@ -782,8 +782,8 @@ int main(int argc, char ** argv) {
             ++countchunk;
         }
 
-		nll += nllchunk;
-		count += countchunk;
+        nll += nllchunk;
+        count += countchunk;
 
         // perplexity is e^(average negative log-likelihood)
         printf("%d\t%.8lf\t%.8lf\n", i + 1, std::exp(nll / count), std::exp(nllchunk/countchunk) );
