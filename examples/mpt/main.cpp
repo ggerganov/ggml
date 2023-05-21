@@ -127,6 +127,9 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
             fin.read((char *) buf.data(), len);
             word.assign(buf.data(), len);
 
+            // Convert token from utf-8
+            utf8_to_string(word, word);
+
             vocab.token_to_id[word] = i;
             vocab.id_to_token[i] = word;
         }
