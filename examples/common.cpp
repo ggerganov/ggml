@@ -245,7 +245,7 @@ static void utf8_to_string(std::string const &in, std::string &out) {
 			out.push_back( u8[i] );
 		} else if (tmp < 0xe0UL) {
 			elem_len = 2;
-            out.push_back( ((u8[i] & 0x1f) << 6) | (u8[i+1] & 0x3f) );
+            		out.push_back( ((u8[i] & 0x1f) << 6) | (u8[i+1] & 0x3f) );
 		} else if (tmp < 0xf0UL) {
 			elem_len = 3;
 			out.push_back( ((u8[i] & 0xf) << 12) | ((u8[i+1] & 0x3f) << 6) | (u8[i+2] & 0x3f) );
@@ -254,13 +254,10 @@ static void utf8_to_string(std::string const &in, std::string &out) {
 			out.push_back( ((u8[i] & 0x7) << 18) | ((u8[i+1] & 0x3f) << 12)	| ((u8[i+2] & 0x3f) << 6) | (u8[i+3] & 0x3f) );
 		} else {
 		
-            printf("Invalid Unicode code point\n");
-            break;
+            		printf("Invalid Unicode code point\n");
+            		break;
 		}
-
-
 	}
-
 }
 
 std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::string & text) {
