@@ -205,6 +205,7 @@ int mnist_eval(
 
     const int prediction = std::max_element(probs_data, probs_data + 10) - probs_data;
 
+    // export the computation graph
     ggml_graph_export(&gf, "mnist.ggml");
 
     ggml_free(ctx0);
