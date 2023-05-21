@@ -232,18 +232,43 @@ static void append_utf8(char32_t ch, std::string & out) {
     }
 }
 
+static void utf8_to_string(std::string const &in, std::string &out) {
+	int elem_len = 1;
+
+	std::string u8 = in;
+	out.clear();
+
+	for (size_t i = 0; i < u8.size(); i += elem_len) {
+		uint32_t tmp = (uint32_t)u8[i] & 0xff;
+		if (tmp < 0x80UL) {
+			elem_len = 1;
+			out.push_back( u8[i] );
+		} else if (tmp < 0xe0UL) {
+			elem_len = 2;
+            out.push_back( ((u8[i] & 0x1f) << 6) | (u8[i+1] & 0x3f) );
+		} else if (tmp < 0xf0UL) {
+			elem_len = 3;
+			out.push_back( ((u8[i] & 0xf) << 12) | ((u8[i+1] & 0x3f) << 6) | (u8[i+2] & 0x3f) );
+		} else if (tmp < 0xf8UL) {
+			elem_len = 4;
+			out.push_back( ((u8[i] & 0x7) << 18) | ((u8[i+1] & 0x3f) << 12)	| ((u8[i+2] & 0x3f) << 6) | (u8[i+3] & 0x3f) );
+		} else {
+		
+            printf("Invalid Unicode code point\n");
+            break;
+		}
+
+
+	}
+
+}
+
 std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::string & text) {
     std::vector<std::string> words;
-
-    // Convert input to utf-8
-    std::string utf8conv;
-    for (int w = 0; w < text.size(); w++) {
-        append_utf8( uint8_t(text[w]), utf8conv);
-    }
     
     // first split the text into words
     {
-        std::string str = utf8conv;
+        std::string str = text;
         std::string pat = R"('s|'t|'re|'ve|'m|'ll|'d| ?[[:alpha:]]+| ?[[:digit:]]+| ?[^\s[:alpha:][:digit:]]+|\s+(?!\S)|\s+)";
 
         // Generate the subpattern from the special_tokens vector if it's not empty
