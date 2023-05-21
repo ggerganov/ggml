@@ -65,7 +65,6 @@ std::map<std::string, int32_t> json_parse(const std::string & fname);
 void append_utf8(char32_t ch, std::string & out);
 void utf8_to_string(std::string const &in, std::string &out);
 
-
 // split text into tokens
 //
 // ref: https://github.com/openai/gpt-2/blob/a74da5d99abaaba920de8131d64da2862a8f213b/src/encoder.py#L53
