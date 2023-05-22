@@ -723,7 +723,7 @@ int main(int argc, char ** argv) {
                 embd.push_back( embd_inp[batch_start+p]  );
             }
 
-            std::vector<float> batch_logits;// = llama_get_logits(ctx);
+            std::vector<float> batch_logits;
 
             const int64_t t_start_us = ggml_time_us();
 
