@@ -8,6 +8,8 @@
 #include <cmath>
 #include <fstream>
 #include <regex>
+#include <locale>
+#include <codecvt>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -212,34 +214,22 @@ void gpt_vocab::add_special_token(const std::string & token) {
     special_tokens.push_back(token);
 }
 
-static void append_utf8(char32_t ch, std::string & out) {
-    if (ch <= 0x7F) {
-        out.push_back(static_cast<unsigned char>(ch));
-    } else if (ch <= 0x7FF) {
-        out.push_back(static_cast<unsigned char>(0xC0 | ((ch >> 6) & 0x1F)));
-        out.push_back(static_cast<unsigned char>(0x80 | (ch & 0x3F)));
-    } else if (ch <= 0xFFFF) {
-        out.push_back(static_cast<unsigned char>(0xE0 | ((ch >> 12) & 0x0F)));
-        out.push_back(static_cast<unsigned char>(0x80 | ((ch >> 6) & 0x3F)));
-        out.push_back(static_cast<unsigned char>(0x80 | (ch & 0x3F)));
-    } else if (ch <= 0x10FFFF) {
-        out.push_back(static_cast<unsigned char>(0xF0 | ((ch >> 18) & 0x07)));
-        out.push_back(static_cast<unsigned char>(0x80 | ((ch >> 12) & 0x3F)));
-        out.push_back(static_cast<unsigned char>(0x80 | ((ch >> 6) & 0x3F)));
-        out.push_back(static_cast<unsigned char>(0x80 | (ch & 0x3F)));
-    } else {
-        printf("Invalid Unicode code point\n");
-    }
+std::string convert_to_utf8(const std::wstring& input) {
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+    return converter.to_bytes(input);
+}
+
+std::wstring convert_to_wstring(const std::string& input) {
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+    return converter.from_bytes(input);
 }
 
 std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::string & text) {
     std::vector<std::string> words;
 
     // Convert input to utf-8
-    std::string utf8conv;
-    for (int w = 0; w < text.size(); w++) {
-        append_utf8( uint8_t(text[w]), utf8conv);
-    }
+    std::wstring text_multibytes = convert_to_wstring(text);
+    std::string utf8conv = convert_to_utf8(text_multibytes);
     
     // first split the text into words
     {
