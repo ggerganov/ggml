@@ -3,6 +3,7 @@
 #include "common-ggml.h"
 #include "common.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -19,10 +20,11 @@
 #include <vector>
 
 // no defaults for now
+// Here `n_ctx` is the max limit for context length.
+// See https://github.com/ggerganov/ggml/pull/165#issuecomment-1556233670
 struct mpt_hparams {
-    int32_t n_ctx        = 4096;
     int32_t d_model      = 0;
-    int32_t max_seq_len  = 0;
+    int32_t n_ctx        = 4096;
     int32_t n_heads      = 0;
     int32_t n_layers     = 0;
     int32_t n_vocab      = 0;
@@ -86,9 +88,10 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
     // load hparams
     {
         auto & hparams = model.hparams;
+        int32_t n_ctx;
 
         fin.read((char *) &hparams.d_model,        sizeof(hparams.d_model));
-        fin.read((char *) &hparams.max_seq_len,    sizeof(hparams.max_seq_len));
+        fin.read((char *) &n_ctx,                  sizeof(hparams.n_ctx));
         fin.read((char *) &hparams.n_heads,        sizeof(hparams.n_heads));
         fin.read((char *) &hparams.n_layers,       sizeof(hparams.n_layers));
         fin.read((char *) &hparams.n_vocab,        sizeof(hparams.n_vocab));
@@ -96,10 +99,11 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
         fin.read((char *) &hparams.clip_qkv,       sizeof(hparams.clip_qkv));
         fin.read((char *) &hparams.ftype,          sizeof(hparams.ftype));
 
+        hparams.n_ctx = std::min(n_ctx, hparams.n_ctx);
         const int32_t qntvr = hparams.ftype / GGML_QNT_VERSION_FACTOR;
 
         printf("%s: d_model        = %d\n", __func__, hparams.d_model);
-        printf("%s: max_seq_len    = %d\n", __func__, hparams.max_seq_len);
+        printf("%s: n_ctx          = %d\n", __func__, hparams.n_ctx);
         printf("%s: n_heads        = %d\n", __func__, hparams.n_heads);
         printf("%s: n_layers       = %d\n", __func__, hparams.n_layers);
         printf("%s: n_vocab        = %d\n", __func__, hparams.n_vocab);
