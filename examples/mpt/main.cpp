@@ -233,7 +233,11 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
             word.assign(buf.data(), len);
 
             // Convert token from utf-8
-            utf8_to_string(word, word);
+            std::wstring word_multibytes = convert_to_wstring( word );
+            word.resize( word_multibytes.size() );
+            for(int w=0;w<word_multibytes.size();w++) {
+                word[w] = uint8_t( word_multibytes[w] );
+            }
 
             vocab.token_to_id[word] = i;
             vocab.id_to_token[i] = word;
