@@ -1,0 +1,8 @@
+Hello World! => Hello, World,!
+I can't believe it's already Friday!" => I, can,'t, believe, it,'s, already, F,riday,!"
+The URL for the website is https://www.example.com." => The, URL, for, the, website, is, https,://,www,.,example,.,com,."
+"She said, 'I love to travel.'" => ",She, said,,, ',I, love, to, travel,.'"
+'The temperature is 25.5°C.' => ',The, temperature, is, ,2,5,.,5,°,C,.'
+"Let's meet at 2:30 p.m. in the park." => ",Let,'s, meet, at, ,2,:,3,0, p,.,m,., in, the, par,k,."
+The book costs $19.99 => The, book, costs, $,1,9,.,9,9
+"John's favorite color is blue." => ",John,'s, favorite, color, is, blue,."
