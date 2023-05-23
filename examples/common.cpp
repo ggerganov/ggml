@@ -10,6 +10,14 @@
 #include <regex>
 #include <locale>
 #include <codecvt>
+#include <sstream>
+#include <filesystem>
+
+#ifdef __APPLE__
+namespace fs = std::__fs::filesystem;
+#else
+namespace fs = std::filesystem;
+#endif
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -283,6 +291,98 @@ std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::stri
 
 
     return tokens;
+}
+
+bool are_strings_equal(const std::vector<std::string>& vec1, const std::vector<std::string>& vec2) {
+    if (vec1.size() != vec2.size()) return false;
+
+    for (size_t i = 0; i < vec1.size(); ++i) 
+        if (vec1[i] != vec2[i]) return false;
+
+    return true;
+}
+
+std::vector<std::string> split_string(const std::string& input, char delimiter) {
+    std::vector<std::string> output;
+    std::stringstream ss(input);
+    std::string token;
+
+    while (std::getline(ss, token, delimiter)) {
+        output.push_back(token);
+    }
+
+    return output;
+}
+
+void test_tokenizer(const std::string & fname, gpt_vocab & vocab){
+
+    std::map<std::string, std::vector<std::string>> tests;
+    
+    // find a test file for the model
+    //  - check if the model filename contains the test filename after stripping '.txt'
+    //  - for instance, 'dolly-v2-3b' model gets test cases from 'dolly-v2.txt'
+    std::string curr_path = __FILE__;
+    fs::path dir_test = fs::path(curr_path).parent_path() / "prompts";
+    std::string fpath_test = "";
+    for (const auto & entry : fs::directory_iterator(dir_test))
+        if (!entry.is_directory())
+        {
+            std::string t_fname = entry.path().filename().string();
+
+            if (t_fname.length() > 4 && t_fname.substr(t_fname.length() - 4) == ".txt") 
+                t_fname = t_fname.substr(0, t_fname.length() - 4);
+                
+                if (fname.find(t_fname) != std::string::npos)
+                    fpath_test = entry.path().string();
+        }
+
+    if (fpath_test.empty()) fprintf(stderr, "%s : No test cases found.\n", __func__);
+
+    auto fin = std::ifstream(fpath_test, std::ios_base::in);
+    const char * delimeter = " => ";
+    const char del_tok = ',';
+    std::string line;
+    while (std::getline(fin, line)) {
+        size_t delimiterPos = line.find(delimeter);
+        if (delimiterPos != std::string::npos) {
+            std::string text = line.substr(0, delimiterPos);
+            std::string tokens = line.substr(delimiterPos + std::strlen(delimeter));
+            tests[text] = split_string(tokens, del_tok);
+        }
+    }
+
+    bool succeed = true;
+
+    for (const auto & test : tests) {
+        std::vector<gpt_vocab::id> tokens = gpt_tokenize(vocab, test.first);
+        std::vector<std::string> tokens_in_str; 
+        
+        for (const auto & t : tokens)
+            tokens_in_str.push_back(vocab.id_to_token[t]);
+        
+        if (!are_strings_equal(tokens_in_str, test.second)){
+            
+            succeed = false;
+
+            // print out failure cases
+            fprintf(stderr, "%s : failed test: '%s'\n", __func__, test.first.c_str());
+            fprintf(stderr, "%s : tokens in huggingface: ", __func__);
+            for (const auto & t : test.second) {
+                fprintf(stderr, "%s, ", t.c_str());
+            }
+            fprintf(stderr, "\n");
+            fprintf(stderr, "%s : tokens in ggml:      ", __func__);
+            for (const auto & t : tokens_in_str) {
+                fprintf(stderr, "%s, ", t.c_str());
+            }
+            fprintf(stderr, "\n");
+            
+        }
+    }
+
+    if (succeed)
+        fprintf(stderr, "%s : All tests passed.\n", __func__);
+
 }
 
 bool gpt_vocab_init(const std::string & fname, gpt_vocab & vocab) {

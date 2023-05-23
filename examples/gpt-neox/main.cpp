@@ -74,65 +74,6 @@ struct gpt_neox_model {
     std::map<std::string, struct ggml_tensor *> tensors;
 };
 
-bool are_strings_equal(const std::vector<std::string>& vec1, const std::vector<std::string>& vec2) {
-    if (vec1.size() != vec2.size()) return false;
-
-    for (size_t i = 0; i < vec1.size(); ++i) 
-        if (vec1[i] != vec2[i]) return false;
-
-    return true;
-}
-
-void test_tokenizer(const std::string & fname, gpt_vocab & vocab){
-
-    static std::map<std::string, std::map<std::string, std::vector<std::string>>> tests = {
-        {"common",  {{ "a b c", { "a", " b", " c" }}, 
-                    { " a b c",       { " a", " b", " c" }},
-                    { "a b c!",      { "a", " b", " c", "!" }}}},
-        {"polyglot-ko", {{ "이것은 테스트 이다.",      { "이것", "은", " 테스트", " 이다", "."}},
-                        { "걱정할 필요 없다.",      { "걱정", "할", " 필요", " 없", "다", "."}},
-                        { "버그는 언젠가 고쳐진다.",      { "버그", "는", " 언젠가",  " 고쳐", "진다", "."}}}},
-    };
-
-    bool succeed = true;
-
-    for (const auto & test : tests) {
-        
-        if (test.first == "common" || fname.find(test.first) != std::string::npos){ // test only necessary
-            
-            for (const auto & tcase : test.second){
-                std::vector<gpt_vocab::id> tokens = gpt_tokenize(vocab, tcase.first);
-                std::vector<std::string> tokens_in_str; 
-                
-                for (const auto & t : tokens)
-                    tokens_in_str.push_back(vocab.id_to_token[t]);
-                
-                if (!are_strings_equal(tokens_in_str, tcase.second)){
-                    
-                    succeed = false;
-
-                    // print out failure cases
-                    fprintf(stderr, "%s : failed test: '%s'\n", __func__, tcase.first.c_str());
-                    fprintf(stderr, "%s : expected tokens: ", __func__);
-                    for (const auto & t : tcase.second) {
-                        fprintf(stderr, "%s, ", t.c_str());
-                    }
-                    fprintf(stderr, "\n");
-                    fprintf(stderr, "%s : got tokens:      ", __func__);
-                    for (const auto & t : tokens_in_str) {
-                        fprintf(stderr, "%s, ", t.c_str());
-                    }
-                    fprintf(stderr, "\n");
-                }
-            }
-        }
-    }
-
-    if (succeed)
-        fprintf(stderr, "%s : All tests passed.\n", __func__);
-
-}
-
 // load the model's weights from a file
 bool gpt_neox_model_load(const std::string & fname, gpt_neox_model & model, gpt_vocab & vocab) {
     printf("%s: loading model from '%s' - please wait ...\n", __func__, fname.c_str());
