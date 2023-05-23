@@ -1,0 +1,18 @@
+# test case format
+# <language>: <sentence>
+
+English: Hello World!
+English: I can't believe it's already Friday!"
+English: The URL for the website is https://www.example.com."
+English: "She said, 'I love to travel.'"
+English: 'The temperature is 25.5°C.'
+English: "Let's meet at 2:30 p.m. in the park."
+English: The book costs $19.99
+English: "John's favorite color is blue."
+Korean: 이것은 테스트 이다.
+Korean: 걱정할 필요 없다.
+Korean: 버그는 언젠가 고쳐진다.
+Japanese: 明日の天気はどうですか。
+Chinese: 请问洗手间在哪里？
+Emoji: I'm feeling 😄 today!
+Unicode: ◑ ▢ ▣ ◱
