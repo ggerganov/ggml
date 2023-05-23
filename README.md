@@ -2,8 +2,6 @@
 
 Tensor library for machine learning
 
-**⚠️ The quantization formats Q4 and Q8 have been updated: https://github.com/ggerganov/llama.cpp/pull/1508 - requantize any old models**
-
 ***Note that this project is under development and not ready for production use. \
 Some of the development is currently happening in the [llama.cpp](https://github.com/ggerganov/llama.cpp) and [whisper.cpp](https://github.com/ggerganov/whisper.cpp) repos***
 
@@ -11,11 +9,11 @@ Some of the development is currently happening in the [llama.cpp](https://github
 
 - Written in C
 - 16-bit float support
-- 4-bit integer quantization support
-- Automatic differentiation (WIP in progress)
+- Integer quantization support (4-bit, 5-bit, 8-bit, etc.)
+- Automatic differentiation
 - ADAM and L-BFGS optimizers
-- Optimized for Apple silicon via NEON intrinsics and Accelerate framework
-- On x86 architectures utilzes AVX intrinsics
+- Optimized for Apple Silicon
+- On x86 architectures utilizes AVX / AVX2 intrinsics
 - No third-party dependencies
 - Zero memory allocations during runtime
 
