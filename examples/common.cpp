@@ -222,26 +222,12 @@ void gpt_vocab::add_special_token(const std::string & token) {
     special_tokens.push_back(token);
 }
 
-std::string convert_to_utf8(const std::wstring& input) {
-    std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-    return converter.to_bytes(input);
-}
-
-std::wstring convert_to_wstring(const std::string& input) {
-    std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-    return converter.from_bytes(input);
-}
-
 std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::string & text) {
     std::vector<std::string> words;
 
-    // Convert input to utf-8
-    std::wstring text_multibytes = convert_to_wstring(text);
-    std::string utf8conv = convert_to_utf8(text_multibytes);
-    
     // first split the text into words
     {
-        std::string str = utf8conv;
+        std::string str = text;
         std::string pat = R"('s|'t|'re|'ve|'m|'ll|'d| ?[[:alpha:]]+| ?[[:digit:]]+| ?[^\s[:alpha:][:digit:]]+|\s+(?!\S)|\s+)";
 
         // Generate the subpattern from the special_tokens vector if it's not empty
