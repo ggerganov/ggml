@@ -119,6 +119,10 @@ std::string replace(const std::string & s, const std::string & from, const std::
     return result;
 }
 
+void gpt_vocab::add_special_token(const std::string & token) {
+    special_tokens.push_back(token);
+}
+
 std::map<std::string, int32_t> json_parse(const std::string & fname) {
     std::map<std::string, int32_t> result;
 
@@ -210,10 +214,6 @@ std::map<std::string, int32_t> json_parse(const std::string & fname) {
     return result;
 }
 
-void gpt_vocab::add_special_token(const std::string & token) {
-    special_tokens.push_back(token);
-}
-
 std::string convert_to_utf8(const std::wstring & input) {
     std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
     return converter.to_bytes(input);
@@ -226,7 +226,7 @@ std::wstring convert_to_wstring(const std::string & input) {
 
 std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::string & text) {
     std::vector<std::string> words;
-    
+
     // first split the text into words
     {
         std::string str = text;
