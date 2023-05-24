@@ -197,10 +197,13 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
         fin.read((char *) &hparams.clip_qkv,       sizeof(hparams.clip_qkv));
         fin.read((char *) &hparams.ftype,          sizeof(hparams.ftype));
 
+        hparams.n_ctx = std::min(hparams.max_seq_len, hparams.n_ctx);
+
         const int32_t qntvr = hparams.ftype / GGML_QNT_VERSION_FACTOR;
 
         printf("%s: d_model        = %d\n", __func__, hparams.d_model);
         printf("%s: max_seq_len    = %d\n", __func__, hparams.max_seq_len);
+        printf("%s: n_ctx          = %d\n", __func__, hparams.n_ctx);
         printf("%s: n_heads        = %d\n", __func__, hparams.n_heads);
         printf("%s: n_layers       = %d\n", __func__, hparams.n_layers);
         printf("%s: n_vocab        = %d\n", __func__, hparams.n_vocab);
@@ -304,30 +307,29 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
 
         model.layers.resize(n_layer);
 
-        model.wte_weight = ggml_new_tensor_2d(ctx, wtype, n_embd, n_vocab);
+        model.wte_weight    = ggml_new_tensor_2d(ctx, wtype, n_embd, n_vocab);
         model.norm_f_weight = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
 
         // map by name
-        model.tensors["transformer.wte.weight"] = model.wte_weight;
+        model.tensors["transformer.wte.weight"]    = model.wte_weight;
         model.tensors["transformer.norm_f.weight"] = model.norm_f_weight;
 
         for (int i = 0; i < (int) n_layer; ++i) {
             auto & layer = model.layers[i];
 
-            layer.norm_1_weight = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
-            layer.c_attn_wqkv_weight = ggml_new_tensor_2d(ctx, wtype, n_embd, 3 * n_embd);
-            layer.c_attn_out_proj_weight = ggml_new_tensor_2d(ctx, wtype, n_embd, n_embd);
-            layer.norm_2_weight = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
-            layer.ffn_up_proj = ggml_new_tensor_2d(ctx, wtype, n_embd, 4 * n_embd);
-            layer.ffn_down_proj = ggml_new_tensor_2d(ctx, wtype, 4 * n_embd, n_embd);
+            layer.norm_1_weight          = ggml_new_tensor_1d(ctx, GGML_TYPE_F32,     n_embd);
+            layer.c_attn_wqkv_weight     = ggml_new_tensor_2d(ctx, wtype,             n_embd, 3 * n_embd);
+            layer.c_attn_out_proj_weight = ggml_new_tensor_2d(ctx, wtype,             n_embd,     n_embd);
+            layer.norm_2_weight          = ggml_new_tensor_1d(ctx, GGML_TYPE_F32,     n_embd);
+            layer.ffn_up_proj            = ggml_new_tensor_2d(ctx, wtype,             n_embd, 4 * n_embd);
+            layer.ffn_down_proj          = ggml_new_tensor_2d(ctx, wtype,         4 * n_embd,     n_embd);
 
             // map by name
-            model.tensors["transformer.blocks." + std::to_string(i) + ".norm_1.weight"] = layer.norm_1_weight;
-            model.tensors["transformer.blocks." + std::to_string(i) + ".attn.Wqkv.weight"] = layer.c_attn_wqkv_weight;
-            model.tensors["transformer.blocks." + std::to_string(i) + ".attn.out_proj.weight"] =
-                layer.c_attn_out_proj_weight;
-            model.tensors["transformer.blocks." + std::to_string(i) + ".norm_2.weight"] = layer.norm_2_weight;
-            model.tensors["transformer.blocks." + std::to_string(i) + ".ffn.up_proj.weight"] = layer.ffn_up_proj;
+            model.tensors["transformer.blocks." + std::to_string(i) + ".norm_1.weight"]        = layer.norm_1_weight;
+            model.tensors["transformer.blocks." + std::to_string(i) + ".attn.Wqkv.weight"]     = layer.c_attn_wqkv_weight;
+            model.tensors["transformer.blocks." + std::to_string(i) + ".attn.out_proj.weight"] = layer.c_attn_out_proj_weight;
+            model.tensors["transformer.blocks." + std::to_string(i) + ".norm_2.weight"]        = layer.norm_2_weight;
+            model.tensors["transformer.blocks." + std::to_string(i) + ".ffn.up_proj.weight"]   = layer.ffn_up_proj;
             model.tensors["transformer.blocks." + std::to_string(i) + ".ffn.down_proj.weight"] = layer.ffn_down_proj;
         }
     }
@@ -336,11 +338,11 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
     {
         const auto & hparams = model.hparams;
 
-        const size_t n_embd = hparams.d_model;
+        const size_t n_embd  = hparams.d_model;
         const size_t n_layer = hparams.n_layers;
 
-        const int64_t n_mem = n_layer * n_ctx;
-        const int64_t n_elements = n_embd * n_mem;
+        const int64_t n_mem      = n_layer * n_ctx;
+        const int64_t n_elements = n_embd  * n_mem;
 
         model.memory_k = ggml_new_tensor_1d(ctx, GGML_TYPE_F16, n_elements);
         model.memory_v = ggml_new_tensor_1d(ctx, GGML_TYPE_F16, n_elements);
@@ -690,8 +692,8 @@ int perplexity(mpt_params params) {
     const int64_t t_main_start_us = ggml_time_us();
 
     printf("%s: n_threads = %d\n", __func__, params.n_threads);
-    printf("%s: n_batch = %d\n", __func__, params.n_batch);
-    printf("%s: n_ctx = %d\n", __func__, params.n_ctx);
+    printf("%s: n_batch   = %d\n", __func__, params.n_batch);
+    printf("%s: n_ctx     = %d\n", __func__, params.n_ctx);
     printf("\n");
 
     int64_t t_load_us = 0;
@@ -763,7 +765,7 @@ int perplexity(mpt_params params) {
             const int64_t t_start_us = ggml_time_us();
 
             if (!mpt_eval(model, params.n_threads, j * batch_size, embd, batch_logits, true, mem_per_token)) {
-                printf("Failed to predict\n");
+                printf("%s: failed to evaluate model\n", __func__);
                 return 1;
             }
 
@@ -830,10 +832,9 @@ int perplexity(mpt_params params) {
 
         printf("\n\n");
         printf("%s: mem per token = %8zu bytes\n", __func__, mem_per_token);
-        printf("%s:     load time = %8.2f ms\n", __func__, t_load_us / 1000.0f);
-        printf("%s:  eval time = %8.2f ms / %.2f ms per token\n", __func__, t_predict_us / 1000.0f,
-               t_predict_us / 1000.0f / (n_chunk * params.n_ctx) );
-        printf("%s:    total time = %8.2f ms\n", __func__, (t_main_end_us - t_main_start_us) / 1000.0f);
+        printf("%s:     load time = %8.2f ms\n",   __func__, t_load_us / 1000.0f);
+        printf("%s:     eval time = %8.2f ms / %.2f ms per token\n", __func__, t_predict_us / 1000.0f, t_predict_us / 1000.0f / (n_chunk * params.n_ctx));
+        printf("%s:    total time = %8.2f ms\n",   __func__, (t_main_end_us - t_main_start_us) / 1000.0f);
     }
 
     ggml_free(model.ctx);
@@ -869,7 +870,6 @@ int main(int argc, char ** argv) {
     printf("%s: n_batch   = %d\n",   __func__, params.n_batch);
     printf("%s: n_ctx     = %d\n",   __func__, params.n_ctx);
     printf("%s: n_predict = %d\n\n", __func__, params.n_predict);
-    printf("\n");
 
     std::mt19937 rng(params.seed);
     if (params.prompt.empty()) {
@@ -924,7 +924,6 @@ int main(int argc, char ** argv) {
 
     for (size_t i = 0; i < embd_inp.size(); i++) {
         printf("%s: token[%lu] = %6d\n", __func__, i, embd_inp[i]);
-        // vocab.id_to_token.at(embd_inp[i]).c_str()
     }
     printf("\n");
 
@@ -945,7 +944,7 @@ int main(int argc, char ** argv) {
             const int64_t t_start_us = ggml_time_us();
 
             if (!mpt_eval(model, params.n_threads, n_past, embd, logits, false, mem_per_token)) {
-                printf("Failed to predict\n");
+                printf("%s: failed to predict\n", __func__);
                 return 1;
             }
 
@@ -999,7 +998,6 @@ int main(int argc, char ** argv) {
         // display text
         for (auto id : embd) {
            printf("%s", vocab.id_to_token[id].c_str());
-//            printf("[%i]%s", id, vocab.id_to_token[id].c_str());
         }
         fflush(stdout);
 
@@ -1017,10 +1015,8 @@ int main(int argc, char ** argv) {
         printf("%s: sampled tokens = %8d\n", __func__, n_sampled);
         printf("%s:  mem per token = %8zu bytes\n", __func__, mem_per_token);
         printf("%s:      load time = %8.2f ms\n", __func__, t_load_us / 1000.0f);
-        printf("%s:    sample time = %8.2f ms / %.2f ms per token\n", __func__, t_sample_us / 1000.0f,
-               t_sample_us / 1000.0f / n_sampled);
-        printf("%s:   eval time = %8.2f ms / %.2f ms per token\n", __func__, t_predict_us / 1000.0f,
-               t_predict_us / 1000.0f / n_past);
+        printf("%s:    sample time = %8.2f ms / %.2f ms per token\n", __func__, t_sample_us / 1000.0f, t_sample_us / 1000.0f / n_sampled);
+        printf("%s:      eval time = %8.2f ms / %.2f ms per token\n", __func__, t_predict_us / 1000.0f, t_predict_us / 1000.0f / n_past);
         printf("%s:     total time = %8.2f ms\n", __func__, (t_main_end_us - t_main_start_us) / 1000.0f);
     }
 
