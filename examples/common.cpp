@@ -282,8 +282,9 @@ std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::stri
 bool are_strings_equal(const std::vector<std::string>& vec1, const std::vector<std::string>& vec2) {
     if (vec1.size() != vec2.size()) return false;
 
-    for (size_t i = 0; i < vec1.size(); ++i) 
+    for (size_t i = 0; i < vec1.size(); ++i) {
         if (vec1[i] != vec2[i]) return false;
+    }
 
     return true;
 }
@@ -306,7 +307,7 @@ std::string find_test_file(const std::string & fname){
     std::string curr_path = __FILE__;
     fs::path dir_test = fs::path(curr_path).parent_path() / "prompts";
     std::string fpath_test = "";
-    for (const auto & entry : fs::directory_iterator(dir_test))
+    for (const auto & entry : fs::directory_iterator(dir_test)) {
         if (!entry.is_directory())
         {
             std::string t_fname = entry.path().filename().string();
@@ -317,6 +318,7 @@ std::string find_test_file(const std::string & fname){
                 if (fname.find(t_fname) != std::string::npos)
                     return entry.path().string();
         }
+    }
     
     return ""; // empty string if test file not found
 }
@@ -357,9 +359,10 @@ void test_gpt_tokenizer(const std::string & fname, gpt_vocab & vocab){
         std::vector<gpt_vocab::id> tokens = gpt_tokenize(vocab, test.first);
         std::vector<std::string> tokens_in_str; 
         
-        for (const auto & t : tokens)
+        for (const auto & t : tokens) {
             tokens_in_str.push_back(vocab.id_to_token[t]);
-        
+        }
+
         if (!are_strings_equal(tokens_in_str, test.second)){
             
             succeed = false;
@@ -380,9 +383,9 @@ void test_gpt_tokenizer(const std::string & fname, gpt_vocab & vocab){
         }
     }
 
-    if (succeed)
+    if (succeed) {
         fprintf(stderr, "%s : All tests passed.\n", __func__);
-
+    }
 }
 
 bool gpt_vocab_init(const std::string & fname, gpt_vocab & vocab) {

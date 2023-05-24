@@ -140,9 +140,10 @@ void test_tokenizer_replit(const std::string & fname, replit_tokenizer & vocab){
         std::vector<std::size_t> tokens = replit_tokenizer_tokenize(vocab, test.first);
         std::vector<std::string> tokens_in_str; 
         
-        for (const auto & t : tokens)
+        for (const auto & t : tokens) {
             tokens_in_str.push_back(vocab.raw_vocab.id_to_token[t]);
-        
+        }
+
         if (!are_strings_equal(tokens_in_str, test.second)){
             
             succeed = false;
@@ -163,9 +164,9 @@ void test_tokenizer_replit(const std::string & fname, replit_tokenizer & vocab){
         }
     }
 
-    if (succeed)
+    if (succeed) {
         fprintf(stderr, "%s : All tests passed.\n", __func__);
-
+    }
 }
 
 // no defaults for now
