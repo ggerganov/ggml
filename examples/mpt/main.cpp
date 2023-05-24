@@ -3,18 +3,13 @@
 #include "common-ggml.h"
 #include "common.h"
 
-#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
-#include <cstring>
 #include <fstream>
-#include <iostream>
+#include <cinttypes>
 #include <map>
-#include <stdint.h>
 #include <string>
-#include <unistd.h>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -352,7 +347,7 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
 
         const size_t memory_size = ggml_nbytes(model.memory_k) + ggml_nbytes(model.memory_v);
 
-        printf("%s: memory_size = %8.2f MB, n_mem = %ld\n", __func__, memory_size / 1024.0 / 1024.0, n_mem);
+        printf("%s: memory_size = %8.2f MB, n_mem = %" PRId64 "\n", __func__, memory_size / 1024.0 / 1024.0, n_mem);
     }
 
     // load weights
@@ -878,14 +873,7 @@ int main(int argc, char ** argv) {
 
     std::mt19937 rng(params.seed);
     if (params.prompt.empty()) {
-        if (!isatty(STDIN_FILENO)) {
-            std::string line;
-            while (std::getline(std::cin, line)) {
-                params.prompt = params.prompt + "\n" + line;
-            }
-        } else {
-            params.prompt = gpt_random_prompt(rng);
-        }
+        params.prompt = gpt_random_prompt(rng);
     }
 
     int64_t t_load_us = 0;
