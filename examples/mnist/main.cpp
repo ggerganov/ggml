@@ -208,6 +208,41 @@ int mnist_eval(
     return prediction;
 }
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int wasm_eval(uint8_t *digitPtr)
+{
+    mnist_model model;
+    if (!mnist_model_load("models/mnist/ggml-model-f32.bin", model)) {
+        fprintf(stderr, "error loading model\n");
+        return -1;
+    }
+    std::vector<float> digit(digitPtr, digitPtr + 784);
+    int result = mnist_eval(model, 1, digit);
+    ggml_free(model.ctx);
+    return result;
+}
+
+int wasm_random_digit(char *digitPtr)
+{
+    auto fin = std::ifstream("models/mnist/t10k-images.idx3-ubyte", std::ios::binary);
+    if (!fin) {
+        fprintf(stderr, "failed to open digits file\n");
+        return 0;
+    }
+    srand(time(NULL));
+    // Seek to a random digit: 16-byte header + 28*28 * (random 0 - 10000)
+    fin.seekg(16 + 784 * (rand() % 10000));
+    fin.read(digitPtr, 784);
+    return 1;
+}
+
+#ifdef __cplusplus
+}
+#endif
+
 int main(int argc, char ** argv) {
     srand(time(NULL));
     ggml_time_init();

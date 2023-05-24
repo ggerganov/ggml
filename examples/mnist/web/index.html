@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>MNIST with GGML</title>
+    <script src="mnist.js"></script>
+</head>
+<body>
+    <h2>MNIST digit recognizer with GGML</h2>
+    <p>Draw a single digit on the canvas below:</p>
+    <canvas id="ggCanvas" width="364" height="364" style="border:2px solid #d3d3d3;">
+        Your browser does not support the HTML canvas tag.
+    </canvas>
+    <div>
+        <button id="clear" onclick="onClear()">Clear</button>
+        <button id="random" onclick="onRandom()">Random</button>
+    </div>
+    <div>
+        <p id="prediction"></p>
+    </div>
+    <script>
+"use strict";
+const DIGIT_SIZE = 28; // digits are 28x28 pixels
+var canvas = document.getElementById("ggCanvas");
+var ctx = canvas.getContext("2d");
+var digit = new Array(DIGIT_SIZE*DIGIT_SIZE).fill(0);
+var dragging = false;
+
+function onClear(event) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    digit.fill(0);
+    document.getElementById("prediction").innerHTML = "";
+}
+
+function onRandom(event) {
+    onClear();
+    var buf = Module._malloc(digit.length);
+    if (buf == 0) {
+        console.log("failed to allocate memory");
+        return;
+    }
+    let ret = Module.ccall('wasm_random_digit', null, ['number'], [buf]);
+    let digitBytes = new Uint8Array(Module.HEAPU8.buffer, buf, digit.length);
+    for (let i = 0; i < digit.length; i++) {
+        digit[i] = digitBytes[i];
+        let x = i % DIGIT_SIZE;
+        let y = Math.floor(i / DIGIT_SIZE);
+        setPixel(x, y, digit[i]);
+    }
+    Module._free(buf);
+    onMouseUp();
+}
+
+// Get the position of the mouse relative to the canvas
+function getMousePos(event) {
+    if (event.touches !== undefined && event.touches.length > 0) {
+        event = event.touches[0];
+    }
+    var rect = canvas.getBoundingClientRect();
+    return [Math.floor(event.clientX) - rect.left, Math.floor(event.clientY) - rect.top];
+}
+
+function setPixel(x, y, val) {
+    digit[y * DIGIT_SIZE + x] = val;
+    let canvasX = x * 13;
+    let canvasY = y * 13;
+    let color = 255 - val;
+    ctx.fillStyle = "#" + color.toString(16) + color.toString(16) + color.toString(16);
+    ctx.fillRect(canvasX, canvasY, 13, 13);
+}
+
+function onMouseDown(e) {
+    dragging = true;
+    let [mouseX, mouseY] = getMousePos(e);
+    setPixel(Math.floor(mouseX / 13), Math.floor(mouseY / 13), 255);
+}
+
+function onMouseUp(e) {
+    dragging = false;
+    var buf = Module._malloc(digit.length);
+    if (buf == 0) {
+        console.log("failed to allocate memory");
+        return;
+    }
+    Module.HEAPU8.set(digit, buf);
+    let prediction = Module.ccall('wasm_eval', null, ['number'], [buf]);
+    Module._free(buf);
+    if (prediction >= 0) {
+        document.getElementById("prediction").innerHTML = "Predicted digit is <b>" + prediction + "</b>";
+    }
+}
+function onMouseMove(e) {
+    if (dragging) {
+        let [mouseX, mouseY] = getMousePos(e);
+        setPixel(Math.floor(mouseX / 13), Math.floor(mouseY / 13), 255);
+    }
+}
+
+// Prevent scrolling when touching the canvas
+document.body.addEventListener("touchstart", function (e) {
+if (e.target == canvas) {
+    e.preventDefault();
+}
+}, {passive: false});
+document.body.addEventListener("touchend", function (e) {
+if (e.target == canvas) {
+    e.preventDefault();
+}
+}, {passive: false});
+document.body.addEventListener("touchmove", function (e) {
+if (e.target == canvas) {
+    e.preventDefault();
+}
+}, {passive: false});
+
+// Use the same handlers for mouse and touch events
+canvas.onmousedown = onMouseDown;
+canvas.onmouseup = onMouseUp;
+canvas.onmousemove = onMouseMove;
+canvas.ontouchstart = onMouseDown;
+canvas.ontouchend = onMouseUp;
+canvas.ontouchmove = onMouseMove;
+    </script>
+</body>
+</html>
