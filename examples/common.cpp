@@ -12,12 +12,8 @@
 #include <codecvt>
 #include <sstream>
 #include <filesystem>
-
-#ifdef __APPLE__
-namespace fs = std::__fs::filesystem;
-#else
-namespace fs = std::filesystem;
-#endif
+#include <iostream>
+#include <dirent.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -302,22 +298,32 @@ std::vector<std::string> split_string(const std::string& input, char delimiter) 
 }
 
 std::string find_test_file(const std::string & fname){
+    //
     //  check if the model filename contains the test filename after stripping '.txt'
     //  for instance, 'dolly-v2-3b' model gets test cases from 'dolly-v2.txt'
+    //
+    
     std::string curr_path = __FILE__;
-    fs::path dir_test = fs::path(curr_path).parent_path() / "prompts";
-    std::string fpath_test = "";
-    for (const auto & entry : fs::directory_iterator(dir_test)) {
-        if (!entry.is_directory())
-        {
-            std::string t_fname = entry.path().filename().string();
+    std::string dir_test = curr_path.substr(0, curr_path.find_last_of("/\\") + 1) + "prompts";
 
-            if (t_fname.length() > 4 && t_fname.substr(t_fname.length() - 4) == ".txt") 
-                t_fname = t_fname.substr(0, t_fname.length() - 4);
+    // iterate over files in test directory    
+    DIR *dir;
+    struct dirent *ent;
+    std::string t_fname, t_name; 
+    if ((dir = opendir(dir_test.c_str())) != nullptr) {
+        while ((ent = readdir(dir)) != nullptr) {
+            std::string t_fname = ent->d_name;
+           
+            if (t_fname.length() > 4 && t_fname.substr(t_fname.length() - 4) == ".txt") {
+                // ex) t_fname: dolly-v2.txt, t_name: dolly-v2
+                t_name = t_fname.substr(0, t_fname.length() - 4); 
                 
-                if (fname.find(t_fname) != std::string::npos)
-                    return entry.path().string();
+                if (fname.find(t_name) != std::string::npos) {
+                    return dir_test + "/" + t_fname;
+                }
+            }
         }
+        closedir(dir);
     }
     
     return ""; // empty string if test file not found
