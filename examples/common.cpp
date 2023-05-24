@@ -214,12 +214,12 @@ void gpt_vocab::add_special_token(const std::string & token) {
     special_tokens.push_back(token);
 }
 
-std::string convert_to_utf8(const std::wstring& input) {
+std::string convert_to_utf8(const std::wstring & input) {
     std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
     return converter.to_bytes(input);
 }
 
-std::wstring convert_to_wstring(const std::string& input) {
+std::wstring convert_to_wstring(const std::string & input) {
     std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
     return converter.from_bytes(input);
 }
@@ -412,7 +412,6 @@ gpt_vocab::id gpt_sample_top_k_top_p_repeat(
     const auto last_n_tokens = std::vector<int32_t>(last_n_tokens_data, last_n_tokens_data + last_n_tokens_data_size);
 
     if (temp <= 0) {
-
         // select the token with the highest logit directly
         float max_logit = plogits[0];
         gpt_vocab::id max_id = 0;
@@ -430,25 +429,19 @@ gpt_vocab::id gpt_sample_top_k_top_p_repeat(
     std::vector<std::pair<double, gpt_vocab::id>> logits_id;
     logits_id.reserve(n_logits);
 
-
     {
         const float scale = 1.0f/temp;
         for (int i = 0; i < n_logits; ++i) {
-
             // repetition penalty from ctrl paper (https://arxiv.org/abs/1909.05858)
             // credit https://github.com/facebookresearch/llama/compare/main...shawwn:llama:main
-
-            if( repeat_last_n > 0 && std::find(last_n_tokens.end()-repeat_last_n, last_n_tokens.end(), i) != last_n_tokens.end() )
-            {
+            if (repeat_last_n > 0 && std::find(last_n_tokens.end()-repeat_last_n, last_n_tokens.end(), i) != last_n_tokens.end()) {
                 // if score < 0 then repetition penalty has to multiplied to reduce the previous token probability
                 if (plogits[i] < 0.0f) {
                     logits_id.push_back(std::make_pair(plogits[i]*scale*repeat_penalty, i));
                 } else {
                     logits_id.push_back(std::make_pair(plogits[i]*scale/repeat_penalty, i));
                 }
-            }
-             else
-            {
+            } else {
                 logits_id.push_back(std::make_pair(plogits[i]*scale, i));
             }
         }

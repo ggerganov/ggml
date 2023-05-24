@@ -233,10 +233,10 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
             word.assign(buf.data(), len);
 
             // Convert token from utf-8
-            std::wstring word_multibytes = convert_to_wstring( word );
-            word.resize( word_multibytes.size() );
-            for(int w=0;w<word_multibytes.size();w++) {
-                word[w] = uint8_t( word_multibytes[w] );
+            std::wstring word_multibytes = convert_to_wstring(word);
+            word.resize(word_multibytes.size());
+            for (int w = 0; w < word_multibytes.size(); w++) {
+                word[w] = uint8_t(word_multibytes[w]);
             }
 
             vocab.token_to_id[word] = i;
@@ -316,7 +316,7 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
         model.tensors["transformer.wte.weight"] = model.wte_weight;
         model.tensors["transformer.norm_f.weight"] = model.norm_f_weight;
 
-        for (int i = 0; i < (int)n_layer; ++i) {
+        for (int i = 0; i < (int) n_layer; ++i) {
             auto & layer = model.layers[i];
 
             layer.norm_1_weight = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
@@ -453,11 +453,11 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
 
     const auto & hparams = model.hparams;
 
-    const int n_embd = hparams.d_model;
+    const int n_embd  = hparams.d_model;
     const int n_layer = hparams.n_layers;
-    const int n_head = hparams.n_heads;
+    const int n_head  = hparams.n_heads;
     const int n_vocab = hparams.n_vocab;
-    const int n_ctx = hparams.n_ctx;
+    const int n_ctx   = hparams.n_ctx;
 
     static size_t buf_size = 256u * 1024 * 1024;
     static void * buf = malloc(buf_size);
@@ -673,7 +673,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
     return true;
 }
 
-std::vector<float> softmax(const std::vector<float>& logits) {
+std::vector<float> softmax(const std::vector<float> & logits) {
     std::vector<float> probs(logits.size());
     float max_logit = logits[0];
     for (float v : logits) max_logit = std::max(max_logit, v);
@@ -791,7 +791,6 @@ int perplexity(mpt_params params) {
             fprintf(stderr, "%d minutes\n", total_seconds / 60);
 
             printf("\nChunk\tPPL cumulative\tPPL chunk\n");
-
         }
 
         // We get the logits for all the tokens in the context window (params.n_ctx)
@@ -808,7 +807,7 @@ int perplexity(mpt_params params) {
         // process the entire prompt.
 
         double nllchunk = 0.0;
-        int countchunk =0;
+        int countchunk = 0;
 
         for (int j = std::min(512, params.n_ctx / 2); j < params.n_ctx - 1; ++j) {
             // Calculate probability of next token, given the previous ones.
@@ -866,14 +865,14 @@ int main(int argc, char ** argv) {
         params.seed = time(NULL);
     }
 
-    if( params.n_predict < 0 ) {
+    if (params.n_predict < 0) {
         params.n_predict = 0;
     }
 
-    printf("%s: seed = %d\n", __func__, params.seed);
-    printf("%s: n_threads = %d\n", __func__, params.n_threads);
-    printf("%s: n_batch = %d\n", __func__, params.n_batch);
-    printf("%s: n_ctx = %d\n", __func__, params.n_ctx);
+    printf("%s: seed      = %d\n",   __func__, params.seed);
+    printf("%s: n_threads = %d\n",   __func__, params.n_threads);
+    printf("%s: n_batch   = %d\n",   __func__, params.n_batch);
+    printf("%s: n_ctx     = %d\n",   __func__, params.n_ctx);
     printf("%s: n_predict = %d\n\n", __func__, params.n_predict);
     printf("\n");
 
@@ -917,22 +916,23 @@ int main(int argc, char ** argv) {
     }
 
     printf("\n");
-    printf("%s: temp = %.3f\n", __func__, params.temp);
-    printf("%s: top_k = %d\n", __func__, params.top_k);
-    printf("%s: top_p = %.3f\n", __func__, params.top_p);
-    printf("%s: repeat_last_n = %d\n", __func__, params.repeat_last_n);
+    printf("%s: temp           = %.3f\n", __func__, params.temp);
+    printf("%s: top_k          = %d\n",   __func__, params.top_k);
+    printf("%s: top_p          = %.3f\n", __func__, params.top_p);
+    printf("%s: repeat_last_n  = %d\n",   __func__, params.repeat_last_n);
     printf("%s: repeat_penalty = %.3f\n", __func__, params.repeat_penalty);
 
     int64_t t_sample_us = 0;
     int64_t t_predict_us = 0;
 
-    std::vector<int32_t> last_n_tokens( params.n_ctx );
+    std::vector<int32_t> last_n_tokens(params.n_ctx);
     std::fill(last_n_tokens.begin(), last_n_tokens.end(), 0);
 
     // tokenize the prompt
     std::vector<int> embd_inp = ::gpt_tokenize(vocab, params.prompt);
 
-    printf("\n%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
+    printf("\n");
+    printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
 
     for (size_t i = 0; i < embd_inp.size(); i++) {
         printf("%s: token[%lu] = %6d\n", __func__, i, embd_inp[i]);
@@ -951,7 +951,7 @@ int main(int argc, char ** argv) {
     int n_consumed = 0;
     int n_sampled  = 0;
 
-    while ( n_sampled < params.n_predict ) {
+    while (n_sampled < params.n_predict) {
         // predict
         if (embd.size() > 0) {
             const int64_t t_start_us = ggml_time_us();
@@ -967,7 +967,7 @@ int main(int argc, char ** argv) {
             embd.clear();
         }
 
-        if ( (int)embd_inp.size() <= n_consumed ) {
+        if ((int)embd_inp.size() <= n_consumed) {
             // sample next token
 
             const int top_k = params.top_k;
@@ -981,7 +981,7 @@ int main(int argc, char ** argv) {
             {
                 const int64_t t_start_sample_us = ggml_time_us();
 
-                id = gpt_sample_top_k_top_p_repeat( vocab, logits.data() + (logits.size() - model.hparams.n_vocab), last_n_tokens.data(), last_n_tokens.size(), top_k, top_p, temp, repeat_last_n, repeat_penalty, rng);
+                id = gpt_sample_top_k_top_p_repeat(vocab, logits.data() + (logits.size() - model.hparams.n_vocab), last_n_tokens.data(), last_n_tokens.size(), top_k, top_p, temp, repeat_last_n, repeat_penalty, rng);
 
                 last_n_tokens.erase(last_n_tokens.begin());
                 last_n_tokens.push_back(id);
@@ -1006,7 +1006,6 @@ int main(int argc, char ** argv) {
                     break;
                 }
             }
-
         }
 
         // display text
@@ -1020,9 +1019,7 @@ int main(int argc, char ** argv) {
         if (embd.back() == 0) {
             break;
         }
-
     }
-
 
     // report timing
     {

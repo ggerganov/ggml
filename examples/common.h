@@ -62,7 +62,7 @@ struct gpt_vocab {
 std::map<std::string, int32_t> json_parse(const std::string & fname);
 
 // handle utf-8 coding
-void utf8_to_string(std::string const &in, std::string &out);
+void utf8_to_string(std::string const & in, std::string & out);
 
 // split text into tokens
 //
