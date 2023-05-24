@@ -99,11 +99,11 @@ byte_decoder = {v:k for k, v in byte_encoder.items()}
 counter = 0
 # sort by value
 for key in sorted(encoder, key=encoder.get):
-    # workaround for key error when c = whitespace
+    # workaround for key error when c not found
     text=""
     for c in key:
-        if c == " ":
-            text += " "
+        if c not in byte_decoder:
+            text += c
         else:
             text += chr(byte_decoder[c] )
     text = bytearray( text, encoding="utf-8" )

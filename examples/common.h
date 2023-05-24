@@ -61,6 +61,9 @@ struct gpt_vocab {
 // poor-man's JSON parsing
 std::map<std::string, int32_t> json_parse(const std::string & fname);
 
+// handle utf-8 coding
+void utf8_to_string(std::string const & in, std::string & out);
+
 // split text into tokens
 //
 // ref: https://github.com/openai/gpt-2/blob/a74da5d99abaaba920de8131d64da2862a8f213b/src/encoder.py#L53
@@ -90,6 +93,18 @@ gpt_vocab::id gpt_sample_top_k_top_p(
         int    top_k,
         double top_p,
         double temp,
+        std::mt19937 & rng);
+
+gpt_vocab::id gpt_sample_top_k_top_p_repeat(
+        const gpt_vocab & vocab,
+        const float * logits,
+        const int32_t * last_n_tokens_data,
+        size_t last_n_tokens_data_size,
+        int    top_k,
+        double top_p,
+        double temp,
+        int repeat_last_n,
+        float repeat_penalty,
         std::mt19937 & rng);
 
 //
