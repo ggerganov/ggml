@@ -17,6 +17,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <sstream>
 
 using piece_t = std::pair<std::size_t, float>;
 using piece_map_t = std::unordered_map<std::string, piece_t>;
@@ -125,6 +126,46 @@ std::string replit_tokenizer_detokenize(replit_tokenizer & tokenizer, const std:
     }
     auto denormalized_text = replace_all(text, ws_symbol, " ");
     return denormalized_text;
+}
+
+void test_tokenizer_replit(const std::string & fname, replit_tokenizer & vocab){
+
+    std::string fpath_test = find_test_file(fname);
+
+    std::map<std::string, std::vector<std::string>> tests = extract_tests_from_file(fpath_test);
+
+    bool succeed = true;
+
+    for (const auto & test : tests) {
+        std::vector<std::size_t> tokens = replit_tokenizer_tokenize(vocab, test.first);
+        std::vector<std::string> tokens_in_str; 
+        
+        for (const auto & t : tokens)
+            tokens_in_str.push_back(vocab.raw_vocab.id_to_token[t]);
+        
+        if (!are_strings_equal(tokens_in_str, test.second)){
+            
+            succeed = false;
+
+            // print out failure cases
+            fprintf(stderr, "%s : failed test: '%s'\n", __func__, test.first.c_str());
+            fprintf(stderr, "%s : tokens in huggingface: ", __func__);
+            for (const auto & t : test.second) {
+                fprintf(stderr, "%s, ", t.c_str());
+            }
+            fprintf(stderr, "\n");
+            fprintf(stderr, "%s : tokens in ggml:      ", __func__);
+            for (const auto & t : tokens_in_str) {
+                fprintf(stderr, "%s, ", t.c_str());
+            }
+            fprintf(stderr, "\n");
+            
+        }
+    }
+
+    if (succeed)
+        fprintf(stderr, "%s : All tests passed.\n", __func__);
+
 }
 
 // no defaults for now
@@ -669,7 +710,7 @@ int main(int argc, char ** argv) {
 
         t_load_us = ggml_time_us() - t_start_us;
 
-        test_tokenizer(params.model, vocab);
+        test_tokenizer_replit(params.model, vocab);
     }
 
     int n_past = 0;
