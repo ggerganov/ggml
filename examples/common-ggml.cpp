@@ -335,15 +335,97 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
 
         // header
         {
-            uint32_t magic   = GGML_FILE_MAGIC;
-            uint32_t version = GGML_FILE_VERSION;
-            uint32_t leafs   = cgraph->n_leafs;
-            uint32_t nodes   = cgraph->n_nodes;
+            const uint32_t magic   = GGML_FILE_MAGIC;
+            const uint32_t version = GGML_FILE_VERSION;
+            const uint32_t leafs   = cgraph->n_leafs;
+            const uint32_t nodes   = cgraph->n_nodes;
 
             fwrite(&magic,   sizeof(uint32_t), 1, fout);
             fwrite(&version, sizeof(uint32_t), 1, fout);
             fwrite(&leafs,   sizeof(uint32_t), 1, fout);
             fwrite(&nodes,   sizeof(uint32_t), 1, fout);
+        }
+
+        // leafs
+        {
+            const uint32_t n_leafs = cgraph->n_leafs;
+
+            fwrite(&n_leafs, sizeof(uint32_t), 1, fout);
+
+            for (int i = 0; i < cgraph->n_leafs; ++i) {
+                const struct ggml_tensor * tensor = cgraph->leafs[i];
+
+                const uint32_t type   = tensor->type;
+                const uint32_t op     = tensor->op;
+                const uint32_t n_dims = tensor->n_dims;
+
+                fwrite(&type,   sizeof(uint32_t), 1, fout);
+                fwrite(&op,     sizeof(uint32_t), 1, fout);
+                fwrite(&n_dims, sizeof(uint32_t), 1, fout);
+
+                for (int j = 0; j < GGML_MAX_DIMS; ++j) {
+                    const int64_t ne = tensor->ne[j];
+                    const size_t  nb = tensor->nb[j];
+
+                    fwrite(&ne, sizeof(int64_t), 1, fout);
+                    fwrite(&nb, sizeof(size_t),  1, fout);
+                }
+
+                // store the pointer address
+                fwrite(&tensor->data, sizeof(void *), 1, fout);
+
+                {
+                    const size_t len = strlen(tensor->name);
+
+                    fwrite(&len, sizeof(size_t), 1, fout);
+                    fwrite(tensor->name, sizeof(char), len, fout);
+                }
+
+                // dump the data
+                // TODO: pad this to 32 byte boundary
+                {
+                    const size_t size = ggml_nbytes(tensor);
+
+                    fwrite(tensor->data, sizeof(char), size, fout);
+                }
+            }
+        }
+
+        // nodes
+        {
+            const uint32_t n_nodes = cgraph->n_nodes;
+
+            fwrite(&n_nodes, sizeof(uint32_t), 1, fout);
+
+            for (int i = 0; i < cgraph->n_nodes; ++i) {
+                const struct ggml_tensor * tensor = cgraph->nodes[i];
+
+                const uint32_t type   = tensor->type;
+                const uint32_t op     = tensor->op;
+                const uint32_t n_dims = tensor->n_dims;
+
+                fwrite(&type,   sizeof(uint32_t), 1, fout);
+                fwrite(&op,     sizeof(uint32_t), 1, fout);
+                fwrite(&n_dims, sizeof(uint32_t), 1, fout);
+
+                for (int j = 0; j < GGML_MAX_DIMS; ++j) {
+                    const int64_t ne = tensor->ne[j];
+                    const size_t  nb = tensor->nb[j];
+
+                    fwrite(&ne, sizeof(int64_t), 1, fout);
+                    fwrite(&nb, sizeof(size_t),  1, fout);
+                }
+
+                // store the pointer address
+                fwrite(&tensor->data, sizeof(void *), 1, fout);
+
+                {
+                    const size_t len = strlen(tensor->name);
+
+                    fwrite(&len, sizeof(size_t), 1, fout);
+                    fwrite(tensor->name, sizeof(char), len, fout);
+                }
+            }
         }
 
         fclose(fout);
