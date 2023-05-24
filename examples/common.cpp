@@ -345,7 +345,7 @@ std::map<std::string, std::vector<std::string>> extract_tests_from_file(const st
     return tests;
 }
 
-void test_tokenizer(const std::string & fname, gpt_vocab & vocab){
+void test_gpt_tokenizer(const std::string & fname, gpt_vocab & vocab){
 
     std::string fpath_test = find_test_file(fname);
 
