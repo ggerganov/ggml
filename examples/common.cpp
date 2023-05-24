@@ -300,13 +300,9 @@ std::vector<std::string> split_string(const std::string& input, char delimiter) 
     return output;
 }
 
-void test_tokenizer(const std::string & fname, gpt_vocab & vocab){
-
-    std::map<std::string, std::vector<std::string>> tests;
-    
-    // find a test file for the model
-    //  - check if the model filename contains the test filename after stripping '.txt'
-    //  - for instance, 'dolly-v2-3b' model gets test cases from 'dolly-v2.txt'
+std::string find_test_file(const std::string & fname){
+    //  check if the model filename contains the test filename after stripping '.txt'
+    //  for instance, 'dolly-v2-3b' model gets test cases from 'dolly-v2.txt'
     std::string curr_path = __FILE__;
     fs::path dir_test = fs::path(curr_path).parent_path() / "prompts";
     std::string fpath_test = "";
@@ -319,10 +315,20 @@ void test_tokenizer(const std::string & fname, gpt_vocab & vocab){
                 t_fname = t_fname.substr(0, t_fname.length() - 4);
                 
                 if (fname.find(t_fname) != std::string::npos)
-                    fpath_test = entry.path().string();
+                    return entry.path().string();
         }
+    
+    return ""; // empty string if test file not found
+}
 
-    if (fpath_test.empty()) fprintf(stderr, "%s : No test cases found.\n", __func__);
+std::map<std::string, std::vector<std::string>> extract_tests_from_file(const std::string & fpath_test){
+    
+    if (fpath_test.empty()){
+        fprintf(stderr, "%s : No test cases found.\n", __func__);
+        return std::map<std::string, std::vector<std::string>>();
+    }
+
+    std::map<std::string, std::vector<std::string>> tests;
 
     auto fin = std::ifstream(fpath_test, std::ios_base::in);
     const char * delimeter = " => ";
@@ -336,6 +342,14 @@ void test_tokenizer(const std::string & fname, gpt_vocab & vocab){
             tests[text] = split_string(tokens, del_tok);
         }
     }
+    return tests;
+}
+
+void test_tokenizer(const std::string & fname, gpt_vocab & vocab){
+
+    std::string fpath_test = find_test_file(fname);
+
+    std::map<std::string, std::vector<std::string>> tests = extract_tests_from_file(fpath_test);
 
     bool succeed = true;
 
