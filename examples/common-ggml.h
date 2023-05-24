@@ -17,6 +17,5 @@ bool ggml_common_quantize_0(
         const std::vector<std::string> & to_quant,
         const std::vector<std::string> & to_skip);
 
-struct ggml_cgraph;
-
-void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname);
+void        ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname);
+ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** ctx_data, struct ggml_context ** ctx_eval);

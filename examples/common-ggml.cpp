@@ -273,15 +273,27 @@ void ggml_graph_export_node(const struct ggml_tensor * tensor, const char * arg,
 }
 
 void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
+    assert(cgraph->work      == NULL);
+    assert(cgraph->work_size == 0);
+
+    uint64_t size_eval = 0;
+
+    // compute size of intermediate results
+    // TODO: does not take into account scratch buffers !!!!
+    for (int i = 0; i < cgraph->n_nodes; ++i) {
+        size_eval += ggml_nbytes(cgraph->nodes[i]);
+    }
+
     // print
     {
         FILE * fout = stdout;
 
         fprintf(fout, "\n");
-        fprintf(fout, "%-16s %8x\n", "magic",   GGML_FILE_MAGIC);
-        fprintf(fout, "%-16s %8d\n", "version", GGML_FILE_VERSION);
-        fprintf(fout, "%-16s %8d\n", "leafs",   cgraph->n_leafs);
-        fprintf(fout, "%-16s %8d\n", "nodes",   cgraph->n_nodes);
+        fprintf(fout, "%-16s %8x\n",   "magic",   GGML_FILE_MAGIC);
+        fprintf(fout, "%-16s %8d\n",   "version", GGML_FILE_VERSION);
+        fprintf(fout, "%-16s %8d\n",   "leafs",   cgraph->n_leafs);
+        fprintf(fout, "%-16s %8d\n",   "nodes",   cgraph->n_nodes);
+        fprintf(fout, "%-16s %8llu\n", "eval",    size_eval);
 
         // header
         fprintf(fout, "\n");
@@ -340,18 +352,15 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
             const uint32_t leafs   = cgraph->n_leafs;
             const uint32_t nodes   = cgraph->n_nodes;
 
-            fwrite(&magic,   sizeof(uint32_t), 1, fout);
-            fwrite(&version, sizeof(uint32_t), 1, fout);
-            fwrite(&leafs,   sizeof(uint32_t), 1, fout);
-            fwrite(&nodes,   sizeof(uint32_t), 1, fout);
+            fwrite(&magic,     sizeof(uint32_t), 1, fout);
+            fwrite(&version,   sizeof(uint32_t), 1, fout);
+            fwrite(&leafs,     sizeof(uint32_t), 1, fout);
+            fwrite(&nodes,     sizeof(uint32_t), 1, fout);
+            fwrite(&size_eval, sizeof(uint64_t), 1, fout);
         }
 
         // leafs
         {
-            const uint32_t n_leafs = cgraph->n_leafs;
-
-            fwrite(&n_leafs, sizeof(uint32_t), 1, fout);
-
             for (int i = 0; i < cgraph->n_leafs; ++i) {
                 const struct ggml_tensor * tensor = cgraph->leafs[i];
 
@@ -364,22 +373,21 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
                 fwrite(&n_dims, sizeof(uint32_t), 1, fout);
 
                 for (int j = 0; j < GGML_MAX_DIMS; ++j) {
-                    const int64_t ne = tensor->ne[j];
-                    const size_t  nb = tensor->nb[j];
+                    const uint64_t ne = tensor->ne[j];
+                    const uint64_t nb = tensor->nb[j];
 
-                    fwrite(&ne, sizeof(int64_t), 1, fout);
-                    fwrite(&nb, sizeof(size_t),  1, fout);
+                    fwrite(&ne, sizeof(uint64_t), 1, fout);
+                    fwrite(&nb, sizeof(uint64_t), 1, fout);
                 }
 
                 // store the pointer address
-                fwrite(&tensor->data, sizeof(void *), 1, fout);
-
                 {
-                    const size_t len = strlen(tensor->name);
+                    const uint64_t ptr = (uint64_t) tensor->data;
 
-                    fwrite(&len, sizeof(size_t), 1, fout);
-                    fwrite(tensor->name, sizeof(char), len, fout);
+                    fwrite(&ptr, sizeof(uint64_t), 1, fout);
                 }
+
+                fwrite(tensor->name, sizeof(char), GGML_MAX_NAME, fout);
 
                 // dump the data
                 // TODO: pad this to 32 byte boundary
@@ -393,10 +401,6 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
 
         // nodes
         {
-            const uint32_t n_nodes = cgraph->n_nodes;
-
-            fwrite(&n_nodes, sizeof(uint32_t), 1, fout);
-
             for (int i = 0; i < cgraph->n_nodes; ++i) {
                 const struct ggml_tensor * tensor = cgraph->nodes[i];
 
@@ -409,25 +413,211 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
                 fwrite(&n_dims, sizeof(uint32_t), 1, fout);
 
                 for (int j = 0; j < GGML_MAX_DIMS; ++j) {
-                    const int64_t ne = tensor->ne[j];
-                    const size_t  nb = tensor->nb[j];
+                    const uint64_t ne = tensor->ne[j];
+                    const uint64_t nb = tensor->nb[j];
 
-                    fwrite(&ne, sizeof(int64_t), 1, fout);
-                    fwrite(&nb, sizeof(size_t),  1, fout);
+                    fwrite(&ne, sizeof(uint64_t), 1, fout);
+                    fwrite(&nb, sizeof(uint64_t), 1, fout);
                 }
 
                 // store the pointer address
-                fwrite(&tensor->data, sizeof(void *), 1, fout);
-
                 {
-                    const size_t len = strlen(tensor->name);
+                    const uint64_t ptr = (uint64_t) tensor->data;
 
-                    fwrite(&len, sizeof(size_t), 1, fout);
-                    fwrite(tensor->name, sizeof(char), len, fout);
+                    fwrite(&ptr, sizeof(uint64_t), 1, fout);
                 }
+
+                fwrite(tensor->name, sizeof(char), GGML_MAX_NAME, fout);
             }
         }
 
         fclose(fout);
     }
+}
+
+ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** ctx_data, struct ggml_context ** ctx_eval) {
+    assert(*ctx_data == NULL);
+    assert(*ctx_eval == NULL);
+
+    ggml_cgraph result;
+
+    struct ggml_tensor * data = NULL;
+
+    // read file into data
+    {
+        FILE * fin = fopen(fname, "rb");
+
+        if (!fin) {
+            fprintf(stderr, "%s: failed to open %s\n", __func__, fname);
+            return result;
+        }
+
+        size_t fsize = 0;
+
+        fseek(fin, 0, SEEK_END);
+        fsize = ftell(fin);
+        fseek(fin, 0, SEEK_SET);
+
+        // create the data context
+        {
+            const size_t overhead = 1*GGML_TENSOR_OVERHEAD;
+
+            struct ggml_init_params params = {
+                .mem_size   = fsize + overhead,
+                .mem_buffer = NULL,
+                .no_alloc   = false,
+            };
+
+            *ctx_data = ggml_init(params);
+
+            if (!*ctx_data) {
+                fprintf(stderr, "%s: failed to create ggml context\n", __func__);
+                return result;
+            }
+        }
+
+        data = ggml_new_tensor_1d(*ctx_data, GGML_TYPE_I8, fsize);
+
+        fread(data->data, sizeof(char), fsize, fin);
+
+        fclose(fin);
+    }
+
+    // populate result
+    {
+        const char * ptr = (const char *) data->data;
+
+        const uint32_t magic = *(const uint32_t *) ptr; ptr += sizeof(magic);
+
+        if (magic != GGML_FILE_MAGIC) {
+            fprintf(stderr, "%s: invalid magic number, got %08x\n", __func__, magic);
+            return result;
+        }
+
+        const uint32_t version = *(const uint32_t *) ptr; ptr += sizeof(version);
+
+        if (version != GGML_FILE_VERSION) {
+            fprintf(stderr, "%s: invalid version number\n", __func__);
+            return result;
+        }
+
+        const uint32_t leafs     = *(const uint32_t *) ptr; ptr += sizeof(leafs);
+        const uint32_t nodes     = *(const uint32_t *) ptr; ptr += sizeof(nodes);
+        const uint64_t size_eval = *(const uint64_t *) ptr; ptr += sizeof(size_eval);
+
+        result.n_leafs   = leafs;
+        result.n_nodes   = nodes;
+
+        // create the data context
+        {
+            const size_t overhead = (leafs + nodes)*GGML_TENSOR_OVERHEAD;
+
+            struct ggml_init_params params = {
+                .mem_size   = size_eval + overhead,
+                .mem_buffer = NULL,
+                .no_alloc   = true,
+            };
+
+            *ctx_eval = ggml_init(params);
+
+            if (!*ctx_eval) {
+                fprintf(stderr, "%s: failed to create ggml context\n", __func__);
+                return result;
+            }
+        }
+
+        // leafs
+        {
+            uint32_t type;
+            uint32_t op;
+            uint32_t n_dims;
+
+            for (int i = 0; i < leafs; ++i) {
+                type   = *(const uint32_t *) ptr; ptr += sizeof(type);
+                op     = *(const uint32_t *) ptr; ptr += sizeof(op);
+                n_dims = *(const uint32_t *) ptr; ptr += sizeof(n_dims);
+
+                int64_t ne[GGML_MAX_DIMS];
+                size_t  nb[GGML_MAX_DIMS];
+
+                for (int j = 0; j < GGML_MAX_DIMS; ++j) {
+                    uint64_t ne_cur;
+                    uint64_t nb_cur;
+
+                    ne_cur = *(const uint64_t *) ptr; ptr += sizeof(ne_cur);
+                    nb_cur = *(const uint64_t *) ptr; ptr += sizeof(nb_cur);
+
+                    ne[j] = ne_cur;
+                    nb[j] = nb_cur;
+                }
+
+                struct ggml_tensor * tensor = ggml_new_tensor(*ctx_eval, (enum ggml_type) type, n_dims, ne);
+
+                tensor->op = (enum ggml_op) op;
+
+                uint64_t ptr_cur = *(const uint64_t *) ptr; ptr += sizeof(ptr_cur);
+
+                memcpy(tensor->name, ptr, GGML_MAX_NAME); ptr += GGML_MAX_NAME;
+
+                tensor->data = (void *) ptr;
+
+                for (int j = 0; j < GGML_MAX_DIMS; ++j) {
+                    tensor->nb[j] = nb[j];
+                }
+
+                result.leafs[i] = tensor;
+
+                ptr += ggml_nbytes(tensor);
+
+                fprintf(stderr, "%s: loaded leaf %d: '%16s', %3d dims, %9zu bytes\n", __func__, i, tensor->name, n_dims, ggml_nbytes(tensor));
+            }
+        }
+
+        ggml_set_no_alloc(*ctx_eval, false);
+
+        // nodes
+        {
+            uint32_t type;
+            uint32_t op;
+            uint32_t n_dims;
+
+            for (int i = 0; i < nodes; ++i) {
+                type   = *(const uint32_t *) ptr; ptr += sizeof(type);
+                op     = *(const uint32_t *) ptr; ptr += sizeof(op);
+                n_dims = *(const uint32_t *) ptr; ptr += sizeof(n_dims);
+
+                int64_t ne[GGML_MAX_DIMS];
+                size_t  nb[GGML_MAX_DIMS];
+
+                for (int j = 0; j < GGML_MAX_DIMS; ++j) {
+                    uint64_t ne_cur;
+                    uint64_t nb_cur;
+
+                    ne_cur = *(const uint64_t *) ptr; ptr += sizeof(ne_cur);
+                    nb_cur = *(const uint64_t *) ptr; ptr += sizeof(nb_cur);
+
+                    ne[j] = ne_cur;
+                    nb[j] = nb_cur;
+                }
+
+                struct ggml_tensor * tensor = ggml_new_tensor(*ctx_eval, (enum ggml_type) type, n_dims, ne);
+
+                tensor->op = (enum ggml_op) op;
+
+                uint64_t ptr_cur = *(const uint64_t *) ptr; ptr += sizeof(ptr_cur);
+
+                memcpy(tensor->name, ptr, GGML_MAX_NAME); ptr += GGML_MAX_NAME;
+
+                for (int j = 0; j < GGML_MAX_DIMS; ++j) {
+                    tensor->nb[j] = nb[j];
+                }
+
+                result.nodes[i] = tensor;
+
+                fprintf(stderr, "%s: loaded node %d: '%16s', %3d dims, %9zu bytes\n", __func__, i, tensor->name, n_dims, ggml_nbytes(tensor));
+            }
+        }
+    }
+
+    return result;
 }

@@ -194,8 +194,9 @@ int mnist_eval(
     // soft max
     ggml_tensor * probs = ggml_soft_max(ctx0, fc2);
 
-    // run the computation
+    // build / export / run the computation graph
     ggml_build_forward_expand(&gf, probs);
+    ggml_graph_export        (&gf, "mnist.ggml"); // export before running to avoid work tensor
     ggml_graph_compute       (ctx0, &gf);
 
     //ggml_graph_print   (&gf);
@@ -205,10 +206,19 @@ int mnist_eval(
 
     const int prediction = std::max_element(probs_data, probs_data + 10) - probs_data;
 
-    // export the computation graph
-    ggml_graph_export(&gf, "mnist.ggml");
-
     ggml_free(ctx0);
+
+    // TMP
+    // import the computation graph
+    {
+        struct ggml_context * ctx_data = NULL;
+        struct ggml_context * ctx_eval = NULL;
+
+        struct ggml_cgraph gfi = ggml_graph_import("mnist.ggml", &ctx_data, &ctx_eval);
+        gfi.n_threads = n_threads;
+
+        ggml_graph_compute(ctx0, &gfi);
+    }
 
     return prediction;
 }
