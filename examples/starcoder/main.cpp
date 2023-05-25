@@ -768,7 +768,7 @@ int main(int argc, char ** argv) {
 
         t_load_us = ggml_time_us() - t_start_us;
 
-        test_gpt_tokenizer(params.model, vocab);
+        test_gpt_tokenizer(vocab, "../prompts/starcoder.txt");
     }
 
     int n_past = 0;

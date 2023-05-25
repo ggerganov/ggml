@@ -128,9 +128,8 @@ std::string replit_tokenizer_detokenize(replit_tokenizer & tokenizer, const std:
     return denormalized_text;
 }
 
-void test_tokenizer_replit(const std::string & fname, replit_tokenizer & vocab){
+void test_tokenizer_replit(replit_tokenizer & vocab, const std::string & fpath_test){
 
-    std::string fpath_test = find_test_file(fname);
 
     std::map<std::string, std::vector<std::string>> tests = extract_tests_from_file(fpath_test);
 
@@ -711,7 +710,7 @@ int main(int argc, char ** argv) {
 
         t_load_us = ggml_time_us() - t_start_us;
 
-        test_tokenizer_replit(params.model, vocab);
+        test_tokenizer_replit(vocab, "../prompts/replit.txt");
     }
 
     int n_past = 0;
