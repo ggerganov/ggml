@@ -157,6 +157,26 @@ if (GGML_OPENBLAS)
     endif()
 endif()
 
+if (GGML_CLBLAST)
+	set(CLBLAST_INCLUDE_SEARCH_PATHS
+        /usr/include
+        /usr/local/include
+	    $ENV{CLBLAST_HOME}
+	    $ENV{CLBLAST_HOME}/include
+        )
+	find_path(CLBLAST_INC NAMES cblast.h PATHS ${CLBLAST_INCLUDE_SEARCH_PATHS})
+	find_library(CLBLAST_LIB NAMES clblast)
+	if (CLBLAST_LIB)
+		message(STATUS "clBLAST found")
+
+		set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${CLBLAST_LIB})
+		set(GGML_OPENCL_SOURCES ggml-opencl.c ggml-opencl.h)
+		set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CLBLAST)
+		link_libraries("-Wl,--copy-dt-needed-entries")
+    else()
+        message(WARNING "clBLAST not found")
+    endif()
+endif()
 if (GGML_CUBLAS)
     cmake_minimum_required(VERSION 3.17)
 
@@ -189,7 +209,8 @@ endif()
 add_library(${TARGET}
     ggml.c
     ../include/ggml/ggml.h
-    ${GGML_CUDA_SOURCES})
+    ${GGML_CUDA_SOURCES}
+    ${GGML_OPENCL_SOURCES})
 
 target_include_directories(${TARGET} PUBLIC
     .
