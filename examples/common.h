@@ -80,12 +80,11 @@ std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::stri
 //   - if all sentences are tokenized identically, print 'All tests passed.'
 //   - otherwise, print sentence, huggingface tokens, ggml tokens
 //
-void test_gpt_tokenizer(const std::string & fname, gpt_vocab & vocab);
+void test_gpt_tokenizer(gpt_vocab & vocab, const std::string & fpath_test);
 
 //
 // test_tokenizer utils (required for non-gpt models)
 //
-std::string find_test_file(const std::string & fname);
 std::map<std::string, std::vector<std::string>> extract_tests_from_file(const std::string & fpath_test);
 std::vector<std::string> split_string(const std::string& input, char delimiter);
 bool are_strings_equal(const std::vector<std::string>& vec1, const std::vector<std::string>& vec2);

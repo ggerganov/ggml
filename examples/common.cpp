@@ -297,38 +297,6 @@ std::vector<std::string> split_string(const std::string& input, char delimiter) 
     return output;
 }
 
-std::string find_test_file(const std::string & fname){
-    //
-    //  check if the model filename contains the test filename after stripping '.txt'
-    //  for instance, 'dolly-v2-3b' model gets test cases from 'dolly-v2.txt'
-    //
-    
-    std::string curr_path = __FILE__;
-    std::string dir_test = curr_path.substr(0, curr_path.find_last_of("/\\") + 1) + "prompts";
-
-    // iterate over files in test directory    
-    DIR *dir;
-    struct dirent *ent;
-    std::string t_fname, t_name; 
-    if ((dir = opendir(dir_test.c_str())) != nullptr) {
-        while ((ent = readdir(dir)) != nullptr) {
-            std::string t_fname = ent->d_name;
-           
-            if (t_fname.length() > 4 && t_fname.substr(t_fname.length() - 4) == ".txt") {
-                // ex) t_fname: dolly-v2.txt, t_name: dolly-v2
-                t_name = t_fname.substr(0, t_fname.length() - 4); 
-                
-                if (fname.find(t_name) != std::string::npos) {
-                    return dir_test + "/" + t_fname;
-                }
-            }
-        }
-        closedir(dir);
-    }
-    
-    return ""; // empty string if test file not found
-}
-
 std::map<std::string, std::vector<std::string>> extract_tests_from_file(const std::string & fpath_test){
     
     if (fpath_test.empty()){
@@ -353,9 +321,7 @@ std::map<std::string, std::vector<std::string>> extract_tests_from_file(const st
     return tests;
 }
 
-void test_gpt_tokenizer(const std::string & fname, gpt_vocab & vocab){
-
-    std::string fpath_test = find_test_file(fname);
+void test_gpt_tokenizer(gpt_vocab & vocab, const std::string & fpath_test){
 
     std::map<std::string, std::vector<std::string>> tests = extract_tests_from_file(fpath_test);
 
