@@ -11,9 +11,8 @@
 #include <locale>
 #include <codecvt>
 #include <sstream>
-#include <filesystem>
+
 #include <iostream>
-#include <dirent.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -275,36 +274,26 @@ std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::stri
     return tokens;
 }
 
-bool are_strings_equal(const std::vector<std::string>& vec1, const std::vector<std::string>& vec2) {
-    if (vec1.size() != vec2.size()) return false;
-
-    for (size_t i = 0; i < vec1.size(); ++i) {
-        if (vec1[i] != vec2[i]) return false;
-    }
-
-    return true;
-}
-
-std::vector<std::string> split_string(const std::string& input, char delimiter) {
-    std::vector<std::string> output;
+std::vector<gpt_vocab::id> parse_tokens_from_string(const std::string& input, char delimiter) {
+    std::vector<gpt_vocab::id> output;
     std::stringstream ss(input);
     std::string token;
 
     while (std::getline(ss, token, delimiter)) {
-        output.push_back(token);
+        output.push_back(std::stoi(token));
     }
 
     return output;
 }
 
-std::map<std::string, std::vector<std::string>> extract_tests_from_file(const std::string & fpath_test){
+std::map<std::string, std::vector<gpt_vocab::id>> extract_tests_from_file(const std::string & fpath_test){
     
     if (fpath_test.empty()){
-        fprintf(stderr, "%s : No test cases found.\n", __func__);
-        return std::map<std::string, std::vector<std::string>>();
+        fprintf(stderr, "%s : No test file found.\n", __func__);
+        return std::map<std::string, std::vector<gpt_vocab::id>>();
     }
 
-    std::map<std::string, std::vector<std::string>> tests;
+    std::map<std::string, std::vector<gpt_vocab::id>> tests;
 
     auto fin = std::ifstream(fpath_test, std::ios_base::in);
     const char * delimeter = " => ";
@@ -314,8 +303,8 @@ std::map<std::string, std::vector<std::string>> extract_tests_from_file(const st
         size_t delimiterPos = line.find(delimeter);
         if (delimiterPos != std::string::npos) {
             std::string text = line.substr(0, delimiterPos);
-            std::string tokens = line.substr(delimiterPos + std::strlen(delimeter));
-            tests[text] = split_string(tokens, del_tok);
+            std::string s_tokens = line.substr(delimiterPos + std::strlen(delimeter));
+            tests[text] = parse_tokens_from_string(s_tokens, del_tok);
         }
     }
     return tests;
@@ -323,41 +312,34 @@ std::map<std::string, std::vector<std::string>> extract_tests_from_file(const st
 
 void test_gpt_tokenizer(gpt_vocab & vocab, const std::string & fpath_test){
 
-    std::map<std::string, std::vector<std::string>> tests = extract_tests_from_file(fpath_test);
+    std::map<std::string, std::vector<gpt_vocab::id>> tests = extract_tests_from_file(fpath_test);
 
-    bool succeed = true;
+    size_t n_fails = 0;
 
     for (const auto & test : tests) {
         std::vector<gpt_vocab::id> tokens = gpt_tokenize(vocab, test.first);
-        std::vector<std::string> tokens_in_str; 
         
-        for (const auto & t : tokens) {
-            tokens_in_str.push_back(vocab.id_to_token[t]);
-        }
-
-        if (!are_strings_equal(tokens_in_str, test.second)){
+        if (tokens != test.second){
             
-            succeed = false;
+            n_fails++;
 
             // print out failure cases
             fprintf(stderr, "%s : failed test: '%s'\n", __func__, test.first.c_str());
             fprintf(stderr, "%s : tokens in huggingface: ", __func__);
             for (const auto & t : test.second) {
-                fprintf(stderr, "%s, ", t.c_str());
+                fprintf(stderr, "%s(%d), ", vocab.id_to_token[t].c_str(), t);
             }
             fprintf(stderr, "\n");
-            fprintf(stderr, "%s : tokens in ggml:      ", __func__);
-            for (const auto & t : tokens_in_str) {
-                fprintf(stderr, "%s, ", t.c_str());
+            fprintf(stderr, "%s : tokens in ggml: ", __func__);
+            for (const auto & t : tokens) {
+                fprintf(stderr, "%s(%d), ", vocab.id_to_token[t].c_str()), t;
             }
             fprintf(stderr, "\n");
             
         }
     }
 
-    if (succeed) {
-        fprintf(stderr, "%s : All tests passed.\n", __func__);
-    }
+    fprintf(stderr, "%s : %lu tests failed out of %lu tests.\n", __func__, n_fails, tests.size());
 }
 
 bool gpt_vocab_init(const std::string & fname, gpt_vocab & vocab) {
