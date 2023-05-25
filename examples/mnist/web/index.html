@@ -7,14 +7,14 @@
     <script src="mnist.js"></script>
 </head>
 <body>
-    <h2>MNIST digit recognizer with GGML</h2>
-    <p>Draw a single digit on the canvas below:</p>
+    <h2>MNIST digit recognizer with <a href="https://github.com/ggerganov/ggml">GGML</a></h2>
+    <p id="msg">Loading model and data set, please wait ...</p>
     <canvas id="ggCanvas" width="364" height="364" style="border:2px solid #d3d3d3;">
         Your browser does not support the HTML canvas tag.
     </canvas>
     <div>
         <button id="clear" onclick="onClear()">Clear</button>
-        <button id="random" onclick="onRandom()">Random</button>
+        <button id="random" onclick="onRandom()" disabled>Random</button>
     </div>
     <div>
         <p id="prediction"></p>
@@ -114,13 +114,19 @@ if (e.target == canvas) {
 }
 }, {passive: false});
 
-// Use the same handlers for mouse and touch events
-canvas.onmousedown = onMouseDown;
-canvas.onmouseup = onMouseUp;
-canvas.onmousemove = onMouseMove;
-canvas.ontouchstart = onMouseDown;
-canvas.ontouchend = onMouseUp;
-canvas.ontouchmove = onMouseMove;
+function onRuntimeInitialized() {
+    // Use the same handlers for mouse and touch events
+    canvas.onmousedown = onMouseDown;
+    canvas.onmouseup = onMouseUp;
+    canvas.onmousemove = onMouseMove;
+    canvas.ontouchstart = onMouseDown;
+    canvas.ontouchend = onMouseUp;
+    canvas.ontouchmove = onMouseMove;
+    document.getElementById("msg").innerHTML = "Draw a single digit on the canvas below:"
+    document.getElementById("random").disabled = false;
+}
+
+Module['onRuntimeInitialized'] = onRuntimeInitialized;
     </script>
 </body>
 </html>
