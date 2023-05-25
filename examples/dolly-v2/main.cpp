@@ -12,8 +12,6 @@
 #include <map>
 #include <string>
 #include <vector>
-#include <iostream>
-#include <unistd.h>
 
 // default hparams (Dolly-V2 3B)
 struct dollyv2_hparams {
@@ -689,14 +687,7 @@ int main(int argc, char ** argv) {
 
     std::mt19937 rng(params.seed);
     if (params.prompt.empty()) {
-        if( !isatty(STDIN_FILENO) ){
-            std::string line;
-            while( std::getline(std::cin, line) ){
-                params.prompt = params.prompt + "\n" + line;
-            }
-        } else {
-            params.prompt = gpt_random_prompt(rng);
-        }
+        params.prompt = gpt_random_prompt(rng);
     }
 
     const std::string prompt = prompt_for_generation(params.prompt);
