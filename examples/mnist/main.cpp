@@ -196,7 +196,6 @@ int mnist_eval(
 
     // build / export / run the computation graph
     ggml_build_forward_expand(&gf, probs);
-    ggml_graph_export        (&gf, "mnist.ggml"); // export before running to avoid work tensor
     ggml_graph_compute       (ctx0, &gf);
 
     //ggml_graph_print   (&gf);
@@ -207,6 +206,8 @@ int mnist_eval(
     const int prediction = std::max_element(probs_data, probs_data + 10) - probs_data;
 
     ggml_free(ctx0);
+
+    ggml_graph_export(&gf, "mnist.ggml");
 
     // TMP
     // import the computation graph

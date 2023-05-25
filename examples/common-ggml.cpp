@@ -428,6 +428,55 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
                 }
 
                 fwrite(tensor->name, sizeof(char), GGML_MAX_NAME, fout);
+
+                // output the op arguments
+                {
+                    struct ggml_tensor * args[2 + GGML_MAX_OPT] = { NULL };
+
+                    args[0] = tensor->src0;
+                    args[1] = tensor->src1;
+
+                    for (int j = 0; j < GGML_MAX_OPT; ++j) {
+                        args[2 + j] = tensor->opt[j];
+                    }
+
+                    for (int j = 0; j < 2 + GGML_MAX_OPT; ++j) {
+                        if (args[j]) {
+                            int32_t idx = -1;
+
+                            // check if leaf
+                            {
+                                for (int k = 0; k < cgraph->n_leafs; ++k) {
+                                    if (args[j] == cgraph->leafs[k]) {
+                                        idx = k;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // check if node
+                            if (idx == -1) {
+                                for (int k = 0; k < cgraph->n_nodes; ++k) {
+                                    if (args[j] == cgraph->nodes[k]) {
+                                        idx = GGML_MAX_NODES + k;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (idx == -1) {
+                                fprintf(stderr, "%s: failed to find tensor, arg = %d, node = %d\n", __func__, j, i);
+                                return;
+                            }
+
+                            fwrite(&idx, sizeof(int32_t), 1, fout);
+                        } else {
+                            const int32_t nul = -1;
+
+                            fwrite(&nul, sizeof(int32_t), 1, fout);
+                        }
+                    }
+                }
             }
         }
 
@@ -610,6 +659,32 @@ ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** ctx_dat
 
                 for (int j = 0; j < GGML_MAX_DIMS; ++j) {
                     tensor->nb[j] = nb[j];
+                }
+
+                // parse args
+                {
+                    struct ggml_tensor ** args[2 + GGML_MAX_OPT] = {
+                        &tensor->src0,
+                        &tensor->src1,
+                    };
+
+                    for (int j = 0; j < GGML_MAX_OPT; ++j) {
+                        args[2 + j] = &tensor->opt[j];
+                    }
+
+                    for (int j = 0; j < 2 + GGML_MAX_OPT; ++j) {
+                        const uint32_t arg_idx = *(const int32_t *) ptr; ptr += sizeof(arg_idx);
+
+                        if (arg_idx == -1) {
+                            continue;
+                        }
+
+                        if (arg_idx < GGML_MAX_NODES) {
+                            *args[j] = result.leafs[arg_idx];
+                        } else {
+                            *args[j] = result.nodes[arg_idx - GGML_MAX_NODES];
+                        }
+                    }
                 }
 
                 result.nodes[i] = tensor;
