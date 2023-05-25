@@ -54,12 +54,12 @@ for repo in list_repo_hf:
 
     tokenizer = AutoTokenizer.from_pretrained(repo, trust_remote_code=True)
 
-    tokenized_by_hf = []
+    tokens_hf = []
     for language, sentence in test_sentences:
         if language == target_language:
-            tokenized_line = [tokenizer.decode([tokenizer.convert_tokens_to_ids(el)]) for el in tokenizer.tokenize(sentence)]
-            tokenized_by_hf.append((sentence, tokenized_line))
+            tokens = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(sentence))
+            tokens_hf.append((sentence, tokens))
 
     save_txt = repo2ggml[repo] + ".txt"
     with open(save_txt, "w") as f:
-        f.writelines([sentence + " => " + ",".join(tokenized) + "\n" for sentence, tokenized in tokenized_by_hf])
+        f.writelines([sentence + " => " + ",".join(str(t) for t in tokens) + "\n" for sentence, tokens in tokens_hf])
