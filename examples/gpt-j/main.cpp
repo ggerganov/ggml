@@ -651,7 +651,7 @@ int main(int argc, char ** argv) {
 
         t_load_us = ggml_time_us() - t_start_us;
 
-        test_gpt_tokenizer(vocab, "../prompts/gpt-j.txt");
+        test_gpt_tokenizer(vocab, params.token_test);
     }
 
     int n_past = 0;

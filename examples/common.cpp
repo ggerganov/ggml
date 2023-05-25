@@ -12,8 +12,6 @@
 #include <codecvt>
 #include <sstream>
 
-#include <iostream>
-
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -57,7 +55,10 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
             if (params.prompt.back() == '\n') {
                 params.prompt.pop_back();
             }
-        } else {
+        } else if (arg == "--token_test") {
+            params.token_test = argv[++i];
+        }
+        else {
             fprintf(stderr, "error: unknown argument: %s\n", arg.c_str());
             gpt_print_usage(argc, argv, params);
             exit(0);
