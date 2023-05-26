@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <inttypes.h>
 
 #define MAX_NARGS 2
 
@@ -132,8 +133,7 @@ bool check_gradient(
             const float error_rel = g0 != 0 ? fabsf(g0 - g1)/fabs(g0) : 0;
 
             if (error_abs > max_error_abs || error_rel > max_error_rel) {
-                printf("%s: ndims=%d, i=%d, k=%lld, g0=%f, g1=%f, error_abs=%f, error_rel=%f\n",
-                        op_name, ndims, i, k, g0, g1, error_abs, error_rel);
+                printf("%s: ndims=%d, i=%d, k=%" PRId64 ", g0=%f, g1=%f, error_abs=%f, error_rel=%f\n", op_name, ndims, i, k, g0, g1, error_abs, error_rel);
                 assert(false);
             }
         }
@@ -176,7 +176,7 @@ bool check_mat_mul(
     const int64_t n22 = y->ne[2];
     const int64_t n32 = y->ne[3];
 
-    printf("x0: [%lld, %lld, %lld, %lld]\n", n00, n10, n20, n30);
+    printf("x0: [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "]\n", n00, n10, n20, n30);
     for (int j = 0; j < n10; ++j) {
         for (int i = 0; i < n00; ++i) {
             printf("%6.3f ", mat_get(x0, i, j, 0, 0));
@@ -185,7 +185,7 @@ bool check_mat_mul(
     }
     printf("\n");
 
-    printf("x1: [%lld, %lld, %lld, %lld]\n", n01, n11, n21, n31);
+    printf("x1: [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "]\n", n01, n11, n21, n31);
     for (int j = 0; j < n11; ++j) {
         for (int i = 0; i < n01; ++i) {
             printf("%6.3f ", mat_get(x1, i, j, 0, 0));
@@ -194,7 +194,7 @@ bool check_mat_mul(
     }
     printf("\n");
 
-    printf("y: [%lld, %lld, %lld, %lld]\n", n02, n12, n22, n32);
+    printf("y: [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "]\n", n02, n12, n22, n32);
     for (int j = 0; j < n12; ++j) {
         for (int i = 0; i < n02; ++i) {
             printf("%6.3f ", mat_get(y, i, j, 0, 0));
@@ -264,7 +264,7 @@ int main(int argc, const char ** argv) {
                 struct ggml_tensor * m = ggml_mul_mat(ctx0, x[1], x[0]);
                 struct ggml_tensor * f = ggml_sum(ctx0, m);
 
-                printf("testing: mul_mat, [%lld, %lld, %lld, %lld] = [%lld, %lld, %lld, %lld] * [%lld, %lld, %lld, %lld]\n",
+                printf("testing: mul_mat, [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "] = [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "] * [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "]\n",
                            m->ne[0],    m->ne[1],    m->ne[2],    m->ne[3],
                         x[1]->ne[0], x[1]->ne[1], x[1]->ne[2], x[1]->ne[3],
                         x[0]->ne[0], x[0]->ne[1], x[0]->ne[2], x[0]->ne[3]);
@@ -300,7 +300,7 @@ int main(int argc, const char ** argv) {
                 struct ggml_tensor * m = ggml_mul_mat(ctx0, x[1], x[0]);
                 struct ggml_tensor * f = ggml_sum(ctx0, m);
 
-                printf("testing: mul_mat, [%lld, %lld, %lld, %lld] = [%lld, %lld, %lld, %lld] * [%lld, %lld, %lld, %lld]\n",
+                printf("testing: mul_mat, [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "] = [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "] * [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "]\n",
                            m->ne[0],    m->ne[1],    m->ne[2],    m->ne[3],
                         x[1]->ne[0], x[1]->ne[1], x[1]->ne[2], x[1]->ne[3],
                         x[0]->ne[0], x[0]->ne[1], x[0]->ne[2], x[0]->ne[3]);

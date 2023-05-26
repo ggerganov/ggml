@@ -8,9 +8,10 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <cinttypes>
+
 #include <fstream>
 #include <map>
-#include <stdint.h>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -326,7 +327,7 @@ bool replit_model_load(const std::string & fname, replit_model & model, replit_t
 
         const size_t memory_size = ggml_nbytes(model.memory_k) + ggml_nbytes(model.memory_v);
 
-        printf("%s: memory_size = %8.2f MB, n_mem = %lld\n", __func__, memory_size / 1024.0 / 1024.0, n_mem);
+        printf("%s: memory_size = %8.2f MB, n_mem = %" PRId64 "\n", __func__, memory_size / 1024.0 / 1024.0, n_mem);
     }
 
     // load weights
