@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <cinttypes>
 #include <map>
