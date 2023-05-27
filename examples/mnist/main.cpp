@@ -206,7 +206,7 @@ int mnist_eval(
     if (fname_cgraph) {
         // export the compute graph for later use
         // see the "mnist-cpu" example
-        ggml_graph_export(&gf, "mnist.ggml");
+        ggml_cgraph_export(&gf, "mnist.ggml");
 
         fprintf(stderr, "%s: exported compute graph to '%s'\n", __func__, fname_cgraph);
     }

@@ -242,7 +242,7 @@ bool ggml_common_quantize_0(
         } \
     } while (0)
 
-void ggml_graph_export_leaf(const struct ggml_tensor * tensor, FILE * fout) {
+void ggml_cgraph_export_leaf(const struct ggml_tensor * tensor, FILE * fout) {
     const int64_t * ne = tensor->ne;
     const size_t  * nb = tensor->nb;
 
@@ -256,7 +256,7 @@ void ggml_graph_export_leaf(const struct ggml_tensor * tensor, FILE * fout) {
             tensor->name);
 }
 
-void ggml_graph_export_node(const struct ggml_tensor * tensor, const char * arg, FILE * fout) {
+void ggml_cgraph_export_node(const struct ggml_tensor * tensor, const char * arg, FILE * fout) {
     const int64_t * ne = tensor->ne;
     const size_t  * nb = tensor->nb;
 
@@ -272,7 +272,7 @@ void ggml_graph_export_node(const struct ggml_tensor * tensor, const char * arg,
             tensor->name);
 }
 
-void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
+void ggml_cgraph_export(const struct ggml_cgraph * cgraph, const char * fname) {
     assert(cgraph->work      == NULL);
     assert(cgraph->work_size == 0);
 
@@ -301,7 +301,7 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
                 "TYPE", "OP", "NDIMS", "NE0", "NE1", "NE2", "NE3", "NB0", "NB1", "NB2", "NB3", "DATA", "NAME");
 
         for (int i = 0; i < cgraph->n_leafs; ++i) {
-            ggml_graph_export_leaf(cgraph->leafs[i], fout);
+            ggml_cgraph_export_leaf(cgraph->leafs[i], fout);
 
             GGML_ASSERT(cgraph->leafs[i]->op   == GGML_OP_NONE);
             GGML_ASSERT(cgraph->leafs[i]->src0 == NULL);
@@ -314,19 +314,19 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
                 "ARG", "TYPE", "OP", "NDIMS", "NE0", "NE1", "NE2", "NE3", "NB0", "NB1", "NB2", "NB3", "NTASKS", "DATA", "NAME");
 
         for (int i = 0; i < cgraph->n_nodes; ++i) {
-            ggml_graph_export_node(cgraph->nodes[i], "DST", fout);
+            ggml_cgraph_export_node(cgraph->nodes[i], "DST", fout);
 
             if (cgraph->nodes[i]->src0) {
-                ggml_graph_export_node(cgraph->nodes[i]->src0, "SRC0", fout);
+                ggml_cgraph_export_node(cgraph->nodes[i]->src0, "SRC0", fout);
             }
 
             if (cgraph->nodes[i]->src1) {
-                ggml_graph_export_node(cgraph->nodes[i]->src1, "SRC1", fout);
+                ggml_cgraph_export_node(cgraph->nodes[i]->src1, "SRC1", fout);
             }
 
             for (int j = 0; j < GGML_MAX_OPT; ++j) {
                 if (cgraph->nodes[i]->opt[j]) {
-                    ggml_graph_export_node(cgraph->nodes[i]->opt[j], "OPT", fout);
+                    ggml_cgraph_export_node(cgraph->nodes[i]->opt[j], "OPT", fout);
                 }
             }
 
@@ -484,7 +484,7 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
     }
 }
 
-ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** ctx_data, struct ggml_context ** ctx_eval) {
+ggml_cgraph ggml_cgraph_import(const char * fname, struct ggml_context ** ctx_data, struct ggml_context ** ctx_eval) {
     assert(*ctx_data == NULL);
     assert(*ctx_eval == NULL);
 
