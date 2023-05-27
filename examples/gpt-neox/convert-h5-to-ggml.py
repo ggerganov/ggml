@@ -15,9 +15,6 @@ if len(sys.argv) < 3:
 dir_model = sys.argv[1]
 fname_out = sys.argv[1] + "/ggml-model.bin"
 
-with open(dir_model + "/tokenizer.json", "r", encoding="utf-8") as f:
-    encoder = json.load(f)
-
 with open(dir_model + "/config.json", "r", encoding="utf-8") as f:
     hparams = json.load(f)
 
@@ -39,9 +36,6 @@ if len(sys.argv) > 2:
 
 tokenizer = AutoTokenizer.from_pretrained(dir_model)
 model = AutoModelForCausalLM.from_pretrained(dir_model, low_cpu_mem_usage=True)
-#print (model)
-
-#print(tokenizer.encode('I believe the meaning of life is'))
 
 list_vars = model.state_dict()
 for name in list_vars.keys():
@@ -62,11 +56,8 @@ fout.write(struct.pack("i", hparams["use_parallel_residual"] if "use_parallel_re
 fout.write(struct.pack("i", ftype))
 
 # TODO: temporary hack to not deal with implementing the tokenizer
-dot_token = tokenizer.encode('.')[0]
 for i in range(hparams["vocab_size"]):
-    text = tokenizer.decode([dot_token, i]).encode('utf-8')
-    # remove the first byte (it's always '.')
-    text = text[1:]
+    text = tokenizer.decode([i]).encode('utf-8')
     fout.write(struct.pack("i", len(text)))
     fout.write(text)
 
@@ -81,10 +72,10 @@ for name in list_vars.keys():
         print("  Skipping variable: " + name)
         continue
 
-    n_dims = len(data.shape);
+    n_dims = len(data.shape)
 
     # ftype == 0 -> float32, ftype == 1 -> float16
-    ftype_cur = 0;
+    ftype_cur = 0
     if ftype != 0:
         if name[-7:] == ".weight" and n_dims == 2:
             print("  Converting to float16")
@@ -105,7 +96,7 @@ for name in list_vars.keys():
     fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
     for i in range(n_dims):
         fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
-    fout.write(str);
+    fout.write(str)
 
     # data
     data.tofile(fout)

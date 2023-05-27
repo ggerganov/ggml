@@ -10,6 +10,7 @@
 #include <regex>
 #include <locale>
 #include <codecvt>
+#include <sstream>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -54,7 +55,10 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
             if (params.prompt.back() == '\n') {
                 params.prompt.pop_back();
             }
-        } else {
+        } else if (arg == "-tt" || arg == "--token_test") {
+            params.token_test = argv[++i];
+        }
+        else {
             fprintf(stderr, "error: unknown argument: %s\n", arg.c_str());
             gpt_print_usage(argc, argv, params);
             exit(0);
@@ -75,6 +79,8 @@ void gpt_print_usage(int /*argc*/, char ** argv, const gpt_params & params) {
     fprintf(stderr, "                        prompt to start generation with (default: random)\n");
     fprintf(stderr, "  -f FNAME, --file FNAME\n");
     fprintf(stderr, "                        load prompt from a file\n");
+    fprintf(stderr, "  -tt TOKEN_TEST, --token_test TOKEN_TEST\n");
+    fprintf(stderr, "                        test tokenization\n");
     fprintf(stderr, "  -n N, --n_predict N   number of tokens to predict (default: %d)\n", params.n_predict);
     fprintf(stderr, "  --top_k N             top-k sampling (default: %d)\n", params.top_k);
     fprintf(stderr, "  --top_p N             top-p sampling (default: %.1f)\n", params.top_p);
@@ -219,6 +225,7 @@ std::string convert_to_utf8(const std::wstring & input) {
     return converter.to_bytes(input);
 }
 
+
 std::wstring convert_to_wstring(const std::string & input) {
     std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
     return converter.from_bytes(input);
@@ -257,41 +264,92 @@ std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::stri
         }
     }
 
-    // find the longest tokens that form the words:
+    // find the longest token that forms each word in words:
     std::vector<gpt_vocab::id> tokens;
     for (const auto & word : words) {
-        if (word.size() == 0) continue;
-
-        int i = 0;
-        int n = word.size();
-        while (i < n) {
-            int j = n;
-            while (j > i) {
-                auto it = vocab.token_to_id.find(word.substr(i, j-i));
-                if (it != vocab.token_to_id.end()) {
+        for (int i = 0; i < word.size(); ){
+            for (int j = word.size() - 1; j >= i; j--){
+                auto cand = word.substr(i, j-i+1);
+                auto it = vocab.token_to_id.find(cand);
+                if (it != vocab.token_to_id.end()){ // word.substr(i, j-i+1) in vocab
                     tokens.push_back(it->second);
-                    i = j;
-                    j = n;
-                    continue;
+                    i = j + 1;
+                    break;
                 }
-                --j;
-            }
-            if (i == n) {
-                break;
-            }
-            if (j == i) {
-                auto sub = word.substr(i, 1);
-                if (vocab.token_to_id.find(sub) != vocab.token_to_id.end()) {
-                    tokens.push_back(vocab.token_to_id.at(sub));
-                } else {
-                    fprintf(stderr, "%s: unknown token '%s'\n", __func__, sub.data());
+                else if (j == i){ // word.substr(i, 1) has no matching
+                    fprintf(stderr, "%s: unknown token '%s'\n", __func__, word.substr(i, 1).data());
+                    i++;
                 }
-                ++i;
             }
         }
     }
 
+
     return tokens;
+}
+
+std::vector<gpt_vocab::id> parse_tokens_from_string(const std::string& input, char delimiter) {
+    std::vector<gpt_vocab::id> output;
+    std::stringstream ss(input);
+    std::string token;
+
+    while (std::getline(ss, token, delimiter)) {
+        output.push_back(std::stoi(token));
+    }
+
+    return output;
+}
+
+std::map<std::string, std::vector<gpt_vocab::id>> extract_tests_from_file(const std::string & fpath_test){
+    if (fpath_test.empty()){
+        fprintf(stderr, "%s : No test file found.\n", __func__);
+        return std::map<std::string, std::vector<gpt_vocab::id>>();
+    }
+
+    std::map<std::string, std::vector<gpt_vocab::id>> tests;
+
+    auto fin = std::ifstream(fpath_test, std::ios_base::in);
+    const char * delimeter = " => ";
+    const char del_tok = ',';
+    std::string line;
+    while (std::getline(fin, line)) {
+        size_t delimiterPos = line.find(delimeter);
+        if (delimiterPos != std::string::npos) {
+            std::string text = line.substr(0, delimiterPos);
+            std::string s_tokens = line.substr(delimiterPos + std::strlen(delimeter));
+            tests[text] = parse_tokens_from_string(s_tokens, del_tok);
+        }
+    }
+    return tests;
+}
+
+void test_gpt_tokenizer(gpt_vocab & vocab, const std::string & fpath_test){
+    std::map<std::string, std::vector<gpt_vocab::id>> tests = extract_tests_from_file(fpath_test);
+
+    size_t n_fails = 0;
+
+    for (const auto & test : tests) {
+        std::vector<gpt_vocab::id> tokens = gpt_tokenize(vocab, test.first);
+
+        if (tokens != test.second){
+            n_fails++;
+
+            // print out failure cases
+            fprintf(stderr, "%s : failed test: '%s'\n", __func__, test.first.c_str());
+            fprintf(stderr, "%s : tokens in hf:   ", __func__);
+            for (const auto & t : test.second) {
+                fprintf(stderr, "%s(%d), ", vocab.id_to_token[t].c_str(), t);
+            }
+            fprintf(stderr, "\n");
+            fprintf(stderr, "%s : tokens in ggml: ", __func__);
+            for (const auto & t : tokens) {
+                fprintf(stderr, "%s(%d), ", vocab.id_to_token[t].c_str(), t);
+            }
+            fprintf(stderr, "\n");
+        }
+    }
+
+    fprintf(stderr, "%s : %lu tests failed out of %lu tests.\n", __func__, n_fails, tests.size());
 }
 
 bool gpt_vocab_init(const std::string & fname, gpt_vocab & vocab) {
