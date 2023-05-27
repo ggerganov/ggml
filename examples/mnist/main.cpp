@@ -193,6 +193,7 @@ int mnist_eval(
 
     // soft max
     ggml_tensor * probs = ggml_soft_max(ctx0, fc2);
+    ggml_set_name(probs, "probs");
 
     // build / export / run the computation graph
     ggml_build_forward_expand(&gf, probs);
@@ -201,25 +202,27 @@ int mnist_eval(
     //ggml_graph_print   (&gf);
     ggml_graph_dump_dot(&gf, NULL, "mnist.dot");
 
+    ggml_graph_export(&gf, "mnist.ggml");
+
+#if 0
     const float * probs_data = ggml_get_data_f32(probs);
 
     const int prediction = std::max_element(probs_data, probs_data + 10) - probs_data;
+#else
+    struct ggml_context * ctx_data = NULL;
+    struct ggml_context * ctx_eval = NULL;
+
+    struct ggml_cgraph gfi = ggml_graph_import("mnist.ggml", &ctx_data, &ctx_eval);
+    gfi.n_threads = n_threads;
+
+    ggml_graph_compute(ctx0, &gfi);
+
+    const float * probs_data = ggml_get_data_f32(ggml_get_tensor_by_name(&gfi, "probs"));
+
+    const int prediction = std::max_element(probs_data, probs_data + 10) - probs_data;
+#endif
 
     ggml_free(ctx0);
-
-    ggml_graph_export(&gf, "mnist.ggml");
-
-    // TMP
-    // import the computation graph
-    {
-        struct ggml_context * ctx_data = NULL;
-        struct ggml_context * ctx_eval = NULL;
-
-        struct ggml_cgraph gfi = ggml_graph_import("mnist.ggml", &ctx_data, &ctx_eval);
-        gfi.n_threads = n_threads;
-
-        ggml_graph_compute(ctx0, &gfi);
-    }
 
     return prediction;
 }
