@@ -26,8 +26,8 @@ struct gpt_params {
 
     int32_t n_batch = 8; // batch size for prompt processing
 
-    std::string model = "models/gpt-2-117M/ggml-model.bin"; // model path
-    std::string prompt;
+    std::string model      = "models/gpt-2-117M/ggml-model.bin"; // model path
+    std::string prompt     = "";
     std::string token_test = "";
 };
 

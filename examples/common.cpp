@@ -55,7 +55,7 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
             if (params.prompt.back() == '\n') {
                 params.prompt.pop_back();
             }
-        } else if (arg == "--token_test") {
+        } else if (arg == "-tt" || arg == "--token_test") {
             params.token_test = argv[++i];
         }
         else {
@@ -79,6 +79,8 @@ void gpt_print_usage(int /*argc*/, char ** argv, const gpt_params & params) {
     fprintf(stderr, "                        prompt to start generation with (default: random)\n");
     fprintf(stderr, "  -f FNAME, --file FNAME\n");
     fprintf(stderr, "                        load prompt from a file\n");
+    fprintf(stderr, "  -tt TOKEN_TEST, --token_test TOKEN_TEST\n");
+    fprintf(stderr, "                        test tokenization\n");
     fprintf(stderr, "  -n N, --n_predict N   number of tokens to predict (default: %d)\n", params.n_predict);
     fprintf(stderr, "  --top_k N             top-k sampling (default: %d)\n", params.top_k);
     fprintf(stderr, "  --top_p N             top-p sampling (default: %.1f)\n", params.top_p);
@@ -274,7 +276,7 @@ std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::stri
                     i = j + 1;
                     break;
                 }
-                else if (j == i){ // word.substr(i, 1) has no matching 
+                else if (j == i){ // word.substr(i, 1) has no matching
                     fprintf(stderr, "%s: unknown token '%s'\n", __func__, word.substr(i, 1).data());
                     i++;
                 }
@@ -299,7 +301,6 @@ std::vector<gpt_vocab::id> parse_tokens_from_string(const std::string& input, ch
 }
 
 std::map<std::string, std::vector<gpt_vocab::id>> extract_tests_from_file(const std::string & fpath_test){
-    
     if (fpath_test.empty()){
         fprintf(stderr, "%s : No test file found.\n", __func__);
         return std::map<std::string, std::vector<gpt_vocab::id>>();
@@ -323,31 +324,28 @@ std::map<std::string, std::vector<gpt_vocab::id>> extract_tests_from_file(const 
 }
 
 void test_gpt_tokenizer(gpt_vocab & vocab, const std::string & fpath_test){
-
     std::map<std::string, std::vector<gpt_vocab::id>> tests = extract_tests_from_file(fpath_test);
 
     size_t n_fails = 0;
 
     for (const auto & test : tests) {
         std::vector<gpt_vocab::id> tokens = gpt_tokenize(vocab, test.first);
-        
+
         if (tokens != test.second){
-            
             n_fails++;
 
             // print out failure cases
             fprintf(stderr, "%s : failed test: '%s'\n", __func__, test.first.c_str());
-            fprintf(stderr, "%s : tokens in huggingface: ", __func__);
+            fprintf(stderr, "%s : tokens in hf:   ", __func__);
             for (const auto & t : test.second) {
                 fprintf(stderr, "%s(%d), ", vocab.id_to_token[t].c_str(), t);
             }
             fprintf(stderr, "\n");
             fprintf(stderr, "%s : tokens in ggml: ", __func__);
             for (const auto & t : tokens) {
-                fprintf(stderr, "%s(%d), ", vocab.id_to_token[t].c_str()), t;
+                fprintf(stderr, "%s(%d), ", vocab.id_to_token[t].c_str(), t);
             }
             fprintf(stderr, "\n");
-            
         }
     }
 

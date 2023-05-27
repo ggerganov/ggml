@@ -3,40 +3,40 @@ from transformers import AutoTokenizer
 
 os.environ['TOKENIZERS_PARALLELISM'] = "false"
 
-list_repo_hf = ["databricks/dolly-v2-3b",  # dolly-v2 (3b, 7b, 12b models share the same tokenizer)
-                "gpt2",  # gpt-2 (gpt2-xl, gpt2-large share the same tokenizer)
-                "uer/gpt2-chinese-cluecorpussmall",  # gpt-2-chinese
-                "EleutherAI/gpt-j-6b",  # gpt-j
-                "EleutherAI/gpt-neox-20b",  # gpt-neox
-                "EleutherAI/polyglot-ko-1.3b",  # gpt-neox (polyglot-ko 5.8b and 12.8b share the same tokenizer")
-                "rinna/japanese-gpt-neox-3.6b",  # gpt-neox
-                # mpt-7b (uses gpt-neox-20b tokenizer)
-                "replit/replit-code-v1-3b",  # replit
-                "bigcode/starcoder",  # starcoder (huggingface-cli login required)
-                "openai/whisper-tiny"  # whisper (base, large, large-v2 share the same tokenizer)
-                ]
+list_repo_hf  = ["databricks/dolly-v2-3b",           # dolly-v2 (3b, 7b, 12b models share the same tokenizer)
+                 "gpt2",                             # gpt-2 (gpt2-xl, gpt2-large share the same tokenizer)
+                 "uer/gpt2-chinese-cluecorpussmall", # gpt-2-chinese
+                 "EleutherAI/gpt-j-6b",              # gpt-j
+                 "EleutherAI/gpt-neox-20b",          # gpt-neox
+                 "EleutherAI/polyglot-ko-1.3b",      # gpt-neox (polyglot-ko 5.8b and 12.8b share the same tokenizer")
+                 "rinna/japanese-gpt-neox-3.6b",     # gpt-neox
+                 # mpt-7b (uses gpt-neox-20b tokenizer)
+                 "replit/replit-code-v1-3b",         # replit
+                 "bigcode/starcoder",                # starcoder (huggingface-cli login required)
+                 "openai/whisper-tiny"               # whisper (base, large, large-v2 share the same tokenizer)
+                 ]
 
-repo2ggml = {"databricks/dolly-v2-3b": "dolly-v2",
-             "gpt2": "gpt-2",
-             "uer/gpt2-chinese-cluecorpussmall": "gpt-2-chinese",
-             "EleutherAI/gpt-j-6b": "gpt-j",
-             "EleutherAI/gpt-neox-20b": "gpt-neox",
-             "EleutherAI/polyglot-ko-1.3b": "polyglot-ko",
-             "rinna/japanese-gpt-neox-3.6b": "japanese-gpt-neox",
-             "replit/replit-code-v1-3b": "replit",
-             "bigcode/starcoder": "starcoder",
-             "openai/whisper-tiny": "whisper"}
+repo2ggml     = {"databricks/dolly-v2-3b"           : "dolly-v2",
+                 "gpt2"                             : "gpt-2",
+                 "uer/gpt2-chinese-cluecorpussmall" : "gpt-2-chinese",
+                 "EleutherAI/gpt-j-6b"              : "gpt-j",
+                 "EleutherAI/gpt-neox-20b"          : "gpt-neox",
+                 "EleutherAI/polyglot-ko-1.3b"      : "polyglot-ko",
+                 "rinna/japanese-gpt-neox-3.6b"     : "gpt-neox-japanese",
+                 "replit/replit-code-v1-3b"         : "replit",
+                 "bigcode/starcoder"                : "starcoder",
+                 "openai/whisper-tiny"              : "whisper"}
 
-repo2language = {"databricks/dolly-v2-3b": "english",
-                 "gpt2": "english",
-                 "uer/gpt2-chinese-cluecorpussmall": "chinese",
-                 "EleutherAI/gpt-j-6b": "english",
-                 "EleutherAI/gpt-neox-20b": "english",
-                 "EleutherAI/polyglot-ko-1.3b": "korean",
-                 "rinna/japanese-gpt-neox-3.6b": "japanese",
-                 "replit/replit-code-v1-3b": "english",
-                 "bigcode/starcoder": "english",
-                 "openai/whisper-tiny": "english"}
+repo2language = {"databricks/dolly-v2-3b"           : "english",
+                 "gpt2"                             : "english",
+                 "uer/gpt2-chinese-cluecorpussmall" : "chinese",
+                 "EleutherAI/gpt-j-6b"              : "english",
+                 "EleutherAI/gpt-neox-20b"          : "english",
+                 "EleutherAI/polyglot-ko-1.3b"      : "korean",
+                 "rinna/japanese-gpt-neox-3.6b"     : "japanese",
+                 "replit/replit-code-v1-3b"         : "english",
+                 "bigcode/starcoder"                : "english",
+                 "openai/whisper-tiny"              : "english"}
 
 delimeter = ": "
 test_sentences = []

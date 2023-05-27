@@ -69,6 +69,7 @@ struct mpt_params {
 
     std::string model      = ""; // model path
     std::string prompt     = "";
+    std::string token_test = "";
 
     bool    perplexity     = false;
 
@@ -92,6 +93,8 @@ void mpt_print_usage(int /*argc*/, char ** argv, const mpt_params & params) {
     fprintf(stderr, "                        prompt to start generation with (default: random)\n");
     fprintf(stderr, "  -f FNAME, --file FNAME\n");
     fprintf(stderr, "                        load prompt from a file\n");
+    fprintf(stderr, "  -tt TOKEN_TEST, --token_test TOKEN_TEST\n");
+    fprintf(stderr, "                        test tokenization\n");
     fprintf(stderr, "  -n N, --n_predict N   number of tokens to predict (default: %d)\n", params.n_predict);
     fprintf(stderr, "  --top_k N             top-k sampling (default: %d, 0 = n_vocab)\n", params.top_k);
     fprintf(stderr, "  --top_p N             top-p sampling (default: %.2f)\n", params.top_p);
@@ -154,6 +157,8 @@ bool mpt_params_parse(int argc, char ** argv, mpt_params & params) {
             if (params.prompt.back() == '\n') {
                 params.prompt.pop_back();
             }
+        } else if (arg == "-tt" || arg == "--token_test") {
+            params.token_test = argv[++i];
         } else {
             fprintf(stderr, "error: unknown argument: %s\n", arg.c_str());
             mpt_print_usage(argc, argv, params);
@@ -686,7 +691,7 @@ std::vector<float> softmax(const std::vector<float> & logits) {
     return probs;
 }
 
-int perplexity(mpt_params params) {
+int perplexity(const mpt_params & params) {
     ggml_time_init();
 
     const int64_t t_main_start_us = ggml_time_us();
@@ -713,8 +718,6 @@ int perplexity(mpt_params params) {
         }
 
         t_load_us = ggml_time_us() - t_start_us;
-
-        test_gpt_tokenizer(vocab, params.token_test);
     }
 
     int64_t t_predict_us = 0;
@@ -895,6 +898,8 @@ int main(int argc, char ** argv) {
         }
 
         t_load_us = ggml_time_us() - t_start_us;
+
+        test_gpt_tokenizer(vocab, params.token_test);
     }
 
     if (params.top_k == 0) {
