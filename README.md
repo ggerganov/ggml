@@ -2,7 +2,7 @@
 
 Tensor library for machine learning
 
-***Note that this project is under development and not ready for production use. \
+***Note that this project is under active. \
 Some of the development is currently happening in the [llama.cpp](https://github.com/ggerganov/llama.cpp) and [whisper.cpp](https://github.com/ggerganov/whisper.cpp) repos***
 
 ## Features
