@@ -509,7 +509,7 @@ ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** ctx_dat
 
         // create the data context
         {
-            const size_t overhead = 1*GGML_TENSOR_OVERHEAD;
+            const size_t overhead = 1*ggml_tensor_overhead();
 
             struct ggml_init_params params = {
                 .mem_size   = fsize + overhead,
@@ -559,7 +559,7 @@ ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** ctx_dat
 
         // create the data context
         {
-            const size_t overhead = (leafs + nodes)*GGML_TENSOR_OVERHEAD;
+            const size_t overhead = (leafs + nodes)*ggml_tensor_overhead();
 
             struct ggml_init_params params = {
                 .mem_size   = size_eval + overhead,
