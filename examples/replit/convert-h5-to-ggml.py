@@ -3,7 +3,7 @@ import sys
 import struct
 import json
 import numpy as np
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM
 import sentencepiece.sentencepiece_model_pb2 as model
 
 if len(sys.argv) < 3:
@@ -11,7 +11,6 @@ if len(sys.argv) < 3:
     print("  ftype == 0 -> float32")
     print("  ftype == 1 -> float16")
     sys.exit(1)
-
 
 # output in the same directory as the model
 dir_model = sys.argv[1]
@@ -22,8 +21,7 @@ with open(dir_model + "/config.json", "r", encoding="utf-8") as f:
     hparams = json.load(f)
 
 sp_proto = model.ModelProto()
-sp_proto.ParseFromString(open(Path(sys.argv[1]) / "spiece.model", "rb").read())
-
+sp_proto.ParseFromString(open(dir_model + "/spiece.model", "rb").read())
 
 # possible data types
 #   ftype == 0 -> float32
@@ -41,7 +39,6 @@ if len(sys.argv) > 2:
     fname_out = sys.argv[1] + "/ggml-model-" + ftype_str[ftype] + ".bin"
 
 
-tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(
     dir_model, low_cpu_mem_usage=True, trust_remote_code=True
 )
@@ -67,12 +64,23 @@ fout.write(struct.pack("i", ftype))
 
 
 # TODO: temporary hack to not deal with implementing the tokenizer
+counter = 0
 for piece in sp_proto.pieces:
     encoded_piece = piece.piece.encode("utf-8")
     fout.write(struct.pack("i", len(encoded_piece)))
     fout.write(encoded_piece)
     fout.write(struct.pack("f", piece.score))
+    counter += 1
 
+# hack for added token in teknium/Replit-v1-CodeInstruct-3B
+if( hparams["vocab_size"] == 32769 ):
+    encoded_piece = bytearray( "<s>", encoding="utf-8" )
+    fout.write(struct.pack("i", len(encoded_piece)))
+    fout.write(encoded_piece)
+    fout.write(struct.pack("f", 1.0))
+    counter += 1
+
+assert counter == hparams["vocab_size"]
 
 for name in list_vars.keys():
     data = list_vars[name].squeeze().numpy()
