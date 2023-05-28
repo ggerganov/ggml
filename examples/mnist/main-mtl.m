@@ -95,8 +95,8 @@ struct ggml_mtl_context * mnist_mtl_init(
     ctx->ctx_eval = ctx_eval;
     ctx->ctx_work = ctx_work;
 
-    ctx->device  = MTLCreateSystemDefaultDevice();
-    ctx->queue   = [ctx->device newCommandQueue];
+    ctx->device = MTLCreateSystemDefaultDevice();
+    ctx->queue  = [ctx->device newCommandQueue];
 
     // determine if we can use MPS
     if (MPSSupportsMTLDevice(ctx->device)) {
@@ -107,11 +107,13 @@ struct ggml_mtl_context * mnist_mtl_init(
     }
 
     // compile from source string and show compile log
-    NSError * error = nil;
-    ctx->library = [ctx->device newLibraryWithSource:msl_library_mnist options:nil error:&error];
-    if (error) {
-        fprintf(stderr, "%s: error: %s\n", __func__, [[error description] UTF8String]);
-        exit(1);
+    {
+        NSError * error = nil;
+        ctx->library = [ctx->device newLibraryWithSource:msl_library_mnist options:nil error:&error];
+        if (error) {
+            fprintf(stderr, "%s: error: %s\n", __func__, [[error description] UTF8String]);
+            exit(1);
+        }
     }
 
     // load kernels
@@ -200,7 +202,7 @@ struct ggml_mtl_context * mnist_mtl_init(
     }
 
     // pin ctx_eval memory to GPU
-    // this heap will be used for the intermediate results of the evaluation
+    // this buffer will be used for the intermediate results of the evaluation
     {
         const size_t mem_size = ggml_get_mem_size(ctx_eval);
 
@@ -467,7 +469,7 @@ int mnist_mtl_eval(
     }
 
     // select the most probable digit
-    int pred = -1;
+    int result = -1;
     {
         const float * probs = ctx->out.contents;
 
@@ -477,11 +479,11 @@ int mnist_mtl_eval(
             fprintf(stderr, "%s: probs[%2d] = %f\n", __func__, i, probs[i]);
 
             if (probs[i] > prob) {
-                pred = i;
+                result = i;
                 prob = probs[i];
             }
         }
     }
 
-    return pred;
+    return result;
 }

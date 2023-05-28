@@ -53,6 +53,7 @@ int mnist_eval(
 
     struct ggml_context * ctx_work = ggml_init(params);
 
+    // this allocates all Metal resources and memory buffers
     auto ctx_mtl = mnist_mtl_init(ctx_data, ctx_eval, ctx_work, &gf);
 
     int prediction = -1;
@@ -66,6 +67,7 @@ int mnist_eval(
             memset(input->data, 0, ggml_nbytes(input));
         }
 
+        // the actual inference happens here
         prediction = mnist_mtl_eval(ctx_mtl, &gf);
     }
 
