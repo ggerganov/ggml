@@ -26,7 +26,7 @@ struct ggml_mtl_context {
     id<MTLBuffer> buffer_eval;
 #endif
 
-    id<MTLBuffer> results;
+    id<MTLBuffer> out;
 
     // custom kernels
     id<MTLFunction>             function_add;
@@ -214,9 +214,9 @@ struct ggml_mtl_context * mnist_mtl_init(
     {
         const size_t mem_size = ggml_nbytes(gf->nodes[gf->n_nodes - 1]);
 
-        ctx->results = [ctx->device newBufferWithLength:mem_size options:MTLResourceStorageModeShared];
+        ctx->out = [ctx->device newBufferWithLength:mem_size options:MTLResourceStorageModeShared];
 
-        fprintf(stderr, "%s: allocated results buffer, size = %zu\n", __func__, mem_size);
+        fprintf(stderr, "%s: allocated out buffer, size = %zu\n", __func__, mem_size);
     }
 
     return ctx;
@@ -305,6 +305,15 @@ int mnist_mtl_eval(
     size_t offs_src0;
     size_t offs_src1;
     size_t offs_dst;
+
+    // copy the input data to the GPU
+    {
+        struct ggml_tensor * inp = ggml_get_tensor_by_name(gf, "input");
+
+        id<MTLBuffer> id_dst = mnist_mtl_get_buffer(ctx, inp, &offs_src0);
+
+        memcpy(id_dst.contents + offs_src0, inp->data, ggml_nbytes(inp));
+    }
 
     for (int i = 0; i < gf->n_nodes; ++i) {
         fprintf(stderr, "%s: encoding node %3d, op = %8s\n", __func__, i, ggml_op_name(gf->nodes[i]->op));
@@ -439,13 +448,13 @@ int mnist_mtl_eval(
             encoder = nil;
         }
 
-        struct ggml_tensor * output = gf->nodes[gf->n_nodes - 1];
+        struct ggml_tensor * out = gf->nodes[gf->n_nodes - 1];
 
-        id<MTLBuffer> id_src = mnist_mtl_get_buffer(ctx, output, &offs_src0);
-        id<MTLBuffer> id_dst = ctx->results;
+        id<MTLBuffer> id_src = mnist_mtl_get_buffer(ctx, out, &offs_src0);
+        id<MTLBuffer> id_dst = ctx->out;
 
         id<MTLBlitCommandEncoder> encoder_blit = [command_buffer blitCommandEncoder];
-        [encoder_blit copyFromBuffer:id_src sourceOffset:offs_src0 toBuffer:id_dst destinationOffset:0 size:ggml_nbytes(output)];
+        [encoder_blit copyFromBuffer:id_src sourceOffset:offs_src0 toBuffer:id_dst destinationOffset:0 size:ggml_nbytes(out)];
         [encoder_blit endEncoding];
     }
 
@@ -460,7 +469,7 @@ int mnist_mtl_eval(
     // select the most probable digit
     int pred = -1;
     {
-        const float * probs = ctx->results.contents;
+        const float * probs = ctx->out.contents;
 
         float prob = probs[0];
 

@@ -53,11 +53,22 @@ int mnist_eval(
 
     struct ggml_context * ctx_work = ggml_init(params);
 
-    struct ggml_tensor * input = ggml_get_tensor_by_name(&gf, "input");
-    memcpy(input->data, digit.data(), ggml_nbytes(input));
-
     auto ctx_mtl = mnist_mtl_init(ctx_data, ctx_eval, ctx_work, &gf);
-    const int prediction = mnist_mtl_eval(ctx_mtl, &gf);
+
+    int prediction = -1;
+
+    for (int i = 0; i < 1; ++i) {
+        struct ggml_tensor * input = ggml_get_tensor_by_name(&gf, "input");
+
+        if (i % 2 == 0) {
+            memcpy(input->data, digit.data(), ggml_nbytes(input));
+        } else {
+            memset(input->data, 0, ggml_nbytes(input));
+        }
+
+        prediction = mnist_mtl_eval(ctx_mtl, &gf);
+    }
+
     mnist_mtl_free(ctx_mtl);
 
     ggml_free(ctx_work);
