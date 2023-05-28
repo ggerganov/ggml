@@ -46,6 +46,8 @@ using namespace metal;                                                          
                                                                                         \n\
 #define MAX(x, y) ((x) > (y) ? (x) : (y))                                               \n\
                                                                                         \n\
+constant int k_digits [[function_constant(0)]];                                         \n\
+                                                                                        \n\
 kernel void kernel_add(                                                                 \n\
         device const float * src0,                                                      \n\
         device const float * src1,                                                      \n\
@@ -66,15 +68,15 @@ kernel void kernel_soft_max(                                                    
         device       float * dst,                                                       \n\
         uint gid[[thread_position_in_grid]]) {                                          \n\
     float max = 0.0f;                                                                   \n\
-    for (int i = 0; i < 10; i++) {                                                      \n\
+    for (int i = 0; i < k_digits; i++) {                                                \n\
         max = MAX(max, src[i]);                                                         \n\
     }                                                                                   \n\
     float sum = 0.0f;                                                                   \n\
-    for (int i = 0; i < 10; i++) {                                                      \n\
+    for (int i = 0; i < k_digits; i++) {                                                \n\
         dst[i] = exp(src[i] - max);                                                     \n\
         sum += dst[i];                                                                  \n\
     }                                                                                   \n\
-    for (int i = 0; i < 10; i++) {                                                      \n\
+    for (int i = 0; i < k_digits; i++) {                                                \n\
         dst[i] /= sum;                                                                  \n\
     }                                                                                   \n\
 }                                                                                       \n\
@@ -113,14 +115,24 @@ struct ggml_mtl_context * mnist_mtl_init(
     }
 
     // load kernels
-    ctx->function_add = [ctx->library newFunctionWithName:@"kernel_add"];
-    ctx->pipeline_add = [ctx->device newComputePipelineStateWithFunction:ctx->function_add error:nil];
+    {
+        const int k_digits = ggml_get_tensor_by_name(gf, "probs")->ne[0];
 
-    ctx->function_relu = [ctx->library newFunctionWithName:@"kernel_relu"];
-    ctx->pipeline_relu = [ctx->device newComputePipelineStateWithFunction:ctx->function_relu error:nil];
+        MTLFunctionConstantValues * constants = [MTLFunctionConstantValues new];
+        [constants setConstantValue:&k_digits type:MTLDataTypeInt withName:@"k_digits"];
 
-    ctx->function_soft_max = [ctx->library newFunctionWithName:@"kernel_soft_max"];
-    ctx->pipeline_soft_max = [ctx->device newComputePipelineStateWithFunction:ctx->function_soft_max error:nil];
+        ctx->function_add = [ctx->library newFunctionWithName:@"kernel_add"];
+        ctx->pipeline_add = [ctx->device newComputePipelineStateWithFunction:ctx->function_add error:nil];
+        fprintf(stderr, "%s: loaded kernel_add: %p\n", __func__, ctx->pipeline_add);
+
+        ctx->function_relu = [ctx->library newFunctionWithName:@"kernel_relu"];
+        ctx->pipeline_relu = [ctx->device newComputePipelineStateWithFunction:ctx->function_relu error:nil];
+        fprintf(stderr, "%s: loaded kernel_relu: %p\n", __func__, ctx->pipeline_relu);
+
+        ctx->function_soft_max = [ctx->library newFunctionWithName:@"kernel_soft_max" constantValues:constants error:nil];
+        ctx->pipeline_soft_max = [ctx->device newComputePipelineStateWithFunction:ctx->function_soft_max error:nil];
+        fprintf(stderr, "%s: loaded kernel_soft_max: %p\n", __func__, ctx->pipeline_soft_max);
+    }
 
 #ifdef GGML_MTL_HEAP
     // MTLHeap approach
@@ -446,18 +458,19 @@ int mnist_mtl_eval(
     }
 
     // select the most probable digit
+    int pred = -1;
+    {
+        const float * probs = ctx->results.contents;
 
-    const float * probs = ctx->results.contents;
+        float prob = probs[0];
 
-    int   pred = 0;
-    float prob = probs[0];
+        for (int i = 0; i < 10; ++i) {
+            fprintf(stderr, "%s: probs[%2d] = %f\n", __func__, i, probs[i]);
 
-    for (int i = 0; i < 10; ++i) {
-        fprintf(stderr, "%s: probs[%2d] = %f\n", __func__, i, probs[i]);
-
-        if (probs[i] > prob) {
-            pred = i;
-            prob = probs[i];
+            if (probs[i] > prob) {
+                pred = i;
+                prob = probs[i];
+            }
         }
     }
 

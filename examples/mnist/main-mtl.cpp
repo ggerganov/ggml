@@ -1,5 +1,14 @@
 // Use a pre-generated MNIST compute graph for inference on the M1 GPU via MPS
 //
+// You can generate a compute graph using the "mnist" tool:
+//
+// $ ./bin/mnist ./models/mnist/ggml-model-f32.bin ../examples/mnist/models/mnist/t10k-images.idx3-ubyte
+//
+// This command creates the "mnist.ggml" file, which contains the generated compute graph.
+// Now, you can re-use the compute graph on the GPU with the "mnist-mtl" tool:
+//
+// $ ./bin/mnist-mtl ./models/mnist/mnist.ggml ../examples/mnist/models/mnist/t10k-images.idx3-ubyte
+//
 
 #include "ggml/ggml.h"
 

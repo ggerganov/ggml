@@ -12,7 +12,6 @@
 
 #include "ggml/ggml.h"
 
-#include "common.h"
 #include "common-ggml.h"
 
 #include <cmath>
@@ -20,7 +19,6 @@
 #include <cstring>
 #include <ctime>
 #include <fstream>
-#include <string>
 
 // evaluate the MNIST compute graph
 //
