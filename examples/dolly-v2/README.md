@@ -21,6 +21,9 @@ make -j
 # get the Dolly-V2 3B model
 git clone https://huggingface.co/databricks/dolly-v2-3b
 
+# install Python dependencies
+python3 -m pip install -r ../requirements.txt
+
 # convert model to FP16
 python3 ../examples/dolly-v2/convert-h5-to-ggml.py ./dolly-v2-3b/ 1
 

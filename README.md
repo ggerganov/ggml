@@ -73,6 +73,9 @@ make -j4 gpt-2 gpt-j
 ../examples/gpt-j/download-ggml-model.sh 6B
 ./bin/gpt-j -m models/gpt-j-6B/ggml-model.bin -p "This is an example"
 
+# Install Python dependencies
+python3 -m pip install -r ../requirements.txt
+
 # Run the Cerebras-GPT 111M model
 # Download from: https://huggingface.co/cerebras
 python3 ../examples/gpt-2/convert-cerebras-to-ggml.py /path/to/Cerebras-GPT-111M/

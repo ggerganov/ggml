@@ -71,6 +71,9 @@ main:    total time =  4580.56 ms
 git clone https://github.com/ggerganov/ggml
 cd ggml
 
+# Install Python dependencies
+python3 -m pip install -r requirements.txt
+
 # Convert HF model to ggml
 python examples/starcoder/convert-hf-to-ggml.py bigcode/gpt_bigcode-santacoder
 
