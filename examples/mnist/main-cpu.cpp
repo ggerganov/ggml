@@ -12,13 +12,12 @@
 
 #include "ggml/ggml.h"
 
-#include "common-ggml.h"
-
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
 #include <fstream>
+#include <vector>
 
 // evaluate the MNIST compute graph
 //
