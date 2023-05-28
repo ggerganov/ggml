@@ -34,12 +34,17 @@ struct ggml_mtl_context {
 
     id<MTLFunction>             function_relu;
     id<MTLComputePipelineState> pipeline_relu;
+
+    id<MTLFunction>             function_soft_max;
+    id<MTLComputePipelineState> pipeline_soft_max;
 };
 
 // MSL code
 NSString * const msl_library_mnist = @"\
 #include <metal_stdlib>                                                                 \n\
 using namespace metal;                                                                  \n\
+                                                                                        \n\
+#define MAX(x, y) ((x) > (y) ? (x) : (y))                                               \n\
                                                                                         \n\
 kernel void kernel_add(                                                                 \n\
         device const float * src0,                                                      \n\
@@ -54,6 +59,24 @@ kernel void kernel_relu(                                                        
         device       float * dst,                                                       \n\
         uint gid[[thread_position_in_grid]]) {                                          \n\
     dst[gid] = max(0.0f, src[gid]);                                                     \n\
+}                                                                                       \n\
+                                                                                        \n\
+kernel void kernel_soft_max(                                                            \n\
+        device const float * src,                                                       \n\
+        device       float * dst,                                                       \n\
+        uint gid[[thread_position_in_grid]]) {                                          \n\
+    float max = 0.0f;                                                                   \n\
+    for (int i = 0; i < 10; i++) {                                                      \n\
+        max = MAX(max, src[i]);                                                         \n\
+    }                                                                                   \n\
+    float sum = 0.0f;                                                                   \n\
+    for (int i = 0; i < 10; i++) {                                                      \n\
+        dst[i] = exp(src[i] - max);                                                     \n\
+        sum += dst[i];                                                                  \n\
+    }                                                                                   \n\
+    for (int i = 0; i < 10; i++) {                                                      \n\
+        dst[i] /= sum;                                                                  \n\
+    }                                                                                   \n\
 }                                                                                       \n\
 ";
 
@@ -95,6 +118,9 @@ struct ggml_mtl_context * mnist_mtl_init(
 
     ctx->function_relu = [ctx->library newFunctionWithName:@"kernel_relu"];
     ctx->pipeline_relu = [ctx->device newComputePipelineStateWithFunction:ctx->function_relu error:nil];
+
+    ctx->function_soft_max = [ctx->library newFunctionWithName:@"kernel_soft_max"];
+    ctx->pipeline_soft_max = [ctx->device newComputePipelineStateWithFunction:ctx->function_soft_max error:nil];
 
 #ifdef GGML_MTL_HEAP
     // MTLHeap approach
@@ -310,6 +336,9 @@ int mnist_mtl_eval(
                 } break;
             case GGML_OP_SOFT_MAX:
                 {
+#if 0
+                    // NOTE: MPSMatrixSoftMax is not working properly, probably there is a bug
+
                     if (encoder != nil) {
                         [encoder endEncoding];
                         encoder = nil;
@@ -328,6 +357,22 @@ int mnist_mtl_eval(
                     MPSMatrixSoftMax * softmax = [[MPSMatrixSoftMax alloc] initWithDevice:ctx->device];
 
                     [softmax encodeToCommandBuffer:command_buffer inputMatrix:mat_src resultMatrix:mat_dst];
+#else
+                    if (encoder == nil) {
+                        encoder = [command_buffer computeCommandEncoder];
+                    }
+
+                    id<MTLBuffer> id_src = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src0, &offs_src0);
+                    id<MTLBuffer> id_dst = mnist_mtl_get_buffer(ctx, gf->nodes[i],       &offs_dst);
+
+                    [encoder setComputePipelineState:ctx->pipeline_soft_max];
+                    [encoder setBuffer:id_src offset:offs_src0 atIndex:0];
+                    [encoder setBuffer:id_dst offset:offs_dst  atIndex:1];
+
+                    const int64_t n = ggml_nelements(gf->nodes[i]);
+
+                    [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+#endif
                 } break;
             case GGML_OP_MUL_MAT:
                 {
