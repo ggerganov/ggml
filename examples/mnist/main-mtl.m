@@ -9,7 +9,6 @@
 struct ggml_mtl_context {
     id<MTLDevice> device;
     id<MTLCommandQueue> queue;
-    id<MTLCommandBuffer> command_buffer;
 
     id<MTLHeap> heap_data;
     id<MTLHeap> heap_eval;
@@ -26,7 +25,6 @@ struct ggml_mtl_context * mnist_mtl_init(
 
     ctx->device         = MTLCreateSystemDefaultDevice();
     ctx->queue          = [ctx->device newCommandQueue];
-    ctx->command_buffer = [ctx->queue commandBuffer];
 
     // pin ctx_data memory to GPU
     // use MTLStorageModeShared to allow us to initialize the weights from the CPU
@@ -74,23 +72,39 @@ void mnist_mtl_free(struct ggml_mtl_context * ctx) {
 int mnist_mtl_eval(struct ggml_mtl_context * ctx, struct ggml_cgraph * gf) {
     fprintf(stderr, "%s: evaluating\n", __func__);
 
-    // create a new encoder for the command buffer
-    id<MTLComputeCommandEncoder> encoder = [ctx->command_buffer computeCommandEncoder];
+    id<MTLCommandBuffer> command_buffer  = [ctx->queue commandBuffer];
+    id<MTLComputeCommandEncoder> encoder = [command_buffer computeCommandEncoder];
 
     for (int i = 0; i < gf->n_nodes; ++i) {
         fprintf(stderr, "%s: encoding node %3d, op = %8s\n", __func__, i, ggml_op_name(gf->nodes[i]->op));
 
-        // TODO ...
+        switch (gf->nodes[i]->op) {
+            case GGML_OP_ADD:
+                {
+                } break;
+            case GGML_OP_RELU:
+                {
+                } break;
+            case GGML_OP_SOFT_MAX:
+                {
+                } break;
+            case GGML_OP_MUL_MAT:
+                {
+                } break;
+            default:
+                fprintf(stderr, "%s: node %3d, op = %8s not implemented\n", __func__, i, ggml_op_name(gf->nodes[i]->op));
+                GGML_ASSERT(false);
+                return -1;
+        }
     }
 
-    // finish encoding
     [encoder endEncoding];
 
-    [ctx->command_buffer commit];
-    [ctx->command_buffer waitUntilCompleted];
+    [command_buffer commit];
+    [command_buffer waitUntilCompleted];
 
     {
-        const double time_elapsed = [ctx->command_buffer GPUEndTime] - [ctx->command_buffer GPUStartTime];
+        const double time_elapsed = [command_buffer GPUEndTime] - [command_buffer GPUStartTime];
         fprintf(stderr, "%s: time elapsed = %f\n", __func__, time_elapsed);
     }
 
