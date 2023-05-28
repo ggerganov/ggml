@@ -197,10 +197,10 @@ id<MTLBuffer> mnist_mtl_get_buffer_on_heap(struct ggml_mtl_context * ctx, struct
     id<MTLBuffer> result;
 
     if (is_data) {
-        fprintf(stderr, "%s: data tensor '%8s', offs = %8ld, size = %8ld\n", __func__, t->name, t_offs, t_size);
+        fprintf(stderr, "%s: data tensor '%16s', offs = %8ld, size = %8ld\n", __func__, t->name, t_offs, t_size);
         result = [ctx->heap_data newBufferWithLength:t_size options:MTLResourceStorageModeShared offset:t_offs];
     } else {
-        fprintf(stderr, "%s: eval tensor '%8s', offs = %8ld, size = %8ld\n", __func__, t->name, t_offs, t_size);
+        fprintf(stderr, "%s: eval tensor '%16s', offs = %8ld, size = %8ld\n", __func__, t->name, t_offs, t_size);
         result = [ctx->heap_eval newBufferWithLength:t_size options:MTLResourceStorageModePrivate offset:t_offs];
     }
 
@@ -227,10 +227,10 @@ id<MTLBuffer> mnist_mtl_get_buffer(struct ggml_mtl_context * ctx, struct ggml_te
     id<MTLBuffer> result;
 
     if (is_data) {
-        fprintf(stderr, "%s: data tensor '%8s', offs = %8ld, size = %8ld\n", __func__, t->name, t_offs, t_size);
+        fprintf(stderr, "%s: data tensor '%16s', offs = %8ld, size = %8ld\n", __func__, t->name, t_offs, t_size);
         result = ctx->buffer_data;
     } else {
-        fprintf(stderr, "%s: eval tensor '%8s', offs = %8ld, size = %8ld\n", __func__, t->name, t_offs, t_size);
+        fprintf(stderr, "%s: eval tensor '%16s', offs = %8ld, size = %8ld\n", __func__, t->name, t_offs, t_size);
         result = ctx->buffer_eval;
     }
 
@@ -254,7 +254,6 @@ int mnist_mtl_eval(
     fprintf(stderr, "%s: evaluating\n", __func__);
 
     id<MTLCommandBuffer> command_buffer  = [ctx->queue commandBuffer];
-    //id<MTLComputeCommandEncoder> encoder = [command_buffer computeCommandEncoder];
     id<MTLComputeCommandEncoder> encoder = nil;
 
     size_t offs_src0;
@@ -366,7 +365,6 @@ int mnist_mtl_eval(
         }
     }
 
-    //[encoder endEncoding];
     if (encoder != nil) {
         [encoder endEncoding];
         encoder = nil;
