@@ -138,7 +138,7 @@ struct mpt_hparams {
 
 struct replit_layer {
     // pre normalization
-    struct ggml_tensor * ln_1_weight;
+    struct ggml_tensor * norm_1_weight;
 
     // attention
     struct ggml_tensor * c_attn_wqkv_weight;
@@ -146,19 +146,19 @@ struct replit_layer {
     struct ggml_tensor * c_attn_out_proj_weight;
 
     // post normalization
-    struct ggml_tensor * ln_2_weight;
+    struct ggml_tensor * norm_2_weight;
 
     // ff
-    struct ggml_tensor * c_mlp_mlp_up_weight;
+    struct ggml_tensor * ffn_up_proj_weight;
 
-    struct ggml_tensor * c_mlp_mlp_down_weight;
+    struct ggml_tensor * ffn_down_proj_weight;
 };
 
 struct replit_model {
     mpt_hparams hparams;
 
     struct ggml_tensor * wte_weight;  // position embedding
-    struct ggml_tensor * ln_f_weight; // language model head
+    struct ggml_tensor * norm_f_weight; // language model head
 
     std::vector<replit_layer> layers;
 
@@ -240,12 +240,12 @@ bool replit_model_load(const std::string & fname, replit_model & model, replit_t
         const int n_vocab = hparams.n_vocab;
 
         ctx_size += n_embd * n_vocab * ggml_type_sizef(wtype); // wte_weight
-        ctx_size += n_embd * ggml_type_sizef(GGML_TYPE_F32);   // ln_f_weight
+        ctx_size += n_embd * ggml_type_sizef(GGML_TYPE_F32);   // norm_f_weight
 
-        ctx_size += n_layer * (n_embd * ggml_type_sizef(GGML_TYPE_F32));      // ln_1_weight
+        ctx_size += n_layer * (n_embd * ggml_type_sizef(GGML_TYPE_F32));      // norm_1_weight
         ctx_size += n_layer * (3 * n_embd * n_embd * ggml_type_sizef(wtype)); // attn_Wqkv_weight
         ctx_size += n_layer * (n_embd * n_embd * ggml_type_sizef(wtype));     // attn_out_proj_weight
-        ctx_size += n_layer * (n_embd * ggml_type_sizef(GGML_TYPE_F32));      // ln_2_weight
+        ctx_size += n_layer * (n_embd * ggml_type_sizef(GGML_TYPE_F32));      // norm_2_weight
         ctx_size += n_layer * (4 * n_embd * n_embd * ggml_type_sizef(wtype)); // mlp_mlp_up_weight
         ctx_size += n_layer * (n_embd * n_embd * 4 * ggml_type_sizef(wtype)); // mlp_mlp_down_weight
 
@@ -283,31 +283,29 @@ bool replit_model_load(const std::string & fname, replit_model & model, replit_t
         model.layers.resize(n_layer);
 
         model.wte_weight = ggml_new_tensor_2d(ctx, wtype, n_embd, n_vocab);
-        model.ln_f_weight = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
+        model.norm_f_weight = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
 
         // map by name
         model.tensors["transformer.wte.weight"] = model.wte_weight;
-        model.tensors["transformer.ln_f.weight"] = model.ln_f_weight;
+        model.tensors["transformer.norm_f.weight"] = model.norm_f_weight;
 
         for (int i = 0; i < n_layer; ++i) {
             auto & layer = model.layers[i];
 
-            layer.ln_1_weight = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
+            layer.norm_1_weight = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
             layer.c_attn_wqkv_weight = ggml_new_tensor_2d(ctx, wtype, n_embd, 3 * n_embd);
             layer.c_attn_out_proj_weight = ggml_new_tensor_2d(ctx, wtype, n_embd, n_embd);
-            layer.ln_2_weight = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
-            layer.c_mlp_mlp_up_weight = ggml_new_tensor_2d(ctx, wtype, n_embd, 4 * n_embd);
-            layer.c_mlp_mlp_down_weight = ggml_new_tensor_2d(ctx, wtype, 4 * n_embd, n_embd);
+            layer.norm_2_weight = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
+            layer.ffn_up_proj_weight = ggml_new_tensor_2d(ctx, wtype, n_embd, 4 * n_embd);
+            layer.ffn_down_proj_weight = ggml_new_tensor_2d(ctx, wtype, 4 * n_embd, n_embd);
 
             // map by name
-            model.tensors["transformer.blocks." + std::to_string(i) + ".ln_1.weight"] = layer.ln_1_weight;
+            model.tensors["transformer.blocks." + std::to_string(i) + ".norm_1.weight"] = layer.norm_1_weight;
             model.tensors["transformer.blocks." + std::to_string(i) + ".attn.Wqkv.weight"] = layer.c_attn_wqkv_weight;
-            model.tensors["transformer.blocks." + std::to_string(i) + ".attn.out_proj.weight"] =
-                layer.c_attn_out_proj_weight;
-            model.tensors["transformer.blocks." + std::to_string(i) + ".ln_2.weight"] = layer.ln_2_weight;
-            model.tensors["transformer.blocks." + std::to_string(i) + ".mlp.mlp_up.weight"] = layer.c_mlp_mlp_up_weight;
-            model.tensors["transformer.blocks." + std::to_string(i) + ".mlp.mlp_down.weight"] =
-                layer.c_mlp_mlp_down_weight;
+            model.tensors["transformer.blocks." + std::to_string(i) + ".attn.out_proj.weight"] = layer.c_attn_out_proj_weight;
+            model.tensors["transformer.blocks." + std::to_string(i) + ".norm_2.weight"] = layer.norm_2_weight;
+            model.tensors["transformer.blocks." + std::to_string(i) + ".ffn.up_proj.weight"] = layer.ffn_up_proj_weight;
+            model.tensors["transformer.blocks." + std::to_string(i) + ".ffn.down_proj.weight"] = layer.ffn_down_proj_weight;
         }
     }
 
@@ -473,7 +471,7 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
         {
             cur = ggml_norm(ctx0, inpL);
 
-            cur = ggml_mul(ctx0, ggml_repeat(ctx0, model.layers[il].ln_1_weight, cur), cur);
+            cur = ggml_mul(ctx0, ggml_repeat(ctx0, model.layers[il].norm_1_weight, cur), cur);
         }
 
         // self-attention
@@ -563,20 +561,20 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
         {
             cur = ggml_norm(ctx0, inpL);
 
-            cur = ggml_mul(ctx0, ggml_repeat(ctx0, model.layers[il].ln_2_weight, cur), cur);
+            cur = ggml_mul(ctx0, ggml_repeat(ctx0, model.layers[il].norm_2_weight, cur), cur);
         }
 
         // n = self.mlp(m)
         {
 
-            cur = ggml_mul_mat(ctx0, model.layers[il].c_mlp_mlp_up_weight, cur);
+            cur = ggml_mul_mat(ctx0, model.layers[il].ffn_up_proj_weight, cur);
 
             // GELU activation
             cur = ggml_gelu(ctx0, cur);
 
             // projection
             // cur = proj_w*cur + proj_b
-            cur = ggml_mul_mat(ctx0, model.layers[il].c_mlp_mlp_down_weight, cur);
+            cur = ggml_mul_mat(ctx0, model.layers[il].ffn_down_proj_weight, cur);
         }
 
         // x = x + n
@@ -587,7 +585,7 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
     {
         inpL = ggml_norm(ctx0, inpL);
         // inpL = ln_f_g*inpL
-        inpL = ggml_mul(ctx0, ggml_repeat(ctx0, model.ln_f_weight, inpL), inpL);
+        inpL = ggml_mul(ctx0, ggml_repeat(ctx0, model.norm_f_weight, inpL), inpL);
     }
 
     // output embedding weight tied to input embedding
@@ -660,6 +658,7 @@ int main(int argc, char ** argv) {
         }
 
         t_load_us = ggml_time_us() - t_start_us;
+
     }
 
     int n_past = 0;
@@ -743,7 +742,7 @@ int main(int argc, char ** argv) {
         fflush(stdout);
 
         // end of text token
-        if (embd.back() == 0) {
+        if (embd.back() == 1) {
             break;
         }
     }
