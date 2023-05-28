@@ -7,12 +7,35 @@
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
 struct ggml_mtl_context {
-    id<MTLDevice> device;
+    struct ggml_context * ctx_data;
+    struct ggml_context * ctx_eval;
+    struct ggml_context * ctx_work;
+
+    id<MTLDevice>       device;
     id<MTLCommandQueue> queue;
+    id<MTLLibrary>      library;
 
     id<MTLHeap> heap_data;
     id<MTLHeap> heap_eval;
+
+    // custom kernels
+    id<MTLFunction>             function_add;
+    id<MTLComputePipelineState> pipeline_add;
 };
+
+// MSL code
+NSString * const msl_library_mnist = @"\
+#include <metal_stdlib>                                                                 \n\
+using namespace metal;                                                                  \n\
+                                                                                        \n\
+kernel void kernel_add(                                                                 \n\
+        device const float * src0,                                                      \n\
+        device const float * src1,                                                      \n\
+        device float * dst,                                                             \n\
+        uint gid[[thread_position_in_grid]]) {                                          \n\
+    dst[gid] = src0[gid] + src1[gid];                                                   \n\
+}                                                                                       \n\
+";
 
 struct ggml_mtl_context * mnist_mtl_init(
     struct ggml_context * ctx_data,
@@ -23,8 +46,24 @@ struct ggml_mtl_context * mnist_mtl_init(
 
     struct ggml_mtl_context * ctx = malloc(sizeof(struct ggml_mtl_context));
 
-    ctx->device         = MTLCreateSystemDefaultDevice();
-    ctx->queue          = [ctx->device newCommandQueue];
+    ctx->ctx_data = ctx_data;
+    ctx->ctx_eval = ctx_eval;
+    ctx->ctx_work = ctx_work;
+
+    ctx->device  = MTLCreateSystemDefaultDevice();
+    ctx->queue   = [ctx->device newCommandQueue];
+
+    // compile from source string and show compile log
+    NSError * error = nil;
+    ctx->library = [ctx->device newLibraryWithSource:msl_library_mnist options:nil error:&error];
+    if (error) {
+        fprintf(stderr, "%s: error: %s\n", __func__, [[error description] UTF8String]);
+        exit(1);
+    }
+
+    // load kernels
+    ctx->function_add = [ctx->library newFunctionWithName:@"kernel_add"];
+    ctx->pipeline_add = [ctx->device newComputePipelineStateWithFunction:ctx->function_add error:nil];
 
     // pin ctx_data memory to GPU
     // use MTLStorageModeShared to allow us to initialize the weights from the CPU
@@ -69,7 +108,28 @@ void mnist_mtl_free(struct ggml_mtl_context * ctx) {
     free(ctx);
 }
 
-int mnist_mtl_eval(struct ggml_mtl_context * ctx, struct ggml_cgraph * gf) {
+// make a view of the respective MTL heap
+id<MTLBuffer> mnist_mtl_get_buffer(struct ggml_mtl_context * ctx, struct ggml_tensor * t) {
+    const int64_t offs_data = (int64_t) t->data - (int64_t) ggml_get_mem_buffer(ctx->ctx_data);
+    const int64_t offs_eval = (int64_t) t->data - (int64_t) ggml_get_mem_buffer(ctx->ctx_eval);
+
+    const bool is_data = (offs_eval < 0) || (offs_data >= 0 && offs_data < offs_eval);
+
+    const size_t t_size = ggml_nbytes(t);
+    const size_t t_offs = is_data ? offs_data : offs_eval;
+
+    if (is_data) {
+        fprintf(stderr, "%s: data tensor '%s'\n", __func__, t->name);
+        return [ctx->heap_data newBufferWithLength:t_size options:MTLResourceStorageModeShared offset:t_offs];
+    } else {
+        fprintf(stderr, "%s: eval tensor '%s'\n", __func__, t->name);
+        return [ctx->heap_eval newBufferWithLength:t_size options:MTLResourceStorageModePrivate offset:t_offs];
+    }
+}
+
+int mnist_mtl_eval(
+        struct ggml_mtl_context * ctx,
+        struct ggml_cgraph      * gf) {
     fprintf(stderr, "%s: evaluating\n", __func__);
 
     id<MTLCommandBuffer> command_buffer  = [ctx->queue commandBuffer];
@@ -81,6 +141,17 @@ int mnist_mtl_eval(struct ggml_mtl_context * ctx, struct ggml_cgraph * gf) {
         switch (gf->nodes[i]->op) {
             case GGML_OP_ADD:
                 {
+                    id<MTLBuffer> id_src0 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src0);
+                    id<MTLBuffer> id_src1 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src1);
+                    id<MTLBuffer> id_dst  = mnist_mtl_get_buffer(ctx, gf->nodes[i]);
+
+                    [encoder setComputePipelineState:ctx->pipeline_add];
+                    [encoder setBuffer:id_src0 offset:0 atIndex:0];
+                    [encoder setBuffer:id_src1 offset:0 atIndex:1];
+                    [encoder setBuffer:id_dst  offset:0 atIndex:2];
+
+                    const int64_t n = ggml_nelements(gf->nodes[i]);
+                    [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
                 } break;
             case GGML_OP_RELU:
                 {
