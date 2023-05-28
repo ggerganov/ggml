@@ -26,15 +26,14 @@ struct ggml_mtl_context {
     id<MTLBuffer> buffer_eval;
 #endif
 
+    id<MTLBuffer> results;
+
     // custom kernels
     id<MTLFunction>             function_add;
     id<MTLComputePipelineState> pipeline_add;
 
     id<MTLFunction>             function_relu;
     id<MTLComputePipelineState> pipeline_relu;
-
-    id<MTLFunction>             function_softmax;
-    id<MTLComputePipelineState> pipeline_softmax;
 };
 
 // MSL code
@@ -173,6 +172,15 @@ struct ggml_mtl_context * mnist_mtl_init(
     }
 #endif
 
+    // allocate buffer for result extraction
+    {
+        const size_t mem_size = ggml_nbytes(gf->nodes[gf->n_nodes - 1]);
+
+        ctx->results = [ctx->device newBufferWithLength:mem_size options:MTLResourceStorageModeShared];
+
+        fprintf(stderr, "%s: allocated results buffer, size = %zu\n", __func__, mem_size);
+    }
+
     return ctx;
 }
 
@@ -280,6 +288,7 @@ int mnist_mtl_eval(
                     [encoder setBuffer:id_dst  offset:offs_dst  atIndex:2];
 
                     const int64_t n = ggml_nelements(gf->nodes[i]);
+
                     [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
                 } break;
             case GGML_OP_RELU:
@@ -296,6 +305,7 @@ int mnist_mtl_eval(
                     [encoder setBuffer:id_dst offset:offs_dst  atIndex:1];
 
                     const int64_t n = ggml_nelements(gf->nodes[i]);
+
                     [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
                 } break;
             case GGML_OP_SOFT_MAX:
@@ -365,9 +375,21 @@ int mnist_mtl_eval(
         }
     }
 
-    if (encoder != nil) {
-        [encoder endEncoding];
-        encoder = nil;
+    // extract results from the GPU
+    {
+        if (encoder != nil) {
+            [encoder endEncoding];
+            encoder = nil;
+        }
+
+        struct ggml_tensor * output = gf->nodes[gf->n_nodes - 1];
+
+        id<MTLBuffer> id_src = mnist_mtl_get_buffer(ctx, output, &offs_src0);
+        id<MTLBuffer> id_dst = ctx->results;
+
+        id<MTLBlitCommandEncoder> encoder_blit = [command_buffer blitCommandEncoder];
+        [encoder_blit copyFromBuffer:id_src sourceOffset:offs_src0 toBuffer:id_dst destinationOffset:0 size:ggml_nbytes(output)];
+        [encoder_blit endEncoding];
     }
 
     [command_buffer commit];
@@ -378,5 +400,21 @@ int mnist_mtl_eval(
         fprintf(stderr, "%s: time elapsed = %f\n", __func__, time_elapsed);
     }
 
-    return 0;
+    // select the most probable digit
+
+    const float * probs = ctx->results.contents;
+
+    int   pred = 0;
+    float prob = probs[0];
+
+    for (int i = 0; i < 10; ++i) {
+        fprintf(stderr, "%s: probs[%2d] = %f\n", __func__, i, probs[i]);
+
+        if (probs[i] > prob) {
+            pred = i;
+            prob = probs[i];
+        }
+    }
+
+    return pred;
 }

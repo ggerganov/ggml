@@ -47,7 +47,6 @@ int mnist_eval(
     struct ggml_tensor * input = ggml_get_tensor_by_name(&gf, "input");
     memcpy(input->data, digit.data(), ggml_nbytes(input));
 
-    //ggml_graph_compute(ctx_work, &gf);
     auto ctx_mtl = mnist_mtl_init(ctx_data, ctx_eval, ctx_work, &gf);
     const int prediction = mnist_mtl_eval(ctx_mtl, &gf);
     mnist_mtl_free(ctx_mtl);
