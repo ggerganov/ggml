@@ -38,7 +38,7 @@ int mnist_eval(
     struct ggml_context * ctx_data = NULL;
     struct ggml_context * ctx_eval = NULL;
 
-    struct ggml_cgraph gf = ggml_cgraph_import(fname_cgraph, &ctx_data, &ctx_eval);
+    struct ggml_cgraph gf = ggml_graph_import(fname_cgraph, &ctx_data, &ctx_eval);
     gf.n_threads = n_threads;
 
     // allocate eval context
