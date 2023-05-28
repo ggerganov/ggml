@@ -48,11 +48,9 @@ int mnist_eval(
     memcpy(input->data, digit.data(), ggml_nbytes(input));
 
     //ggml_graph_compute(ctx_work, &gf);
-    mnist_mtl_eval(ctx_data, ctx_eval, ctx_work, &gf);
-
-    const float * probs_data = ggml_get_data_f32(ggml_get_tensor_by_name(&gf, "probs"));
-
-    const int prediction = std::max_element(probs_data, probs_data + 10) - probs_data;
+    auto ctx_mtl = mnist_mtl_init(ctx_data, ctx_eval, ctx_work, &gf);
+    const int prediction = mnist_mtl_eval(ctx_mtl, &gf);
+    mnist_mtl_free(ctx_mtl);
 
     ggml_free(ctx_work);
     ggml_free(ctx_data);

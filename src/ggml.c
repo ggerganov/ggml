@@ -4030,6 +4030,14 @@ void ggml_set_no_alloc(struct ggml_context * ctx, bool no_alloc) {
     ctx->no_alloc = no_alloc;
 }
 
+void * ggml_get_mem_buffer(struct ggml_context * ctx) {
+    return ctx->mem_buffer;
+}
+
+size_t ggml_get_mem_size(struct ggml_context * ctx) {
+    return ctx->mem_size;
+}
+
 // IMPORTANT:
 // when creating "opt" tensors, always save and load the scratch buffer
 // this is an error prone process, but it is necessary to support inplace
