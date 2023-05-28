@@ -21,6 +21,12 @@ struct ggml_mtl_context {
     // custom kernels
     id<MTLFunction>             function_add;
     id<MTLComputePipelineState> pipeline_add;
+
+    id<MTLFunction>             function_relu;
+    id<MTLComputePipelineState> pipeline_relu;
+
+    id<MTLFunction>             function_softmax;
+    id<MTLComputePipelineState> pipeline_softmax;
 };
 
 // MSL code
@@ -34,6 +40,13 @@ kernel void kernel_add(                                                         
         device float * dst,                                                             \n\
         uint gid[[thread_position_in_grid]]) {                                          \n\
     dst[gid] = src0[gid] + src1[gid];                                                   \n\
+}                                                                                       \n\
+                                                                                        \n\
+kernel void kernel_relu(                                                                \n\
+        device const float * src,                                                       \n\
+        device       float * dst,                                                       \n\
+        uint gid[[thread_position_in_grid]]) {                                          \n\
+    dst[gid] = max(0.0f, src[gid]);                                                     \n\
 }                                                                                       \n\
 ";
 
@@ -53,6 +66,14 @@ struct ggml_mtl_context * mnist_mtl_init(
     ctx->device  = MTLCreateSystemDefaultDevice();
     ctx->queue   = [ctx->device newCommandQueue];
 
+    // determine if we can use MPS
+    if (MPSSupportsMTLDevice(ctx->device)) {
+        fprintf(stderr, "%s: using MPS\n", __func__);
+    } else {
+        fprintf(stderr, "%s: not using MPS\n", __func__);
+        GGML_ASSERT(false && "MPS not supported");
+    }
+
     // compile from source string and show compile log
     NSError * error = nil;
     ctx->library = [ctx->device newLibraryWithSource:msl_library_mnist options:nil error:&error];
@@ -64,6 +85,9 @@ struct ggml_mtl_context * mnist_mtl_init(
     // load kernels
     ctx->function_add = [ctx->library newFunctionWithName:@"kernel_add"];
     ctx->pipeline_add = [ctx->device newComputePipelineStateWithFunction:ctx->function_add error:nil];
+
+    ctx->function_relu = [ctx->library newFunctionWithName:@"kernel_relu"];
+    ctx->pipeline_relu = [ctx->device newComputePipelineStateWithFunction:ctx->function_relu error:nil];
 
     // pin ctx_data memory to GPU
     // use MTLStorageModeShared to allow us to initialize the weights from the CPU
@@ -77,13 +101,24 @@ struct ggml_mtl_context * mnist_mtl_init(
         heap_desc.storageMode = MTLStorageModeShared;
         heap_desc.size        = mem_size;
 
+        printf("heap_desc.size = %zu\n", mem_size);
+
         ctx->heap_data = [ctx->device newHeapWithDescriptor:heap_desc];
-        [ctx->heap_data setPurgeableState:MTLPurgeableStateNonVolatile];
+        [ctx->heap_data setPurgeableState:MTLPurgeableStateNonVolatile]; // TODO: is this needed?
+        ctx->heap_data.label = @"heap_data";
+
+        printf("ctx->heap_data.size = %zu\n", [ctx->heap_data size]);
 
         id<MTLBuffer> buffer = [ctx->heap_data newBufferWithLength:mem_size options:MTLResourceStorageModeShared];
+        if (!buffer) {
+            fprintf(stderr, "%s: error: failed to allocate buffer\n", __func__);
+            exit(1);
+        }
 
         // copy data from CPU to GPU
         memcpy([buffer contents], mem_buffer, mem_size);
+
+        fprintf(stderr, "%s: allocated data heap, size = %zu\n", __func__, mem_size);
     }
 
     // pin ctx_eval memory to GPU
@@ -96,7 +131,9 @@ struct ggml_mtl_context * mnist_mtl_init(
         heap_desc.size        = mem_size;
 
         ctx->heap_eval = [ctx->device newHeapWithDescriptor:heap_desc];
-        [ctx->heap_eval setPurgeableState:MTLPurgeableStateNonVolatile];
+        [ctx->heap_eval setPurgeableState:MTLPurgeableStateNonVolatile]; // TODO: is this needed?
+
+        fprintf(stderr, "%s: allocated eval heap, size = %zu\n", __func__, mem_size);
     }
 
     return ctx;
@@ -118,13 +155,22 @@ id<MTLBuffer> mnist_mtl_get_buffer(struct ggml_mtl_context * ctx, struct ggml_te
     const size_t t_size = ggml_nbytes(t);
     const size_t t_offs = is_data ? offs_data : offs_eval;
 
+    id<MTLBuffer> result;
+
     if (is_data) {
-        fprintf(stderr, "%s: data tensor '%s'\n", __func__, t->name);
-        return [ctx->heap_data newBufferWithLength:t_size options:MTLResourceStorageModeShared offset:t_offs];
+        fprintf(stderr, "%s: data tensor '%8s', offs = %8ld, size = %8ld\n", __func__, t->name, t_offs, t_size);
+        result = [ctx->heap_data newBufferWithLength:t_size options:MTLResourceStorageModeShared offset:t_offs];
     } else {
-        fprintf(stderr, "%s: eval tensor '%s'\n", __func__, t->name);
-        return [ctx->heap_eval newBufferWithLength:t_size options:MTLResourceStorageModePrivate offset:t_offs];
+        fprintf(stderr, "%s: eval tensor '%8s', offs = %8ld, size = %8ld\n", __func__, t->name, t_offs, t_size);
+        result = [ctx->heap_eval newBufferWithLength:t_size options:MTLResourceStorageModePrivate offset:t_offs];
     }
+
+    NSLog(@"%s: buffer = %p\n", __func__, result);
+    if (result == nil) {
+        fprintf(stderr, "%s: error: buffer is nil\n", __func__);
+    }
+
+    return result;
 }
 
 int mnist_mtl_eval(
@@ -155,9 +201,30 @@ int mnist_mtl_eval(
                 } break;
             case GGML_OP_RELU:
                 {
+                    id<MTLBuffer> id_src = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src0);
+                    id<MTLBuffer> id_dst = mnist_mtl_get_buffer(ctx, gf->nodes[i]);
+
+                    [encoder setComputePipelineState:ctx->pipeline_relu];
+                    [encoder setBuffer:id_src offset:0 atIndex:0];
+                    [encoder setBuffer:id_dst offset:0 atIndex:1];
+
+                    const int64_t n = ggml_nelements(gf->nodes[i]);
+                    [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
                 } break;
             case GGML_OP_SOFT_MAX:
                 {
+                    // use MPSMatrixSoftMax
+                    //id<MTLBuffer> id_src = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src0);
+                    //id<MTLBuffer> id_dst = mnist_mtl_get_buffer(ctx, gf->nodes[i]);
+
+                    //MPSMatrixDescriptor * desc = [MPSMatrixDescriptor
+                    //    matrixDescriptorWithRows:1 columns:gf->nodes[i]->ne[0] rowBytes:gf->nodes[i]->nb[1] dataType:MPSDataTypeFloat32];
+
+                    //MPSMatrix * mat_src = [[MPSMatrix alloc] initWithBuffer:id_src descriptor:desc];
+                    //MPSMatrix * mat_dst = [[MPSMatrix alloc] initWithBuffer:id_dst descriptor:desc];
+
+                    //MPSMatrixSoftMax * softmax = [[MPSMatrixSoftMax alloc] initWithDevice:ctx->device];
+                    //[softmax encodeToCommandBuffer:command_buffer inputMatrix:mat_src resultMatrix:mat_dst];
                 } break;
             case GGML_OP_MUL_MAT:
                 {
