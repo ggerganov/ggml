@@ -6,6 +6,9 @@
 #import <Metal/Metal.h>
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
+// TODO: couldn't get this to work
+//#define GGML_MTL_HEAP
+
 struct ggml_mtl_context {
     struct ggml_context * ctx_data;
     struct ggml_context * ctx_eval;
@@ -15,8 +18,13 @@ struct ggml_mtl_context {
     id<MTLCommandQueue> queue;
     id<MTLLibrary>      library;
 
+#ifdef GGML_MTL_HEAP
     id<MTLHeap> heap_data;
     id<MTLHeap> heap_eval;
+#else
+    id<MTLBuffer> buffer_data;
+    id<MTLBuffer> buffer_eval;
+#endif
 
     // custom kernels
     id<MTLFunction>             function_add;
@@ -89,6 +97,9 @@ struct ggml_mtl_context * mnist_mtl_init(
     ctx->function_relu = [ctx->library newFunctionWithName:@"kernel_relu"];
     ctx->pipeline_relu = [ctx->device newComputePipelineStateWithFunction:ctx->function_relu error:nil];
 
+#ifdef GGML_MTL_HEAP
+    // MTLHeap approach
+
     // pin ctx_data memory to GPU
     // use MTLStorageModeShared to allow us to initialize the weights from the CPU
     // TODO: how to use MTLStorageModeManaged?
@@ -135,6 +146,32 @@ struct ggml_mtl_context * mnist_mtl_init(
 
         fprintf(stderr, "%s: allocated eval heap, size = %zu\n", __func__, mem_size);
     }
+#else
+    // MTLBuffer approach
+
+    // pin ctx_data memory to GPU
+    // use MTLStorageModeShared to allow us to initialize the weights from the CPU
+    // TODO: how to use MTLStorageModeManaged?
+    // TODO: see if we can avoid this copy somehow
+    {
+        const void * mem_buffer = ggml_get_mem_buffer(ctx_data);
+        const size_t mem_size   = ggml_get_mem_size(ctx_data);
+
+        ctx->buffer_data = [ctx->device newBufferWithBytes:mem_buffer length:mem_size options:MTLResourceStorageModeShared];
+
+        fprintf(stderr, "%s: allocated data buffer, size = %zu\n", __func__, mem_size);
+    }
+
+    // pin ctx_eval memory to GPU
+    // this heap will be used for the intermediate results of the evaluation
+    {
+        const size_t mem_size = ggml_get_mem_size(ctx_eval);
+
+        ctx->buffer_eval = [ctx->device newBufferWithLength:mem_size options:MTLResourceStorageModePrivate];
+
+        fprintf(stderr, "%s: allocated eval buffer, size = %zu\n", __func__, mem_size);
+    }
+#endif
 
     return ctx;
 }
@@ -145,8 +182,10 @@ void mnist_mtl_free(struct ggml_mtl_context * ctx) {
     free(ctx);
 }
 
+#ifdef GGML_MTL_HEAP
+
 // make a view of the respective MTL heap
-id<MTLBuffer> mnist_mtl_get_buffer(struct ggml_mtl_context * ctx, struct ggml_tensor * t) {
+id<MTLBuffer> mnist_mtl_get_buffer_on_heap(struct ggml_mtl_context * ctx, struct ggml_tensor * t) {
     const int64_t offs_data = (int64_t) t->data - (int64_t) ggml_get_mem_buffer(ctx->ctx_data);
     const int64_t offs_eval = (int64_t) t->data - (int64_t) ggml_get_mem_buffer(ctx->ctx_eval);
 
@@ -165,13 +204,49 @@ id<MTLBuffer> mnist_mtl_get_buffer(struct ggml_mtl_context * ctx, struct ggml_te
         result = [ctx->heap_eval newBufferWithLength:t_size options:MTLResourceStorageModePrivate offset:t_offs];
     }
 
-    NSLog(@"%s: buffer = %p\n", __func__, result);
     if (result == nil) {
         fprintf(stderr, "%s: error: buffer is nil\n", __func__);
+        GGML_ASSERT(false);
     }
 
     return result;
 }
+
+#else
+
+// get data / eval buffer + offset
+id<MTLBuffer> mnist_mtl_get_buffer(struct ggml_mtl_context * ctx, struct ggml_tensor * t, size_t * offs) {
+    const int64_t offs_data = (int64_t) t->data - (int64_t) ggml_get_mem_buffer(ctx->ctx_data);
+    const int64_t offs_eval = (int64_t) t->data - (int64_t) ggml_get_mem_buffer(ctx->ctx_eval);
+
+    const bool is_data = (offs_eval < 0) || (offs_data >= 0 && offs_data < offs_eval);
+
+    const size_t t_size = ggml_nbytes(t);
+    const size_t t_offs = is_data ? offs_data : offs_eval;
+
+    id<MTLBuffer> result;
+
+    if (is_data) {
+        fprintf(stderr, "%s: data tensor '%8s', offs = %8ld, size = %8ld\n", __func__, t->name, t_offs, t_size);
+        result = ctx->buffer_data;
+    } else {
+        fprintf(stderr, "%s: eval tensor '%8s', offs = %8ld, size = %8ld\n", __func__, t->name, t_offs, t_size);
+        result = ctx->buffer_eval;
+    }
+
+    if (result == nil) {
+        fprintf(stderr, "%s: error: buffer is nil\n", __func__);
+        GGML_ASSERT(false);
+    }
+
+    if (offs != nil) {
+        *offs = t_offs;
+    }
+
+    return result;
+}
+
+#endif
 
 int mnist_mtl_eval(
         struct ggml_mtl_context * ctx,
@@ -179,7 +254,12 @@ int mnist_mtl_eval(
     fprintf(stderr, "%s: evaluating\n", __func__);
 
     id<MTLCommandBuffer> command_buffer  = [ctx->queue commandBuffer];
-    id<MTLComputeCommandEncoder> encoder = [command_buffer computeCommandEncoder];
+    //id<MTLComputeCommandEncoder> encoder = [command_buffer computeCommandEncoder];
+    id<MTLComputeCommandEncoder> encoder = nil;
+
+    size_t offs_src0;
+    size_t offs_src1;
+    size_t offs_dst;
 
     for (int i = 0; i < gf->n_nodes; ++i) {
         fprintf(stderr, "%s: encoding node %3d, op = %8s\n", __func__, i, ggml_op_name(gf->nodes[i]->op));
@@ -187,47 +267,97 @@ int mnist_mtl_eval(
         switch (gf->nodes[i]->op) {
             case GGML_OP_ADD:
                 {
-                    id<MTLBuffer> id_src0 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src0);
-                    id<MTLBuffer> id_src1 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src1);
-                    id<MTLBuffer> id_dst  = mnist_mtl_get_buffer(ctx, gf->nodes[i]);
+                    if (encoder == nil) {
+                        encoder = [command_buffer computeCommandEncoder];
+                    }
+
+                    id<MTLBuffer> id_src0 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src0, &offs_src0);
+                    id<MTLBuffer> id_src1 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src1, &offs_src1);
+                    id<MTLBuffer> id_dst  = mnist_mtl_get_buffer(ctx, gf->nodes[i],       &offs_dst);
 
                     [encoder setComputePipelineState:ctx->pipeline_add];
-                    [encoder setBuffer:id_src0 offset:0 atIndex:0];
-                    [encoder setBuffer:id_src1 offset:0 atIndex:1];
-                    [encoder setBuffer:id_dst  offset:0 atIndex:2];
+                    [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
+                    [encoder setBuffer:id_src1 offset:offs_src1 atIndex:1];
+                    [encoder setBuffer:id_dst  offset:offs_dst  atIndex:2];
 
                     const int64_t n = ggml_nelements(gf->nodes[i]);
                     [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
                 } break;
             case GGML_OP_RELU:
                 {
-                    id<MTLBuffer> id_src = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src0);
-                    id<MTLBuffer> id_dst = mnist_mtl_get_buffer(ctx, gf->nodes[i]);
+                    if (encoder == nil) {
+                        encoder = [command_buffer computeCommandEncoder];
+                    }
+
+                    id<MTLBuffer> id_src = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src0, &offs_src0);
+                    id<MTLBuffer> id_dst = mnist_mtl_get_buffer(ctx, gf->nodes[i],       &offs_dst);
 
                     [encoder setComputePipelineState:ctx->pipeline_relu];
-                    [encoder setBuffer:id_src offset:0 atIndex:0];
-                    [encoder setBuffer:id_dst offset:0 atIndex:1];
+                    [encoder setBuffer:id_src offset:offs_src0 atIndex:0];
+                    [encoder setBuffer:id_dst offset:offs_dst  atIndex:1];
 
                     const int64_t n = ggml_nelements(gf->nodes[i]);
                     [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
                 } break;
             case GGML_OP_SOFT_MAX:
                 {
+                    if (encoder != nil) {
+                        [encoder endEncoding];
+                        encoder = nil;
+                    }
+
                     // use MPSMatrixSoftMax
-                    //id<MTLBuffer> id_src = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src0);
-                    //id<MTLBuffer> id_dst = mnist_mtl_get_buffer(ctx, gf->nodes[i]);
+                    id<MTLBuffer> id_src = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src0, &offs_src0);
+                    id<MTLBuffer> id_dst = mnist_mtl_get_buffer(ctx, gf->nodes[i],       &offs_dst);
 
-                    //MPSMatrixDescriptor * desc = [MPSMatrixDescriptor
-                    //    matrixDescriptorWithRows:1 columns:gf->nodes[i]->ne[0] rowBytes:gf->nodes[i]->nb[1] dataType:MPSDataTypeFloat32];
+                    MPSMatrixDescriptor * desc = [MPSMatrixDescriptor
+                        matrixDescriptorWithRows:1 columns:gf->nodes[i]->ne[0] rowBytes:gf->nodes[i]->nb[1] dataType:MPSDataTypeFloat32];
 
-                    //MPSMatrix * mat_src = [[MPSMatrix alloc] initWithBuffer:id_src descriptor:desc];
-                    //MPSMatrix * mat_dst = [[MPSMatrix alloc] initWithBuffer:id_dst descriptor:desc];
+                    MPSMatrix * mat_src = [[MPSMatrix alloc] initWithBuffer:id_src offset:offs_src0 descriptor:desc];
+                    MPSMatrix * mat_dst = [[MPSMatrix alloc] initWithBuffer:id_dst offset:offs_dst  descriptor:desc];
 
-                    //MPSMatrixSoftMax * softmax = [[MPSMatrixSoftMax alloc] initWithDevice:ctx->device];
-                    //[softmax encodeToCommandBuffer:command_buffer inputMatrix:mat_src resultMatrix:mat_dst];
+                    MPSMatrixSoftMax * softmax = [[MPSMatrixSoftMax alloc] initWithDevice:ctx->device];
+
+                    [softmax encodeToCommandBuffer:command_buffer inputMatrix:mat_src resultMatrix:mat_dst];
                 } break;
             case GGML_OP_MUL_MAT:
                 {
+                    if (encoder != nil) {
+                        [encoder endEncoding];
+                        encoder = nil;
+                    }
+
+                    // use MPSMatrixMultiplication
+                    id<MTLBuffer> id_src0 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src0, &offs_src0);
+                    id<MTLBuffer> id_src1 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src1, &offs_src1);
+                    id<MTLBuffer> id_dst  = mnist_mtl_get_buffer(ctx, gf->nodes[i],       &offs_dst);
+
+                    const int64_t ncols0 = gf->nodes[i]->src0->ne[0];
+                    const int64_t nrows0 = gf->nodes[i]->src0->ne[1];
+
+                    const int64_t ncols1 = gf->nodes[i]->src1->ne[0];
+                    const int64_t nrows1 = gf->nodes[i]->src1->ne[1];
+
+                    const int64_t ncols2 = gf->nodes[i]->ne[0];
+                    const int64_t nrows2 = gf->nodes[i]->ne[1];
+
+                    GGML_ASSERT(ncols0 == ncols1);
+
+                    MPSMatrixDescriptor * desc0 = [MPSMatrixDescriptor
+                        matrixDescriptorWithRows:nrows0 columns:ncols0 rowBytes:gf->nodes[i]->src0->nb[1] dataType:MPSDataTypeFloat32];
+                    MPSMatrixDescriptor * desc1 = [MPSMatrixDescriptor
+                        matrixDescriptorWithRows:nrows1 columns:ncols1 rowBytes:gf->nodes[i]->src1->nb[1] dataType:MPSDataTypeFloat32];
+                    MPSMatrixDescriptor * desc2 = [MPSMatrixDescriptor
+                        matrixDescriptorWithRows:nrows2 columns:ncols2 rowBytes:gf->nodes[i]->nb[1] dataType:MPSDataTypeFloat32];
+
+                    MPSMatrix * mat_src0 = [[MPSMatrix alloc] initWithBuffer:id_src0 offset:offs_src0 descriptor:desc0];
+                    MPSMatrix * mat_src1 = [[MPSMatrix alloc] initWithBuffer:id_src1 offset:offs_src1 descriptor:desc1];
+                    MPSMatrix * mat_dst  = [[MPSMatrix alloc] initWithBuffer:id_dst  offset:offs_dst  descriptor:desc2];
+
+                    MPSMatrixMultiplication * mul = [[MPSMatrixMultiplication alloc] initWithDevice:ctx->device
+                        transposeLeft:false transposeRight:true resultRows:nrows1 resultColumns:nrows0 interiorColumns:ncols0 alpha:1.0 beta:0.0];
+
+                    [mul encodeToCommandBuffer:command_buffer leftMatrix:mat_src1 rightMatrix:mat_src0 resultMatrix:mat_dst];
                 } break;
             default:
                 fprintf(stderr, "%s: node %3d, op = %8s not implemented\n", __func__, i, ggml_op_name(gf->nodes[i]->op));
@@ -236,7 +366,11 @@ int mnist_mtl_eval(
         }
     }
 
-    [encoder endEncoding];
+    //[encoder endEncoding];
+    if (encoder != nil) {
+        [encoder endEncoding];
+        encoder = nil;
+    }
 
     [command_buffer commit];
     [command_buffer waitUntilCompleted];
