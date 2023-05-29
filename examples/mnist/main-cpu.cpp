@@ -51,12 +51,12 @@ int mnist_eval(
 
     struct ggml_context * ctx0 = ggml_init(params);
 
-    struct ggml_tensor * input = ggml_get_tensor_by_name(&gfi, "input");
+    struct ggml_tensor * input = ggml_graph_get_tensor(&gfi, "input");
     memcpy(input->data, digit.data(), ggml_nbytes(input));
 
     ggml_graph_compute(ctx0, &gfi);
 
-    const float * probs_data = ggml_get_data_f32(ggml_get_tensor_by_name(&gfi, "probs"));
+    const float * probs_data = ggml_get_data_f32(ggml_graph_get_tensor(&gfi, "probs"));
 
     const int prediction = std::max_element(probs_data, probs_data + 10) - probs_data;
 

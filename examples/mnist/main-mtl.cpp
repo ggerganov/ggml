@@ -59,7 +59,7 @@ int mnist_eval(
     int prediction = -1;
 
     for (int i = 0; i < 1; ++i) {
-        struct ggml_tensor * input = ggml_get_tensor_by_name(&gf, "input");
+        struct ggml_tensor * input = ggml_graph_get_tensor(&gf, "input");
 
         if (i % 2 == 0) {
             memcpy(input->data, digit.data(), ggml_nbytes(input));

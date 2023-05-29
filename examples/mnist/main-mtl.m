@@ -118,7 +118,7 @@ struct ggml_mtl_context * mnist_mtl_init(
 
     // load kernels
     {
-        const int k_digits = ggml_get_tensor_by_name(gf, "probs")->ne[0];
+        const int k_digits = ggml_graph_get_tensor(gf, "probs")->ne[0];
 
         MTLFunctionConstantValues * constants = [MTLFunctionConstantValues new];
         [constants setConstantValue:&k_digits type:MTLDataTypeInt withName:@"k_digits"];
@@ -310,7 +310,7 @@ int mnist_mtl_eval(
 
     // copy the input data to the GPU
     {
-        struct ggml_tensor * inp = ggml_get_tensor_by_name(gf, "input");
+        struct ggml_tensor * inp = ggml_graph_get_tensor(gf, "input");
 
         id<MTLBuffer> id_dst = mnist_mtl_get_buffer(ctx, inp, &offs_src0);
 
