@@ -12,6 +12,7 @@
 
 #include "ggml/ggml.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
