@@ -165,7 +165,8 @@ bool mnist_model_load(const std::string & fname, mnist_model & model) {
 int mnist_eval(
         const mnist_model & model,
         const int n_threads,
-        std::vector<float> digit
+        std::vector<float> digit,
+        const char * fname_cgraph
         ) {
 
     const auto & hparams = model.hparams;
@@ -176,6 +177,7 @@ int mnist_eval(
     struct ggml_init_params params = {
         .mem_size   = buf_size,
         .mem_buffer = buf,
+        .no_alloc   = false,
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
@@ -192,13 +194,22 @@ int mnist_eval(
 
     // soft max
     ggml_tensor * probs = ggml_soft_max(ctx0, fc2);
+    ggml_set_name(probs, "probs");
 
-    // run the computation
+    // build / export / run the computation graph
     ggml_build_forward_expand(&gf, probs);
     ggml_graph_compute       (ctx0, &gf);
 
     //ggml_graph_print   (&gf);
     ggml_graph_dump_dot(&gf, NULL, "mnist.dot");
+
+    if (fname_cgraph) {
+        // export the compute graph for later use
+        // see the "mnist-cpu" example
+        ggml_graph_export(&gf, "mnist.ggml");
+
+        fprintf(stderr, "%s: exported compute graph to '%s'\n", __func__, fname_cgraph);
+    }
 
     const float * probs_data = ggml_get_data_f32(probs);
 
@@ -213,30 +224,31 @@ int mnist_eval(
 extern "C" {
 #endif
 
-int wasm_eval(uint8_t *digitPtr)
-{
+int wasm_eval(uint8_t * digitPtr) {
     mnist_model model;
     if (!mnist_model_load("models/mnist/ggml-model-f32.bin", model)) {
         fprintf(stderr, "error loading model\n");
         return -1;
     }
     std::vector<float> digit(digitPtr, digitPtr + 784);
-    int result = mnist_eval(model, 1, digit);
+    int result = mnist_eval(model, 1, digit, nullptr);
     ggml_free(model.ctx);
+
     return result;
 }
 
-int wasm_random_digit(char *digitPtr)
-{
+int wasm_random_digit(char * digitPtr) {
     auto fin = std::ifstream("models/mnist/t10k-images.idx3-ubyte", std::ios::binary);
     if (!fin) {
         fprintf(stderr, "failed to open digits file\n");
         return 0;
     }
     srand(time(NULL));
+
     // Seek to a random digit: 16-byte header + 28*28 * (random 0 - 10000)
     fin.seekg(16 + 784 * (rand() % 10000));
     fin.read(digitPtr, 784);
+
     return 1;
 }
 
@@ -300,7 +312,9 @@ int main(int argc, char ** argv) {
         fprintf(stderr, "\n");
     }
 
-    fprintf(stdout, "%s: predicted digit is %d\n", __func__, mnist_eval(model, 1, digit));
+    const int prediction = mnist_eval(model, 1, digit, "mnist.ggml");
+
+    fprintf(stdout, "%s: predicted digit is %d\n", __func__, prediction);
 
     ggml_free(model.ctx);
 
