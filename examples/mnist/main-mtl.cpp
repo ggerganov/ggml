@@ -24,13 +24,11 @@
 // evaluate the MNIST compute graph
 //
 //   - fname_cgraph: path to the compute graph
-//   - n_threads:    number of threads to use
 //   - digit:        784 pixel values
 //
 // returns 0 - 9 prediction
 int mnist_eval(
         const char * fname_cgraph,
-        const int n_threads,
         std::vector<float> digit
         ) {
     // load the compute graph
@@ -38,10 +36,9 @@ int mnist_eval(
     struct ggml_context * ctx_eval = NULL;
 
     struct ggml_cgraph gf = ggml_graph_import(fname_cgraph, &ctx_data, &ctx_eval);
-    gf.n_threads = n_threads;
+    gf.n_threads = 1;
 
-    // allocate eval context
-    // needed during ggml_graph_compute() to allocate a work tensor
+    // allocate work context
     static size_t buf_size = gf.work_size; // TODO
     static void * buf = malloc(buf_size);
 
@@ -121,7 +118,7 @@ int main(int argc, char ** argv) {
         fprintf(stderr, "\n");
     }
 
-    const int prediction = mnist_eval(argv[1], 1, digit);
+    const int prediction = mnist_eval(argv[1], digit);
 
     fprintf(stdout, "%s: predicted digit is %d\n", __func__, prediction);
 

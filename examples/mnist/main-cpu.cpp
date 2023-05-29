@@ -39,7 +39,7 @@ int mnist_eval(
     struct ggml_cgraph gfi = ggml_graph_import(fname_cgraph, &ctx_data, &ctx_eval);
     gfi.n_threads = n_threads;
 
-    // allocate eval context
+    // allocate work context
     // needed during ggml_graph_compute() to allocate a work tensor
     static size_t buf_size = gfi.work_size; // TODO
     static void * buf = malloc(buf_size);
@@ -50,18 +50,18 @@ int mnist_eval(
         .no_alloc   = false,
     };
 
-    struct ggml_context * ctx0 = ggml_init(params);
+    struct ggml_context * ctx_work = ggml_init(params);
 
     struct ggml_tensor * input = ggml_graph_get_tensor(&gfi, "input");
     memcpy(input->data, digit.data(), ggml_nbytes(input));
 
-    ggml_graph_compute(ctx0, &gfi);
+    ggml_graph_compute(ctx_work, &gfi);
 
     const float * probs_data = ggml_get_data_f32(ggml_graph_get_tensor(&gfi, "probs"));
 
     const int prediction = std::max_element(probs_data, probs_data + 10) - probs_data;
 
-    ggml_free(ctx0);
+    ggml_free(ctx_work);
     ggml_free(ctx_data);
     ggml_free(ctx_eval);
 
