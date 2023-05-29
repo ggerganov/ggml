@@ -392,9 +392,7 @@ int mnist_mtl_eval(
                     [encoder setBuffer:id_src offset:offs_src0 atIndex:0];
                     [encoder setBuffer:id_dst offset:offs_dst  atIndex:1];
 
-                    const int64_t n = ggml_nelements(gf->nodes[i]);
-
-                    [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+                    [encoder dispatchThreadgroups:MTLSizeMake(1, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
 #endif
                 } break;
             case GGML_OP_MUL_MAT:
