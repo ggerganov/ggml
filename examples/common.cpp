@@ -6,6 +6,7 @@
 #include "dr_wav.h"
 
 #include <cmath>
+#include <cstring>
 #include <fstream>
 #include <regex>
 #include <locale>
