@@ -923,16 +923,42 @@ extern "C" {
             float                 min,
             float                 max);
 
+    // TODO: implement general-purpose convolutions
+    // GGML_API struct ggml_tensor * ggml_conv_1d(
+    //        struct ggml_context * ctx,
+    //        struct ggml_tensor  * a,
+    //        struct ggml_tensor  * b,
+    //        int                   s0
+    //        int                   p0,
+    //        int                   d0);
+    //
+    // GGML_API struct ggml_tensor * ggml_conv_2d(
+    //        struct ggml_context * ctx,
+    //        struct ggml_tensor  * a,
+    //        struct ggml_tensor  * b,
+    //        int                   s0,
+    //        int                   s1,
+    //        int                   p0,
+    //        int                   p1,
+    //        int                   d0,
+    //        int                   d1);
+
     // padding = half
     // TODO: we don't support extra parameters for now
     //       that's why we are hard-coding the stride, padding, and dilation
     //       not great ..
-    GGML_API struct ggml_tensor * ggml_conv_1d_1s_ph(
+    // example:
+    // a:      3   80  768    1
+    // b:   3000   80    1    1
+    // res: 3000  768    1    1
+    // used in whisper
+    GGML_API struct ggml_tensor * ggml_conv_1d_s1_ph(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             struct ggml_tensor  * b);
 
-    GGML_API struct ggml_tensor * ggml_conv_1d_2s_ph(
+    // used in whisper
+    GGML_API struct ggml_tensor * ggml_conv_1d_s2_ph(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             struct ggml_tensor  * b);
