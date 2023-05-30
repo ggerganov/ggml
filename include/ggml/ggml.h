@@ -923,16 +923,16 @@ extern "C" {
             float                 min,
             float                 max);
 
-    // padding = 1
+    // padding = half
     // TODO: we don't support extra parameters for now
     //       that's why we are hard-coding the stride, padding, and dilation
     //       not great ..
-    GGML_API struct ggml_tensor * ggml_conv_1d_1s(
+    GGML_API struct ggml_tensor * ggml_conv_1d_1s_ph(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             struct ggml_tensor  * b);
 
-    GGML_API struct ggml_tensor * ggml_conv_1d_2s(
+    GGML_API struct ggml_tensor * ggml_conv_1d_2s_ph(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             struct ggml_tensor  * b);
