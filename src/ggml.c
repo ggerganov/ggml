@@ -14581,7 +14581,7 @@ static void ggml_graph_export_leaf(const struct ggml_tensor * tensor, FILE * fou
     const int64_t * ne = tensor->ne;
     const size_t  * nb = tensor->nb;
 
-    fprintf(fout, "%-6s %-12s %8d %8lld %8lld %8lld %8lld %16zu %16zu %16zu %16zu %16p %16s\n",
+    fprintf(fout, "%-6s %-12s %8d %8jd %jd %jd %jd %16zu %16zu %16zu %16zu %16p %16s\n",
             ggml_type_name(tensor->type),
             ggml_op_name  (tensor->op),
             tensor->n_dims,
@@ -14595,7 +14595,7 @@ static void ggml_graph_export_node(const struct ggml_tensor * tensor, const char
     const int64_t * ne = tensor->ne;
     const size_t  * nb = tensor->nb;
 
-    fprintf(fout, "%-6s %-6s %-12s %8d %8lld %8lld %8lld %8lld %16zu %16zu %16zu %16zu %8d %16p %16s\n",
+    fprintf(fout, "%-6s %-6s %-12s %8d %8jd %8jd %8jd %8jd %16zu %16zu %16zu %16zu %8d %16p %16s\n",
             arg,
             ggml_type_name(tensor->type),
             ggml_op_name  (tensor->op),
@@ -14624,11 +14624,11 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
         FILE * fout = stdout;
 
         fprintf(fout, "\n");
-        fprintf(fout, "%-16s %8x\n",   "magic",   GGML_FILE_MAGIC);
-        fprintf(fout, "%-16s %8d\n",   "version", GGML_FILE_VERSION);
-        fprintf(fout, "%-16s %8d\n",   "leafs",   cgraph->n_leafs);
-        fprintf(fout, "%-16s %8d\n",   "nodes",   cgraph->n_nodes);
-        fprintf(fout, "%-16s %8llu\n", "eval",    size_eval);
+        fprintf(fout, "%-16s %8x\n",  "magic",   GGML_FILE_MAGIC);
+        fprintf(fout, "%-16s %8d\n",  "version", GGML_FILE_VERSION);
+        fprintf(fout, "%-16s %8d\n",  "leafs",   cgraph->n_leafs);
+        fprintf(fout, "%-16s %8d\n",  "nodes",   cgraph->n_nodes);
+        fprintf(fout, "%-16s %8ju\n", "eval",    size_eval);
 
         // header
         fprintf(fout, "\n");
@@ -14862,7 +14862,13 @@ struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** 
 
         data = ggml_new_tensor_1d(*ctx_data, GGML_TYPE_I8, fsize);
 
-        fread(data->data, sizeof(char), fsize, fin);
+        {
+            const size_t ret = fread(data->data, sizeof(char), fsize, fin);
+            if (ret != fsize) {
+                fprintf(stderr, "%s: failed to read %s\n", __func__, fname);
+                return result;
+            }
+        }
 
         fclose(fin);
     }
@@ -15046,7 +15052,7 @@ void ggml_graph_print(const struct ggml_cgraph * cgraph) {
 
         perf_total_per_op_us[node->op] += MAX(1, node->perf_time_us);
 
-        GGML_PRINT(" - %3d: [ %5" PRId64 ", %5" PRId64 ", %5" PRId64 "] %16s %s (%3d) cpu = %7.3f / %7.3f ms, wall = %7.3f / %7.3f ms\n",
+        GGML_PRINT(" - %3d: [ %5jd, %5jd, %5jd] %16s %s (%3d) cpu = %7.3f / %7.3f ms, wall = %7.3f / %7.3f ms\n",
                 i,
                 node->ne[0], node->ne[1], node->ne[2],
                 GGML_OP_NAME[node->op], node->is_param ? "x" : node->grad ? "g" : " ", node->perf_runs,
@@ -15060,7 +15066,7 @@ void ggml_graph_print(const struct ggml_cgraph * cgraph) {
     for (int i = 0; i < cgraph->n_leafs; i++) {
         struct ggml_tensor * node = cgraph->leafs[i];
 
-        GGML_PRINT(" - %3d: [ %5" PRId64 ", %5" PRId64 "] %8s\n",
+        GGML_PRINT(" - %3d: [ %5jd, %5jd] %8s\n",
                 i,
                 node->ne[0], node->ne[1],
                 GGML_OP_NAME[node->op]);
@@ -15143,9 +15149,9 @@ void ggml_graph_dump_dot(const struct ggml_cgraph * gb, const struct ggml_cgraph
         }
 
         if (node->n_dims == 2) {
-            fprintf(fp, "%d [%" PRId64 ", %" PRId64 "] | <x>%s", i, node->ne[0], node->ne[1], GGML_OP_SYMBOL[node->op]);
+            fprintf(fp, "%d [%jd, %jd] | <x>%s", i, node->ne[0], node->ne[1], GGML_OP_SYMBOL[node->op]);
         } else {
-            fprintf(fp, "%d [%" PRId64 ", %" PRId64 ", %" PRId64 "] | <x>%s", i, node->ne[0], node->ne[1], node->ne[2], GGML_OP_SYMBOL[node->op]);
+            fprintf(fp, "%d [%jd, %jd, %jd] | <x>%s", i, node->ne[0], node->ne[1], node->ne[2], GGML_OP_SYMBOL[node->op]);
         }
 
 
@@ -15178,7 +15184,7 @@ void ggml_graph_dump_dot(const struct ggml_cgraph * gb, const struct ggml_cgraph
             }
         }
         else {
-            fprintf(fp, "CONST %d [%" PRId64 ", %" PRId64 "]", i, node->ne[0], node->ne[1]);
+            fprintf(fp, "CONST %d [%jd, %jd]", i, node->ne[0], node->ne[1]);
         }
         fprintf(fp, "\"; ]\n");
     }
