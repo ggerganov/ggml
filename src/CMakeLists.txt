@@ -170,7 +170,7 @@ if (GGML_CLBLAST)
 		message(STATUS "clBLAST found")
 
 		set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${CLBLAST_LIB})
-		set(GGML_OPENCL_SOURCES ggml-opencl.c ggml-opencl.h)
+		set(GGML_OPENCL_SOURCES ggml-opencl.cpp ggml-opencl.h)
 		set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CLBLAST)
 		link_libraries("-Wl,--copy-dt-needed-entries")
     else()
