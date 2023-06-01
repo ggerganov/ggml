@@ -202,12 +202,13 @@ bool replit_model_load(const std::string & fname, replit_model & model, replit_t
 
         const int32_t qntvr = hparams.ftype / GGML_QNT_VERSION_FACTOR;
 
-        printf("%s: d_model       = %d\n", __func__, hparams.d_model);
-        printf("%s: max_seq_len   = %d\n", __func__, hparams.max_seq_len);
-        printf("%s: n_heads       = %d\n", __func__, hparams.n_heads);
-        printf("%s: n_layers      = %d\n", __func__, hparams.n_layers);
+        printf("%s: d_model      = %d\n", __func__, hparams.d_model);
+        printf("%s: max_seq_len  = %d\n", __func__, hparams.max_seq_len);
+        printf("%s: n_heads      = %d\n", __func__, hparams.n_heads);
+        printf("%s: n_layers     = %d\n", __func__, hparams.n_layers);
         printf("%s: n_vocab      = %d\n", __func__, hparams.n_vocab);
-        printf("%s: ftype   = %d\n", __func__, hparams.ftype);
+        printf("%s: ftype        = %d\n", __func__, hparams.ftype);
+        printf("%s: qntvr        = %d\n", __func__, qntvr);
 
         hparams.ftype %= GGML_QNT_VERSION_FACTOR;
     }
