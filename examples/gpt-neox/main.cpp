@@ -156,10 +156,10 @@ bool gpt_neox_model_load(const std::string & fname, gpt_neox_model & model, gpt_
     {
         const auto & hparams = model.hparams;
 
-        const int n_embd  = hparams.n_embd;
-        const int n_layer = hparams.n_layer;
-        const int n_ctx   = hparams.n_ctx;
-        const int n_vocab = hparams.n_vocab;
+        const size_t n_embd  = hparams.n_embd;
+        const size_t n_layer = hparams.n_layer;
+        const size_t n_ctx   = hparams.n_ctx;
+        const size_t n_vocab = hparams.n_vocab;
 
         ctx_size += n_embd*ggml_type_sizef(GGML_TYPE_F32); // ln_f_g
         ctx_size += n_embd*ggml_type_sizef(GGML_TYPE_F32); // ln_f_b
@@ -190,7 +190,7 @@ bool gpt_neox_model_load(const std::string & fname, gpt_neox_model & model, gpt_
         ctx_size += n_ctx*n_layer*n_embd*ggml_type_sizef(GGML_TYPE_F32); // memory_k
         ctx_size += n_ctx*n_layer*n_embd*ggml_type_sizef(GGML_TYPE_F32); // memory_v
 
-        ctx_size += (6 + 16*n_layer)*512; // object overhead
+        ctx_size += (6 + 16*n_layer)*1024; // object overhead
 
         printf("%s: ggml ctx size = %6.2f MB\n", __func__, ctx_size/(1024.0*1024.0));
     }
