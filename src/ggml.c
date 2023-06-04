@@ -10222,7 +10222,7 @@ static void ggml_compute_forward_set_f32(
     const int im2 = (ne12 == 0 ? 0 : ne12-1);
     const int im3 = (ne13 == 0 ? 0 : ne13-1);
 
-    GGML_ASSERT(offset + im0*nb0  + im1*nb1  + im2*nb2  + im3*nb3  < ggml_nbytes(dst));
+    GGML_ASSERT(offset + im0*nb0  + im1*nb1  + im2*nb2  + im3*nb3  <= ggml_nbytes(dst));
 
     GGML_ASSERT(nb10 == sizeof(float));
 
