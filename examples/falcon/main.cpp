@@ -14,6 +14,7 @@
 #include <vector>
 
 // default hparams (Falcon 7B)
+// TODO add n_head_kv to support 40B
 struct falcon_hparams {
     int32_t n_vocab = 65024;
     int32_t n_ctx   = 2048;
@@ -139,12 +140,10 @@ bool falcon_model_load(const std::string & fname, falcon_model & model, gpt_voca
         const int n_ctx = hparams.n_ctx;
         const int n_ff = 4 * model.hparams.n_embd;
         const int n_vocab = hparams.n_vocab;
+        const int head_dim = hparams.n_embd / hparams.n_head;
 
         ctx_size +=
             n_embd * n_vocab * ggml_type_sizef(wtype);  // tok_embeddings
-
-        // ctx_size += n_embd*ggml_type_sizef(GGML_TYPE_F32); // norm
-        // ctx_size += n_embd*ggml_type_sizef(GGML_TYPE_F32); // norm_b
 
         ctx_size += n_embd * ggml_type_sizef(GGML_TYPE_F32);  // output_norm
         ctx_size += n_embd * ggml_type_sizef(GGML_TYPE_F32);  // output_norm_b
@@ -172,9 +171,9 @@ bool falcon_model_load(const std::string & fname, falcon_model & model, gpt_voca
         ctx_size +=
             n_layer * (n_ff * n_embd * ggml_type_sizef(wtype));  // ffn_down
 
-        ctx_size += n_ctx * n_layer * n_embd *
+        ctx_size += n_ctx * n_layer * head_dim *
                     ggml_type_sizef(GGML_TYPE_F32);  // memory_k
-        ctx_size += n_ctx * n_layer * n_embd *
+        ctx_size += n_ctx * n_layer * head_dim *
                     ggml_type_sizef(GGML_TYPE_F32);  // memory_v
 
         ctx_size += (5 + 10 * n_layer) * 256;  // object overhead TODO:
@@ -261,12 +260,12 @@ bool falcon_model_load(const std::string & fname, falcon_model & model, gpt_voca
     {
         const auto & hparams = model.hparams;
 
-        const int n_embd  = hparams.n_embd;
         const int n_layer = hparams.n_layer;
         const int n_ctx   = hparams.n_ctx;
+        const int head_dim = hparams.n_embd / hparams.n_head;
 
         const int64_t n_mem      = n_layer*n_ctx;
-        const int64_t n_elements = n_embd*n_mem;
+        const int64_t n_elements = head_dim*n_mem;
 
         model.memory_k = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_elements);
         model.memory_v = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_elements);
