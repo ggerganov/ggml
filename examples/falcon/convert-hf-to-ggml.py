@@ -80,13 +80,12 @@ fout.write(struct.pack("i", hparams["n_head"]))
 fout.write(struct.pack("i", hparams["n_layer"]))
 fout.write(struct.pack("i", ftype))
 
-# Is this correct?
-# 
-# No. Multibyte characters that span multiple tokens like emoji 🤖 won't be
-# decoded properly.
-dot_token = tokenizer.encode(".")[0]
+reverse_vocab = {id: encoded_tok for encoded_tok, id in tokenizer.vocab.items()}
+byte_encoder = bytes_to_unicode()
+byte_decoder = {v:k for k, v in byte_encoder.items()}
+
 for i in range(hparams["vocab_size"]):
-    text = tokenizer.decode([i]).encode('utf-8')
+    text = bytearray([byte_decoder[c] for c in reverse_vocab[i]])
     fout.write(struct.pack("i", len(text)))
     fout.write(text)
     

@@ -623,7 +623,7 @@ int main(int argc, char ** argv) {
     const int64_t t_main_start_us = ggml_time_us();
 
     gpt_params params;
-    params.model = "models/stablelm-base-alpha-3b/ggml-model-f16.bin";
+    params.model = "models/falcon-7b/ggml-model-f16.bin";
 
     if (gpt_params_parse(argc, argv, params) == false) {
         return 1;
