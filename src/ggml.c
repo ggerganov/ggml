@@ -1609,14 +1609,17 @@ quantize_fns_t ggml_internal_get_quantize_fn(size_t i) {
 #define GGML_F32x4_REDUCE_ONE(x) vaddvq_f32(x)
 #define GGML_F32x4_REDUCE(res, x)              \
 {                                              \
-    for (int i = 0; i < GGML_F32_ARR/2; ++i) { \
-        x[2*i] = vaddq_f32(x[2*i], x[2*i+1]);  \
+    int offset = GGML_F32_ARR >> 1;            \
+    for (int i = 0; i < offset; ++i) {         \
+        x[i] = vaddq_f32(x[i], x[offset+i]);   \
     }                                          \
-    for (int i = 0; i < GGML_F32_ARR/4; ++i) { \
-        x[4*i] = vaddq_f32(x[4*i], x[4*i+2]);  \
+    offset >>= 1;                              \
+    for (int i = 0; i < offset; ++i) {         \
+        x[i] = vaddq_f32(x[i], x[offset+i]);   \
     }                                          \
-    for (int i = 0; i < GGML_F32_ARR/8; ++i) { \
-        x[8*i] = vaddq_f32(x[8*i], x[8*i+4]);  \
+    offset >>= 1;                              \
+    for (int i = 0; i < offset; ++i) {         \
+        x[i] = vaddq_f32(x[i], x[offset+i]);   \
     }                                          \
     res = GGML_F32x4_REDUCE_ONE(x[0]);         \
 }
@@ -1647,14 +1650,17 @@ quantize_fns_t ggml_internal_get_quantize_fn(size_t i) {
     #define GGML_F16x8_MUL          vmulq_f16
     #define GGML_F16x8_REDUCE(res, x)                             \
     {                                                             \
-        for (int i = 0; i < GGML_F16_ARR/2; ++i) {                \
-            x[2*i] = vaddq_f16(x[2*i], x[2*i+1]);                 \
+        int offset = GGML_F16_ARR >> 1;                           \
+        for (int i = 0; i < offset; ++i) {                        \
+            x[i] = vaddq_f16(x[i], x[offset+i]);                  \
         }                                                         \
-        for (int i = 0; i < GGML_F16_ARR/4; ++i) {                \
-            x[4*i] = vaddq_f16(x[4*i], x[4*i+2]);                 \
+        offset >>= 1;                                             \
+        for (int i = 0; i < offset; ++i) {                        \
+            x[i] = vaddq_f16(x[i], x[offset+i]);                  \
         }                                                         \
-        for (int i = 0; i < GGML_F16_ARR/8; ++i) {                \
-            x[8*i] = vaddq_f16(x[8*i], x[8*i+4]);                 \
+        offset >>= 1;                                             \
+        for (int i = 0; i < offset; ++i) {                        \
+            x[i] = vaddq_f16(x[i], x[offset+i]);                  \
         }                                                         \
         const float32x4_t t0 = vcvt_f32_f16(vget_low_f16 (x[0])); \
         const float32x4_t t1 = vcvt_f32_f16(vget_high_f16(x[0])); \
