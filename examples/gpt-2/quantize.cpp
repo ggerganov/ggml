@@ -20,11 +20,11 @@ struct gpt2_hparams {
     int32_t n_embd  = 768;
     int32_t n_head  = 12;
     int32_t n_layer = 12;
-    int32_t f16     = 1;
+    int32_t ftype   = 1;
 };
 
 // quantize a model
-bool gpt2_model_quantize(const std::string & fname_inp, const std::string & fname_out, ggml_mtype mtype) {
+bool gpt2_model_quantize(const std::string & fname_inp, const std::string & fname_out, ggml_ftype ftype) {
     gpt_vocab vocab;
 
     printf("%s: loading model from '%s'\n", __func__, fname_inp.c_str());
@@ -62,21 +62,27 @@ bool gpt2_model_quantize(const std::string & fname_inp, const std::string & fnam
         finp.read((char *) &hparams.n_embd,  sizeof(hparams.n_embd));
         finp.read((char *) &hparams.n_head,  sizeof(hparams.n_head));
         finp.read((char *) &hparams.n_layer, sizeof(hparams.n_layer));
-        finp.read((char *) &hparams.f16,     sizeof(hparams.f16));
+        finp.read((char *) &hparams.ftype,   sizeof(hparams.ftype));
 
-        printf("%s: n_vocab = %d\n", __func__, hparams.n_vocab);
-        printf("%s: n_ctx   = %d\n", __func__, hparams.n_ctx);
-        printf("%s: n_embd  = %d\n", __func__, hparams.n_embd);
-        printf("%s: n_head  = %d\n", __func__, hparams.n_head);
-        printf("%s: n_layer = %d\n", __func__, hparams.n_layer);
-        printf("%s: f16     = %d\n", __func__, hparams.f16);
+        const int32_t qntvr_src =    hparams.ftype / GGML_QNT_VERSION_FACTOR;
+        const int32_t ftype_dst = GGML_QNT_VERSION * GGML_QNT_VERSION_FACTOR + ftype;
+
+        printf("%s: n_vocab     = %d\n", __func__, hparams.n_vocab);
+        printf("%s: n_ctx       = %d\n", __func__, hparams.n_ctx);
+        printf("%s: n_embd      = %d\n", __func__, hparams.n_embd);
+        printf("%s: n_head      = %d\n", __func__, hparams.n_head);
+        printf("%s: n_layer     = %d\n", __func__, hparams.n_layer);
+        printf("%s: ftype (src) = %d\n", __func__, hparams.ftype);
+        printf("%s: qntvr (src) = %d\n", __func__, qntvr_src);
+        printf("%s: ftype (dst) = %d\n", __func__, ftype_dst);
+        printf("%s: qntvr (dst) = %d\n", __func__, GGML_QNT_VERSION);
 
         fout.write((char *) &hparams.n_vocab, sizeof(hparams.n_vocab));
         fout.write((char *) &hparams.n_ctx,   sizeof(hparams.n_ctx));
         fout.write((char *) &hparams.n_embd,  sizeof(hparams.n_embd));
         fout.write((char *) &hparams.n_head,  sizeof(hparams.n_head));
         fout.write((char *) &hparams.n_layer, sizeof(hparams.n_layer));
-        fout.write((char *) &mtype,           sizeof(hparams.f16));
+        fout.write((char *) &ftype_dst,       sizeof(ftype_dst));
     }
 
     // load vocab
@@ -116,7 +122,7 @@ bool gpt2_model_quantize(const std::string & fname_inp, const std::string & fnam
         "model/h.*/mlp/c_proj/w",
     };
 
-    if (!ggml_common_quantize_0(finp, fout, mtype, to_quant, {})) {
+    if (!ggml_common_quantize_0(finp, fout, ftype, to_quant, {})) {
         fprintf(stderr, "%s: failed to quantize model '%s'\n", __func__, fname_inp.c_str());
         return false;
     }
@@ -133,10 +139,7 @@ bool gpt2_model_quantize(const std::string & fname_inp, const std::string & fnam
 int main(int argc, char ** argv) {
     if (argc != 4) {
         fprintf(stderr, "usage: %s model-f32.bin model-quant.bin type\n", argv[0]);
-        fprintf(stderr, "  type = 2 - q4_0\n");
-        fprintf(stderr, "  type = 3 - q4_1\n");
-        fprintf(stderr, "  type = 5 - q4_2\n");
-        fprintf(stderr, "  type = 6 - q4_3\n");
+        ggml_print_ftypes(stderr);
         return 1;
     }
 
@@ -150,7 +153,7 @@ int main(int argc, char ** argv) {
     const std::string fname_inp = argv[1];
     const std::string fname_out = argv[2];
 
-    const int mtype = atoi(argv[3]);
+    const ggml_ftype ftype = ggml_parse_ftype(argv[3]);
 
     const int64_t t_main_start_us = ggml_time_us();
 
@@ -160,7 +163,7 @@ int main(int argc, char ** argv) {
     {
         const int64_t t_start_us = ggml_time_us();
 
-        if (!gpt2_model_quantize(fname_inp, fname_out, ggml_mtype(mtype))) {
+        if (!gpt2_model_quantize(fname_inp, fname_out, ggml_ftype(ftype))) {
             fprintf(stderr, "%s: failed to quantize model from '%s'\n", __func__, fname_inp.c_str());
             return 1;
         }

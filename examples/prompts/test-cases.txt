@@ -1,0 +1,110 @@
+# test case format
+# <language>: <sentence>
+
+English: Hello World!
+English: I can't believe it's already Friday!"
+English: The URL for the website is https://www.example.com."
+English: "She said, 'I love to travel.'"
+English: 'The temperature is 25.5°C.'
+English: "Let's meet at 2:30 p.m. in the park."
+English: The book costs $19.99
+English: "John's favorite color is blue."
+English: Th@nk y0u f0r y0ur h3lp!
+English: C@n I g3t a c0ffee, pl3@se?
+English: W0w! Th@t's @m@zing!
+English: H0w 4re y0u t0d@y?
+English: I l0ve t0 tr@vel @r0und the w0rld.
+English: Wh@t's y0ur f@v0rite m0vie?
+English: The cat is sleeping on the mat.
+English: I need to buy some groceries for dinner.
+English: The sun is shining brightly in the sky.
+English: She is reading a book in the park.
+English: We went for a walk on the beach yesterday.
+English: He plays the guitar like a pro.
+English: They are going to the movies tonight.
+English: The flowers are blooming in the garden.
+English: I enjoy listening to classical music.
+English: We need to buy groceries for the week.
+English: The dog is chasing its tail in circles.
+English: She is wearing a beautiful red dress.
+English: He is a talented actor in Hollywood.
+English: The children are playing in the playground.
+English: I'm going to visit my grandparents this weekend.
+English: The coffee tastes bitter without sugar.
+English: They are planning a surprise party for her.
+English: She sings like an angel on stage.
+English: We should take a vacation to relax.
+English: He is studying medicine at the university.
+English: The rain is pouring heavily outside.
+English: I enjoy watching romantic movies.
+English: They are celebrating their anniversary today.
+English: She dances gracefully to the music.
+English: He is an excellent basketball player.
+English: The baby is sleeping soundly in the crib.
+English: I need to finish my homework before dinner.
+English: They are organizing a charity event next month.
+English: She is cooking a delicious meal for us.
+English: We should go hiking in the mountains.
+English: The car broke down on the way to work.
+English: He loves playing video games in his free time.
+English: The birds are chirping in the trees.
+English: I want to learn how to play the piano.
+English: They are building a new shopping mall in the city.
+English: She is writing a novel in her spare time.
+English: We are going to the zoo this Saturday.
+English: The cake looks delicious with chocolate frosting.
+English: He is a talented painter who sells his artwork.
+English: The students are studying for their exams.
+English: I enjoy swimming in the ocean.
+English: They are renovating their house.
+English: She is practicing yoga to stay healthy.
+English: We should plant flowers in the garden.
+English: The traffic is heavy during rush hour.
+English: He is a skilled chef who creates amazing dishes.
+English: The baby is crawling on the floor.
+English: I need to buy a new pair of shoes.
+English: They are going on a road trip across the country.
+English: She is playing the piano beautifully.
+English: We are going to a concert tomorrow night.
+English: The cake tastes delicious with vanilla frosting.
+English: He is a dedicated teacher who inspires his students.
+English: The students are participating in a science fair.
+English: I enjoy hiking in the mountains.
+English: They are organizing a beach cleanup next weekend.
+English: She is taking photographs of nature.
+English: We should try a new restaurant in town.
+English: The traffic is moving slowly on the highway.
+English: He is a talented singer with a beautiful voice.
+English: The baby is laughing and giggling.
+English: I need to do laundry and wash my clothes.
+English: They are planning a trip to Europe.
+English: She is learning how to play the guitar.
+English: We are going to a museum this Sunday.
+English: The coffee smells amazing in the morning.
+English: He is a hardworking farmer who grows crops.
+English: The students are presenting their research projects.
+English: I enjoy playing soccer with my friends.
+English: They are volunteering at a local shelter.
+English: She is practicing martial arts for self-defense.
+English: We should try a new recipe for dinner.
+English: The traffic is congest
+English: The sun is shining brightly today.
+English: I enjoy reading books in my free time.
+English: She plays the piano beautifully.
+English: The cat chased the mouse around the room.
+English: I love eating pizza with extra cheese.
+English: He always wears a hat wherever he goes.
+English: The flowers in the garden are blooming.
+English: She danced gracefully on the stage.
+English: The dog barked loudly in the park.
+English: We went swimming in the ocean yesterday.
+English: He speaks fluent French and Spanish.
+English: The train arrived at the station on time.
+English: She cooked a delicious meal for her family.
+Korean: 이것은 테스트 이다.
+Korean: 걱정할 필요 없다.
+Korean: 버그는 언젠가 고쳐진다.
+Japanese: 明日の天気はどうですか。
+Chinese: 请问洗手间在哪里？
+Emoji: I'm feeling 😄 today!
+Unicode: ◑ ▢ ▣ ◱

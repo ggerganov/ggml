@@ -2,18 +2,18 @@
 
 Tensor library for machine learning
 
-***Note that this project is under development and not ready for production use. \
+***Note that this project is under active development. \
 Some of the development is currently happening in the [llama.cpp](https://github.com/ggerganov/llama.cpp) and [whisper.cpp](https://github.com/ggerganov/whisper.cpp) repos***
 
 ## Features
 
 - Written in C
 - 16-bit float support
-- 4-bit integer quantization support
-- Automatic differentiation (WIP in progress)
+- Integer quantization support (4-bit, 5-bit, 8-bit, etc.)
+- Automatic differentiation
 - ADAM and L-BFGS optimizers
-- Optimized for Apple silicon via NEON intrinsics and Accelerate framework
-- On x86 architectures utilzes AVX intrinsics
+- Optimized for Apple Silicon
+- On x86 architectures utilizes AVX / AVX2 intrinsics
 - No third-party dependencies
 - Zero memory allocations during runtime
 
@@ -26,10 +26,16 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [X] Example of Cerebras-GPT inference [examples/gpt-2](https://github.com/ggerganov/ggml/tree/master/examples/gpt-2)
 - [ ] Example of FLAN-T5 inference https://github.com/ggerganov/ggml/pull/12
 - [X] Example of LLaMA inference [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp)
+- [X] Example of LLaMA training [ggerganov/llama.cpp/examples/baby-llama](https://github.com/ggerganov/llama.cpp/tree/master/examples/baby-llama)
+- [X] Example of BLOOM inference [NouamaneTazi/bloomz.cpp](https://github.com/NouamaneTazi/bloomz.cpp)
 - [X] Example of RWKV inference [saharNooby/rwkv.cpp](https://github.com/saharNooby/rwkv.cpp)
 - [ ] Example of [SAM](https://github.com/facebookresearch/segment-anything) inference
 - [ ] Idea for GPU support: https://github.com/ggerganov/llama.cpp/discussions/915
-- [X] Example of StableLM (GPT-NeoX) inference [examples/stablelm](https://github.com/ggerganov/ggml/tree/master/examples/stablelm)
+- [X] Example of StableLM (GPT-NeoX) inference [examples/gpt-neox](https://github.com/ggerganov/ggml/tree/master/examples/gpt-neox)
+- [X] Example of BERT inference [skeskinen/bert.cpp](https://github.com/skeskinen/bert.cpp)
+- [X] Example of 💫 StarCoder inference [examples/starcoder](https://github.com/ggerganov/ggml/tree/master/examples/starcoder)
+- [X] Example of MPT inference [examples/mpt](https://github.com/ggerganov/ggml/tree/master/examples/mpt)
+- [X] Example of Replit inference [examples/replit](https://github.com/ggerganov/ggml/tree/master/examples/replit)
 
 ## Whisper inference (example)
 
@@ -92,3 +98,15 @@ For more information, checkout the corresponding programs in the [examples](exam
 # fix the path to point to your CUDA compiler
 cmake -DGGML_CUBLAS=ON -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.1/bin/nvcc ..
 ```
+
+## Using clBLAST
+
+```bash
+cmake -DGGML_CLBLAST=ON ..
+```
+
+## Resources
+
+- [GGML - Large Language Models for Everyone](https://github.com/rustformers/llm/blob/main/crates/ggml/README.md): a description of the GGML format provided by the maintainers of the `llm` Rust crate, which provides Rust bindings for GGML
+- [marella/ctransformers](https://github.com/marella/ctransformers): Python bindings for GGML models.
+- [go-skynet/go-ggml-transformers.cpp](https://github.com/go-skynet/go-ggml-transformers.cpp): Golang bindings for GGML models

@@ -90,3 +90,15 @@ Predicted digit is 9
 Computation graph:
 
 ![mnist dot](https://user-images.githubusercontent.com/1991296/231882071-84e29d53-b226-4d73-bdc2-5bd6dcb7efd1.png)
+
+
+## Web demo
+
+The example can be compiled with Emscripten like this:
+
+```bash
+cd examples/mnist
+emcc -I../../include -I../../include/ggml -I../../examples ../../src/ggml.c main.cpp -o web/mnist.js -s EXPORTED_FUNCTIONS='["_wasm_eval","_wasm_random_digit","_malloc","_free"]' -s EXPORTED_RUNTIME_METHODS='["ccall"]' -s ALLOW_MEMORY_GROWTH=1 --preload-file models/mnist
+```
+
+Online demo: https://mnist.ggerganov.com
