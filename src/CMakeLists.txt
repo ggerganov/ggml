@@ -226,6 +226,8 @@ else()
 endif()
 
 if (BUILD_SHARED_LIBS)
+    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+
     target_link_libraries(${TARGET} PUBLIC
         ${CMAKE_DL_LIBS}
         )
