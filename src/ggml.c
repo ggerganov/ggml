@@ -15305,6 +15305,7 @@ struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** 
 
             if (!*ctx_data) {
                 fprintf(stderr, "%s: failed to create ggml context\n", __func__);
+                fclose(fin);
                 return result;
             }
         }
@@ -15315,6 +15316,7 @@ struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** 
             const size_t ret = fread(data->data, sizeof(char), fsize, fin);
             if (ret != fsize) {
                 fprintf(stderr, "%s: failed to read %s\n", __func__, fname);
+                fclose(fin);
                 return result;
             }
         }
