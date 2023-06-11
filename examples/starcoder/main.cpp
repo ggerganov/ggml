@@ -846,6 +846,9 @@ int main(int argc, char ** argv) {
         if (model.hparams.n_layer <= 30 && embd.back() == 49152) {
             break;
         }
+        else if (model.hparams.n_layer >= 40 && embd.back() == 49155) { //TODO: this is only for starcoderalpha
+            break;
+        }
         // check if model is starcoder
         else if (embd.back() == 0) { //TODO: this is only for starcoder
             break;
