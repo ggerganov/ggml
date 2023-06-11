@@ -139,6 +139,18 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
 
             // if (i < 10) fprintf(stderr, "%.s: vocab[%d] = '%s'\n", __func__, i, word.c_str());
         }
+
+        // Add StarChat special tokens.
+        for (const std::string & token : {
+                "<|system|>",
+                "<|user|>",
+                "<|assistant|>",
+                "<|end|>",
+            }) {
+            if (vocab.token_to_id.find(token) != vocab.token_to_id.end()) {
+                vocab.add_special_token(token);
+            }
+        }
     }
 
     // for the big tensors, we have the option to store the data in 16-bit floats or quantized
@@ -781,6 +793,15 @@ int main(int argc, char ** argv) {
     }
     printf("\n\n");
 
+    // Handle StarChat "<|end|>" token.
+    gpt_vocab::id starchat_end_token = -1;
+    {
+        const auto it = vocab.token_to_id.find("<|end|>");
+        if (it != vocab.token_to_id.end()) {
+            starchat_end_token = it->second;
+        }
+    }
+
     // submit the input prompt token-by-token
     // this reduces the memory usage during inference, at the cost of a bit of speed at the beginning
     std::vector<gpt_vocab::id> embd;
@@ -848,6 +869,10 @@ int main(int argc, char ** argv) {
         }
         // check if model is starcoder
         else if (embd.back() == 0) { //TODO: this is only for starcoder
+            break;
+        }
+        // Handle StarChat "<|end|>" token.
+        else if (embd.back() == starchat_end_token) {
             break;
         }
     }
