@@ -126,6 +126,11 @@ if (GGML_OPENBLAS)
     endif()
 endif()
 
+if (MSVC)
+    # test-1 requre at least 4MB stack
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:4194304")
+endif()
+
 #
 # test-vec0
 
