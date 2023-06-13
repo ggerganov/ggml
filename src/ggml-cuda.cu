@@ -98,41 +98,39 @@ static_assert(sizeof(block_q8_0) == sizeof(ggml_fp16_t) + QK8_0, "wrong q8_0 blo
 #endif
 
 static __global__ void mul_f32(const float * x, const float * y, float * dst, const int kx, const int ky) {
+    __shared__ float s_x[CUDA_MUL_BLOCK_SIZE];
+    __shared__ float s_y[CUDA_MUL_BLOCK_SIZE];
+    
     const int i = blockDim.x*blockIdx.x + threadIdx.x;
 
     if (i >= kx) {
         return;
     }
-    dst[i] = x[i] * y[i%ky];
+    
+    s_x[threadIdx.x] = x[i];
+    s_y[threadIdx.x] = y[i%ky];
+    __syncthreads();
+    
+    dst[i] = s_x[threadIdx.x] * s_y[threadIdx.x]; 
 }
 
-static __device__ void dequantize_q4_0(const void * vx, const int ib, const int iqs, float & v0, float & v1){
+static __constant__ float d_d[QK4_0];
+
+static __global__ void dequantize_q4_0(const void * vx, const int ib, const int iqs, float & v0, float & v1){
     const block_q4_0 * x = (const block_q4_0 *) vx;
 
-    const float d = x[ib].d;
-
-    const uint8_t vui = x[ib].qs[iqs];
-
-    const int8_t vi0 = vui & 0xF;
-    const int8_t vi1 = vui >> 4;
-
-    v0 = (vi0 - 8)*d;
-    v1 = (vi1 - 8)*d;
+    v0 = (x[ib].qs[iqs] & 0xF - 8) * d_d[ib];
+    v1 = (x[ib].qs[iqs] >> 4 - 8) * d_d[ib];
 }
 
-static __device__ void dequantize_q4_1(const void * vx, const int ib, const int iqs, float & v0, float & v1){
+static __constant__ float d_d[QK4_1]; 
+static __constant__ float d_m[QK4_1];
+
+static __global__ void dequantize_q4_1(const void * vx, const int ib, const int iqs, float & v0, float & v1){
     const block_q4_1 * x = (const block_q4_1 *) vx;
 
-    const float d = x[ib].d;
-    const float m = x[ib].m;
-
-    const uint8_t vui = x[ib].qs[iqs];
-
-    const int8_t vi0 = vui & 0xF;
-    const int8_t vi1 = vui >> 4;
-
-    v0 = vi0*d + m;
-    v1 = vi1*d + m;
+    v0 = (x[ib].qs[iqs] & 0xF) * d_d[ib] + d_m[ib]; 
+    v1 = (x[ib].qs[iqs] >> 4) * d_d[ib] + d_m[ib];
 }
 
 static __device__ void dequantize_q5_0(const void * vx, const int ib, const int iqs, float & v0, float & v1){
