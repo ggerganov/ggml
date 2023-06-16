@@ -6383,7 +6383,7 @@ struct ggml_tensor * ggml_clamp(
 
     ggml_scratch_save(ctx);
 
-    struct ggml_tensor * b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 3);
+    struct ggml_tensor * b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 2);
 
     ((float *) b->data)[0] = min;
     ((float *) b->data)[1] = max;
@@ -11132,7 +11132,7 @@ static void ggml_compute_forward_clamp_f32(
         const struct ggml_tensor * src1,
         struct ggml_tensor * dst) {
     assert(params->ith == 0);
-    assert(src1->type == GGML_TYPE_I32);
+    assert(src1->type == GGML_TYPE_F32);
     assert(ggml_nelements(src1) == 2);
 
     if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
