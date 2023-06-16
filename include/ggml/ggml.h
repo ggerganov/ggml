@@ -290,6 +290,7 @@ extern "C" {
         GGML_OP_STEP,
         GGML_OP_RELU,
         GGML_OP_GELU,
+        GGML_OP_GELU_QUICK,
         GGML_OP_SILU,
         GGML_OP_SILU_BACK,
         GGML_OP_NORM, // normalize
@@ -684,6 +685,14 @@ extern "C" {
             struct ggml_tensor  * a);
 
     GGML_API struct ggml_tensor * ggml_gelu_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+    GGML_API struct ggml_tensor * ggml_gelu_quick(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+    GGML_API struct ggml_tensor * ggml_gelu_quick_inplace(
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
 
