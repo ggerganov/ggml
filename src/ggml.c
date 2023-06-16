@@ -98,7 +98,7 @@ typedef void* thread_ret_t;
 /*#define GGML_PERF*/
 #define GGML_DEBUG 0
 #define GGML_GELU_FP16
-#define GGML_QUICK_GELU_FP16
+#define GGML_GELU_QUICK_FP16
 #define GGML_SILU_FP16
 
 #define GGML_SOFT_MAX_UNROLL 4
@@ -324,7 +324,7 @@ static inline ggml_fp16_t ggml_compute_fp32_to_fp16(float f) {
 static ggml_fp16_t table_gelu_f16[1 << 16];
 
 // precomputed quick gelu table for f16 (128 KB)
-static ggml_fp16_t table_quick_gelu_f16[1 << 16];
+static ggml_fp16_t table_gelu_quick_f16[1 << 16];
 
 // precomputed silu table for f16 (128 KB)
 static ggml_fp16_t table_silu_f16[1 << 16];
@@ -3292,7 +3292,7 @@ inline static void ggml_vec_step_f32 (const int n, float * y, const float * x) {
 inline static void ggml_vec_relu_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? x[i] : 0.f; }
 
 static const float GELU_COEF_A    = 0.044715f;
-static const float QUICK_GELU_COEF    = -1.702f;
+static const float GELU_QUICK_COEF    = -1.702f;
 static const float SQRT_2_OVER_PI = 0.79788456080286535587989211986876f;
 
 inline static float ggml_gelu_f32(float x) {
@@ -3323,30 +3323,30 @@ inline static void ggml_vec_gelu_f32(const int n, float * y, const float * x) {
 }
 #endif
 
-inline static float ggml_quick_gelu_f32(float x) {
-    return x*(1.0f/(1.0f+expf(QUICK_GELU_COEF*x)));
+inline static float ggml_gelu_quick_f32(float x) {
+    return x*(1.0f/(1.0f+expf(GELU_QUICK_COEF*x)));
 }
 
-inline static void ggml_vec_quick_gelu_f16(const int n, ggml_fp16_t * y, const ggml_fp16_t * x) {
+inline static void ggml_vec_gelu_quick_f16(const int n, ggml_fp16_t * y, const ggml_fp16_t * x) {
     const uint16_t * i16 = (const uint16_t *) x;
     for (int i = 0; i < n; ++i) {
-        y[i] = table_quick_gelu_f16[i16[i]];
+        y[i] = table_gelu_quick_f16[i16[i]];
     }
 }
 
-#ifdef GGML_QUICK_GELU_FP16
-inline static void ggml_vec_quick_gelu_f32(const int n, float * y, const float * x) {
+#ifdef GGML_GELU_QUICK_FP16
+inline static void ggml_vec_gelu_quick_f32(const int n, float * y, const float * x) {
     uint16_t t;
     for (int i = 0; i < n; ++i) {
         ggml_fp16_t fp16 = GGML_FP32_TO_FP16(x[i]);
         memcpy(&t, &fp16, sizeof(uint16_t));
-        y[i] = GGML_FP16_TO_FP32(table_quick_gelu_f16[t]);
+        y[i] = GGML_FP16_TO_FP32(table_gelu_quick_f16[t]);
     }
 }
 #else
-inline static void ggml_vec_quick_gelu_f32(const int n, float * y, const float * x) {
+inline static void ggml_vec_gelu_quick_f32(const int n, float * y, const float * x) {
     for (int i = 0; i < n; ++i) {
-        y[i] = ggml_quick_gelu_f32(x[i]);
+        y[i] = ggml_gelu_quick_f32(x[i]);
     }
 }
 #endif
@@ -3552,7 +3552,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "STEP",
     "RELU",
     "GELU",
-    "QUICK_GELU",
+    "GELU_QUICK",
     "SILU",
     "SILU_BACK",
     "NORM",
@@ -3617,7 +3617,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "step(x)",
     "relu(x)",
     "gelu(x)",
-    "quick_gelu(x)",
+    "gelu_quick(x)",
     "silu(x)",
     "silu_back(x)",
     "norm(x)",
@@ -3944,7 +3944,7 @@ struct ggml_context * ggml_init(struct ggml_init_params params) {
                 memcpy(&ii, &ui, sizeof(ii));
                 const float f = table_f32_f16[i] = GGML_COMPUTE_FP16_TO_FP32(ii);
                 table_gelu_f16[i] = GGML_FP32_TO_FP16(ggml_gelu_f32(f));
-                table_quick_gelu_f16[i] = GGML_FP32_TO_FP16(ggml_quick_gelu_f32(f));
+                table_gelu_quick_f16[i] = GGML_FP32_TO_FP16(ggml_gelu_quick_f32(f));
                 table_silu_f16[i] = GGML_FP32_TO_FP16(ggml_silu_f32(f));
                 table_exp_f16[i]  = GGML_FP32_TO_FP16(expf(f));
             }
@@ -5307,9 +5307,9 @@ struct ggml_tensor * ggml_gelu_inplace(
     return ggml_gelu_impl(ctx, a, true);
 }
 
-// ggml_quick_gelu
+// ggml_gelu_quick
 
-struct ggml_tensor * ggml_quick_gelu_impl(
+struct ggml_tensor * ggml_gelu_quick_impl(
         struct ggml_context * ctx,
         struct ggml_tensor * a,
         bool inplace) {
@@ -5321,7 +5321,7 @@ struct ggml_tensor * ggml_quick_gelu_impl(
 
     struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
 
-    result->op   = GGML_OP_QUICK_GELU;
+    result->op   = GGML_OP_GELU_QUICK;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src0 = a;
     result->src1 = NULL;
@@ -5329,16 +5329,16 @@ struct ggml_tensor * ggml_quick_gelu_impl(
     return result;
 }
 
-struct ggml_tensor * ggml_quick_gelu(
+struct ggml_tensor * ggml_gelu_quick(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_quick_gelu_impl(ctx, a, false);
+    return ggml_gelu_quick_impl(ctx, a, false);
 }
 
-struct ggml_tensor * ggml_quick_gelu_inplace(
+struct ggml_tensor * ggml_gelu_quick_inplace(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_quick_gelu_impl(ctx, a, true);
+    return ggml_gelu_quick_impl(ctx, a, true);
 }
 
 // ggml_silu
@@ -9188,9 +9188,9 @@ static void ggml_compute_forward_gelu(
     //printf("XXXXXXXX gelu\n");
 }
 
-// ggml_compute_forward_quick_gelu
+// ggml_compute_forward_gelu_quick
 
-static void ggml_compute_forward_quick_gelu_f32(
+static void ggml_compute_forward_gelu_quick_f32(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
         struct ggml_tensor * dst) {
@@ -9216,7 +9216,7 @@ static void ggml_compute_forward_quick_gelu_f32(
     const int ir1 = MIN(ir0 + dr, nr);
 
     for (int i1 = ir0; i1 < ir1; i1++) {
-        ggml_vec_quick_gelu_f32(nc,
+        ggml_vec_gelu_quick_f32(nc,
                 (float *) ((char *) dst->data  + i1*( dst->nb[1])),
                 (float *) ((char *) src0->data + i1*(src0->nb[1])));
 
@@ -9231,14 +9231,14 @@ static void ggml_compute_forward_quick_gelu_f32(
     }
 }
 
-static void ggml_compute_forward_quick_gelu(
+static void ggml_compute_forward_gelu_quick(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
         struct ggml_tensor * dst) {
     switch (src0->type) {
         case GGML_TYPE_F32:
             {
-                ggml_compute_forward_quick_gelu_f32(params, src0, dst);
+                ggml_compute_forward_gelu_quick_f32(params, src0, dst);
             } break;
         default:
             {
@@ -13491,9 +13491,9 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_gelu(params, tensor->src0, tensor);
             } break;
-        case GGML_OP_QUICK_GELU:
+        case GGML_OP_GELU_QUICK:
             {
-                ggml_compute_forward_quick_gelu(params, tensor->src0, tensor);
+                ggml_compute_forward_gelu_quick(params, tensor->src0, tensor);
             } break;
         case GGML_OP_SILU:
             {
@@ -13906,7 +13906,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             {
                 GGML_ASSERT(false); // TODO: not implemented
             } break;
-        case GGML_OP_QUICK_GELU:
+        case GGML_OP_GELU_QUICK:
             {
                 GGML_ASSERT(false); // TODO: not implemented
             } break;
@@ -14717,7 +14717,7 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
                     } break;
                 case GGML_OP_MUL:
                 case GGML_OP_GELU:
-                case GGML_OP_QUICK_GELU:
+                case GGML_OP_GELU_QUICK:
                 case GGML_OP_SILU:
                 case GGML_OP_SILU_BACK:
                 case GGML_OP_NORM:
