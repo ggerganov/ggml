@@ -513,8 +513,8 @@ extern "C" {
     GGML_API void *  ggml_get_data    (const struct ggml_tensor * tensor);
     GGML_API float * ggml_get_data_f32(const struct ggml_tensor * tensor);
 
-    GGML_API const char * ggml_get_name(const struct ggml_tensor * tensor);
-    GGML_API void         ggml_set_name(struct ggml_tensor * tensor, const char * name);
+    GGML_API const char *         ggml_get_name(const struct ggml_tensor * tensor);
+    GGML_API struct ggml_tensor * ggml_set_name(struct ggml_tensor * tensor, const char * name);
 
     //
     // operations on tensors with backpropagation

@@ -4518,9 +4518,10 @@ const char * ggml_get_name(const struct ggml_tensor * tensor) {
     return tensor->name;
 }
 
-void ggml_set_name(struct ggml_tensor * tensor, const char * name) {
+struct ggml_tensor * ggml_set_name(struct ggml_tensor * tensor, const char * name) {
     strncpy(tensor->name, name, sizeof(tensor->name));
     tensor->name[sizeof(tensor->name) - 1] = '\0';
+    return tensor;
 }
 
 struct ggml_tensor * ggml_view_tensor(
