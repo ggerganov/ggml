@@ -15307,9 +15307,9 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
 
                 // store the pointer address
                 {
-                    const uint64_t ptr = (uint64_t) tensor->data;
+                    const uintptr_t ptr = (uintptr_t) tensor->data;
 
-                    fwrite(&ptr, sizeof(uint64_t), 1, fout);
+                    fwrite(&ptr, sizeof(uintptr_t), 1, fout);
                 }
 
                 fwrite(tensor->name, sizeof(char), GGML_MAX_NAME, fout);
@@ -15347,9 +15347,9 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
 
                 // store the pointer address
                 {
-                    const uint64_t ptr = (uint64_t) tensor->data;
+                    const uintptr_t ptr = (uintptr_t) tensor->data;
 
-                    fwrite(&ptr, sizeof(uint64_t), 1, fout);
+                    fwrite(&ptr, sizeof(uintptr_t), 1, fout);
                 }
 
                 fwrite(tensor->name, sizeof(char), GGML_MAX_NAME, fout);
