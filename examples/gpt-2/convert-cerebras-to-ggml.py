@@ -35,7 +35,7 @@ def bytes_to_unicode():
     return dict(zip(bs, cs))
 
 if len(sys.argv) < 2:
-    print("Usage: convert-h5-to-ggml.py dir-model [use-f32]\n")
+    print("Usage: convert-cerebras-to-ggml.py dir-model [use-f32]\n")
     sys.exit(1)
 
 # output in the same directory as the model
