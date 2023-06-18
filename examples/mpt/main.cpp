@@ -291,9 +291,9 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
     // create the ggml context
     {
         struct ggml_init_params params = {
-            .mem_size = ctx_size,
-            .mem_buffer = NULL,
-            .no_alloc = false,
+            /*.mem_size   =*/ ctx_size,
+            /*.mem_buffer =*/ NULL,
+            /*.no_alloc   =*/ false,
         };
 
         model.ctx = ggml_init(params);
@@ -488,13 +488,14 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
     }
 
     struct ggml_init_params params = {
-        .mem_size = buf_size,
-        .mem_buffer = buf,
-        .no_alloc = false,
+        /*.mem_size   =*/ buf_size,
+        /*.mem_buffer =*/ buf,
+        /*.no_alloc   =*/ false,
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
-    struct ggml_cgraph gf = {.n_threads = n_threads};
+    struct ggml_cgraph gf = {};
+    gf.n_threads = n_threads;
 
     struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
     memcpy(embd->data, embd_inp.data(), N * ggml_element_size(embd));

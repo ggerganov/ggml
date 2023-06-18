@@ -2,6 +2,7 @@ if (GGML_ALL_WARNINGS)
   if (NOT MSVC)
       set(cxx_flags
           # TODO(marella): Add other warnings.
+          -Wpedantic
           -Wunused-variable
           -Wno-unused-function
           -Wno-multichar
