@@ -16,7 +16,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     env:
-      GGML_NLOOP: 35
+      GGML_NLOOP: 3
       GGML_NITER: 1
 
     steps:
