@@ -14708,6 +14708,25 @@ static void ggml_compute_forward_map_binary_f32(
     }
 }
 
+
+static void ggml_compute_forward_map_binary(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src0,
+        const struct ggml_tensor * src1,
+        struct ggml_tensor * dst,
+        const ggml_binary_op_f32_t fun) {
+    switch (src0->type) {
+        case GGML_TYPE_F32:
+            {
+                ggml_compute_forward_map_binary_f32(params, src0, src1, dst, fun);
+            } break;
+        default:
+            {
+                GGML_ASSERT(false);
+            } break;
+    }
+}
+
 // ggml_compute_forward_map_custom1
 
 static void ggml_compute_forward_map_custom1_f32(
@@ -14808,25 +14827,6 @@ static void ggml_compute_forward_map_custom3(
         case GGML_TYPE_F32:
             {
                 ggml_compute_forward_map_custom3_f32(params, a, b, c, dst, fun);
-            } break;
-        default:
-            {
-                GGML_ASSERT(false);
-            } break;
-    }
-}
-
-
-static void ggml_compute_forward_map_binary(
-        const struct ggml_compute_params * params,
-        const struct ggml_tensor * src0,
-        const struct ggml_tensor * src1,
-        struct ggml_tensor * dst,
-        const ggml_binary_op_f32_t fun) {
-    switch (src0->type) {
-        case GGML_TYPE_F32:
-            {
-                ggml_compute_forward_map_binary_f32(params, src0, src1, dst, fun);
             } break;
         default:
             {
