@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    env:
+      GGML_NLOOP: 3
+      GGML_NITER: 1
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set GGML_NTHREADS for Ubuntu
+      run: echo "GGML_NTHREADS=2" >> $GITHUB_ENV
+      if: matrix.os == 'ubuntu-latest'
+
+    - name: Set GGML_NTHREADS for MacOS
+      run: echo "GGML_NTHREADS=3" >> $GITHUB_ENV
+      if: matrix.os == 'macos-latest'
+
+    - name: Create Build Environment
+      run: mkdir build
+
+    - name: Configure CMake
+      working-directory: ./build
+      run: cmake ..
+
+    - name: Build
+      working-directory: ./build
+      run: make
+
+    - name: Test
+      working-directory: ./build
+      run: ctest --verbose --timeout 900

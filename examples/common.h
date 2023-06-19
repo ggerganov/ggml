@@ -66,6 +66,8 @@ std::string convert_to_utf8(const std::wstring & input);
 
 std::wstring convert_to_wstring(const std::string & input);
 
+void gpt_split_words(std::string str, std::vector<std::string>& words);
+
 // split text into tokens
 //
 // ref: https://github.com/openai/gpt-2/blob/a74da5d99abaaba920de8131d64da2862a8f213b/src/encoder.py#L53

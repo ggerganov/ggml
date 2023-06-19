@@ -73,6 +73,10 @@ for piece in sp_proto.pieces:
     fout.write(encoded_piece)
     fout.write(struct.pack("f", piece.score))
 
+if hparams["vocab_size"] > len(sp_proto.pieces):
+    for i in range(hparams["vocab_size"] - len(sp_proto.pieces)):
+        fout.write(struct.pack("i", 0))
+        fout.write(struct.pack("f", 0))
 
 for name in list_vars.keys():
     data = list_vars[name].squeeze().numpy()
