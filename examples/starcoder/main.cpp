@@ -146,6 +146,10 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
                 "<|user|>",
                 "<|assistant|>",
                 "<|end|>",
+                "<fim-prefix>",
+                "<fim-middle>",
+                "<fim-suffix>",
+                "<fim-pad>"
             }) {
             if (vocab.token_to_id.find(token) != vocab.token_to_id.end()) {
                 vocab.add_special_token(token);
