@@ -60,7 +60,7 @@ int main(int argc, const char ** argv) {
                                     l)
                                 )
                             ),
-                        ggml_new_f32(ctx0, NP)
+                        ggml_new_f32(ctx0, (float)NP)
                         ),
                     ggml_mul(ctx0,
                         ggml_sum(ctx0, ggml_sqr(ctx0, x)),

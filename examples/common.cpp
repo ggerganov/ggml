@@ -17,6 +17,10 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+#if defined(_MSC_VER)
+#pragma warning(disable: 4244 4267) // possible loss of data
+#endif
+
 bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
@@ -366,7 +370,7 @@ void test_gpt_tokenizer(gpt_vocab & vocab, const std::string & fpath_test){
         }
     }
 
-    fprintf(stderr, "%s : %lu tests failed out of %lu tests.\n", __func__, n_fails, tests.size());
+    fprintf(stderr, "%s : %zu tests failed out of %zu tests.\n", __func__, n_fails, tests.size());
 }
 
 bool gpt_vocab_init(const std::string & fname, gpt_vocab & vocab) {

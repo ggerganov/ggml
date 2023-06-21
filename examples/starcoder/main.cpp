@@ -12,6 +12,10 @@
 #include <string>
 #include <vector>
 
+#if defined(_MSC_VER)
+#pragma warning(disable: 4244 4267) // possible loss of data
+#endif
+
 // default hparams (GPT-2 117M)
 // https://huggingface.co/bigcode/gpt_bigcode-santacoder/blob/main/config.json
 struct starcoder_hparams {

@@ -14,6 +14,10 @@
 #include <utility>
 #include <vector>
 
+#if defined(_MSC_VER)
+#pragma warning(disable: 4244 4267) // possible loss of data
+#endif
+
 // no defaults for now
 struct mpt_hparams {
     int32_t d_model      = 0;
@@ -932,7 +936,7 @@ int main(int argc, char ** argv) {
     printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
 
     for (size_t i = 0; i < embd_inp.size(); i++) {
-        printf("%s: token[%lu] = %6d\n", __func__, i, embd_inp[i]);
+        printf("%s: token[%zu] = %6d\n", __func__, i, embd_inp[i]);
     }
     printf("\n");
 

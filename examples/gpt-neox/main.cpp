@@ -13,6 +13,10 @@
 #include <string>
 #include <vector>
 
+#if defined(_MSC_VER)
+#pragma warning(disable: 4244 4267) // possible loss of data
+#endif
+
 // default hparams (StableLM 3B)
 struct gpt_neox_hparams {
     int32_t n_vocab = 50257;

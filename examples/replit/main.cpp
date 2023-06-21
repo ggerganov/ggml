@@ -13,10 +13,27 @@
 #include <map>
 #include <stdint.h>
 #include <string>
-#include <unistd.h>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#if defined(_WIN32)
+#define NOMINMAX
+#include <Windows.h>
+bool is_stdin_terminal() {
+    auto in = GetStdHandle(STD_INPUT_HANDLE);
+    return GetFileType(in) == FILE_TYPE_CHAR;
+}
+#else
+#include <unistd.h>
+bool is_stdin_terminal() {
+    return isatty(STDIN_FILENO);
+}
+#endif
+
+#if defined(_MSC_VER)
+#pragma warning(disable: 4244 4267) // possible loss of data
+#endif
 
 using piece_t = std::pair<std::size_t, float>;
 using piece_map_t = std::unordered_map<std::string, piece_t>;
@@ -645,7 +662,7 @@ int main(int argc, char ** argv) {
 
     std::mt19937 rng(params.seed);
     if (params.prompt.empty()) {
-        if (!isatty(STDIN_FILENO)) {
+        if (!is_stdin_terminal()) {
             std::string line;
             while (std::getline(std::cin, line)) {
                 params.prompt = params.prompt + "\n" + line;
@@ -685,7 +702,7 @@ int main(int argc, char ** argv) {
     printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
 
     for (int i = 0; i < embd_inp.size(); i++) {
-        printf("%s: token[%d] = %6lu\n", __func__, i, embd_inp[i]);
+        printf("%s: token[%d] = %6zu\n", __func__, i, embd_inp[i]);
         // vocab.id_to_token.at(embd_inp[i]).c_str()
     }
     printf("\n");
