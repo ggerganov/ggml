@@ -12,3 +12,6 @@ compile_commands.json
 
 src/arm_neon.h
 tests/arm_neon.h
+
+zig-out/
+zig-cache/
