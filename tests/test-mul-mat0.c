@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_DEPRECATE // Disables ridiculous "unsafe" warnigns on Windows
 #include "ggml/ggml.h"
 
 #include <math.h>
@@ -5,6 +6,10 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <inttypes.h>
+
+#if defined(_MSC_VER)
+#pragma warning(disable: 4244 4267) // possible loss of data
+#endif
 
 #define MAX_NARGS 2
 

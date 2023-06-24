@@ -1,8 +1,12 @@
 build/
 build-debug/
 build-*/
+out/
 
 compile_commands.json
+CMakeSettings.json
+.vs/
+.vscode/
 
 .exrc
 .cache

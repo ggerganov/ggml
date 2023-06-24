@@ -19,6 +19,10 @@
 #include <regex>
 #include <random>
 
+#if defined(_MSC_VER)
+#pragma warning(disable: 4244 4267) // possible loss of data
+#endif
+
 #if defined(GGML_BIG_ENDIAN)
 #include <bit>
 

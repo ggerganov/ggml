@@ -13,6 +13,10 @@
 #include <string>
 #include <vector>
 
+#if defined(_MSC_VER)
+#pragma warning(disable: 4244 4267) // possible loss of data
+#endif
+
 // default hparams (Dolly-V2 3B)
 struct dollyv2_hparams {
     int32_t n_vocab = 50254; // tokenizer.vocab_size

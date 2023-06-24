@@ -5,13 +5,11 @@
 #include <float.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <inttypes.h>
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <math.h>
-
-#include <sys/time.h>
 
 #if defined(__ARM_NEON)
 #include "arm_neon.h"
@@ -22,6 +20,12 @@
 #ifndef MIN
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
+#if defined(_MSC_VER)
+#pragma warning(disable: 4244 4267) // possible loss of data
+#include <intrin.h>
+#define __builtin_popcountll __popcnt64
 #endif
 
 const int M = 1280;
@@ -52,12 +56,6 @@ const int K = 1280;
 
 float frand() {
     return (float) rand() / (float) RAND_MAX;
-}
-
-uint64_t get_time_us() {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return tv.tv_sec * 1000000 + tv.tv_usec;
 }
 
 #if defined(__AVX2__)
@@ -255,8 +253,8 @@ void mul_mat_gq_1(
                     s1[b + 1] = d1*(1 << b);
                 }
 
-                m0[0] = -1ULL;
-                m1[0] = -1ULL;
+                m0[0] = 0-1ULL;
+                m1[0] = 0-1ULL;
 
                 for (int s = 0; s < QK/gq_t_bits; ++s) {
                     for (int b = 0; b < QB; b++) {
@@ -2373,6 +2371,7 @@ void mul_mat_gq_6(
 
 int main(int argc, const char ** argv) {
     assert(sizeof(gq_quant_t)*8 == gq_t_bits);
+    ggml_time_init();
 
     // needed to initialize f16 tables
     {
@@ -2462,7 +2461,7 @@ int main(int argc, const char ** argv) {
 
     // convert fp32 -> gq
     {
-        const uint64_t t_start = get_time_us();
+        const int64_t t_start = ggml_time_us();
 
         if (method == 1) {
             quantize_1(src0, src0_gq, M, K);
@@ -2494,7 +2493,7 @@ int main(int argc, const char ** argv) {
             quantize_6(src1, src1_gq, N, K);
         }
 
-        const uint64_t t_end = get_time_us();
+        const int64_t t_end = ggml_time_us();
         printf("convert time: %f ms / method = %d\n", (t_end - t_start) / 1000.0, method);
     }
 
@@ -2504,8 +2503,8 @@ int main(int argc, const char ** argv) {
 
     const int nIter = 1;
 
-    const clock_t start = clock();
-    const uint64_t start_us = get_time_us();
+    const int64_t start = ggml_cycles();
+    const int64_t start_us = ggml_time_us();
 
     double iM = 1.0/M;
     double sum = 0.0f;
@@ -2544,9 +2543,9 @@ int main(int argc, const char ** argv) {
     }
 
     {
-        const clock_t end = clock();
-        const uint64_t end_us = get_time_us();
-        printf("%s: elapsed ticks: %ld\n",  __func__, end - start);
+        const int64_t end = ggml_cycles();
+        const int64_t end_us = ggml_time_us();
+        printf("%s: elapsed ticks: %" PRIu64 "\n",  __func__, end - start);
         printf("%s: elapsed us:    %d / %f ms\n",  __func__, (int)(end_us - start_us), (end_us - start_us) / 1000.0 / nIter);
     }
 

@@ -20,8 +20,11 @@ void mul_mat_vec_f32_0(
         dst[i] = sum;
     }
 }
-
-typedef float afloat __attribute__ ((__aligned__(32)));
+#if defined(_MSC_VER)
+typedef float __declspec(align(32)) afloat;
+#else
+typedef float afloat __attribute__((__aligned__(32)));
+#endif
 void mul_mat_vec_f32_1(
     const afloat *restrict src0,
     const afloat *restrict src1,
@@ -70,17 +73,23 @@ void mul_mat_vec_f32_2(
     for (unsigned i = 0; i < nrows; i++) {
         float sum = 0.0f;
 
-        const void * row = src0 + i*ncols*sizeof(float);
-        const void * col = src1;
+        const char * row = (const char*)src0 + i*ncols*sizeof(float);
+        const char * col = (const char*)src1;
         for (unsigned j = 0; j < ncols; j++) {
             sum += (*(float *)row) * (*(float *)col);
             row += sizeof(float);
             col += sizeof(float);
         }
         *(float *)d = sum;
-        d += sizeof(float);
+        d = (char*)d + sizeof(float);
     }
 }
+
+#if defined(_MSC_VER)
+void* aligned_alloc(size_t alignment, size_t size) {
+    return _aligned_malloc(size, alignment);
+}
+#endif
 
 int main(int argc, const char ** argv) {
     //float * src0 = malloc(sizeof(float)*N*M);
@@ -91,12 +100,12 @@ int main(int argc, const char ** argv) {
     afloat * src1 = (float *)(aligned_alloc(32, sizeof(float)*M));
     afloat * dst  = (float *)(aligned_alloc(32, sizeof(float)*N));
 
-    for (unsigned i = 0; i < N*M; i++) {
-        src0[i] = i;
+    for (int i = 0; i < N*M; i++) {
+        src0[i] = (afloat)i;
     }
 
-    for (unsigned i = 0; i < M; i++) {
-        src1[i] = i;
+    for (int i = 0; i < M; i++) {
+        src1[i] = (afloat)i;
     }
 
     const int nIter = 10;
@@ -108,7 +117,7 @@ int main(int argc, const char ** argv) {
         //mul_mat_vec_f32_0(src0, src1, dst, N, M);
         mul_mat_vec_f32_1(src0, src1, dst, N, M);
         //mul_mat_vec_f32_2(src0, src1, dst, N, M);
-        for (unsigned i = 0; i < N; i++) {
+        for (int  i = 0; i < N; i++) {
             sum += dst[i];
         }
     }
