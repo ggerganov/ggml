@@ -3,7 +3,6 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 
 bool is_close(float a, float b, float epsilon) {
     return fabs(a - b) < epsilon;
@@ -16,8 +15,8 @@ int main(int argc, const char ** argv) {
         .no_alloc   = false,
     };
 
-    struct ggml_opt_params opt_params = ggml_opt_default_params(GGML_OPT_LBFGS);
     //struct ggml_opt_params opt_params = ggml_opt_default_params(GGML_OPT_ADAM);
+    struct ggml_opt_params opt_params = ggml_opt_default_params(GGML_OPT_LBFGS);
 
     opt_params.n_threads = (argc > 1) ? atoi(argv[1]) : 8;
 
@@ -69,7 +68,7 @@ int main(int argc, const char ** argv) {
 
         enum ggml_opt_result res = ggml_opt(NULL, opt_params, f);
 
-        assert(res == GGML_OPT_OK);
+        GGML_ASSERT(res == GGML_OPT_OK);
 
         // print results
         for (int i = 0; i < 16; i++) {
@@ -83,9 +82,9 @@ int main(int argc, const char ** argv) {
 
         for (int i = 0; i < NF; ++i) {
             if (i < NF/2) {
-                assert(is_close(((float *)x->data)[i],  1.0f, 1e-2f));
+                GGML_ASSERT(is_close(((float *)x->data)[i],  1.0f, 1e-2f));
             } else {
-                assert(is_close(((float *)x->data)[i], -1.0f, 1e-2f));
+                GGML_ASSERT(is_close(((float *)x->data)[i], -1.0f, 1e-2f));
             }
         }
     }

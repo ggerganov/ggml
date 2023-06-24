@@ -2,7 +2,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 
 int main(int argc, const char ** argv) {
     struct ggml_init_params params = {
@@ -17,23 +16,23 @@ int main(int argc, const char ** argv) {
     struct ggml_tensor * t2 = ggml_new_tensor_2d(ctx0, GGML_TYPE_I16, 10, 20);
     struct ggml_tensor * t3 = ggml_new_tensor_3d(ctx0, GGML_TYPE_I32, 10, 20, 30);
 
-    assert(t1->n_dims == 1);
-    assert(t1->ne[0]  == 10);
-    assert(t1->nb[1]  == 10*sizeof(float));
+    GGML_ASSERT(t1->n_dims == 1);
+    GGML_ASSERT(t1->ne[0]  == 10);
+    GGML_ASSERT(t1->nb[1]  == 10*sizeof(float));
 
-    assert(t2->n_dims == 2);
-    assert(t2->ne[0]  == 10);
-    assert(t2->ne[1]  == 20);
-    assert(t2->nb[1]  == 10*sizeof(int16_t));
-    assert(t2->nb[2]  == 10*20*sizeof(int16_t));
+    GGML_ASSERT(t2->n_dims == 2);
+    GGML_ASSERT(t2->ne[0]  == 10);
+    GGML_ASSERT(t2->ne[1]  == 20);
+    GGML_ASSERT(t2->nb[1]  == 10*sizeof(int16_t));
+    GGML_ASSERT(t2->nb[2]  == 10*20*sizeof(int16_t));
 
-    assert(t3->n_dims == 3);
-    assert(t3->ne[0]  == 10);
-    assert(t3->ne[1]  == 20);
-    assert(t3->ne[2]  == 30);
-    assert(t3->nb[1]  == 10*sizeof(int32_t));
-    assert(t3->nb[2]  == 10*20*sizeof(int32_t));
-    assert(t3->nb[3]  == 10*20*30*sizeof(int32_t));
+    GGML_ASSERT(t3->n_dims == 3);
+    GGML_ASSERT(t3->ne[0]  == 10);
+    GGML_ASSERT(t3->ne[1]  == 20);
+    GGML_ASSERT(t3->ne[2]  == 30);
+    GGML_ASSERT(t3->nb[1]  == 10*sizeof(int32_t));
+    GGML_ASSERT(t3->nb[2]  == 10*20*sizeof(int32_t));
+    GGML_ASSERT(t3->nb[3]  == 10*20*30*sizeof(int32_t));
 
     ggml_print_objects(ctx0);
 

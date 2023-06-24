@@ -2,7 +2,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 
 int main(int argc, const char ** argv) {
     struct ggml_init_params params = {
@@ -41,8 +40,8 @@ int main(int argc, const char ** argv) {
         printf("f     = %f\n", ggml_get_f32_1d(f, 0));
         printf("df/dx = %f\n", ggml_get_f32_1d(x->grad, 0));
 
-        assert(ggml_get_f32_1d(f, 0)       == 12.0f);
-        assert(ggml_get_f32_1d(x->grad, 0) == 12.0f);
+        GGML_ASSERT(ggml_get_f32_1d(f, 0)       == 12.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x->grad, 0) == 12.0f);
 
         ggml_set_f32(x, 3.0f);
 
@@ -54,8 +53,8 @@ int main(int argc, const char ** argv) {
         printf("f     = %f\n", ggml_get_f32_1d(f, 0));
         printf("df/dx = %f\n", ggml_get_f32_1d(x->grad, 0));
 
-        assert(ggml_get_f32_1d(f, 0)       == 27.0f);
-        assert(ggml_get_f32_1d(x->grad, 0) == 18.0f);
+        GGML_ASSERT(ggml_get_f32_1d(f, 0)       == 27.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x->grad, 0) == 18.0f);
 
         ggml_graph_dump_dot(&gf, NULL, "test1-1-forward.dot");
         ggml_graph_dump_dot(&gb, &gf,  "test1-1-backward.dot");
@@ -89,9 +88,9 @@ int main(int argc, const char ** argv) {
         printf("df/dx1 = %f\n", ggml_get_f32_1d(x1->grad, 0));
         printf("df/dx2 = %f\n", ggml_get_f32_1d(x2->grad, 0));
 
-        assert(ggml_get_f32_1d(y, 0)        == 12.0f);
-        assert(ggml_get_f32_1d(x1->grad, 0) == 7.0f);
-        assert(ggml_get_f32_1d(x2->grad, 0) == 3.0f);
+        GGML_ASSERT(ggml_get_f32_1d(y, 0)        == 12.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 0) == 7.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 0) == 3.0f);
 
         struct ggml_tensor * g1 = x1->grad;
         struct ggml_tensor * g2 = x2->grad;
@@ -106,8 +105,8 @@ int main(int argc, const char ** argv) {
 
         printf("H * [1, 1] = [ %f %f ]\n", ggml_get_f32_1d(x1->grad, 0), ggml_get_f32_1d(x2->grad, 0));
 
-        assert(ggml_get_f32_1d(x1->grad, 0) == 3.0f);
-        assert(ggml_get_f32_1d(x2->grad, 0) == 1.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 0) == 3.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 0) == 1.0f);
 
         ggml_graph_dump_dot(&gf, NULL, "test1-2-forward.dot");
         ggml_graph_dump_dot(&gb, &gf,  "test1-2-backward.dot");
@@ -139,9 +138,9 @@ int main(int argc, const char ** argv) {
         printf("df/dx1 = %f\n", ggml_get_f32_1d(x1->grad, 0));
         printf("df/dx2 = %f\n", ggml_get_f32_1d(x2->grad, 0));
 
-        assert(ggml_get_f32_1d(y, 0)        == 63.0f);
-        assert(ggml_get_f32_1d(x1->grad, 0) == 51.0f);
-        assert(ggml_get_f32_1d(x2->grad, 0) == 9.0f);
+        GGML_ASSERT(ggml_get_f32_1d(y, 0)        == 63.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 0) == 51.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 0) == 9.0f);
 
         ggml_graph_dump_dot(&gf, NULL, "test1-3-forward.dot");
         ggml_graph_dump_dot(&gb, &gf,  "test1-3-backward.dot");
@@ -177,10 +176,10 @@ int main(int argc, const char ** argv) {
         printf("df/dx2 = %f\n", ggml_get_f32_1d(x2->grad, 0));
         printf("df/dx3 = %f\n", ggml_get_f32_1d(x3->grad, 0));
 
-        assert(ggml_get_f32_1d(y, 0)        == 12.0f);
-        assert(ggml_get_f32_1d(x1->grad, 0) == 24.0f);
-        assert(ggml_get_f32_1d(x2->grad, 0) == 12.0f);
-        assert(ggml_get_f32_1d(x3->grad, 0) == 4.0f);
+        GGML_ASSERT(ggml_get_f32_1d(y, 0)        == 12.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 0) == 24.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 0) == 12.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x3->grad, 0) == 4.0f);
 
         struct ggml_tensor * g1 = x1->grad;
         struct ggml_tensor * g2 = x2->grad;
@@ -200,9 +199,9 @@ int main(int argc, const char ** argv) {
                 ggml_get_f32_1d(x2->grad, 0),
                 ggml_get_f32_1d(x3->grad, 0));
 
-        assert(ggml_get_f32_1d(x1->grad, 0) == 56.0f);
-        assert(ggml_get_f32_1d(x2->grad, 0) == 34.0f);
-        assert(ggml_get_f32_1d(x3->grad, 0) == 12.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 0) == 56.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 0) == 34.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x3->grad, 0) == 12.0f);
 
         ggml_graph_dump_dot(&gf, NULL, "test1-4-forward.dot");
         ggml_graph_dump_dot(&gb, &gf,  "test1-4-backward.dot");
@@ -240,13 +239,13 @@ int main(int argc, const char ** argv) {
                 ggml_get_f32_1d(x2->grad, 1),
                 ggml_get_f32_1d(x2->grad, 2));
 
-        assert(ggml_get_f32_1d(y, 0)        == 45.0f);
-        assert(ggml_get_f32_1d(x1->grad, 0) == 5.0f);
-        assert(ggml_get_f32_1d(x2->grad, 0) == 3.0f);
-        assert(ggml_get_f32_1d(x1->grad, 1) == 5.0f);
-        assert(ggml_get_f32_1d(x2->grad, 1) == 3.0f);
-        assert(ggml_get_f32_1d(x1->grad, 2) == 5.0f);
-        assert(ggml_get_f32_1d(x2->grad, 2) == 3.0f);
+        GGML_ASSERT(ggml_get_f32_1d(y, 0)        == 45.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 0) == 5.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 0) == 3.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 1) == 5.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 1) == 3.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 2) == 5.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 2) == 3.0f);
 
         ggml_graph_dump_dot(&gf, NULL, "test1-5-forward.dot");
         ggml_graph_dump_dot(&gb, &gf,  "test1-5-backward.dot");
@@ -293,13 +292,13 @@ int main(int argc, const char ** argv) {
                 ggml_get_f32_1d(x2->grad, 1),
                 ggml_get_f32_1d(x2->grad, 2));
 
-        assert(ggml_get_f32_1d(y, 0)              == -9.0f);
-        assert(ggml_get_f32_1d(x1->grad, 0) == -7.0f);
-        assert(ggml_get_f32_1d(x1->grad, 1) == -7.0f);
-        assert(ggml_get_f32_1d(x1->grad, 2) == -7.0f);
-        assert(ggml_get_f32_1d(x2->grad, 0) ==  3.0f);
-        assert(ggml_get_f32_1d(x2->grad, 1) ==  3.0f);
-        assert(ggml_get_f32_1d(x2->grad, 2) ==  3.0f);
+        GGML_ASSERT(ggml_get_f32_1d(y, 0)              == -9.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 0) == -7.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 1) == -7.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 2) == -7.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 0) ==  3.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 1) ==  3.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 2) ==  3.0f);
 
         ggml_graph_dump_dot(&gf, NULL, "test1-6-forward.dot");
         ggml_graph_dump_dot(&gb, &gf,  "test1-6-backward.dot");
@@ -346,13 +345,13 @@ int main(int argc, const char ** argv) {
                 ggml_get_f32_1d(x2->grad, 1),
                 ggml_get_f32_1d(x2->grad, 2));
 
-        assert(ggml_get_f32_1d(y, 0)        == 99.0f);
-        assert(ggml_get_f32_1d(x1->grad, 0) == 17.0f);
-        assert(ggml_get_f32_1d(x1->grad, 1) == 17.0f);
-        assert(ggml_get_f32_1d(x1->grad, 2) == 17.0f);
-        assert(ggml_get_f32_1d(x2->grad, 0) ==  3.0f);
-        assert(ggml_get_f32_1d(x2->grad, 1) ==  3.0f);
-        assert(ggml_get_f32_1d(x2->grad, 2) ==  3.0f);
+        GGML_ASSERT(ggml_get_f32_1d(y, 0)        == 99.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 0) == 17.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 1) == 17.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 2) == 17.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 0) ==  3.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 1) ==  3.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 2) ==  3.0f);
 
         ggml_graph_dump_dot(&gf, NULL, "test1-7-forward.dot");
         ggml_graph_dump_dot(&gb, &gf,  "test1-7-backward.dot");
@@ -393,13 +392,13 @@ int main(int argc, const char ** argv) {
                 ggml_get_f32_1d(x2->grad, 1),
                 ggml_get_f32_1d(x2->grad, 2));
 
-        assert(ggml_get_f32_1d(y, 0)        ==  2.0f);
-        assert(ggml_get_f32_1d(x1->grad, 0) == -1.0f);
-        assert(ggml_get_f32_1d(x1->grad, 1) == -1.0f);
-        assert(ggml_get_f32_1d(x1->grad, 2) == -1.0f);
-        assert(ggml_get_f32_1d(x2->grad, 0) ==  1.0f);
-        assert(ggml_get_f32_1d(x2->grad, 1) ==  1.0f);
-        assert(ggml_get_f32_1d(x2->grad, 2) ==  1.0f);
+        GGML_ASSERT(ggml_get_f32_1d(y, 0)        ==  2.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 0) == -1.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 1) == -1.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 2) == -1.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 0) ==  1.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 1) ==  1.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 2) ==  1.0f);
 
         ggml_set_f32(x1, 7.0f);
         ggml_set_f32(x2, 5.0f);
@@ -419,13 +418,13 @@ int main(int argc, const char ** argv) {
                 ggml_get_f32_1d(x2->grad, 1),
                 ggml_get_f32_1d(x2->grad, 2));
 
-        assert(ggml_get_f32_1d(y, 0)        ==  2.0f);
-        assert(ggml_get_f32_1d(x1->grad, 0) ==  1.0f);
-        assert(ggml_get_f32_1d(x1->grad, 1) ==  1.0f);
-        assert(ggml_get_f32_1d(x1->grad, 2) ==  1.0f);
-        assert(ggml_get_f32_1d(x2->grad, 0) == -1.0f);
-        assert(ggml_get_f32_1d(x2->grad, 1) == -1.0f);
-        assert(ggml_get_f32_1d(x2->grad, 2) == -1.0f);
+        GGML_ASSERT(ggml_get_f32_1d(y, 0)        ==  2.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 0) ==  1.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 1) ==  1.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x1->grad, 2) ==  1.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 0) == -1.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 1) == -1.0f);
+        GGML_ASSERT(ggml_get_f32_1d(x2->grad, 2) == -1.0f);
 
         ggml_graph_dump_dot(&gf, NULL, "test1-8-forward.dot");
         ggml_graph_dump_dot(&gb, &gf,  "test1-8-backward.dot");
