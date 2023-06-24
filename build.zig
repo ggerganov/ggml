@@ -1,5 +1,6 @@
 const std = @import("std");
 
+// Zig Version: 0.11.0-dev.3379+629f0d23b
 pub fn build(b: *std.build.Builder) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
