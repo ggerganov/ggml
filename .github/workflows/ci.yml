@@ -22,12 +22,12 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Set GGML_NTHREADS for Ubuntu
-      run: echo "GGML_NTHREADS=2" >> $GITHUB_ENV
+    - name: Set GGML_N_THREADS for Ubuntu
+      run: echo "GGML_N_THREADS=2" >> $GITHUB_ENV
       if: matrix.os == 'ubuntu-latest'
 
-    - name: Set GGML_NTHREADS for MacOS
-      run: echo "GGML_NTHREADS=3" >> $GITHUB_ENV
+    - name: Set GGML_N_THREADS for MacOS
+      run: echo "GGML_N_THREADS=2" >> $GITHUB_ENV
       if: matrix.os == 'macos-latest'
 
     - name: Create Build Environment
