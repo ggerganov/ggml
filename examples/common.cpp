@@ -288,7 +288,7 @@ std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::stri
     // find the longest token that forms each word in words:
     std::vector<gpt_vocab::id> tokens;
     for (const auto & word : words) {
-        for (int i = 0; i < word.size(); ){
+        for (int i = 0; i < (int) word.size(); ){
             for (int j = word.size() - 1; j >= i; j--){
                 auto cand = word.substr(i, j-i+1);
                 auto it = vocab.token_to_id.find(cand);
@@ -304,7 +304,6 @@ std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::stri
             }
         }
     }
-
 
     return tokens;
 }
