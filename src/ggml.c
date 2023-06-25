@@ -17296,7 +17296,7 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
                 fwrite(&n_dims, sizeof(uint32_t), 1, fout);
 
                 for (int j = 0; j < GGML_MAX_DIMS; ++j) {
-                    const uint64_t ne = tensor->ne[j];
+                    const uint64_t ne = GGML_DIM_ELEMENTS(tensor, j);
                     const uint64_t nb = tensor->nb[j];
 
                     fwrite(&ne, sizeof(uint64_t), 1, fout);
@@ -17336,7 +17336,7 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
                 fwrite(&n_dims, sizeof(uint32_t), 1, fout);
 
                 for (int j = 0; j < GGML_MAX_DIMS; ++j) {
-                    const uint64_t ne = tensor->ne[j];
+                    const uint64_t ne = GGML_DIM_ELEMENTS(tensor, j);
                     const uint64_t nb = tensor->nb[j];
 
                     fwrite(&ne, sizeof(uint64_t), 1, fout);
