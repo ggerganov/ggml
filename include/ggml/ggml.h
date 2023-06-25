@@ -368,6 +368,8 @@ extern "C" {
 
     static const size_t GGML_OBJECT_SIZE = sizeof(struct ggml_object);
 
+#define GGML_DIM_ELEMENTS(ptr, index) ((ptr)->ne[(index)])
+
     // n-dimensional tensor
     struct ggml_tensor {
         enum ggml_type    type;
