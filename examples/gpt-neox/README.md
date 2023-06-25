@@ -17,6 +17,9 @@ make -j
 # get the StableLM 3B Alpha model
 git clone https://huggingface.co/stabilityai/gpt_neox-base-alpha-3b
 
+# install Python dependencies
+python3 -m pip install -r ../requirements.txt
+
 # convert model to FP16
 python3 ../examples/gpt_neox/convert-h5-to-ggml.py ./stablelm-base-alpha-3b/ 1
 
