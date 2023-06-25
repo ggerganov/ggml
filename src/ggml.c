@@ -4403,13 +4403,13 @@ struct ggml_tensor * ggml_new_tensor_impl(
     //ggml_assert_aligned(result->data);
 
     for (int i = 0; i < n_dims; i++) {
-        result->ne[i] = ne[i];
+        GGML_DIM_ELEMENTS(result, i) = ne[i];
     }
 
     result->nb[0] = GGML_TYPE_SIZE[type];
     result->nb[1] = result->nb[0]*(GGML_DIM_ELEMENTS(result, 0)/GGML_BLCK_SIZE[type]);
     for (int i = 2; i < GGML_MAX_DIMS; i++) {
-        result->nb[i] = result->nb[i - 1]*result->ne[i - 1];
+        result->nb[i] = result->nb[i - 1]*GGML_DIM_ELEMENTS(result, i - 1);
     }
 
     ctx->n_objects++;
@@ -5246,7 +5246,7 @@ struct ggml_tensor * ggml_sum_rows(
 
     int64_t ne[4] = {1,1,1,1};
     for (int i=1; i<a->n_dims; ++i) {
-        ne[i] = a->ne[i];
+        ne[i] = GGML_DIM_ELEMENTS(a, i);
     }
 
     struct ggml_tensor * result = ggml_new_tensor(ctx, a->type, a->n_dims, ne);

@@ -382,30 +382,30 @@ void ggml_metal_graph_compute(
                 struct ggml_tensor * src1 = gf->nodes[i]->src1;
                 struct ggml_tensor * dst  = gf->nodes[i];
 
-                const int64_t  ne00 = src0 ? src0->ne[0] : 0;
-                const int64_t  ne01 = src0 ? src0->ne[1] : 0;
-                const int64_t  ne02 = src0 ? src0->ne[2] : 0;
-                const int64_t  ne03 = src0 ? src0->ne[3] : 0;
+                const int64_t  ne00 = src0 ? GGML_DIM_ELEMENTS(src0, 0) : 0;
+                const int64_t  ne01 = src0 ? GGML_DIM_ELEMENTS(src0, 1) : 0;
+                const int64_t  ne02 = src0 ? GGML_DIM_ELEMENTS(src0, 2) : 0;
+                const int64_t  ne03 = src0 ? GGML_DIM_ELEMENTS(src0, 3) : 0;
 
                 const uint64_t nb00 = src0 ? src0->nb[0] : 0;
                 const uint64_t nb01 = src0 ? src0->nb[1] : 0;
                 const uint64_t nb02 = src0 ? src0->nb[2] : 0;
                 const uint64_t nb03 = src0 ? src0->nb[3] : 0;
 
-                const int64_t  ne10 = src1 ? src1->ne[0] : 0;
-                const int64_t  ne11 = src1 ? src1->ne[1] : 0;
-                const int64_t  ne12 = src1 ? src1->ne[2] : 0;
-                const int64_t  ne13 = src1 ? src1->ne[3] : 0; UNUSED(ne13);
+                const int64_t  ne10 = src1 ? GGML_DIM_ELEMENTS(src1, 0) : 0;
+                const int64_t  ne11 = src1 ? GGML_DIM_ELEMENTS(src1, 1) : 0;
+                const int64_t  ne12 = src1 ? GGML_DIM_ELEMENTS(src1, 2) : 0;
+                const int64_t  ne13 = src1 ? GGML_DIM_ELEMENTS(src1, 3) : 0; UNUSED(ne13);
 
                 const uint64_t nb10 = src1 ? src1->nb[0] : 0;
                 const uint64_t nb11 = src1 ? src1->nb[1] : 0;
                 const uint64_t nb12 = src1 ? src1->nb[2] : 0;
                 const uint64_t nb13 = src1 ? src1->nb[3] : 0; UNUSED(nb13);
 
-                const int64_t  ne0  = dst ? dst->ne[0] : 0;
-                const int64_t  ne1  = dst ? dst->ne[1] : 0;
-                const int64_t  ne2  = dst ? dst->ne[2] : 0;
-                const int64_t  ne3  = dst ? dst->ne[3] : 0;
+                const int64_t  ne0  = dst ? GGML_DIM_ELEMENTS(dst, 0) : 0;
+                const int64_t  ne1  = dst ? GGML_DIM_ELEMENTS(dst, 1) : 0;
+                const int64_t  ne2  = dst ? GGML_DIM_ELEMENTS(dst, 2) : 0;
+                const int64_t  ne3  = dst ? GGML_DIM_ELEMENTS(dst, 3) : 0;
 
                 const uint64_t nb0  = dst ? dst->nb[0] : 0;
                 const uint64_t nb1  = dst ? dst->nb[1] : 0;
@@ -761,7 +761,7 @@ void ggml_metal_graph_compute(
                             [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
                             [encoder setBuffer:id_src1 offset:offs_src1 atIndex:1];
                             [encoder setBuffer:id_dst  offset:offs_dst  atIndex:2];
-                            [encoder setBytes:&(src0->ne[0]) length:sizeof( int64_t) atIndex:3];
+                            [encoder setBytes:&(GGML_DIM_ELEMENTS(src0, 0)) length:sizeof( int64_t) atIndex:3];
                             [encoder setBytes:&(src0->nb[1]) length:sizeof(uint64_t) atIndex:4];
                             [encoder setBytes:&(dst->nb[1])  length:sizeof(uint64_t) atIndex:5];
 
