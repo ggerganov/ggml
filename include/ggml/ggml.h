@@ -447,7 +447,6 @@ extern "C" {
     enum ggml_task_type {
         GGML_TASK_INIT = 0,
         GGML_TASK_COMPUTE,
-        GGML_TASK_FINALIZE,
     };
 
     struct ggml_compute_params {

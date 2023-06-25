@@ -2715,7 +2715,7 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
     if (params->ith != 0) {
         return true;
     }
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return true;
     }
     func(tensor->src0, tensor->src1, tensor);
