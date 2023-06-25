@@ -407,14 +407,14 @@ int mnist_mtl_eval(
                     id<MTLBuffer> id_src1 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src1, &offs_src1);
                     id<MTLBuffer> id_dst  = mnist_mtl_get_buffer(ctx, gf->nodes[i],       &offs_dst);
 
-                    const int64_t ncols0 = gf->nodes[i]->src0->ne[0];
-                    const int64_t nrows0 = gf->nodes[i]->src0->ne[1];
+                    const int64_t ncols0 = GGML_DIM_ELEMENTS(gf->nodes[i]->src0, 0);
+                    const int64_t nrows0 = GGML_DIM_ELEMENTS(gf->nodes[i]->src0, 1);
 
-                    const int64_t ncols1 = gf->nodes[i]->src1->ne[0];
-                    const int64_t nrows1 = gf->nodes[i]->src1->ne[1];
+                    const int64_t ncols1 = GGML_DIM_ELEMENTS(gf->nodes[i]->src1, 0);
+                    const int64_t nrows1 = GGML_DIM_ELEMENTS(gf->nodes[i]->src1, 1);
 
-                    const int64_t ncols2 = gf->nodes[i]->ne[0];
-                    const int64_t nrows2 = gf->nodes[i]->ne[1];
+                    const int64_t ncols2 = GGML_DIM_ELEMENTS(gf->nodes[i], 0);
+                    const int64_t nrows2 = GGML_DIM_ELEMENTS(gf->nodes[i], 1)
 
                     GGML_ASSERT(ncols0 == ncols1);
 

@@ -403,11 +403,11 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
                 return false;
             }
 
-            if (tensor->ne[0] != ne[0] || tensor->ne[1] != ne[1]) {
+            if (GGML_DIM_ELEMENTS(tensor, 0) != ne[0] || GGML_DIM_ELEMENTS(tensor, 1) != ne[1]) {
                 fprintf(stderr,
                         "%s: tensor '%s' has wrong shape in model file: got [%5d, "
                         "%5d], expected [%5d, %5d]\n",
-                        __func__, name.data(), (int)tensor->ne[0], (int)tensor->ne[1], ne[0], ne[1]);
+                        __func__, name.data(), (int)GGML_DIM_ELEMENTS(tensor, 0), (int)GGML_DIM_ELEMENTS(tensor, 1), ne[0], ne[1]);
                 return false;
             }
 
