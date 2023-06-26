@@ -1,5 +1,7 @@
 # ggml
 
+[Roadmap](https://github.com/users/ggerganov/projects/7) / [Manifesto](https://github.com/ggerganov/llama.cpp/discussions/205)
+
 Tensor library for machine learning
 
 ***Note that this project is under active development. \
@@ -17,7 +19,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - No third-party dependencies
 - Zero memory allocations during runtime
 
-## Roadmap
+## Updates
 
 - [X] Example of GPT-2 inference [examples/gpt-2](https://github.com/ggerganov/ggml/tree/master/examples/gpt-2)
 - [X] Example of GPT-J inference [examples/gpt-j](https://github.com/ggerganov/ggml/tree/master/examples/gpt-j)
@@ -38,6 +40,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [X] Example of Replit inference [examples/replit](https://github.com/ggerganov/ggml/tree/master/examples/replit)
 - [X] Example of BioGPT inference [PABannier/biogpt.cpp](https://github.com/PABannier/biogpt.cpp)
 - [X] Example of Encodec inference [PABannier/encodec.cpp](https://github.com/PABannier/encodec.cpp) 
+- [X] Example of CLIP inference [monatis/clip.cpp](https://github.com/monatis/clip.cpp)
 
 ## Whisper inference (example)
 
@@ -74,6 +77,9 @@ make -j4 gpt-2 gpt-j
 # Run the GPT-J 6B model (requires 12GB disk space and 16GB CPU RAM)
 ../examples/gpt-j/download-ggml-model.sh 6B
 ./bin/gpt-j -m models/gpt-j-6B/ggml-model.bin -p "This is an example"
+
+# Install Python dependencies
+python3 -m pip install -r ../requirements.txt
 
 # Run the Cerebras-GPT 111M model
 # Download from: https://huggingface.co/cerebras
