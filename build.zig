@@ -2,24 +2,26 @@ const std = @import("std");
 
 // Zig Version: 0.11.0-dev.3798+a5e15eced
 // Zig Build Command: zig build
-// Zig Run Command:    
-//     zig build run_dolly-v2             
-//     zig build run_gpt-2                  
-//     zig build run_gpt-j                   
-//     zig build run_gpt-neox                 
-//     zig build run_mnist                    
-//     zig build run_mpt                     
-//     zig build run_replit                  
-//     zig build run_starcoder                
-//     zig build run_test-grad0               
-//     zig build run_test-mul-mat0            
-//     zig build run_test-mul-mat2            
-//     zig build run_test-opt                 
-//     zig build run_test-vec1                
-//     zig build run_test0                   
-//     zig build run_test1                    
-//     zig build run_test2                    
-//     zig build run_test3                    
+// Zig Run Command: zig build -h  
+//     zig build run_dolly-v2           
+//     zig build run_gpt-2                
+//     zig build run_gpt-j                 
+//     zig build run_gpt-neox               
+//     zig build run_mnist                  
+//     zig build run_mpt                 
+//     zig build run_replit        
+//     zig build run_starcoder            
+//     zig build run_test-grad0            
+//     zig build run_test-mul-mat0          
+//     zig build run_test-mul-mat2         
+//     zig build run_test-opt               
+//     zig build run_test-vec1               
+//     zig build run_test0                 
+//     zig build run_test1                  
+//     zig build run_test2              
+//     zig build run_test3
+//     zig build run_zig_test0
+//     zig build run_zig_test1     
 pub fn build(b: *std.build.Builder) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -108,6 +110,29 @@ pub fn build(b: *std.build.Builder) void {
         run_cmd.step.dependOn(b.getInstallStep());
         if (b.args) |args| run_cmd.addArgs(args);
         const run_step = b.step("run_" ++ name, "Run tests");
+        run_step.dependOn(&run_cmd.step);
+    }
+
+    // zig_tests
+    const zig_tests = .{
+        "test0",
+        "test1",
+    };
+    inline for (zig_tests) |name| {
+        const exe = b.addExecutable(.{
+            .name = name,
+            .root_source_file = .{ .path = std.fmt.comptimePrint("tests/{s}.zig", .{name}) },
+            .target = target,
+            .optimize = optimize,
+        });
+        exe.addIncludePath("./include");
+        exe.addIncludePath("./include/ggml");
+        exe.linkLibrary(lib);
+        b.installArtifact(exe);
+        const run_cmd = b.addRunArtifact(exe);
+        run_cmd.step.dependOn(b.getInstallStep());
+        if (b.args) |args| run_cmd.addArgs(args);
+        const run_step = b.step("run_zig_" ++ name, "Run zig_tests");
         run_step.dependOn(&run_cmd.step);
     }
 }
