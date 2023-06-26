@@ -22,6 +22,8 @@ The key difference between GGJT and GGUF is the use of a key-value structure for
 
 GGUF files are structured as follows. They assume the use of a global `ALIGNMENT` constant, which is the alignment of the model data. This is currently 64 bytes, but may change in the future. [^1] To achieve this, where relevant, the file is padded with `0x00` bytes to the next multiple of `ALIGNMENT`.
 
+Fields, including arrays, are written sequentially without alignment unless otherwise specified.
+
 [^1]: This may be moved to a per-model key-value pair in the future.
 
 ```c
@@ -50,35 +52,37 @@ enum ggml_type {
 };
 
 enum gguf_metadata_value_type: uint32_t {
-    /// The value is a 8-bit unsigned integer.
+    // The value is a 8-bit unsigned integer.
     GGUF_METADATA_VALUE_TYPE_UINT8 = 0,
-    /// The value is a 8-bit signed integer.
+    // The value is a 8-bit signed integer.
     GGUF_METADATA_VALUE_TYPE_INT8 = 1,
-    /// The value is a 16-bit unsigned little-endian integer.
+    // The value is a 16-bit unsigned little-endian integer.
     GGUF_METADATA_VALUE_TYPE_UINT16 = 2,
-    /// The value is a 16-bit signed little-endian integer.
+    // The value is a 16-bit signed little-endian integer.
     GGUF_METADATA_VALUE_TYPE_INT16 = 3,
-    /// The value is a 32-bit unsigned little-endian integer.
+    // The value is a 32-bit unsigned little-endian integer.
     GGUF_METADATA_VALUE_TYPE_UINT32 = 4,
-    /// The value is a 32-bit signed little-endian integer.
+    // The value is a 32-bit signed little-endian integer.
     GGUF_METADATA_VALUE_TYPE_INT32 = 5,
-    /// The value is a 32-bit IEEE754 floating point number.
+    // The value is a 32-bit IEEE754 floating point number.
     GGUF_METADATA_VALUE_TYPE_FLOAT32 = 6,
-    /// The value is a boolean.
-    /// 1-byte value where 0 is false and 1 is true.
-    /// Anything else is invalid, and should be treated as either the model being invalid or the reader being buggy.
+    // The value is a boolean.
+    // 1-byte value where 0 is false and 1 is true.
+    // Anything else is invalid, and should be treated as either the model being invalid or the reader being buggy.
     GGUF_METADATA_VALUE_TYPE_BOOL = 7,
-    /// The value is a UTF-8 non-null-terminated string, with length prepended.
+    // The value is a UTF-8 non-null-terminated string, with length prepended.
     GGUF_METADATA_VALUE_TYPE_STRING = 8,
-    /// The value is an array of other values, with the length and type prepended.
+    // The value is an array of other values, with the length and type prepended.
+    ///
+    // Arrays can be nested, and the length of the array is the number of elements in the array, not the number of bytes.
     GGUF_METADATA_VALUE_TYPE_ARRAY = 9,
 }
 
-/// A string in GGUF.
+// A string in GGUF.
 struct gguf_string_t {
-    /// The length of the string, in bytes.
+    // The length of the string, in bytes.
     uint32_t len;
-    /// The string as a UTF-8 non-null-terminated string.
+    // The string as a UTF-8 non-null-terminated string.
     char string[len];
 }
 
@@ -93,26 +97,29 @@ union gguf_metadata_value_t {
     bool bool_;
     gguf_string_t string;
     struct {
+        // Number of elements, not bytes
         uint32_t len;
+        // Any value type is valid, including arrays.
         gguf_metadata_value_type type;
+        // The array of values.
         gguf_metadata_value_t array[len];
     } array;
 };
 
 struct gguf_metadata_kv_t {
-    /// A standard GGUF string, with the following caveats:
-    /// - It must be a valid ASCII string.
-    /// - It must be a hierarchical key, where each segment is `lower_snake_case` and separated by a `.`.
-    /// - It must be at most 2^16-1 bytes long.
-    /// Any keys that do not follow these rules are invalid.
+    // A standard GGUF string, with the following caveats:
+    // - It must be a valid ASCII string.
+    // - It must be a hierarchical key, where each segment is `lower_snake_case` and separated by a `.`.
+    // - It must be at most 2^16-1 bytes long.
+    // Any keys that do not follow these rules are invalid.
     gguf_string_t key;
 
-    /// The length of the value, in bytes
+    // The length of the value, in bytes
     uint32_t value_len;
-    /// The type of the value.
-    /// Must be one of the `gguf_metadata_value_type` values.
+    // The type of the value.
+    // Must be one of the `gguf_metadata_value_type` values.
     gguf_metadata_value_type value_type;
-    /// The value.
+    // The value.
     gguf_metadata_value_t value;
 };
 
@@ -138,19 +145,19 @@ struct gguf_header_t {
 };
 
 struct gguf_tensor_info_t {
-    /// The name of the tensor.
+    // The name of the tensor.
     gguf_string_t name;
-    /// The number of dimensions in the tensor.
-    /// Currently at most two, but this may change in the future.
+    // The number of dimensions in the tensor.
+    // Currently at most 4, but this may change in the future.
     uint32_t n_dimensions;
-    /// The dimensions of the tensor.
+    // The dimensions of the tensor.
     uint32_t dimensions[n_dimensions];
-    /// The number of elements in the tensor.
+    // The number of elements in the tensor.
     uint32_t n_elements;
-    /// The type of the tensor.
+    // The type of the tensor.
     ggml_type type;
-    /// The offset of the tensor's data in this file in bytes.
-    /// Must be a multiple of `ALIGNMENT`.
+    // The offset of the tensor's data in this file in bytes.
+    // Must be a multiple of `ALIGNMENT`.
     uint64_t offset;
 };
 
@@ -184,6 +191,10 @@ The following key-value pairs are standardized. This list may grow in the future
 
 Not all of these are required, but they are all recommended. Keys that are required are bolded. For omitted pairs, the reader should assume that the value is unknown and either default or error as appropriate.
 
+The community can develop their own key-value pairs to carry additional data. However, these should be namespaced with the relevant community name to avoid collisions. For example, the `rustformers` community might use `rustformers.` as a prefix for all of their keys.
+
+If a particular community key is widely used, it may be promoted to a standardized key.
+
 ### General
 
 - **`general.architecture: string`**: describes what architecture this model implements. All lowercase ASCII, with only `[a-z0-9]+` characters allowed. Known values include:
@@ -198,8 +209,9 @@ Not all of these are required, but they are all recommended. Keys that are requi
 - **`general.quantization_version: u32`**: version of quantization scheme
 - `general.file_type: string`: type of the majority of the tensors in the file. This shouldn't have any semantic meaning and should be purely informational, hence the use of `string`.
 - `general.license: string`: SPDX license of the model
-- `general.description: string`: information about the model, including provenance
-- `general.url.original_source: string`: path to the original model that this GGML file was created from
+- `general.description: string`: free-form description of the model including anything that isn't covered by the other fields
+- `general.source.url: string`: URL to the source of the model. Can be a GitHub repo, a paper, etc.
+- `general.source.huggingface.repository: string`: Hugging Face model repository that this model is either hosted on or based on
 
 ### LLM
 
@@ -208,15 +220,13 @@ In the following, `[llm]` is used to fill in for the name of a specific LLM arch
 - `[llm].context_length: u32`: size of the maximum supported context
 - `[llm].hidden_size: u32`: embedding layer size
 - `[llm].num_layers: u32`: number of layers
-- `[llm].num_rotary: u32`: `int(hparams["rotary_pct"]*(hparams["hidden_size"]//hparams["num_attention_heads"]))`
+- `[llm].num_ff: u32`: The length of the feedforward layer.
 - `[llm].use_parallel_residual: bool`: whether or not the parallel residual logic should be used
 - `[llm].max_seq_len: u32`: Maximum sequence length
 - `[llm].attention.num_heads: u32`: number of attention heads
 - `[llm].attention.alibi_bias_max: f32`: The maximum bias to use for ALiBI
-- `[llm].attention.clip_kqv: f32`: **TODO**: what is this?
-- `[llm].num_mult: u32`: **TODO**: what is this?
-- `[llm].rot: u32`: **TODO**: what is this?
-- `[llm].num_rot: u32`: **TODO**: what is this?
+- `[llm].attention.clip_kqv: f32`: Value (`C`) to clamp the values of the `Q`, `K`, and `V` tensors between (`[-C, C]`).
+- `[llm].rope.num_dims: u32`: The number of rotary dimensions for RoPE.
 
 #### Models
 
@@ -227,8 +237,8 @@ The following sections describe the metadata for each model architecture. Each k
 - `llama.context_length`
 - `llama.hidden_size`
 - `llama.num_layers`
-- `llama.num_mult`
-- `llama.rot`
+- `llama.num_ff`
+- `llama.rope.num_dims`
 - `llama.attention.num_heads`
 
 ##### MPT
@@ -245,8 +255,8 @@ The following sections describe the metadata for each model architecture. Each k
 - `gptneox.context_length`
 - `gptneox.hidden_size`
 - `gptneox.num_layers`
-- `gptneox.num_rot`
 - `gptneox.use_parallel_residual`
+- `gptneox.rope.num_dims`
 - `gptneox.attention.num_heads`
 
 ##### GPT-J
@@ -254,7 +264,7 @@ The following sections describe the metadata for each model architecture. Each k
 - `gptj.context_length`
 - `gptj.hidden_size`
 - `gptj.num_layers`
-- `gptj.num_rot`
+- `gptj.rope.num_dims`
 - `gptj.attention.num_heads`
 
 ##### GPT-2
@@ -269,7 +279,7 @@ The following sections describe the metadata for each model architecture. Each k
 - `bloom.context_length`
 - `bloom.hidden_size`
 - `bloom.num_layers`
-- `bloom.num_mult`
+- `bloom.num_ff`
 - `bloom.attention.num_heads`
 
 ##### Falcon
@@ -288,14 +298,14 @@ The following sections describe the metadata for each model architecture. Each k
 
 The following keys are used to describe the tokenizer of the model. It is recommended that model authors support as many of these as possible, as it will allow for better tokenization quality with supported executors.
 
-#### Embedded
+#### GGML
 
-GGML supports an embedded vocabulary that may be lossily compressed from a more complete tokenizer. This should enable inferencing of the model, but it may not fully capture the nuances of tokenization. When a more accurate tokenizer is available and supported, it should be used instead.
+GGML supports an embedded vocabulary that may be lossily compressed from a more complete tokenizer. It is simplistic and specific to GGML. This should enable inferencing of the model, but it may not fully capture the nuances of tokenization. When a more accurate tokenizer is available and supported, it should be used instead.
 
-**TODO**: Add more details about how this works, and what kind of tokenizer it's expecting. Should this be called something more specific instead?
+It is not guaranteed to be standardized across models, and may change in the future. It is recommended that model authors use a more standardized tokenizer if possible.
 
-- `tokenizer.embedded.tokens: array[string]`: A list of tokens.
-- `tokenizer.embedded.scores: array[f32]`: If present, the score/probability of each token. If not present, all tokens are assumed to have equal probability. Must be the same length as `tokens`.
+- `tokenizer.ggml.tokens: array[string]`: A list of tokens.
+- `tokenizer.ggml.scores: array[f32]`: If present, the score/probability of each token. If not present, all tokens are assumed to have equal probability. Must be the same length as `tokens`.
 
 #### Hugging Face
 
