@@ -7528,7 +7528,7 @@ static void ggml_compute_forward_dup_same_cont(
     GGML_ASSERT(ggml_is_contiguous(dst) && ggml_is_contiguous(src0));
     GGML_ASSERT(src0->type == dst->type);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -7558,7 +7558,7 @@ static void ggml_compute_forward_dup_f16(
         struct ggml_tensor * dst) {
     GGML_ASSERT(ggml_nelements(dst) == ggml_nelements(src0));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -7847,7 +7847,7 @@ static void ggml_compute_forward_dup_f32(
         struct ggml_tensor * dst) {
     GGML_ASSERT(ggml_nelements(dst) == ggml_nelements(src0));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -8159,7 +8159,7 @@ static void ggml_compute_forward_add_f32(
         struct ggml_tensor * dst) {
     GGML_ASSERT(ggml_are_same_shape(src0, src1) && ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -8245,7 +8245,7 @@ static void ggml_compute_forward_add_f16_f32(
         struct ggml_tensor * dst) {
     GGML_ASSERT(ggml_are_same_shape(src0, src1) && ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -8315,7 +8315,7 @@ static void ggml_compute_forward_add_f16_f16(
         struct ggml_tensor * dst) {
     GGML_ASSERT(ggml_are_same_shape(src0, src1) && ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -8385,7 +8385,7 @@ static void ggml_compute_forward_add_q_f32(
         struct ggml_tensor * dst) {
     GGML_ASSERT(ggml_are_same_shape(src0, src1) && ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -8521,7 +8521,7 @@ static void ggml_compute_forward_add1_f32(
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
     GGML_ASSERT(ggml_is_scalar(src1));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -8584,7 +8584,7 @@ static void ggml_compute_forward_add1_f16_f32(
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
     GGML_ASSERT(ggml_is_scalar(src1));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -8645,7 +8645,7 @@ static void ggml_compute_forward_add1_f16_f16(
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
     GGML_ASSERT(ggml_is_scalar(src1));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -8706,7 +8706,7 @@ static void ggml_compute_forward_add1_q_f32(
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
     GGML_ASSERT(ggml_is_scalar(src1));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -8851,7 +8851,7 @@ static void ggml_compute_forward_acc_f32(
             ggml_nbytes(dst));
     }
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -8953,7 +8953,7 @@ static void ggml_compute_forward_sub_f32(
     assert(params->ith == 0);
     assert(ggml_are_same_shape(src0, src1) && ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -9048,7 +9048,7 @@ static void ggml_compute_forward_mul_f32(
         struct ggml_tensor * dst) {
     GGML_ASSERT(ggml_can_repeat_rows(src1, src0) && ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
     const int ith = params->ith;
@@ -9170,7 +9170,7 @@ static void ggml_compute_forward_div_f32(
     assert(params->ith == 0);
     assert(ggml_are_same_shape(src0, src1) && ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -9265,7 +9265,7 @@ static void ggml_compute_forward_sqr_f32(
     assert(params->ith == 0);
     assert(ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -9307,7 +9307,7 @@ static void ggml_compute_forward_sqrt_f32(
     assert(params->ith == 0);
     assert(ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -9350,7 +9350,7 @@ static void ggml_compute_forward_log_f32(
     GGML_ASSERT(params->ith == 0);
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -9392,7 +9392,7 @@ static void ggml_compute_forward_sum_f32(
     assert(params->ith == 0);
     assert(ggml_is_scalar(dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -9448,7 +9448,7 @@ static void ggml_compute_forward_sum_rows_f32(
         struct ggml_tensor * dst) {
     GGML_ASSERT(params->ith == 0);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -9515,7 +9515,7 @@ static void ggml_compute_forward_mean_f32(
         struct ggml_tensor * dst) {
     assert(params->ith == 0);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -9587,7 +9587,7 @@ static void ggml_compute_forward_repeat_f32(
     GGML_ASSERT(params->ith == 0);
     GGML_ASSERT(ggml_can_repeat(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -9666,7 +9666,7 @@ static void ggml_compute_forward_repeat_back_f32(
     GGML_ASSERT(params->ith == 0);
     GGML_ASSERT(ggml_can_repeat(dst, src0));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -9759,7 +9759,7 @@ static void ggml_compute_forward_abs_f32(
     assert(params->ith == 0);
     assert(ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -9801,7 +9801,7 @@ static void ggml_compute_forward_sgn_f32(
     assert(params->ith == 0);
     assert(ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -9843,7 +9843,7 @@ static void ggml_compute_forward_neg_f32(
     assert(params->ith == 0);
     assert(ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -9885,7 +9885,7 @@ static void ggml_compute_forward_step_f32(
     assert(params->ith == 0);
     assert(ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -9927,7 +9927,7 @@ static void ggml_compute_forward_relu_f32(
     assert(params->ith == 0);
     assert(ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -9970,7 +9970,7 @@ static void ggml_compute_forward_gelu_f32(
     GGML_ASSERT(ggml_is_contiguous(dst));
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -10029,7 +10029,7 @@ static void ggml_compute_forward_gelu_quick_f32(
     GGML_ASSERT(ggml_is_contiguous(dst));
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -10088,7 +10088,7 @@ static void ggml_compute_forward_silu_f32(
     GGML_ASSERT(ggml_is_contiguous(dst));
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -10151,7 +10151,7 @@ static void ggml_compute_forward_silu_back_f32(
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
     GGML_ASSERT(ggml_are_same_shape(src0, grad));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -10210,7 +10210,7 @@ static void ggml_compute_forward_norm_f32(
         struct ggml_tensor * dst) {
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -10287,7 +10287,7 @@ static void ggml_compute_forward_rms_norm_f32(
         struct ggml_tensor * dst) {
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -10363,7 +10363,7 @@ static void ggml_compute_forward_rms_norm_back_f32(
         struct ggml_tensor * dst) {
     GGML_ASSERT(ggml_are_same_shape(src0, dst) && ggml_are_same_shape(src0, src1));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -10664,10 +10664,6 @@ static void ggml_compute_forward_mul_mat_f32(
             return;
         }
 
-        if (params->type == GGML_TASK_FINALIZE) {
-            return;
-        }
-
         for (int64_t i03 = 0; i03 < ne03; i03++) {
             for (int64_t i02 = 0; i02 < ne02; i02++) {
                 const float * x = (float *) ((char *) src0->data + i02*nb02 + i03*nb03);
@@ -10688,10 +10684,6 @@ static void ggml_compute_forward_mul_mat_f32(
 #endif
 
     if (params->type == GGML_TASK_INIT) {
-        return;
-    }
-
-    if (params->type == GGML_TASK_FINALIZE) {
         return;
     }
 
@@ -10831,10 +10823,6 @@ static void ggml_compute_forward_mul_mat_f16_f32(
             return;
         }
 
-        if (params->type == GGML_TASK_FINALIZE) {
-            return;
-        }
-
         for (int64_t i03 = 0; i03 < ne03; i03++) {
             for (int64_t i02 = 0; i02 < ne02; i02++) {
                 float * const wdata = params->wdata;
@@ -10885,10 +10873,6 @@ static void ggml_compute_forward_mul_mat_f16_f32(
 
         GGML_ASSERT(id*sizeof(ggml_fp16_t) <= params->wsize);
 
-        return;
-    }
-
-    if (params->type == GGML_TASK_FINALIZE) {
         return;
     }
 
@@ -11034,10 +11018,6 @@ static void ggml_compute_forward_mul_mat_q_f32(
             return;
         }
 
-        if (params->type == GGML_TASK_FINALIZE) {
-            return;
-        }
-
         float * const wdata = params->wdata;
         dequantize_row_q_t const dequantize_row_q = quantize_fns[type].dequantize_row_q;
 
@@ -11086,10 +11066,6 @@ static void ggml_compute_forward_mul_mat_q_f32(
             }
         }
 
-        return;
-    }
-
-    if (params->type == GGML_TASK_FINALIZE) {
         return;
     }
 
@@ -11255,10 +11231,6 @@ static void ggml_compute_forward_out_prod_f32(
         return;
     }
 
-    if (params->type == GGML_TASK_FINALIZE) {
-        return;
-    }
-
     // parallelize by last three dimensions
 
     // total rows in dst
@@ -11363,7 +11335,7 @@ static void ggml_compute_forward_scale_f32(
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
     GGML_ASSERT(ggml_is_scalar(src1));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -11445,7 +11417,7 @@ static void ggml_compute_forward_set_f32(
             ggml_nbytes(dst));
     }
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -11597,7 +11569,7 @@ static void ggml_compute_forward_get_rows_q(
               struct ggml_tensor * dst) {
     assert(params->ith == 0);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -11626,7 +11598,7 @@ static void ggml_compute_forward_get_rows_f16(
               struct ggml_tensor * dst) {
     assert(params->ith == 0);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -11654,7 +11626,7 @@ static void ggml_compute_forward_get_rows_f32(
               struct ggml_tensor * dst) {
     assert(params->ith == 0);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -11742,7 +11714,7 @@ static void ggml_compute_forward_get_rows_back_f32_f16(
 
     ggml_compute_forward_dup_same_cont(params, opt0, dst);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -11779,7 +11751,7 @@ static void ggml_compute_forward_get_rows_back_f32(
         memset(dst->data, 0, ggml_nbytes(dst));
     }
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -11848,7 +11820,7 @@ static void ggml_compute_forward_diag_f32(
         struct ggml_tensor * dst) {
     GGML_ASSERT(params->ith == 0);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -11943,7 +11915,7 @@ static void ggml_compute_forward_diag_mask_f32(
             ggml_nbytes(dst));
     }
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -12012,7 +11984,7 @@ static void ggml_compute_forward_soft_max_f32(
     GGML_ASSERT(ggml_is_contiguous(dst));
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -12104,7 +12076,7 @@ static void ggml_compute_forward_soft_max_back_f32(
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
     GGML_ASSERT(ggml_are_same_shape(src1, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -12198,7 +12170,7 @@ static void ggml_compute_forward_alibi_f32(
     GGML_ASSERT(src1->type == GGML_TYPE_I32);
     GGML_ASSERT(ggml_nelements(src1) == 3);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -12263,7 +12235,7 @@ static void ggml_compute_forward_alibi_f16(
     GGML_ASSERT(src1->type == GGML_TYPE_I32);
     GGML_ASSERT(ggml_nelements(src1) == 3);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -12367,7 +12339,7 @@ static void ggml_compute_forward_clamp_f32(
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
     GGML_ASSERT(ggml_nelements(src1) == 2);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -12442,7 +12414,7 @@ static void ggml_compute_forward_rope_f32(
     GGML_ASSERT(src1->type == GGML_TYPE_I32);
     GGML_ASSERT(ggml_nelements(src1) == 3);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -12555,7 +12527,7 @@ static void ggml_compute_forward_rope_f16(
     GGML_ASSERT(src1->type == GGML_TYPE_I32);
     GGML_ASSERT(ggml_nelements(src1) == 3);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -12691,7 +12663,7 @@ static void ggml_compute_forward_rope_back_f32(
     assert(src1->type == GGML_TYPE_I32);
     assert(ggml_nelements(src1) == 3);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -12804,7 +12776,7 @@ static void ggml_compute_forward_rope_back_f16(
     assert(src1->type == GGML_TYPE_I32);
     assert(ggml_nelements(src1) == 3);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -13022,10 +12994,6 @@ static void ggml_compute_forward_conv_1d_s1_ph_f16_f32(
         return;
     }
 
-    if (params->type == GGML_TASK_FINALIZE) {
-        return;
-    }
-
     // total rows in dst
     const int nr = ne02;
 
@@ -13139,10 +13107,6 @@ static void ggml_compute_forward_conv_1d_s1_ph_f32(
             }
         }
 
-        return;
-    }
-
-    if (params->type == GGML_TASK_FINALIZE) {
         return;
     }
 
@@ -13285,10 +13249,6 @@ static void ggml_compute_forward_conv_1d_s2_ph_f16_f32(
         return;
     }
 
-    if (params->type == GGML_TASK_FINALIZE) {
-        return;
-    }
-
     // total rows in dst
     const int nr = ne02;
 
@@ -13402,10 +13362,6 @@ static void ggml_compute_forward_conv_1d_s2_ph_f32(
             }
         }
 
-        return;
-    }
-
-    if (params->type == GGML_TASK_FINALIZE) {
         return;
     }
 
@@ -13541,10 +13497,6 @@ static void ggml_compute_forward_conv_2d_sk_p0_f16_f32(
         return;
     }
 
-    if (params->type == GGML_TASK_FINALIZE) {
-        return;
-    }
-
     // total patches in dst
     const int np = ne2;
 
@@ -13677,10 +13629,6 @@ static void ggml_compute_forward_flash_attn_f32(
     GGML_ASSERT(nb2 <= nb3);
 
     if (params->type == GGML_TASK_INIT) {
-        return;
-    }
-
-    if (params->type == GGML_TASK_FINALIZE) {
         return;
     }
 
@@ -13886,10 +13834,6 @@ static void ggml_compute_forward_flash_attn_f16(
     GGML_ASSERT(nb2 <= nb3);
 
     if (params->type == GGML_TASK_INIT) {
-        return;
-    }
-
-    if (params->type == GGML_TASK_FINALIZE) {
         return;
     }
 
@@ -14182,10 +14126,6 @@ static void ggml_compute_forward_flash_ff_f16(
         return;
     }
 
-    if (params->type == GGML_TASK_FINALIZE) {
-        return;
-    }
-
     // parallelize by a rows using ggml_vec_dot_f32
 
     // total rows in a
@@ -14380,10 +14320,6 @@ static void ggml_compute_forward_flash_attn_back_f32(
         if (ith == 0) {
             memset(dst->data, 0, nb0*ne0*ne1*ne2*ne3);
         }
-        return;
-    }
-
-    if (params->type == GGML_TASK_FINALIZE) {
         return;
     }
 
@@ -14693,7 +14629,7 @@ static void ggml_compute_forward_win_part_f32(
         const struct ggml_tensor * src0,
         const struct ggml_tensor * opt0,
         struct ggml_tensor * dst) {
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -14764,7 +14700,7 @@ static void ggml_compute_forward_win_unpart_f32(
         const struct ggml_tensor * src0,
         const struct ggml_tensor * opt0,
         struct ggml_tensor * dst) {
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -14834,7 +14770,7 @@ static void ggml_compute_forward_map_unary_f32(
         const ggml_unary_op_f32_t fun) {
     GGML_ASSERT(ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -14880,7 +14816,7 @@ static void ggml_compute_forward_map_binary_f32(
     assert(params->ith == 0);
     assert(ggml_are_same_shape(src0, src1) && ggml_are_same_shape(src0, dst));
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -14927,7 +14863,7 @@ static void ggml_compute_forward_map_custom1_f32(
         const ggml_custom1_op_f32_t fun) {
     assert(params->ith == 0);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -14962,7 +14898,7 @@ static void ggml_compute_forward_map_custom2_f32(
         const ggml_custom2_op_f32_t fun) {
     assert(params->ith == 0);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -14999,7 +14935,7 @@ static void ggml_compute_forward_map_custom3_f32(
         const ggml_custom3_op_f32_t fun) {
     assert(params->ith == 0);
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -15050,15 +14986,6 @@ static void ggml_compute_forward_cross_entropy_loss_f32(
     if (params->type == GGML_TASK_INIT) {
         if (ith == 0) {
             memset(sums, 0, sizeof(float) * (nth + nth * nc));
-        }
-        return;
-    }
-
-    if (params->type == GGML_TASK_FINALIZE) {
-        if (ith == 0) {
-            float * dp = (float *) dst->data;
-            ggml_vec_sum_f32(nth, dp, sums);
-            dp[0] *= -1.0f;
         }
         return;
     }
@@ -15160,7 +15087,7 @@ static void ggml_compute_forward_cross_entropy_loss_back_f32(
     const int64_t ith = params->ith;
     const int64_t nth = params->nth;
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_INIT) {
         return;
     }
 
@@ -16718,20 +16645,9 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
     while (true) {
         if (atomic_fetch_sub(&state->shared->n_active, 1) == 1) {
             // all other threads are finished and spinning
-            // do finalize and init here so we don't have synchronize again
-            struct ggml_compute_params params = {
-                /*.type  =*/ GGML_TASK_FINALIZE,
-                /*.ith   =*/ 0,
-                /*.nth   =*/ 0,
-                /*.wsize =*/ cgraph->work ? ggml_nbytes(cgraph->work) : 0,
-                /*.wdata =*/ cgraph->work ? cgraph->work->data : NULL,
-            };
-
+            // do init here so we don't have synchronize again
             if (node_n != -1) {
-                /* FINALIZE */
                 struct ggml_tensor * node = state->shared->cgraph->nodes[node_n];
-                params.nth = node->n_tasks;
-                ggml_compute_forward(&params, node);
                 ggml_graph_compute_perf_stats_node(node, state->shared);
             }
 
@@ -16745,8 +16661,13 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
                 state->shared->perf_node_start_time_us = ggml_perf_time_us();
 
                 /* INIT */
-                params.type = GGML_TASK_INIT;
-                params.nth  = node->n_tasks;
+                struct ggml_compute_params params = {
+                    /*.type  =*/ GGML_TASK_INIT,
+                    /*.ith   =*/ 0,
+                    /*.nth   =*/ node->n_tasks,
+                    /*.wsize =*/ cgraph->work ? ggml_nbytes(cgraph->work) : 0,
+                    /*.wdata =*/ cgraph->work ? cgraph->work->data : NULL,
+                };            
                 ggml_compute_forward(&params, node);
 
                 if (node->n_tasks == 1) {
@@ -16755,8 +16676,6 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
                     params.type = GGML_TASK_COMPUTE;
                     ggml_compute_forward(&params, node);
 
-                    params.type = GGML_TASK_FINALIZE;
-                    ggml_compute_forward(&params, node);
                     ggml_graph_compute_perf_stats_node(node, state->shared);
                 } else {
                     break;
