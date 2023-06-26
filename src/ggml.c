@@ -7440,25 +7440,10 @@ static void ggml_compute_forward_dup_f16(
         return;
     }
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
-
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
-    const int64_t ne2 = dst->ne[2];
-    const int64_t ne3 = dst->ne[3];
-
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     const int ith = params->ith; // thread index
     const int nth = params->nth; // number of threads
@@ -7729,25 +7714,10 @@ static void ggml_compute_forward_dup_f32(
         return;
     }
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
-
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
-    const int64_t ne2 = dst->ne[2];
-    const int64_t ne3 = dst->ne[3];
-
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     const int ith = params->ith; // thread index
     const int nth = params->nth; // number of threads
@@ -8045,24 +8015,11 @@ static void ggml_compute_forward_add_f32(
     const int nth = params->nth;
 
     const int nr  = ggml_nrows(src0);
-    const int64_t ne0 = src0->ne[0];
-    const int64_t ne1 = src0->ne[1];
-    const int64_t ne2 = src0->ne[2];
 
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb10 = src1->nb[0];
-    const size_t nb11 = src1->nb[1];
-    const size_t nb12 = src1->nb[2];
-    const size_t nb13 = src1->nb[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     GGML_ASSERT( nb0 == sizeof(float));
     GGML_ASSERT(nb00 == sizeof(float));
@@ -8131,24 +8088,11 @@ static void ggml_compute_forward_add_f16_f32(
     const int nth = params->nth;
 
     const int nr  = ggml_nrows(src0);
-    const int64_t ne0 = src0->ne[0];
-    const int64_t ne1 = src0->ne[1];
-    const int64_t ne2 = src0->ne[2];
 
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb10 = src1->nb[0];
-    const size_t nb11 = src1->nb[1];
-    const size_t nb12 = src1->nb[2];
-    const size_t nb13 = src1->nb[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     GGML_ASSERT(src0->type == GGML_TYPE_F16);
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
@@ -8201,24 +8145,11 @@ static void ggml_compute_forward_add_f16_f16(
     const int nth = params->nth;
 
     const int nr  = ggml_nrows(src0);
-    const int64_t ne0 = src0->ne[0];
-    const int64_t ne1 = src0->ne[1];
-    const int64_t ne2 = src0->ne[2];
 
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb10 = src1->nb[0];
-    const size_t nb11 = src1->nb[1];
-    const size_t nb12 = src1->nb[2];
-    const size_t nb13 = src1->nb[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     GGML_ASSERT(src0->type == GGML_TYPE_F16);
     GGML_ASSERT(src1->type == GGML_TYPE_F16);
@@ -8268,25 +8199,11 @@ static void ggml_compute_forward_add_q_f32(
     }
 
     const int nr  = ggml_nrows(src0);
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    //const int64_t ne03 = src0->ne[3];
 
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb10 = src1->nb[0];
-    const size_t nb11 = src1->nb[1];
-    const size_t nb12 = src1->nb[2];
-    const size_t nb13 = src1->nb[3];
-
-    const size_t nb0  = dst->nb[0];
-    const size_t nb1  = dst->nb[1];
-    const size_t nb2  = dst->nb[2];
-    const size_t nb3  = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -8407,19 +8324,10 @@ static void ggml_compute_forward_add1_f32(
     const int nth = params->nth;
 
     const int nr  = ggml_nrows(src0);
-    const int64_t ne0 = src0->ne[0];
-    const int64_t ne1 = src0->ne[1];
-    const int64_t ne2 = src0->ne[2];
 
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     GGML_ASSERT( nb0 == sizeof(float));
     GGML_ASSERT(nb00 == sizeof(float));
@@ -8473,19 +8381,10 @@ static void ggml_compute_forward_add1_f16_f32(
     const int nth = params->nth;
 
     const int nr  = ggml_nrows(src0);
-    const int64_t ne0 = src0->ne[0];
-    const int64_t ne1 = src0->ne[1];
-    const int64_t ne2 = src0->ne[2];
 
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     GGML_ASSERT(src0->type == GGML_TYPE_F16);
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
@@ -8534,19 +8433,10 @@ static void ggml_compute_forward_add1_f16_f16(
     const int nth = params->nth;
 
     const int nr  = ggml_nrows(src0);
-    const int64_t ne0 = src0->ne[0];
-    const int64_t ne1 = src0->ne[1];
-    const int64_t ne2 = src0->ne[2];
 
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     GGML_ASSERT(src0->type == GGML_TYPE_F16);
     GGML_ASSERT(src1->type == GGML_TYPE_F16);
@@ -8595,19 +8485,10 @@ static void ggml_compute_forward_add1_q_f32(
     const int nth = params->nth;
 
     const int nr  = ggml_nrows(src0);
-    const int64_t ne0 = src0->ne[0];
-    const int64_t ne1 = src0->ne[1];
-    const int64_t ne2 = src0->ne[2];
 
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     const enum ggml_type type = src0->type;
     dequantize_row_q_t const dequantize_row_q = quantize_fns[type].dequantize_row_q;
@@ -8836,24 +8717,11 @@ static void ggml_compute_forward_sub_f32(
     }
 
     const int nr  = ggml_nrows(src0);
-    const int64_t ne0 = src0->ne[0];
-    const int64_t ne1 = src0->ne[1];
-    const int64_t ne2 = src0->ne[2];
 
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb10 = src1->nb[0];
-    const size_t nb11 = src1->nb[1];
-    const size_t nb12 = src1->nb[2];
-    const size_t nb13 = src1->nb[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     GGML_ASSERT( nb0 == sizeof(float));
     GGML_ASSERT(nb00 == sizeof(float));
@@ -8943,29 +8811,11 @@ static void ggml_compute_forward_mul_f32(
 
     const int64_t nr = ggml_nrows(src0);
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
-    const int64_t ne12 = src1->ne[2];
-    const int64_t ne13 = src1->ne[3];
-
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb10 = src1->nb[0];
-    const size_t nb11 = src1->nb[1];
-    const size_t nb12 = src1->nb[2];
-    const size_t nb13 = src1->nb[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     GGML_ASSERT( nb0 == sizeof(float));
     GGML_ASSERT(nb00 == sizeof(float));
@@ -9053,24 +8903,11 @@ static void ggml_compute_forward_div_f32(
     }
 
     const int nr  = ggml_nrows(src0);
-    const int64_t ne0 = src0->ne[0];
-    const int64_t ne1 = src0->ne[1];
-    const int64_t ne2 = src0->ne[2];
 
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb10 = src1->nb[0];
-    const size_t nb11 = src1->nb[1];
-    const size_t nb12 = src1->nb[2];
-    const size_t nb13 = src1->nb[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     GGML_ASSERT( nb0 == sizeof(float));
     GGML_ASSERT(nb00 == sizeof(float));
@@ -9277,14 +9114,8 @@ static void ggml_compute_forward_sum_f32(
     assert(ggml_is_scalar(dst));
     assert(src0->nb[0] == sizeof(float));
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
-
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb00);
 
     ggml_float sum     = 0;
     ggml_float row_sum = 0;
@@ -9333,28 +9164,15 @@ static void ggml_compute_forward_sum_rows_f32(
     GGML_ASSERT(src0->nb[0] == sizeof(float));
     GGML_ASSERT(dst->nb[0] == sizeof(float));
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
-
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
-    const int64_t ne2 = dst->ne[2];
-    const int64_t ne3 = dst->ne[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb00);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0);
 
     GGML_ASSERT(ne0 == 1);
     GGML_ASSERT(ne1 == ne01);
     GGML_ASSERT(ne2 == ne02);
     GGML_ASSERT(ne3 == ne03);
-
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
 
     for (int64_t i3 = 0; i3 < ne03; i3++) {
         for (int64_t i2 = 0; i2 < ne02; i2++) {
@@ -9399,19 +9217,10 @@ static void ggml_compute_forward_mean_f32(
 
     assert(src0->nb[0] == sizeof(float));
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
-
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
-    const int64_t ne2 = dst->ne[2];
-    const int64_t ne3 = dst->ne[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb00);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0);
 
     assert(ne0 == 1);
     assert(ne1 == ne01);
@@ -9422,10 +9231,6 @@ static void ggml_compute_forward_mean_f32(
     UNUSED(ne1);
     UNUSED(ne2);
     UNUSED(ne3);
-
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
 
     for (int64_t i03 = 0; i03 < ne03; i03++) {
         for (int64_t i02 = 0; i02 < ne02; i02++) {
@@ -9469,25 +9274,10 @@ static void ggml_compute_forward_repeat_f32(
         return;
     }
 
-    const int64_t ne0  = dst->ne[0];
-    const int64_t ne1  = dst->ne[1];
-    const int64_t ne2  = dst->ne[2];
-    const int64_t ne3  = dst->ne[3];
-
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
-
-    const size_t nb0  = dst->nb[0];
-    const size_t nb1  = dst->nb[1];
-    const size_t nb2  = dst->nb[2];
-    const size_t nb3  = dst->nb[3];
-
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     // guaranteed to be an integer due to the check in ggml_can_repeat
     const int nr0 = (int)(ne0/ne00);
@@ -9548,25 +9338,10 @@ static void ggml_compute_forward_repeat_back_f32(
         return;
     }
 
-    const int64_t ne0  = dst->ne[0];
-    const int64_t ne1  = dst->ne[1];
-    const int64_t ne2  = dst->ne[2];
-    const int64_t ne3  = dst->ne[3];
-
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
-
-    const size_t nb0  = dst->nb[0];
-    const size_t nb1  = dst->nb[1];
-    const size_t nb2  = dst->nb[2];
-    const size_t nb3  = dst->nb[3];
-
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     // guaranteed to be an integer due to the check in ggml_can_repeat
     const int nr0 = (int)(ne00/ne0);
@@ -10097,18 +9872,9 @@ static void ggml_compute_forward_norm_f32(
     const int ith = params->ith;
     const int nth = params->nth;
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
-
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb00);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0);
 
     const float eps = 1e-5f; // TODO: make this a parameter
 
@@ -10174,18 +9940,9 @@ static void ggml_compute_forward_rms_norm_f32(
     const int ith = params->ith;
     const int nth = params->nth;
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
-
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb00);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0);
 
     const float eps = 1e-6f; // TODO: make this a parameter
 
@@ -10250,22 +10007,10 @@ static void ggml_compute_forward_rms_norm_back_f32(
     const int ith = params->ith;
     const int nth = params->nth;
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
-
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const size_t nb11 = src1->nb[1];
-    const size_t nb12 = src1->nb[2];
-    const size_t nb13 = src1->nb[3];
-
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb00);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb); UNUSED(nb10);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0);
 
     const float eps = 1e-6f; // TODO: make this a parameter
 
@@ -10461,41 +10206,12 @@ static void ggml_compute_forward_mul_mat_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
-
-#if defined(GGML_USE_ACCELERATE) || defined(GGML_USE_OPENBLAS)
-    const int64_t ne10 = src1->ne[0];
-#endif
-    const int64_t ne11 = src1->ne[1];
-#ifndef NDEBUG
-    const int64_t ne12 = src1->ne[2];
-    const int64_t ne13 = src1->ne[3];
-
-    const int64_t ne0  = dst->ne[0];
-    const int64_t ne1  = dst->ne[1];
-    const int64_t ne2  = dst->ne[2];
-    const int64_t ne3  = dst->ne[3];
-
-    const int nb00 = src0->nb[0];
-#endif
-    const int nb01 = src0->nb[1];
-    const int nb02 = src0->nb[2];
-    const int nb03 = src0->nb[3];
-
-#ifndef NDEBUG
-    const int nb10 = src1->nb[0];
-#endif
-    const int nb11 = src1->nb[1];
-    const int nb12 = src1->nb[2];
-    const int nb13 = src1->nb[3];
-
-    const int nb0  = dst->nb[0];
-    const int nb1  = dst->nb[1];
-    const int nb2  = dst->nb[2];
-    const int nb3  = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb00);
+    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne); UNUSED(ne10); UNUSED(ne11); UNUSED(ne12); UNUSED(ne13);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb); UNUSED(nb10); 
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne); UNUSED(ne0); UNUSED(ne1); UNUSED(ne2); UNUSED(ne3);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -10632,36 +10348,14 @@ static void ggml_compute_forward_mul_mat_f16_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
-    const int64_t ne12 = src1->ne[2];
-    const int64_t ne13 = src1->ne[3];
-
-    const int64_t ne0  = dst->ne[0];
-    const int64_t ne1  = dst->ne[1];
-    const int64_t ne2  = dst->ne[2];
-    const int64_t ne3  = dst->ne[3];
     //const int64_t ne   = ne0*ne1*ne2*ne3;
-
-    const int nb00 = src0->nb[0];
-    const int nb01 = src0->nb[1];
-    const int nb02 = src0->nb[2];
-    const int nb03 = src0->nb[3];
-
-    const int nb10 = src1->nb[0];
-    const int nb11 = src1->nb[1];
-    const int nb12 = src1->nb[2];
-    const int nb13 = src1->nb[3];
-
-    const int nb0  = dst->nb[0];
-    const int nb1  = dst->nb[1];
-    const int nb2  = dst->nb[2];
-    const int nb3  = dst->nb[3];
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -10832,35 +10526,12 @@ static void ggml_compute_forward_mul_mat_q_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
-
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
-    const int64_t ne12 = src1->ne[2];
-    const int64_t ne13 = src1->ne[3];
-
-    const int64_t ne0  = dst->ne[0];
-    const int64_t ne1  = dst->ne[1];
-    const int64_t ne2  = dst->ne[2];
-    const int64_t ne3  = dst->ne[3];
-
-    const int nb00 = src0->nb[0];
-    const int nb01 = src0->nb[1];
-    const int nb02 = src0->nb[2];
-    const int nb03 = src0->nb[3];
-
-    const int nb10 = src1->nb[0];
-    const int nb11 = src1->nb[1];
-    const int nb12 = src1->nb[2];
-    const int nb13 = src1->nb[3];
-
-    const int nb0  = dst->nb[0];
-    const int nb1  = dst->nb[1];
-    const int nb2  = dst->nb[2];
-    const int nb3  = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -11070,35 +10741,12 @@ static void ggml_compute_forward_out_prod_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
-
-    const int64_t ne10 = src1->ne[0];
-    //const int64_t ne11 = src1->ne[1];
-    const int64_t ne12 = src1->ne[2];
-    const int64_t ne13 = src1->ne[3];
-
-    const int64_t ne0  = dst->ne[0];
-    const int64_t ne1  = dst->ne[1];
-    const int64_t ne2  = dst->ne[2];
-    const int64_t ne3  = dst->ne[3];
-
-    const int nb00 = src0->nb[0];
-    const int nb01 = src0->nb[1];
-    const int nb02 = src0->nb[2];
-    const int nb03 = src0->nb[3];
-
-    const int nb10 = src1->nb[0];
-    const int nb11 = src1->nb[1];
-    const int nb12 = src1->nb[2];
-    const int nb13 = src1->nb[3];
-
-    const int nb0  = dst->nb[0];
-    const int nb1  = dst->nb[1];
-    const int nb2  = dst->nb[2];
-    const int nb3  = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne); UNUSED(ne11);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -11333,15 +10981,8 @@ static void ggml_compute_forward_set_f32(
     const int nr = ggml_nrows(src1);
     const int nc = src1->ne[0];
 
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
-    const int64_t ne12 = src1->ne[2];
-    const int64_t ne13 = src1->ne[3];
-
-    const size_t nb10 = src1->nb[0];
-    const size_t nb11 = src1->nb[1];
-    const size_t nb12 = src1->nb[2];
-    const size_t nb13 = src1->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
 
     // src0 and dst as viewed during set
     const size_t nb0 = ggml_element_size(src0);
@@ -11732,28 +11373,16 @@ static void ggml_compute_forward_diag_f32(
 
     // TODO: handle transposed/permuted matrices
 
-    const int ne00 = src0->ne[0];
-    const int ne01 = src0->ne[1];
-    const int ne02 = src0->ne[2];
-    const int ne03 = src0->ne[3];
-    const int ne0 = dst->ne[0];
-    const int ne1 = dst->ne[1];
-    const int ne2 = dst->ne[2];
-    const int ne3 = dst->ne[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb01);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+
     GGML_ASSERT(ne00 == ne0);
     GGML_ASSERT(ne00 == ne1);
     GGML_ASSERT(ne01 == 1);
     GGML_ASSERT(ne02 == ne2);
     GGML_ASSERT(ne03 == ne3);
-
-    const int nb00 = src0->nb[0];
-    //const int nb01 = src0->nb[1];
-    const int nb02 = src0->nb[2];
-    const int nb03 = src0->nb[3];
-    const int nb0 = dst->nb[0];
-    const int nb1 = dst->nb[1];
-    const int nb2 = dst->nb[2];
-    const int nb3 = dst->nb[3];
 
     GGML_ASSERT(nb00 == sizeof(float));
     GGML_ASSERT(nb0  == sizeof(float));
@@ -12330,20 +11959,9 @@ static void ggml_compute_forward_rope_f32(
 
     assert(n_past >= 0);
 
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
-    const int64_t ne2 = dst->ne[2];
-    const int64_t ne3 = dst->ne[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     //printf("ne0: %d, ne1: %d, ne2: %d, ne3: %d\n", ne0, ne1, ne2, ne3);
     //printf("n_past = %d, ne2 = %d\n", n_past, ne2);
@@ -12443,20 +12061,9 @@ static void ggml_compute_forward_rope_f16(
 
     assert(n_past >= 0);
 
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
-    const int64_t ne2 = dst->ne[2];
-    const int64_t ne3 = dst->ne[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     //printf("ne0: %d, ne1: %d, ne2: %d, ne3: %d\n", ne0, ne1, ne2, ne3);
     //printf("n_past = %d, ne2 = %d\n", n_past, ne2);
@@ -12583,21 +12190,9 @@ static void ggml_compute_forward_rope_back_f32(
 
     assert(n_past >= 0);
 
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
-    const int64_t ne2 = dst->ne[2];
-    const int64_t ne3 = dst->ne[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
-
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     //printf("ne0: %d, ne1: %d, ne2: %d, ne3: %d\n", ne0, ne1, ne2, ne3);
     //printf("n_past = %d, ne2 = %d\n", n_past, ne2);
@@ -12696,21 +12291,9 @@ static void ggml_compute_forward_rope_back_f16(
 
     assert(n_past >= 0);
 
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
-    const int64_t ne2 = dst->ne[2];
-    const int64_t ne3 = dst->ne[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
-
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
 
     //printf("ne0: %d, ne1: %d, ne2: %d, ne3: %d\n", ne0, ne1, ne2, ne3);
     //printf("n_past = %d, ne2 = %d\n", n_past, ne2);
@@ -12822,36 +12405,12 @@ static void ggml_compute_forward_conv_1d_s1_ph_f16_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    //const int64_t ne03 = src0->ne[3];
-
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
-    //const int64_t ne12 = src1->ne[2];
-    //const int64_t ne13 = src1->ne[3];
-
-    //const int64_t ne0  = dst->ne[0];
-    //const int64_t ne1  = dst->ne[1];
-    //const int64_t ne2  = dst->ne[2];
-    //const int64_t ne3  = dst->ne[3];
-    //const int64_t ne   = ne0*ne1*ne2*ne3;
-
-    const int nb00 = src0->nb[0];
-    const int nb01 = src0->nb[1];
-    const int nb02 = src0->nb[2];
-    //const int nb03 = src0->nb[3];
-
-    const int nb10 = src1->nb[0];
-    const int nb11 = src1->nb[1];
-    //const int nb12 = src1->nb[2];
-    //const int nb13 = src1->nb[3];
-
-    //const int nb0  = dst->nb[0];
-    const int nb1  = dst->nb[1];
-    //const int nb2  = dst->nb[2];
-    //const int nb3  = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb03);
+    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne); UNUSED(ne12); UNUSED(ne13);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb); UNUSED(nb12); UNUSED(nb13);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne); UNUSED(ne0); UNUSED(ne1); UNUSED(ne2); UNUSED(ne3);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0); UNUSED(nb2); UNUSED(nb3);
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -12942,36 +12501,12 @@ static void ggml_compute_forward_conv_1d_s1_ph_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    //const int64_t ne03 = src0->ne[3];
-
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
-    //const int64_t ne12 = src1->ne[2];
-    //const int64_t ne13 = src1->ne[3];
-
-    //const int64_t ne0  = dst->ne[0];
-    //const int64_t ne1  = dst->ne[1];
-    //const int64_t ne2  = dst->ne[2];
-    //const int64_t ne3  = dst->ne[3];
-    //const int64_t ne   = ne0*ne1*ne2*ne3;
-
-    const int nb00 = src0->nb[0];
-    const int nb01 = src0->nb[1];
-    const int nb02 = src0->nb[2];
-    //const int nb03 = src0->nb[3];
-
-    const int nb10 = src1->nb[0];
-    const int nb11 = src1->nb[1];
-    //const int nb12 = src1->nb[2];
-    //const int nb13 = src1->nb[3];
-
-    //const int nb0  = dst->nb[0];
-    const int nb1  = dst->nb[1];
-    //const int nb2  = dst->nb[2];
-    //const int nb3  = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb03);
+    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne); UNUSED(ne12); UNUSED(ne13);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb); UNUSED(nb12); UNUSED(nb13);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne); UNUSED(ne0); UNUSED(ne1); UNUSED(ne2); UNUSED(ne3);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0); UNUSED(nb2); UNUSED(nb3);
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -13085,36 +12620,12 @@ static void ggml_compute_forward_conv_1d_s2_ph_f16_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    //const int64_t ne03 = src0->ne[3];
-
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
-    //const int64_t ne12 = src1->ne[2];
-    //const int64_t ne13 = src1->ne[3];
-
-    //const int64_t ne0  = dst->ne[0];
-    //const int64_t ne1  = dst->ne[1];
-    //const int64_t ne2  = dst->ne[2];
-    //const int64_t ne3  = dst->ne[3];
-    //const int64_t ne   = ne0*ne1*ne2*ne3;
-
-    const int nb00 = src0->nb[0];
-    const int nb01 = src0->nb[1];
-    const int nb02 = src0->nb[2];
-    //const int nb03 = src0->nb[3];
-
-    const int nb10 = src1->nb[0];
-    const int nb11 = src1->nb[1];
-    //const int nb12 = src1->nb[2];
-    //const int nb13 = src1->nb[3];
-
-    //const int nb0  = dst->nb[0];
-    const int nb1  = dst->nb[1];
-    //const int nb2  = dst->nb[2];
-    //const int nb3  = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb03);
+    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne); UNUSED(ne12); UNUSED(ne13);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb); UNUSED(nb12); UNUSED(nb13);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne); UNUSED(ne0); UNUSED(ne1); UNUSED(ne2); UNUSED(ne3);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0); UNUSED(nb2); UNUSED(nb3);
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -13205,36 +12716,12 @@ static void ggml_compute_forward_conv_1d_s2_ph_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    //const int64_t ne03 = src0->ne[3];
-
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
-    //const int64_t ne12 = src1->ne[2];
-    //const int64_t ne13 = src1->ne[3];
-
-    //const int64_t ne0  = dst->ne[0];
-    //const int64_t ne1  = dst->ne[1];
-    //const int64_t ne2  = dst->ne[2];
-    //const int64_t ne3  = dst->ne[3];
-    //const int64_t ne   = ne0*ne1*ne2*ne3;
-
-    const int nb00 = src0->nb[0];
-    const int nb01 = src0->nb[1];
-    const int nb02 = src0->nb[2];
-    //const int nb03 = src0->nb[3];
-
-    const int nb10 = src1->nb[0];
-    const int nb11 = src1->nb[1];
-    //const int nb12 = src1->nb[2];
-    //const int nb13 = src1->nb[3];
-
-    //const int nb0  = dst->nb[0];
-    const int nb1  = dst->nb[1];
-    //const int nb2  = dst->nb[2];
-    //const int nb3  = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb03);
+    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne); UNUSED(ne12); UNUSED(ne13);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb); UNUSED(nb12); UNUSED(nb13);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne); UNUSED(ne0); UNUSED(ne1); UNUSED(ne2); UNUSED(ne3);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0); UNUSED(nb2); UNUSED(nb3);
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -13348,36 +12835,12 @@ static void ggml_compute_forward_conv_2d_sk_p0_f16_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    const int ne00 = src0->ne[0];
-    const int ne01 = src0->ne[1];
-    const int ne02 = src0->ne[2];
-    //const int ne03 = src0->ne[3];
-
-    const int ne10 = src1->ne[0];
-    //const int ne11 = src1->ne[1];
-    const int ne12 = src1->ne[2];
-    //const int ne13 = src1->ne[3];
-
-    const int ne0  = dst->ne[0];
-    const int ne1  = dst->ne[1];
-    const int ne2  = dst->ne[2];
-    //const int ne3  = dst->ne[3];
-    //const int ne   = ne0*ne1*ne2*ne3;
-
-    const int nb00 = src0->nb[0];
-    //const int nb01 = src0->nb[1];
-    //const int nb02 = src0->nb[2];
-    const int nb03 = src0->nb[3];
-
-    const int nb10 = src1->nb[0];
-    //const int nb11 = src1->nb[1];
-    const int nb12 = src1->nb[2];
-    //const int nb13 = src1->nb[3];
-
-    //const int nb0  = dst->nb[0];
-    //const int nb1  = dst->nb[1];
-    const int nb2  = dst->nb[2];
-    //const int nb3  = dst->nb[3];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
+    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb01); UNUSED(nb02); UNUSED(nb03);
+    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne); UNUSED(ne11); UNUSED(ne12); UNUSED(ne13);
+    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb); UNUSED(nb11); UNUSED(nb12); UNUSED(nb13);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne); UNUSED(ne0); UNUSED(ne1); UNUSED(ne2); UNUSED(ne3);
+    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0); UNUSED(nb1); UNUSED(nb2); UNUSED(nb3);
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -14575,15 +14038,8 @@ static void ggml_compute_forward_win_part_f32(
         return;
     }
 
-    const int64_t ne00 = src0->ne[0]; UNUSED(ne00);
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3]; UNUSED(ne03);
-
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
-    const int64_t ne2 = dst->ne[2];
-    const int64_t ne3 = dst->ne[3]; UNUSED(ne3);
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne); UNUSED(ne3);
 
     const int32_t nep0 = ((const int32_t *)(opt0->data))[0];
     const int32_t nep1 = ((const int32_t *)(opt0->data))[1];
@@ -14646,14 +14102,8 @@ static void ggml_compute_forward_win_unpart_f32(
         return;
     }
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    //const int64_t ne03 = src0->ne[3];
-
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
-    const int64_t ne2 = dst->ne[2];
+    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
+    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne); UNUSED(ne3);
 
     const int32_t w = ((const int32_t *)(opt0->data))[0];
 

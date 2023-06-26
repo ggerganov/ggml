@@ -409,6 +409,20 @@ extern "C" {
 
     static const size_t GGML_TENSOR_SIZE = sizeof(struct ggml_tensor);
 
+// Used to copy the number of elements and stride in bytes of tensors into local variables.
+// Adjust if GGML_MAX_DIMS changes!
+#define GGML_DEFINE_LOCALS_1(type, prefix, pointer, array) \
+	const type prefix##0 = (pointer)->array[0];
+#define GGML_DEFINE_LOCALS_2(type, prefix, pointer, array) \
+	GGML_DEFINE_LOCALS_1(type, prefix, pointer, array) \
+	const type prefix##1 = (pointer)->array[1];
+#define GGML_DEFINE_LOCALS_3(type, prefix, pointer, array) \
+	GGML_DEFINE_LOCALS_2(type, prefix, pointer, array) \
+	const type prefix##2 = (pointer)->array[2];
+#define GGML_DEFINE_LOCALS(type, prefix, pointer, array) \
+	GGML_DEFINE_LOCALS_3(type, prefix, pointer, array) \
+	const type prefix##3 = (pointer)->array[3];
+
     // computation graph
     struct ggml_cgraph {
         int n_nodes;
