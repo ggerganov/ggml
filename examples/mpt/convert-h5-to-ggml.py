@@ -36,9 +36,7 @@ def bytes_to_unicode():
 
 
 def count_model_parts(dir_model: str) -> int:
-    """Returns the number of model parts in the model directory.
-    Exits the process if no file is found.
-    """
+    """Returns the number of model parts in the model directory."""
     num_parts = 0
     for filename in os.listdir(dir_model):
         if filename.startswith("pytorch_model-"):
