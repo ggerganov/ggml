@@ -1909,7 +1909,7 @@ static cudaError_t ggml_cuda_cpy_tensor_2d(
     }
     char * dst_ptr = (char *) dst;
 
-    const int64_t ne0 = src->ne[0];
+    const int64_t ne0 = GGML_DIM_ELEMENTS(src, 0);
     const int64_t nb0 = src->nb[0];
     const int64_t nb1 = src->nb[1];
     const int64_t nb2 = src->nb[2];
@@ -1945,7 +1945,7 @@ inline void ggml_cuda_op_add(
     GGML_ASSERT(src1_ddf_i != nullptr);
     GGML_ASSERT(dst_ddf_i != nullptr);
 
-    const int64_t ne0 = src0->ne[0];
+    const int64_t ne0 = GGML_DIM_ELEMENTS(src0, 0);
     const int64_t i01_diff = i01_high - i01_low;
 
     // compute
@@ -1968,10 +1968,10 @@ inline void ggml_cuda_op_mul(
     GGML_ASSERT(src1_ddf_i != nullptr);
     GGML_ASSERT(dst_ddf_i != nullptr);
 
-    const int64_t ne00 = src0->ne[0];
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
 
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
+    const int64_t ne10 = GGML_DIM_ELEMENTS(src1, 0);
+    const int64_t ne11 = GGML_DIM_ELEMENTS(src1, 1);
 
     for (int64_t i01 = i01_low; i01 < i01_high; i01++) {
         const int64_t i11 = i1*ne11 + i01%ne11; // broadcast src1 across src0
@@ -1998,7 +1998,7 @@ inline void ggml_cuda_op_silu(
     GGML_ASSERT(src0_ddf_i != nullptr);
     GGML_ASSERT(dst_ddf_i != nullptr);
 
-    const int64_t ne00 = src0->ne[0];
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
     const int64_t i01_diff = i01_high - i01_low;
 
     // compute
@@ -2021,7 +2021,7 @@ inline void ggml_cuda_op_rms_norm(
     GGML_ASSERT(src0_ddf_i != nullptr);
     GGML_ASSERT(dst_ddf_i != nullptr);
 
-    const int64_t ne00 = src0->ne[0];
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
     const int64_t i01_diff = i01_high - i01_low;
 
     // compute
@@ -2045,7 +2045,7 @@ inline void ggml_cuda_op_dequantize_mul_mat_vec(
     GGML_ASSERT(src1_ddf_i != nullptr);
     GGML_ASSERT(dst_ddf_i != nullptr);
 
-    const int64_t ne00 = src0->ne[0];
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
     const int64_t nrows = i01_high - i01_low;
 
 // on some GPUs it is faster to convert src1 to half and to use half precision intrinsics
@@ -2132,12 +2132,12 @@ inline void ggml_cuda_op_mul_mat_cublas(
     const float alpha = 1.0f;
     const float beta = 0.0f;
 
-    const int64_t ne00 = src0->ne[0];
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
 
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
+    const int64_t ne10 = GGML_DIM_ELEMENTS(src1, 0);
+    const int64_t ne11 = GGML_DIM_ELEMENTS(src1, 1);
 
-    const int64_t ne0 = dst->ne[0];
+    const int64_t ne0 = GGML_DIM_ELEMENTS(dst, 0);
     const int64_t i01_diff = i01_high - i01_low;
 
     int id;
@@ -2169,7 +2169,7 @@ inline void ggml_cuda_op_rope(
     GGML_ASSERT(src0_ddf_i != nullptr);
     GGML_ASSERT(dst_ddf_i != nullptr);
 
-    const int64_t ne00 = src0->ne[0];
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
     const int64_t i01_diff = i01_high - i01_low;
 
     const int n_past = ((int32_t *) src1->data)[0];
@@ -2198,8 +2198,8 @@ inline void ggml_cuda_op_diag_mask_inf(
     GGML_ASSERT(src0_ddf_i != nullptr);
     GGML_ASSERT(dst_ddf_i != nullptr);
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
+    const int64_t ne01 = GGML_DIM_ELEMENTS(src0, 1);
     const int64_t i01_diff = i01_high - i01_low;
 
     const int n_past = ((int32_t *) src1->data)[0];
@@ -2223,7 +2223,7 @@ inline void ggml_cuda_op_soft_max(
     GGML_ASSERT(src0_ddf_i != nullptr);
     GGML_ASSERT(dst_ddf_i != nullptr);
 
-    const int64_t ne00 = src0->ne[0];
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
     const int64_t i01_diff = i01_high - i01_low;
 
     // compute
@@ -2248,7 +2248,7 @@ inline void ggml_cuda_op_scale(
 
     const float scale = ((float *) src1->data)[0];
 
-    const int64_t ne00 = src0->ne[0];
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
     const int64_t i01_diff = i01_high - i01_low;
 
     // compute
@@ -2265,20 +2265,20 @@ inline void ggml_cuda_op_scale(
 
 static void ggml_cuda_op(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
                          ggml_cuda_op_t op, bool src0_needs_f32, bool flatten_rows) {
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
+    const int64_t ne01 = GGML_DIM_ELEMENTS(src0, 1);
+    const int64_t ne02 = GGML_DIM_ELEMENTS(src0, 2);
+    const int64_t ne03 = GGML_DIM_ELEMENTS(src0, 3);
     const int64_t nrows0 = ggml_nrows(src0);
 
     const bool use_src1 = src1 != nullptr;
-    const int64_t ne10 = use_src1 ? src1->ne[0] : 1;
-    const int64_t ne11 = use_src1 ? src1->ne[1] : 1;
-    const int64_t ne12 = use_src1 ? src1->ne[2] : 1;
-    const int64_t ne13 = use_src1 ? src1->ne[3] : 1;
+    const int64_t ne10 = use_src1 ? GGML_DIM_ELEMENTS(src1, 0) : 1;
+    const int64_t ne11 = use_src1 ? GGML_DIM_ELEMENTS(src1, 1) : 1;
+    const int64_t ne12 = use_src1 ? GGML_DIM_ELEMENTS(src1, 2) : 1;
+    const int64_t ne13 = use_src1 ? GGML_DIM_ELEMENTS(src1, 3) : 1;
 
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
+    const int64_t ne0 = GGML_DIM_ELEMENTS(dst, 0);
+    const int64_t ne1 = GGML_DIM_ELEMENTS(dst, 1);
 
     const int nb2  = dst->nb[2];
     const int nb3  = dst->nb[3];
@@ -2567,10 +2567,10 @@ void ggml_cuda_rms_norm(const ggml_tensor * src0, const ggml_tensor * src1, ggml
 }
 
 bool ggml_cuda_can_mul_mat(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst) {
-    const int64_t ne10 = src1->ne[0];
+    const int64_t ne10 = GGML_DIM_ELEMENTS(src1, 0);
 
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
+    const int64_t ne0 = GGML_DIM_ELEMENTS(dst, 0);
+    const int64_t ne1 = GGML_DIM_ELEMENTS(dst, 1);
 
     // TODO: find the optimal values for these
     if ((src0->type == GGML_TYPE_F32 || src0->type == GGML_TYPE_F16 || ggml_is_quantized(src0->type)) &&
@@ -2591,9 +2591,9 @@ void ggml_cuda_mul_mat_vec_p021(const ggml_tensor * src0, const ggml_tensor * sr
     GGML_ASSERT(src0->type == GGML_TYPE_F16);
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
+    const int64_t ne01 = GGML_DIM_ELEMENTS(src0, 1);
+    const int64_t ne02 = GGML_DIM_ELEMENTS(src0, 2);
 
     CUDA_CHECK(cudaSetDevice(g_main_device));
     cudaStream_t cudaStream_main = g_cudaStreams_main[g_main_device];
@@ -2617,9 +2617,9 @@ void ggml_cuda_mul_mat_vec_nc(const ggml_tensor * src0, const ggml_tensor * src1
     GGML_ASSERT(src0->type == GGML_TYPE_F16);
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
+    const int64_t ne01 = GGML_DIM_ELEMENTS(src0, 1);
+    const int64_t ne02 = GGML_DIM_ELEMENTS(src0, 2);
 
     const int64_t nb01 = src0->nb[1];
     const int64_t nb02 = src0->nb[2];
@@ -2646,14 +2646,14 @@ void ggml_cuda_mul_mat(const ggml_tensor * src0, const ggml_tensor * src1, ggml_
     bool all_on_device = (src0->backend == GGML_BACKEND_GPU || src0->backend == GGML_BACKEND_GPU_SPLIT) &&
         src1->backend == GGML_BACKEND_GPU && dst->backend == GGML_BACKEND_GPU;
 
-    if (all_on_device && ggml_is_permuted(src0) && ggml_is_permuted(src1) && src1->ne[1] == 1) {
+    if (all_on_device && ggml_is_permuted(src0) && ggml_is_permuted(src1) && GGML_DIM_ELEMENTS(src1, 1) == 1) {
         ggml_cuda_mul_mat_vec_p021(src0, src1, dst);
-    } else if (all_on_device && !ggml_is_contiguous(src0) && ggml_is_contiguous(src1) && src1->ne[1] == 1) {
+    } else if (all_on_device && !ggml_is_contiguous(src0) && ggml_is_contiguous(src1) && GGML_DIM_ELEMENTS(src1, 1) == 1) {
         ggml_cuda_mul_mat_vec_nc(src0, src1, dst);
     }else if (src0->type == GGML_TYPE_F32) {
         ggml_cuda_op(src0, src1, dst, ggml_cuda_op_mul_mat_cublas, true, false);
     } else if (ggml_is_quantized(src0->type) || src0->type == GGML_TYPE_F16) {
-        if (src1->ne[1] == 1 && src0->ne[0] % GGML_CUDA_DMMV_X == 0 && src0->ne[1] % GGML_CUDA_DMMV_Y == 0) {
+        if (GGML_DIM_ELEMENTS(src1, 1) == 1 && GGML_DIM_ELEMENTS(src0, 0) % GGML_CUDA_DMMV_X == 0 && GGML_DIM_ELEMENTS(src0, 1) % GGML_CUDA_DMMV_Y == 0) {
             ggml_cuda_op(src0, src1, dst, ggml_cuda_op_dequantize_mul_mat_vec, false, false);
         } else {
             ggml_cuda_op(src0, src1, dst, ggml_cuda_op_mul_mat_cublas, true, false);
@@ -2678,17 +2678,17 @@ void ggml_cuda_cpy(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tens
     GGML_ASSERT(ggml_nbytes(src0) <= INT_MAX);
     GGML_ASSERT(ggml_nbytes(src1) <= INT_MAX);
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    GGML_ASSERT(src0->ne[3] == 1);
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
+    const int64_t ne01 = GGML_DIM_ELEMENTS(src0, 1);
+    GGML_ASSERT(GGML_DIM_ELEMENTS(src0, 3) == 1);
 
     const int64_t nb00 = src0->nb[0];
     const int64_t nb01 = src0->nb[1];
     const int64_t nb02 = src0->nb[2];
 
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
-    GGML_ASSERT(src1->ne[3] == 1);
+    const int64_t ne10 = GGML_DIM_ELEMENTS(src1, 0);
+    const int64_t ne11 = GGML_DIM_ELEMENTS(src1, 1);
+    GGML_ASSERT(GGML_DIM_ELEMENTS(src1, 3) == 1);
 
     const int64_t nb10 = src1->nb[0];
     const int64_t nb11 = src1->nb[1];

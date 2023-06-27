@@ -17,19 +17,19 @@ int main(int argc, const char ** argv) {
     struct ggml_tensor * t3 = ggml_new_tensor_3d(ctx0, GGML_TYPE_I32, 10, 20, 30);
 
     GGML_ASSERT(t1->n_dims == 1);
-    GGML_ASSERT(t1->ne[0]  == 10);
+    GGML_ASSERT(GGML_DIM_ELEMENTS(t1, 0)  == 10);
     GGML_ASSERT(t1->nb[1]  == 10*sizeof(float));
 
     GGML_ASSERT(t2->n_dims == 2);
-    GGML_ASSERT(t2->ne[0]  == 10);
-    GGML_ASSERT(t2->ne[1]  == 20);
+    GGML_ASSERT(GGML_DIM_ELEMENTS(t2, 0)  == 10);
+    GGML_ASSERT(GGML_DIM_ELEMENTS(t2, 1)  == 20);
     GGML_ASSERT(t2->nb[1]  == 10*sizeof(int16_t));
     GGML_ASSERT(t2->nb[2]  == 10*20*sizeof(int16_t));
 
     GGML_ASSERT(t3->n_dims == 3);
-    GGML_ASSERT(t3->ne[0]  == 10);
-    GGML_ASSERT(t3->ne[1]  == 20);
-    GGML_ASSERT(t3->ne[2]  == 30);
+    GGML_ASSERT(GGML_DIM_ELEMENTS(t3, 0)  == 10);
+    GGML_ASSERT(GGML_DIM_ELEMENTS(t3, 1)  == 20);
+    GGML_ASSERT(GGML_DIM_ELEMENTS(t3, 2)  == 30);
     GGML_ASSERT(t3->nb[1]  == 10*sizeof(int32_t));
     GGML_ASSERT(t3->nb[2]  == 10*20*sizeof(int32_t));
     GGML_ASSERT(t3->nb[3]  == 10*20*30*sizeof(int32_t));

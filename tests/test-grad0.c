@@ -185,7 +185,7 @@ void print_elements(const char* label, const struct ggml_tensor * t) {
     printf("] shape: [");
     for (int k = 0; k < t->n_dims; ++k) {
         if (k > 0) { printf(", "); }
-        printf("%d", (int)t->ne[k]);
+        printf("%d", (int)GGML_DIM_ELEMENTS(t, k));
     }
     printf("]\n");
 
@@ -280,15 +280,15 @@ bool check_mat_mul(
     float * src0 = (float *) x0->data;
     float * src1 = (float *) x1->data;
 
-    const int nc = x0->ne[1];
-    const int nr = x1->ne[1];
-    const int nk = x0->ne[0];
+    const int nc = GGML_DIM_ELEMENTS(x0, 1);
+    const int nr = GGML_DIM_ELEMENTS(x1, 1);
+    const int nk = GGML_DIM_ELEMENTS(x0, 0);
 
     GGML_PRINT_DEBUG("check_mat_mul: nc=%d, nr=%d, nk=%d\n", nc, nr, nk);
 
     GGML_PRINT_DEBUG("x0:\n");
-    for (int j = 0; j < x0->ne[1]; ++j) {
-        for (int i = 0; i < x0->ne[0]; ++i) {
+    for (int j = 0; j < GGML_DIM_ELEMENTS(x0, 1); ++j) {
+        for (int i = 0; i < GGML_DIM_ELEMENTS(x0, 0); ++i) {
             GGML_PRINT_DEBUG("%6.3f ", src0[j*nk + i]);
         }
         GGML_PRINT_DEBUG("\n");
@@ -296,17 +296,17 @@ bool check_mat_mul(
     GGML_PRINT_DEBUG("\n");
 
     GGML_PRINT_DEBUG("x1:\n");
-    for (int j = 0; j < x1->ne[1]; ++j) {
-        for (int i = 0; i < x1->ne[0]; ++i) {
+    for (int j = 0; j < GGML_DIM_ELEMENTS(x1, 1); ++j) {
+        for (int i = 0; i < GGML_DIM_ELEMENTS(x1, 0); ++i) {
             GGML_PRINT_DEBUG("%6.3f ", src1[j*nk + i]);
         }
         GGML_PRINT_DEBUG("\n");
     }
     GGML_PRINT_DEBUG("\n");
 
-    GGML_PRINT_DEBUG("y: n_dims = %d, (%lld, %lld)\n", y->n_dims, y->ne[0], y->ne[1]);
-    for (int j = 0; j < y->ne[1]; ++j) {
-        for (int i = 0; i < y->ne[0]; ++i) {
+    GGML_PRINT_DEBUG("y: n_dims = %d, (%lld, %lld)\n", y->n_dims, GGML_DIM_ELEMENTS(y, 0), GGML_DIM_ELEMENTS(y, 1));
+    for (int j = 0; j < GGML_DIM_ELEMENTS(y, 1); ++j) {
+        for (int i = 0; i < GGML_DIM_ELEMENTS(y, 0); ++i) {
             GGML_PRINT_DEBUG("%6.3f ", dst[j*nr + i]);
         }
         GGML_PRINT_DEBUG("\n");

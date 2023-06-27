@@ -166,20 +166,20 @@ bool check_mat_mul(
     float * src0 = (float *) x0->data;
     float * src1 = (float *) x1->data;
 
-    const int64_t n00 = x0->ne[0];
-    const int64_t n10 = x0->ne[1];
-    const int64_t n20 = x0->ne[2];
-    const int64_t n30 = x0->ne[3];
+    const int64_t n00 = GGML_DIM_ELEMENTS(x0, 0);
+    const int64_t n10 = GGML_DIM_ELEMENTS(x0, 1);
+    const int64_t n20 = GGML_DIM_ELEMENTS(x0, 2);
+    const int64_t n30 = GGML_DIM_ELEMENTS(x0, 3);
 
-    const int64_t n01 = x1->ne[0];
-    const int64_t n11 = x1->ne[1];
-    const int64_t n21 = x1->ne[2];
-    const int64_t n31 = x1->ne[3];
+    const int64_t n01 = GGML_DIM_ELEMENTS(x1, 0);
+    const int64_t n11 = GGML_DIM_ELEMENTS(x1, 1);
+    const int64_t n21 = GGML_DIM_ELEMENTS(x1, 2);
+    const int64_t n31 = GGML_DIM_ELEMENTS(x1, 3);
 
-    const int64_t n02 = y->ne[0];
-    const int64_t n12 = y->ne[1];
-    const int64_t n22 = y->ne[2];
-    const int64_t n32 = y->ne[3];
+    const int64_t n02 = GGML_DIM_ELEMENTS(y, 0);
+    const int64_t n12 = GGML_DIM_ELEMENTS(y, 1);
+    const int64_t n22 = GGML_DIM_ELEMENTS(y, 2);
+    const int64_t n32 = GGML_DIM_ELEMENTS(y, 3);
 
     printf("x0: [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "]\n", n00, n10, n20, n30);
     for (int j = 0; j < n10; ++j) {
@@ -270,14 +270,14 @@ int main(int argc, const char ** argv) {
                 struct ggml_tensor * f = ggml_sum(ctx0, m);
 
                 printf("testing: mul_mat, [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "] = [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "] * [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "]\n",
-                           m->ne[0],    m->ne[1],    m->ne[2],    m->ne[3],
+                           GGML_DIM_ELEMENTS(m, 0),    GGML_DIM_ELEMENTS(m, 1),    GGML_DIM_ELEMENTS(m, 2),    GGML_DIM_ELEMENTS(m, 3),
                         x[1]->ne[0], x[1]->ne[1], x[1]->ne[2], x[1]->ne[3],
                         x[0]->ne[0], x[0]->ne[1], x[0]->ne[2], x[0]->ne[3]);
 
-                assert(m->ne[0] == x[1]->ne[1]);
-                assert(m->ne[1] == x[0]->ne[1]);
-                assert(m->ne[2] == x[0]->ne[2]);
-                assert(m->ne[3] == x[0]->ne[3]);
+                assert(GGML_DIM_ELEMENTS(m, 0) == x[1]->ne[1]);
+                assert(GGML_DIM_ELEMENTS(m, 1) == x[0]->ne[1]);
+                assert(GGML_DIM_ELEMENTS(m, 2) == x[0]->ne[2]);
+                assert(GGML_DIM_ELEMENTS(m, 3) == x[0]->ne[3]);
 
                 if (ndims <= 2) {
                     check_gradient("mul_mat", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, INFINITY);
@@ -306,14 +306,14 @@ int main(int argc, const char ** argv) {
                 struct ggml_tensor * f = ggml_sum(ctx0, m);
 
                 printf("testing: mul_mat, [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "] = [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "] * [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "]\n",
-                           m->ne[0],    m->ne[1],    m->ne[2],    m->ne[3],
+                           GGML_DIM_ELEMENTS(m, 0),    GGML_DIM_ELEMENTS(m, 1),    GGML_DIM_ELEMENTS(m, 2),    GGML_DIM_ELEMENTS(m, 3),
                         x[1]->ne[0], x[1]->ne[1], x[1]->ne[2], x[1]->ne[3],
                         x[0]->ne[0], x[0]->ne[1], x[0]->ne[2], x[0]->ne[3]);
 
-                assert(m->ne[0] == x[1]->ne[1]);
-                assert(m->ne[1] == x[0]->ne[1]);
-                assert(m->ne[2] == x[0]->ne[2]);
-                assert(m->ne[3] == x[0]->ne[3]);
+                assert(GGML_DIM_ELEMENTS(m, 0) == x[1]->ne[1]);
+                assert(GGML_DIM_ELEMENTS(m, 1) == x[0]->ne[1]);
+                assert(GGML_DIM_ELEMENTS(m, 2) == x[0]->ne[2]);
+                assert(GGML_DIM_ELEMENTS(m, 3) == x[0]->ne[3]);
 
                 if (ndims <= 2) {
                     check_gradient("mul_mat", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, INFINITY);

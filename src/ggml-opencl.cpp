@@ -1159,8 +1159,8 @@ void ggml_cl_free_data(const struct ggml_tensor* tensor) {
 
 static cl_int ggml_cl_h2d_tensor_2d(cl_command_queue queue, cl_mem dst, size_t offset, const struct ggml_tensor * src, uint64_t i3, uint64_t i2, cl_event* ev) {
     cl_int err;
-    const uint64_t ne0 = src->ne[0];
-    const uint64_t ne1 = src->ne[1];
+    const uint64_t ne0 = GGML_DIM_ELEMENTS(src, 0);
+    const uint64_t ne1 = GGML_DIM_ELEMENTS(src, 1);
     const uint64_t nb0 = src->nb[0];
     const uint64_t nb1 = src->nb[1];
     const uint64_t nb2 = src->nb[2];
@@ -1196,15 +1196,15 @@ static cl_int ggml_cl_h2d_tensor_2d(cl_command_queue queue, cl_mem dst, size_t o
 
 static void ggml_cl_mul_f32(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     GGML_ASSERT(src1->backend == GGML_BACKEND_GPU);
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[2];
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
+    const int64_t ne01 = GGML_DIM_ELEMENTS(src0, 1);
+    const int64_t ne02 = GGML_DIM_ELEMENTS(src0, 2);
+    const int64_t ne03 = GGML_DIM_ELEMENTS(src0, 2);
     const int64_t ne0 = ne00 * ne01 * ne02 * ne03;
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
-    const int64_t ne12 = src1->ne[2];
-    const int64_t ne13 = src1->ne[3];
+    const int64_t ne10 = GGML_DIM_ELEMENTS(src1, 0);
+    const int64_t ne11 = GGML_DIM_ELEMENTS(src1, 1);
+    const int64_t ne12 = GGML_DIM_ELEMENTS(src1, 2);
+    const int64_t ne13 = GGML_DIM_ELEMENTS(src1, 3);
     const int64_t nb10 = src1->nb[0];
     const int nb2  = dst->nb[2];
     const int nb3  = dst->nb[3];
@@ -1288,13 +1288,13 @@ void ggml_cl_mul(const struct ggml_tensor * src0, const struct ggml_tensor * src
 }
 
 static void ggml_cl_mul_mat_f32(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
+    const int64_t ne01 = GGML_DIM_ELEMENTS(src0, 1);
+    const int64_t ne02 = GGML_DIM_ELEMENTS(src0, 2);
+    const int64_t ne03 = GGML_DIM_ELEMENTS(src0, 3);
 
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
+    const int64_t ne10 = GGML_DIM_ELEMENTS(src1, 0);
+    const int64_t ne11 = GGML_DIM_ELEMENTS(src1, 1);
 
     const int nb2  = dst->nb[2];
     const int nb3  = dst->nb[3];
@@ -1359,13 +1359,13 @@ static void ggml_cl_mul_mat_f32(const ggml_tensor * src0, const ggml_tensor * sr
 static void ggml_cl_mul_mat_f16(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst, void * wdata, size_t /* wsize */) {
     GGML_ASSERT(fp16_support);
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
+    const int64_t ne01 = GGML_DIM_ELEMENTS(src0, 1);
+    const int64_t ne02 = GGML_DIM_ELEMENTS(src0, 2);
+    const int64_t ne03 = GGML_DIM_ELEMENTS(src0, 3);
 
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
+    const int64_t ne10 = GGML_DIM_ELEMENTS(src1, 0);
+    const int64_t ne11 = GGML_DIM_ELEMENTS(src1, 1);
 
     const int nb10 = src1->nb[0];
     const int nb11 = src1->nb[1];
@@ -1464,13 +1464,13 @@ static void ggml_cl_mul_mat_f16(const ggml_tensor * src0, const ggml_tensor * sr
 }
 
 static void ggml_cl_mul_mat_q_f32(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
+    const int64_t ne00 = GGML_DIM_ELEMENTS(src0, 0);
+    const int64_t ne01 = GGML_DIM_ELEMENTS(src0, 1);
+    const int64_t ne02 = GGML_DIM_ELEMENTS(src0, 2);
+    const int64_t ne03 = GGML_DIM_ELEMENTS(src0, 3);
 
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
+    const int64_t ne10 = GGML_DIM_ELEMENTS(src1, 0);
+    const int64_t ne11 = GGML_DIM_ELEMENTS(src1, 1);
 
     const int nb2  = dst->nb[2];
     const int nb3  = dst->nb[3];
@@ -1591,10 +1591,10 @@ static void ggml_cl_mul_mat_q_f32(const ggml_tensor * src0, const ggml_tensor * 
 
 
 bool ggml_cl_can_mul_mat(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst) {
-    const int64_t ne10 = src1->ne[0];
+    const int64_t ne10 = GGML_DIM_ELEMENTS(src1, 0);
 
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
+    const int64_t ne0 = GGML_DIM_ELEMENTS(dst, 0);
+    const int64_t ne1 = GGML_DIM_ELEMENTS(dst, 1);
 
     // TODO: find the optimal values for these
     if ((src0->type == GGML_TYPE_F32 || src0->type == GGML_TYPE_F16 || ggml_is_quantized(src0->type)) &&
@@ -1657,10 +1657,10 @@ size_t ggml_cl_mul_mat_get_wsize(const struct ggml_tensor * src0, const struct g
 }
 
 void ggml_cl_transform_tensor(void * data, ggml_tensor * tensor) {
-    const int64_t ne0 = tensor->ne[0];
-    const int64_t ne1 = tensor->ne[1];
-    const int64_t ne2 = tensor->ne[2];
-    const int64_t ne3 = tensor->ne[3];
+    const int64_t ne0 = GGML_DIM_ELEMENTS(tensor, 0);
+    const int64_t ne1 = GGML_DIM_ELEMENTS(tensor, 1);
+    const int64_t ne2 = GGML_DIM_ELEMENTS(tensor, 2);
+    const int64_t ne3 = GGML_DIM_ELEMENTS(tensor, 3);
 
     const ggml_type type = tensor->type;
     const size_t q_sz = ggml_type_size(type) * ne0 * ne1 * ne2 * ne3 / ggml_blck_size(type);

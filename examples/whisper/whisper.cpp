@@ -1362,13 +1362,13 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
             if (ggml_nelements(tensor) != nelements) {
                 fprintf(stderr, "%s: tensor '%s' has wrong size in model file\n", __func__, name.data());
                 fprintf(stderr, "%s: shape: [%d, %d, %d], expected: [%d, %d, %d]\n",
-                        __func__, ne[0], ne[1], ne[2], (int) tensor->ne[0], (int) tensor->ne[1], (int) tensor->ne[2]);
+                        __func__, ne[0], ne[1], ne[2], (int) GGML_DIM_ELEMENTS(tensor, 0), (int) GGML_DIM_ELEMENTS(tensor, 1), (int) GGML_DIM_ELEMENTS(tensor, 2));
                 return false;
             }
 
-            if (tensor->ne[0] != ne[0] || tensor->ne[1] != ne[1] || tensor->ne[2] != ne[2]) {
+            if (GGML_DIM_ELEMENTS(tensor, 0) != ne[0] || GGML_DIM_ELEMENTS(tensor, 1) != ne[1] || GGML_DIM_ELEMENTS(tensor, 2) != ne[2]) {
                 fprintf(stderr, "%s: tensor '%s' has wrong shape in model file: got [%d, %d, %d], expected [%d, %d, %d]\n",
-                        __func__, name.data(), (int) tensor->ne[0], (int) tensor->ne[1], (int) tensor->ne[2], ne[0], ne[1], ne[2]);
+                        __func__, name.data(), (int) GGML_DIM_ELEMENTS(tensor, 0), (int) GGML_DIM_ELEMENTS(tensor, 1), (int) GGML_DIM_ELEMENTS(tensor, 2), ne[0], ne[1], ne[2]);
                 return false;
             }
 
@@ -1509,10 +1509,10 @@ static bool whisper_encode_internal(
 
         static int iter = 0;
 
-        const size_t e_pe_stride = model.e_pe->ne[0]*ggml_element_size(model.e_pe);
-        const size_t e_pe_offset = model.e_pe->ne[0]*ggml_element_size(model.e_pe)*n_ctx*iter;
+        const size_t e_pe_stride = model.GGML_DIM_ELEMENTS(e_pe, 0)*ggml_element_size(model.e_pe);
+        const size_t e_pe_offset = model.GGML_DIM_ELEMENTS(e_pe, 0)*ggml_element_size(model.e_pe)*n_ctx*iter;
 
-        struct ggml_tensor * e_pe = ggml_view_2d(ctx0, model.e_pe, model.e_pe->ne[0], n_ctx, e_pe_stride, e_pe_offset);
+        struct ggml_tensor * e_pe = ggml_view_2d(ctx0, model.e_pe, model.GGML_DIM_ELEMENTS(e_pe, 0), n_ctx, e_pe_stride, e_pe_offset);
 
         cur = ggml_add(ctx0, e_pe, ggml_transpose(ctx0, cur));
 
@@ -1778,13 +1778,13 @@ static bool whisper_encode_internal(
 
     // cur
     //{
-    //    printf("ne0 = %d\n", cur->ne[0]);
-    //    printf("ne1 = %d\n", cur->ne[1]);
+    //    printf("ne0 = %d\n", GGML_DIM_ELEMENTS(cur, 0));
+    //    printf("ne1 = %d\n", GGML_DIM_ELEMENTS(cur, 1));
     //    for (int i = 0; i < 10; ++i) {
     //        printf("%8.4f ", ((float *)(cur->data))[i]);
     //    }
     //    printf("... ");
-    //    for (int i = cur->ne[0] - 10; i < cur->ne[0]; ++i) {
+    //    for (int i = GGML_DIM_ELEMENTS(cur, 0) - 10; i < GGML_DIM_ELEMENTS(cur, 0); ++i) {
     //        printf("%8.4f ", ((float *)(cur->data))[i]);
     //    }
     //    printf("\n");
@@ -2242,7 +2242,7 @@ static bool whisper_decode_internal(
     // compute logits only for the last token
     // comment this line to compute logits for all N tokens
     // might be useful in the future
-    cur = ggml_view_2d(ctx0, cur, cur->ne[0], 1, cur->nb[1], (cur->ne[1] - 1)*cur->nb[1]);
+    cur = ggml_view_2d(ctx0, cur, GGML_DIM_ELEMENTS(cur, 0), 1, cur->nb[1], (GGML_DIM_ELEMENTS(cur, 1) - 1)*cur->nb[1]);
 
     struct ggml_tensor * logits = ggml_mul_mat(ctx0, model.d_te, cur);
 
