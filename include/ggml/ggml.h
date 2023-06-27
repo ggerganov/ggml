@@ -333,8 +333,6 @@ extern "C" {
         GGML_OP_ALIBI,
         GGML_OP_CLAMP,
         GGML_OP_CONV_1D,
-        GGML_OP_CONV_1D_S1_PH,
-        GGML_OP_CONV_1D_S2_PH,
         GGML_OP_CONV_2D_SK_P0,
 
         GGML_OP_FLASH_ATTN,
@@ -1082,7 +1080,7 @@ extern "C" {
             float                 min,
             float                 max);
 
-     GGML_API struct ggml_tensor * ggml_conv_1d(
+    GGML_API struct ggml_tensor * ggml_conv_1d(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             struct ggml_tensor  * b,
@@ -1101,25 +1099,12 @@ extern "C" {
     //        int                   d0,
     //        int                   d1);
 
-    // padding = half
-    // TODO: we don't support extra parameters for now
-    //       that's why we are hard-coding the stride, padding, and dilation
-    //       not great ..
-    // example:
-    // a:      3   80  768    1
-    // b:   3000   80    1    1
-    // res: 3000  768    1    1
-    // used in whisper
-    GGML_API struct ggml_tensor * ggml_conv_1d_s1_ph(
+    // alias for ggml_conv_1d(a, b, s, a->ne[0]/2, 1)
+    GGML_API struct ggml_tensor* ggml_conv_1d_ph_d1(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
-            struct ggml_tensor  * b);
-
-    // used in whisper
-    GGML_API struct ggml_tensor * ggml_conv_1d_s2_ph(
-            struct ggml_context * ctx,
-            struct ggml_tensor  * a,
-            struct ggml_tensor  * b);
+            struct ggml_tensor  * b,
+            int                   s);
 
     // kernel size is a->ne[0] x a->ne[1]
     // stride is equal to kernel size

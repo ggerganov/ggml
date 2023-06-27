@@ -3745,8 +3745,6 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "ALIBI",
     "CLAMP",
     "CONV_1D",
-    "CONV_1D_S1_PH",
-    "CONV_1D_S2_PH",
     "CONV_2D_SK_P0",
 
     "FLASH_ATTN",
@@ -3766,7 +3764,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS_BACK",
 };
 
-static_assert(GGML_OP_COUNT == 65, "GGML_OP_COUNT != 64");
+static_assert(GGML_OP_COUNT == 63, "GGML_OP_COUNT != 63");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -3822,8 +3820,6 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "alibi(x)",
     "clamp(x)",
     "conv_1d(x)",
-    "conv_1d_s1_ph(x)",
-    "conv_1d_s2_ph(x)",
     "conv_2d_sk_p0(x)",
 
     "flash_attn(x)",
@@ -3843,7 +3839,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "cross_entropy_loss_back(x,y)",
 };
 
-static_assert(GGML_OP_COUNT == 65, "GGML_OP_COUNT != 64");
+static_assert(GGML_OP_COUNT == 63, "GGML_OP_COUNT != 63");
 
 static_assert(sizeof(struct ggml_object)%GGML_MEM_ALIGN == 0, "ggml_object size must be a multiple of GGML_MEM_ALIGN");
 static_assert(sizeof(struct ggml_tensor)%GGML_MEM_ALIGN == 0, "ggml_tensor size must be a multiple of GGML_MEM_ALIGN");
@@ -6976,58 +6972,15 @@ GGML_API struct ggml_tensor * ggml_conv_1d(
 
     return result;
 }
-// ggml_conv_1d_s1_ph
 
-struct ggml_tensor * ggml_conv_1d_s1_ph(
+// ggml_conv_1d_ph_d1
+
+struct ggml_tensor* ggml_conv_1d_ph_d1(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
-        struct ggml_tensor  * b) {
-    GGML_ASSERT(ggml_is_matrix(b));
-    GGML_ASSERT(a->ne[1] == b->ne[1]);
-    GGML_ASSERT(a->ne[3] == 1);
-    bool is_node = false;
-
-    if (a->grad || b->grad) {
-        GGML_ASSERT(false); // TODO: implement backward
-        is_node = true;
-    }
-
-    const int64_t ne[4] = { b->ne[0], a->ne[2], 1, 1, };
-    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 2, ne);
-
-    result->op   = GGML_OP_CONV_1D_S1_PH;
-    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
-    result->src0 = a;
-    result->src1 = b;
-
-    return result;
-}
-
-// ggml_conv_1d_s2_ph
-
-struct ggml_tensor * ggml_conv_1d_s2_ph(
-        struct ggml_context * ctx,
-        struct ggml_tensor  * a,
-        struct ggml_tensor  * b) {
-    GGML_ASSERT(ggml_is_matrix(b));
-    GGML_ASSERT(a->ne[1] == b->ne[1]);
-    GGML_ASSERT(a->ne[3] == 1);
-    bool is_node = false;
-
-    if (a->grad || b->grad) {
-        GGML_ASSERT(false); // TODO: implement backward
-        is_node = true;
-    }
-
-    const int64_t ne[4] = { b->ne[0]/2, a->ne[2], 1, 1, };
-    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 2, ne);
-
-    result->op   = GGML_OP_CONV_1D_S2_PH;
-    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
-    result->src0 = a;
-    result->src1 = b;
-
-    return result;
+        struct ggml_tensor  * b,
+        int                   s) {
+    ggml_conv_1d(ctx, a, b, s, a->ne[0] / 2, 1);
 }
 
 // ggml_conv_2d_sk_p0
@@ -15632,14 +15585,6 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_conv_1d(params, tensor->src0, tensor->src1, tensor->opt[0], tensor);
             } break;
-        case GGML_OP_CONV_1D_S1_PH:
-            {
-                ggml_compute_forward_conv_1d_s1_ph(params, tensor->src0, tensor->src1, tensor);
-            } break;
-        case GGML_OP_CONV_1D_S2_PH:
-            {
-                ggml_compute_forward_conv_1d_s2_ph(params, tensor->src0, tensor->src1, tensor);
-            } break;
         case GGML_OP_CONV_2D_SK_P0:
             {
                 ggml_compute_forward_conv_2d_sk_p0(params, tensor->src0, tensor->src1, tensor);
@@ -16328,14 +16273,6 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                 }
             } break;
         case GGML_OP_CONV_1D:
-            {
-                GGML_ASSERT(false); // TODO: not implemented
-            } break;
-        case GGML_OP_CONV_1D_S1_PH:
-            {
-                GGML_ASSERT(false); // TODO: not implemented
-            } break;
-        case GGML_OP_CONV_1D_S2_PH:
             {
                 GGML_ASSERT(false); // TODO: not implemented
             } break;
@@ -17108,8 +17045,6 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
                         node->n_tasks = 1; //TODO
                     } break;
                 case GGML_OP_CONV_1D:
-                case GGML_OP_CONV_1D_S1_PH:
-                case GGML_OP_CONV_1D_S2_PH:
                     {
                         node->n_tasks = n_threads;
 
