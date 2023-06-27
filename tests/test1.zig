@@ -1,7 +1,5 @@
 const std = @import("std");
 const c = @cImport({
-    @cInclude("stdio.h");
-    @cInclude("stdlib.h");
     @cInclude("ggml/ggml.h");
 });
 
@@ -114,7 +112,7 @@ pub fn main() !void {
         c.ggml_graph_dump_dot(&gf, null, "test1-2-forward.dot");
         c.ggml_graph_dump_dot(&gb, &gf,  "test1-2-backward.dot");
     }
-    
+
     ///////////////////////////////////////////////////////////////
 
     {
@@ -182,7 +180,7 @@ pub fn main() !void {
         try std.testing.expect(c.ggml_get_f32_1d(y, 0)          ==  12.0);
         try std.testing.expect(c.ggml_get_f32_1d(x1.*.grad, 0)  ==  24.0);
         try std.testing.expect(c.ggml_get_f32_1d(x2.*.grad, 0)  ==  12.0);
-        try std.testing.expect(c.ggml_get_f32_1d(x3.*.grad, 0)  ==  4.0);      
+        try std.testing.expect(c.ggml_get_f32_1d(x3.*.grad, 0)  ==  4.0);
 
         const g1 = x1.*.grad;
         const g2 = x2.*.grad;
@@ -197,16 +195,16 @@ pub fn main() !void {
 
         c.ggml_graph_compute(ctx0, @constCast(&gbb));
 
-        std.debug.print("H * [1, 1, 1] = [ {d:.6} {d:.6} {d:.6}]\n", 
-            .{  
-                c.ggml_get_f32_1d(x1.*.grad, 0), 
+        std.debug.print("H * [1, 1, 1] = [ {d:.6} {d:.6} {d:.6}]\n",
+            .{
+                c.ggml_get_f32_1d(x1.*.grad, 0),
                 c.ggml_get_f32_1d(x2.*.grad, 0),
                 c.ggml_get_f32_1d(x3.*.grad, 0),
             });
 
         try std.testing.expect(c.ggml_get_f32_1d(x1.*.grad, 0)  ==  56.0);
         try std.testing.expect(c.ggml_get_f32_1d(x2.*.grad, 0)  ==  34.0);
-        try std.testing.expect(c.ggml_get_f32_1d(x3.*.grad, 0)  ==  12.0);  
+        try std.testing.expect(c.ggml_get_f32_1d(x3.*.grad, 0)  ==  12.0);
 
         c.ggml_graph_dump_dot(&gf, null, "test1-4-forward.dot");
         c.ggml_graph_dump_dot(&gb, &gf,  "test1-4-backward.dot");
@@ -235,13 +233,13 @@ pub fn main() !void {
         c.ggml_graph_compute(ctx0, @constCast(&gb));
 
         std.debug.print("y      = {d:.6}\n", .{c.ggml_get_f32_1d(y, 0)});
-        std.debug.print("df/dx1 = {d:.6} {d:.6} {d:.6}\n", 
+        std.debug.print("df/dx1 = {d:.6} {d:.6} {d:.6}\n",
             .{
                 c.ggml_get_f32_1d(x1.*.grad, 0),
                 c.ggml_get_f32_1d(x1.*.grad, 1),
                 c.ggml_get_f32_1d(x1.*.grad, 2),
             });
-        std.debug.print("df/dx2 = {d:.6} {d:.6} {d:.6}\n", 
+        std.debug.print("df/dx2 = {d:.6} {d:.6} {d:.6}\n",
             .{
                 c.ggml_get_f32_1d(x2.*.grad, 0),
                 c.ggml_get_f32_1d(x2.*.grad, 1),
@@ -292,13 +290,13 @@ pub fn main() !void {
         c.ggml_graph_compute(ctx0, @constCast(&gb));
 
         std.debug.print("y      = {d:.6}\n", .{c.ggml_get_f32_1d(y, 0)});
-        std.debug.print("df/dx1 = {d:.6} {d:.6} {d:.6}\n", 
+        std.debug.print("df/dx1 = {d:.6} {d:.6} {d:.6}\n",
             .{
                 c.ggml_get_f32_1d(x1.*.grad, 0),
                 c.ggml_get_f32_1d(x1.*.grad, 1),
                 c.ggml_get_f32_1d(x1.*.grad, 2),
             });
-        std.debug.print("df/dx2 = {d:.6} {d:.6} {d:.6}\n", 
+        std.debug.print("df/dx2 = {d:.6} {d:.6} {d:.6}\n",
             .{
                 c.ggml_get_f32_1d(x2.*.grad, 0),
                 c.ggml_get_f32_1d(x2.*.grad, 1),
@@ -349,13 +347,13 @@ pub fn main() !void {
         c.ggml_graph_compute(ctx0, @constCast(&gb));
 
         std.debug.print("y      = {d:.6}\n", .{c.ggml_get_f32_1d(y, 0)});
-        std.debug.print("df/dx1 = {d:.6} {d:.6} {d:.6}\n", 
+        std.debug.print("df/dx1 = {d:.6} {d:.6} {d:.6}\n",
             .{
                 c.ggml_get_f32_1d(x1.*.grad, 0),
                 c.ggml_get_f32_1d(x1.*.grad, 1),
                 c.ggml_get_f32_1d(x1.*.grad, 2),
             });
-        std.debug.print("df/dx2 = {d:.6} {d:.6} {d:.6}\n", 
+        std.debug.print("df/dx2 = {d:.6} {d:.6} {d:.6}\n",
             .{
                 c.ggml_get_f32_1d(x2.*.grad, 0),
                 c.ggml_get_f32_1d(x2.*.grad, 1),
@@ -400,13 +398,13 @@ pub fn main() !void {
         c.ggml_graph_compute(ctx0, @constCast(&gb));
 
         std.debug.print("y      = {d:.6}\n", .{c.ggml_get_f32_1d(y, 0)});
-        std.debug.print("df/dx1 = {d:.6} {d:.6} {d:.6}\n", 
+        std.debug.print("df/dx1 = {d:.6} {d:.6} {d:.6}\n",
             .{
                 c.ggml_get_f32_1d(x1.*.grad, 0),
                 c.ggml_get_f32_1d(x1.*.grad, 1),
                 c.ggml_get_f32_1d(x1.*.grad, 2),
             });
-        std.debug.print("df/dx2 = {d:.6} {d:.6} {d:.6}\n", 
+        std.debug.print("df/dx2 = {d:.6} {d:.6} {d:.6}\n",
             .{
                 c.ggml_get_f32_1d(x2.*.grad, 0),
                 c.ggml_get_f32_1d(x2.*.grad, 1),
@@ -430,13 +428,13 @@ pub fn main() !void {
         c.ggml_graph_compute(ctx0, @constCast(&gb));
 
         std.debug.print("y      = {d:.6}\n", .{c.ggml_get_f32_1d(y, 0)});
-        std.debug.print("df/dx1 = {d:.6} {d:.6} {d:.6}\n", 
+        std.debug.print("df/dx1 = {d:.6} {d:.6} {d:.6}\n",
             .{
                 c.ggml_get_f32_1d(x1.*.grad, 0),
                 c.ggml_get_f32_1d(x1.*.grad, 1),
                 c.ggml_get_f32_1d(x1.*.grad, 2),
             });
-        std.debug.print("df/dx2 = {d:.6} {d:.6} {d:.6}\n", 
+        std.debug.print("df/dx2 = {d:.6} {d:.6} {d:.6}\n",
             .{
                 c.ggml_get_f32_1d(x2.*.grad, 0),
                 c.ggml_get_f32_1d(x2.*.grad, 1),

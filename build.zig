@@ -21,7 +21,9 @@ const std = @import("std");
 //     zig build run_test2              
 //     zig build run_test3
 //     zig build run_zig_test0
-//     zig build run_zig_test1     
+//     zig build run_zig_test1    
+//     zig build run_zig_test2
+//     zig build run_zig_test3 
 pub fn build(b: *std.build.Builder) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -117,6 +119,8 @@ pub fn build(b: *std.build.Builder) void {
     const zig_tests = .{
         "test0",
         "test1",
+        "test2",
+        "test3",
     };
     inline for (zig_tests) |name| {
         const exe = b.addExecutable(.{
