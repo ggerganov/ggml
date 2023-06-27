@@ -7440,10 +7440,7 @@ static void ggml_compute_forward_dup_f16(
         return;
     }
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     const int ith = params->ith; // thread index
     const int nth = params->nth; // number of threads
@@ -7714,10 +7711,7 @@ static void ggml_compute_forward_dup_f32(
         return;
     }
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     const int ith = params->ith; // thread index
     const int nth = params->nth; // number of threads
@@ -8016,10 +8010,7 @@ static void ggml_compute_forward_add_f32(
 
     const int nr  = ggml_nrows(src0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     GGML_ASSERT( nb0 == sizeof(float));
     GGML_ASSERT(nb00 == sizeof(float));
@@ -8089,10 +8080,7 @@ static void ggml_compute_forward_add_f16_f32(
 
     const int nr  = ggml_nrows(src0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     GGML_ASSERT(src0->type == GGML_TYPE_F16);
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
@@ -8146,10 +8134,7 @@ static void ggml_compute_forward_add_f16_f16(
 
     const int nr  = ggml_nrows(src0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     GGML_ASSERT(src0->type == GGML_TYPE_F16);
     GGML_ASSERT(src1->type == GGML_TYPE_F16);
@@ -8200,10 +8185,7 @@ static void ggml_compute_forward_add_q_f32(
 
     const int nr  = ggml_nrows(src0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -8325,9 +8307,7 @@ static void ggml_compute_forward_add1_f32(
 
     const int nr  = ggml_nrows(src0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     GGML_ASSERT( nb0 == sizeof(float));
     GGML_ASSERT(nb00 == sizeof(float));
@@ -8382,9 +8362,7 @@ static void ggml_compute_forward_add1_f16_f32(
 
     const int nr  = ggml_nrows(src0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     GGML_ASSERT(src0->type == GGML_TYPE_F16);
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
@@ -8434,9 +8412,7 @@ static void ggml_compute_forward_add1_f16_f16(
 
     const int nr  = ggml_nrows(src0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     GGML_ASSERT(src0->type == GGML_TYPE_F16);
     GGML_ASSERT(src1->type == GGML_TYPE_F16);
@@ -8486,9 +8462,7 @@ static void ggml_compute_forward_add1_q_f32(
 
     const int nr  = ggml_nrows(src0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     const enum ggml_type type = src0->type;
     dequantize_row_q_t const dequantize_row_q = quantize_fns[type].dequantize_row_q;
@@ -8620,15 +8594,8 @@ static void ggml_compute_forward_acc_f32(
     const int nr = ggml_nrows(src1);
     const int nc = src1->ne[0];
 
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
-    const int64_t ne12 = src1->ne[2];
-    const int64_t ne13 = src1->ne[3];
-
-    const size_t nb10 = src1->nb[0];
-    const size_t nb11 = src1->nb[1];
-    const size_t nb12 = src1->nb[2];
-    const size_t nb13 = src1->nb[3];
+    GGML_TENSOR_LOCALS(int64_t, ne1, src1, ne);
+    GGML_TENSOR_LOCALS(size_t, nb1, src1, nb);
 
     // src0 and dst as viewed during acc
     const size_t nb0 = ggml_element_size(src0);
@@ -8718,10 +8685,7 @@ static void ggml_compute_forward_sub_f32(
 
     const int nr  = ggml_nrows(src0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     GGML_ASSERT( nb0 == sizeof(float));
     GGML_ASSERT(nb00 == sizeof(float));
@@ -8811,11 +8775,7 @@ static void ggml_compute_forward_mul_f32(
 
     const int64_t nr = ggml_nrows(src0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     GGML_ASSERT( nb0 == sizeof(float));
     GGML_ASSERT(nb00 == sizeof(float));
@@ -8904,10 +8864,7 @@ static void ggml_compute_forward_div_f32(
 
     const int nr  = ggml_nrows(src0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne, src0, ne); UNUSED(ne3);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     GGML_ASSERT( nb0 == sizeof(float));
     GGML_ASSERT(nb00 == sizeof(float));
@@ -9114,8 +9071,8 @@ static void ggml_compute_forward_sum_f32(
     assert(ggml_is_scalar(dst));
     assert(src0->nb[0] == sizeof(float));
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb00);
+    GGML_TENSOR_LOCALS(int64_t, ne0, src0, ne);
+    GGML_TENSOR_LOCALS(size_t, nb0, src0, nb);
 
     ggml_float sum     = 0;
     ggml_float row_sum = 0;
@@ -9164,10 +9121,7 @@ static void ggml_compute_forward_sum_rows_f32(
     GGML_ASSERT(src0->nb[0] == sizeof(float));
     GGML_ASSERT(dst->nb[0] == sizeof(float));
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb00);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     GGML_ASSERT(ne0 == 1);
     GGML_ASSERT(ne1 == ne01);
@@ -9217,10 +9171,7 @@ static void ggml_compute_forward_mean_f32(
 
     assert(src0->nb[0] == sizeof(float));
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb00);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     assert(ne0 == 1);
     assert(ne1 == ne01);
@@ -9274,10 +9225,7 @@ static void ggml_compute_forward_repeat_f32(
         return;
     }
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     // guaranteed to be an integer due to the check in ggml_can_repeat
     const int nr0 = (int)(ne0/ne00);
@@ -9338,10 +9286,7 @@ static void ggml_compute_forward_repeat_back_f32(
         return;
     }
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     // guaranteed to be an integer due to the check in ggml_can_repeat
     const int nr0 = (int)(ne00/ne0);
@@ -9872,9 +9817,7 @@ static void ggml_compute_forward_norm_f32(
     const int ith = params->ith;
     const int nth = params->nth;
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb00);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     const float eps = 1e-5f; // TODO: make this a parameter
 
@@ -9940,9 +9883,7 @@ static void ggml_compute_forward_rms_norm_f32(
     const int ith = params->ith;
     const int nth = params->nth;
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb00);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     const float eps = 1e-6f; // TODO: make this a parameter
 
@@ -10007,10 +9948,7 @@ static void ggml_compute_forward_rms_norm_back_f32(
     const int ith = params->ith;
     const int nth = params->nth;
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb00);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb); UNUSED(nb10);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     const float eps = 1e-6f; // TODO: make this a parameter
 
@@ -10206,12 +10144,7 @@ static void ggml_compute_forward_mul_mat_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb00);
-    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne); UNUSED(ne10); UNUSED(ne11); UNUSED(ne12); UNUSED(ne13);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb); UNUSED(nb10); 
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne); UNUSED(ne0); UNUSED(ne1); UNUSED(ne2); UNUSED(ne3);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -10348,12 +10281,7 @@ static void ggml_compute_forward_mul_mat_f16_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     //const int64_t ne   = ne0*ne1*ne2*ne3;
 
@@ -10526,12 +10454,7 @@ static void ggml_compute_forward_mul_mat_q_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -10741,12 +10664,7 @@ static void ggml_compute_forward_out_prod_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne); UNUSED(ne11);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -10981,8 +10899,8 @@ static void ggml_compute_forward_set_f32(
     const int nr = ggml_nrows(src1);
     const int nc = src1->ne[0];
 
-    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb);
+    GGML_TENSOR_LOCALS(int64_t, ne1, src1, ne);
+    GGML_TENSOR_LOCALS(size_t, nb1, src1, nb);
 
     // src0 and dst as viewed during set
     const size_t nb0 = ggml_element_size(src0);
@@ -11373,10 +11291,7 @@ static void ggml_compute_forward_diag_f32(
 
     // TODO: handle transposed/permuted matrices
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb01);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     GGML_ASSERT(ne00 == ne0);
     GGML_ASSERT(ne00 == ne1);
@@ -11959,9 +11874,7 @@ static void ggml_compute_forward_rope_f32(
 
     assert(n_past >= 0);
 
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     //printf("ne0: %d, ne1: %d, ne2: %d, ne3: %d\n", ne0, ne1, ne2, ne3);
     //printf("n_past = %d, ne2 = %d\n", n_past, ne2);
@@ -12061,9 +11974,7 @@ static void ggml_compute_forward_rope_f16(
 
     assert(n_past >= 0);
 
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     //printf("ne0: %d, ne1: %d, ne2: %d, ne3: %d\n", ne0, ne1, ne2, ne3);
     //printf("n_past = %d, ne2 = %d\n", n_past, ne2);
@@ -12190,9 +12101,7 @@ static void ggml_compute_forward_rope_back_f32(
 
     assert(n_past >= 0);
 
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     //printf("ne0: %d, ne1: %d, ne2: %d, ne3: %d\n", ne0, ne1, ne2, ne3);
     //printf("n_past = %d, ne2 = %d\n", n_past, ne2);
@@ -12291,9 +12200,7 @@ static void ggml_compute_forward_rope_back_f16(
 
     assert(n_past >= 0);
 
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb);
+    GGML_TENSOR_UNARY_OP_LOCALS;
 
     //printf("ne0: %d, ne1: %d, ne2: %d, ne3: %d\n", ne0, ne1, ne2, ne3);
     //printf("n_past = %d, ne2 = %d\n", n_past, ne2);
@@ -12405,12 +12312,7 @@ static void ggml_compute_forward_conv_1d_s1_ph_f16_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb03);
-    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne); UNUSED(ne12); UNUSED(ne13);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb); UNUSED(nb12); UNUSED(nb13);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne); UNUSED(ne0); UNUSED(ne1); UNUSED(ne2); UNUSED(ne3);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0); UNUSED(nb2); UNUSED(nb3);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -12501,12 +12403,7 @@ static void ggml_compute_forward_conv_1d_s1_ph_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb03);
-    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne); UNUSED(ne12); UNUSED(ne13);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb); UNUSED(nb12); UNUSED(nb13);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne); UNUSED(ne0); UNUSED(ne1); UNUSED(ne2); UNUSED(ne3);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0); UNUSED(nb2); UNUSED(nb3);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -12620,12 +12517,7 @@ static void ggml_compute_forward_conv_1d_s2_ph_f16_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb03);
-    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne); UNUSED(ne12); UNUSED(ne13);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb); UNUSED(nb12); UNUSED(nb13);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne); UNUSED(ne0); UNUSED(ne1); UNUSED(ne2); UNUSED(ne3);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0); UNUSED(nb2); UNUSED(nb3);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -12716,12 +12608,7 @@ static void ggml_compute_forward_conv_1d_s2_ph_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb03);
-    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne); UNUSED(ne12); UNUSED(ne13);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb); UNUSED(nb12); UNUSED(nb13);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne); UNUSED(ne0); UNUSED(ne1); UNUSED(ne2); UNUSED(ne3);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0); UNUSED(nb2); UNUSED(nb3);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -12835,12 +12722,7 @@ static void ggml_compute_forward_conv_2d_sk_p0_f16_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
-    GGML_DEFINE_LOCALS(size_t, nb0, src0, nb); UNUSED(nb01); UNUSED(nb02); UNUSED(nb03);
-    GGML_DEFINE_LOCALS(int64_t, ne1, src1, ne); UNUSED(ne11); UNUSED(ne12); UNUSED(ne13);
-    GGML_DEFINE_LOCALS(size_t, nb1, src1, nb); UNUSED(nb11); UNUSED(nb12); UNUSED(nb13);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne); UNUSED(ne0); UNUSED(ne1); UNUSED(ne2); UNUSED(ne3);
-    GGML_DEFINE_LOCALS(size_t, nb, dst, nb); UNUSED(nb0); UNUSED(nb1); UNUSED(nb2); UNUSED(nb3);
+    GGML_TENSOR_BINARY_OP_LOCALS;
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -12945,45 +12827,14 @@ static void ggml_compute_forward_flash_attn_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    const int64_t neq0 = q->ne[0];
-    const int64_t neq1 = q->ne[1];
-    const int64_t neq2 = q->ne[2];
-    const int64_t neq3 = q->ne[3];
-
-    const int64_t nek0 = k->ne[0];
-    const int64_t nek1 = k->ne[1];
-    //const int64_t nek2 = k->ne[2];
-    //const int64_t nek3 = k->ne[3];
-
-    //const int64_t nev0 = v->ne[0];
-    const int64_t nev1 = v->ne[1];
-    //const int64_t nev2 = v->ne[2];
-    //const int64_t nev3 = v->ne[3];
-
-    const int64_t ne0  = dst->ne[0];
-    const int64_t ne1  = dst->ne[1];
-    //const int64_t ne2  = dst->ne[2];
-    //const int64_t ne3  = dst->ne[3];
-
-    const int nbk0 = k->nb[0];
-    const int nbk1 = k->nb[1];
-    const int nbk2 = k->nb[2];
-    const int nbk3 = k->nb[3];
-
-    const int nbq0 = q->nb[0];
-    const int nbq1 = q->nb[1];
-    const int nbq2 = q->nb[2];
-    const int nbq3 = q->nb[3];
-
-    const int nbv0 = v->nb[0];
-    const int nbv1 = v->nb[1];
-    const int nbv2 = v->nb[2];
-    const int nbv3 = v->nb[3];
-
-    const int nb0  = dst->nb[0];
-    const int nb1  = dst->nb[1];
-    const int nb2  = dst->nb[2];
-    const int nb3  = dst->nb[3];
+    GGML_TENSOR_LOCALS(int64_t, neq, q, ne);
+    GGML_TENSOR_LOCALS(size_t, nbq, q, nb);
+    GGML_TENSOR_LOCALS(int64_t, nek, k, ne);
+    GGML_TENSOR_LOCALS(size_t, nbk, k, nb);
+    GGML_TENSOR_LOCALS(int64_t, nev, v, ne);
+    GGML_TENSOR_LOCALS(size_t, nbv, v, nb);
+    GGML_TENSOR_LOCALS(int64_t, ne, dst, ne);
+    GGML_TENSOR_LOCALS(size_t, nb, dst, nb);
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -13154,45 +13005,14 @@ static void ggml_compute_forward_flash_attn_f16(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    const int64_t neq0 = q->ne[0];
-    const int64_t neq1 = q->ne[1];
-    const int64_t neq2 = q->ne[2];
-    const int64_t neq3 = q->ne[3];
-
-    const int64_t nek0 = k->ne[0];
-    const int64_t nek1 = k->ne[1];
-    //const int64_t nek2 = k->ne[2];
-    //const int64_t nek3 = k->ne[3];
-
-    //const int64_t nev0 = v->ne[0];
-    const int64_t nev1 = v->ne[1];
-    //const int64_t nev2 = v->ne[2];
-    //const int64_t nev3 = v->ne[3];
-
-    const int64_t ne0  = dst->ne[0];
-    const int64_t ne1  = dst->ne[1];
-    //const int64_t ne2  = dst->ne[2];
-    //const int64_t ne3  = dst->ne[3];
-
-    const int nbk0 = k->nb[0];
-    const int nbk1 = k->nb[1];
-    const int nbk2 = k->nb[2];
-    const int nbk3 = k->nb[3];
-
-    const int nbq0 = q->nb[0];
-    const int nbq1 = q->nb[1];
-    const int nbq2 = q->nb[2];
-    const int nbq3 = q->nb[3];
-
-    const int nbv0 = v->nb[0];
-    const int nbv1 = v->nb[1];
-    const int nbv2 = v->nb[2];
-    const int nbv3 = v->nb[3];
-
-    const int nb0  = dst->nb[0];
-    const int nb1  = dst->nb[1];
-    const int nb2  = dst->nb[2];
-    const int nb3  = dst->nb[3];
+    GGML_TENSOR_LOCALS(int64_t, neq, q, ne);
+    GGML_TENSOR_LOCALS(size_t, nbq, q, nb);
+    GGML_TENSOR_LOCALS(int64_t, nek, k, ne);
+    GGML_TENSOR_LOCALS(size_t, nbk, k, nb);
+    GGML_TENSOR_LOCALS(int64_t, nev, v, ne);
+    GGML_TENSOR_LOCALS(size_t, nbv, v, nb);
+    GGML_TENSOR_LOCALS(int64_t, ne, dst, ne);
+    GGML_TENSOR_LOCALS(size_t, nb, dst, nb);
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -13426,65 +13246,18 @@ static void ggml_compute_forward_flash_ff_f16(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    const int64_t nea0 = a->ne[0];
-    const int64_t nea1 = a->ne[1];
-    const int64_t nea2 = a->ne[2];
-    const int64_t nea3 = a->ne[3];
-
-    const int64_t neb00 = b0->ne[0];
-    const int64_t neb01 = b0->ne[1];
-    //const int64_t neb02 = b0->ne[2];
-    //const int64_t neb03 = b0->ne[3];
-
-    const int64_t neb10 = b1->ne[0];
-    const int64_t neb11 = b1->ne[1];
-    //const int64_t neb12 = b1->ne[2];
-    //const int64_t neb13 = b1->ne[3];
-
-    const int64_t nec00 = c0->ne[0];
-    const int64_t nec01 = c0->ne[1];
-    //const int64_t nec02 = c0->ne[2];
-    //const int64_t nec03 = c0->ne[3];
-
-    const int64_t nec10 = c1->ne[0];
-    const int64_t nec11 = c1->ne[1];
-    //const int64_t nec12 = c1->ne[2];
-    //const int64_t nec13 = c1->ne[3];
-
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
-    const int64_t ne2 = dst->ne[2];
-    //const int64_t ne3 = dst->ne[3];
-
-    const int nba0 = a->nb[0];
-    const int nba1 = a->nb[1];
-    const int nba2 = a->nb[2];
-    const int nba3 = a->nb[3];
-
-    const int nbb00 = b0->nb[0];
-    const int nbb01 = b0->nb[1];
-    const int nbb02 = b0->nb[2];
-    const int nbb03 = b0->nb[3];
-
-    const int nbb10 = b1->nb[0];
-    //const int nbb11 = b1->nb[1];
-    //const int nbb12 = b1->nb[2];
-    //const int nbb13 = b1->nb[3];
-
-    const int nbc00 = c0->nb[0];
-    const int nbc01 = c0->nb[1];
-    const int nbc02 = c0->nb[2];
-    const int nbc03 = c0->nb[3];
-
-    const int nbc10 = c1->nb[0];
-    //const int nbc11 = c1->nb[1];
-    //const int nbc12 = c1->nb[2];
-    //const int nbc13 = c1->nb[3];
-
-    const int nb0 = dst->nb[0];
-    const int nb1 = dst->nb[1];
-    const int nb2 = dst->nb[2];
-    const int nb3 = dst->nb[3];
+    GGML_TENSOR_LOCALS(int64_t, nea, a, ne);
+    GGML_TENSOR_LOCALS(size_t, nba, a, nb);
+    GGML_TENSOR_LOCALS(int64_t, neb0, b0, ne);
+    GGML_TENSOR_LOCALS(size_t, nbb0, b0, nb);
+    GGML_TENSOR_LOCALS(int64_t, neb1, b1, ne);
+    GGML_TENSOR_LOCALS(size_t, nbb1, b1, nb);
+    GGML_TENSOR_LOCALS(int64_t, nec0, c0, ne);
+    GGML_TENSOR_LOCALS(size_t, nbc0, c0, nb);
+    GGML_TENSOR_LOCALS(int64_t, nec1, c1, ne);
+    GGML_TENSOR_LOCALS(size_t, nbc1, c1, nb);
+    GGML_TENSOR_LOCALS(int64_t, ne, dst, ne);
+    GGML_TENSOR_LOCALS(size_t, nb, dst, nb);
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -13632,55 +13405,16 @@ static void ggml_compute_forward_flash_attn_back_f32(
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
 
-    const int64_t neq0 = q->ne[0];
-    const int64_t neq1 = q->ne[1];
-    const int64_t neq2 = q->ne[2];
-    const int64_t neq3 = q->ne[3];
-
-    const int64_t nek0 = k->ne[0];
-    const int64_t nek1 = k->ne[1];
-    //const int64_t nek2 = k->ne[2];
-    //const int64_t nek3 = k->ne[3];
-
-    const int64_t nev0 = v->ne[0];
-    const int64_t nev1 = v->ne[1];
-    //const int64_t nev2 = v->ne[2];
-    //const int64_t nev3 = v->ne[3];
-
-    const int64_t ned0 = d->ne[0];
-    const int64_t ned1 = d->ne[1];
-    //const int64_t ned2 = d->ne[2];
-    //const int64_t ned3 = d->ne[3];
-
-    const int64_t ne0  = dst->ne[0];
-    const int64_t ne1  = dst->ne[1];
-    const int64_t ne2  = dst->ne[2];
-    const int64_t ne3  = dst->ne[3];
-
-    const int nbk0 = k->nb[0];
-    const int nbk1 = k->nb[1];
-    const int nbk2 = k->nb[2];
-    const int nbk3 = k->nb[3];
-
-    const int nbq0 = q->nb[0];
-    const int nbq1 = q->nb[1];
-    const int nbq2 = q->nb[2];
-    const int nbq3 = q->nb[3];
-
-    const int nbv0 = v->nb[0];
-    const int nbv1 = v->nb[1];
-    const int nbv2 = v->nb[2];
-    const int nbv3 = v->nb[3];
-
-    const int nbd0 = d->nb[0];
-    const int nbd1 = d->nb[1];
-    const int nbd2 = d->nb[2];
-    const int nbd3 = d->nb[3];
-
-    const int nb0  = dst->nb[0];
-    const int nb1  = dst->nb[1];
-    const int nb2  = dst->nb[2];
-    const int nb3  = dst->nb[3];
+    GGML_TENSOR_LOCALS(int64_t, neq, q, ne);
+    GGML_TENSOR_LOCALS(size_t, nbq, q, nb);
+    GGML_TENSOR_LOCALS(int64_t, nek, k, ne);
+    GGML_TENSOR_LOCALS(size_t, nbk, k, nb);
+    GGML_TENSOR_LOCALS(int64_t, nev, v, ne);
+    GGML_TENSOR_LOCALS(size_t, nbv, v, nb);
+    GGML_TENSOR_LOCALS(int64_t, ned, d, ne);
+    GGML_TENSOR_LOCALS(size_t, nbd, d, nb);
+    GGML_TENSOR_LOCALS(int64_t, ne, dst, ne);
+    GGML_TENSOR_LOCALS(size_t, nb, dst, nb);
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -14038,8 +13772,8 @@ static void ggml_compute_forward_win_part_f32(
         return;
     }
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne); UNUSED(ne3);
+    GGML_TENSOR_LOCALS(int64_t, ne0, src0, ne);
+    GGML_TENSOR_LOCALS(int64_t, ne, dst, ne);
 
     const int32_t nep0 = ((const int32_t *)(opt0->data))[0];
     const int32_t nep1 = ((const int32_t *)(opt0->data))[1];
@@ -14102,8 +13836,8 @@ static void ggml_compute_forward_win_unpart_f32(
         return;
     }
 
-    GGML_DEFINE_LOCALS(int64_t, ne0, src0, ne); UNUSED(ne03);
-    GGML_DEFINE_LOCALS(int64_t, ne, dst, ne); UNUSED(ne3);
+    GGML_TENSOR_LOCALS(int64_t, ne0, src0, ne);
+    GGML_TENSOR_LOCALS(int64_t, ne, dst, ne);
 
     const int32_t w = ((const int32_t *)(opt0->data))[0];
 
