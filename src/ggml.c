@@ -6937,6 +6937,10 @@ struct ggml_tensor * ggml_clamp(
 
 // ggml_conv_1d
 
+static int64_t ggml_calc_conv_output_size(int64_t ins, int64_t ks, int s, int p, int d) {
+    return (ins + 2 * p - d * (ks - 1) - 1) / s + 1;
+}
+
 GGML_API struct ggml_tensor * ggml_conv_1d(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
@@ -6953,8 +6957,10 @@ GGML_API struct ggml_tensor * ggml_conv_1d(
         is_node = true;
     }
 
-    const int64_t k0 = a->ne[0] * d0;
-    const int64_t ne[4] = {b->ne[0]/s0 - k0 + 1 + p0 * 2, a->ne[2], 1, 1,};
+    const int64_t ne[4] = {
+        ggml_calc_conv_output_size(b->ne[0], a->ne[0], s0, p0, d0),
+        a->ne[2], 1, 1,
+    };
     struct ggml_tensor* result = ggml_new_tensor(ctx, GGML_TYPE_F32, 2, ne);
 
     ggml_scratch_save(ctx);
@@ -6997,7 +7003,11 @@ struct ggml_tensor* ggml_conv_2d(
         is_node = true;
     }
 
-    const int64_t ne[4] = {b->ne[0] / a->ne[0], b->ne[1] / a->ne[1], a->ne[3], 1,};
+    const int64_t ne[4] = {
+        ggml_calc_conv_output_size(b->ne[0], a->ne[0], s0, p0, d0),
+        ggml_calc_conv_output_size(b->ne[1], a->ne[1], s1, p1, d1),
+        a->ne[3], 1,
+    };
     struct ggml_tensor* result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
 
     result->op = GGML_OP_CONV_2D_SK_P0;
@@ -7017,7 +7027,7 @@ struct ggml_tensor* ggml_conv_1d_ph(
         struct ggml_tensor  * b,
         int                   s,
         int                   d) {
-    ggml_conv_1d(ctx, a, b, s, a->ne[0] / 2, d);
+    return ggml_conv_1d(ctx, a, b, s, a->ne[0] / 2, d);
 }
 
 // ggml_conv_2d_sk_p0
