@@ -6939,8 +6939,8 @@ struct ggml_tensor * ggml_clamp(
 
 GGML_API struct ggml_tensor * ggml_conv_1d(
         struct ggml_context * ctx,
-        struct ggml_tensor * a,
-        struct ggml_tensor * b,
+        struct ggml_tensor  * a,
+        struct ggml_tensor  * b,
         int                   s0,
         int                   p0,
         int                   d0) {
@@ -6971,6 +6971,42 @@ GGML_API struct ggml_tensor * ggml_conv_1d(
     result->opt[0] = c;
 
     return result;
+}
+
+// ggml_conv_2d
+
+struct ggml_tensor* ggml_conv_2d(
+    struct ggml_context* ctx,
+    struct ggml_tensor * a,
+    struct ggml_tensor * b,
+    int                  s0,
+    int                  s1,
+    int                  p0,
+    int                  p1,
+    int                  d0,
+    int                  d1) {
+
+    GGML_ASSERT(b->ne[3] == 1);
+    GGML_ASSERT(a->ne[2] == b->ne[2]);
+    GGML_ASSERT(b->ne[0] % a->ne[0] == 0);
+    GGML_ASSERT(b->ne[1] % a->ne[1] == 0);
+    bool is_node = false;
+
+    if (a->grad || b->grad) {
+        GGML_ASSERT(false); // TODO: implement backward
+        is_node = true;
+    }
+
+    const int64_t ne[4] = {b->ne[0] / a->ne[0], b->ne[1] / a->ne[1], a->ne[3], 1,};
+    struct ggml_tensor* result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
+
+    result->op = GGML_OP_CONV_2D_SK_P0;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->src0 = a;
+    result->src1 = b;
+
+    return result;
+
 }
 
 // ggml_conv_1d_ph
