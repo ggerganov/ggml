@@ -6961,10 +6961,18 @@ GGML_API struct ggml_tensor * ggml_conv_1d(
     const int64_t ne[4] = {b->ne[0]/s0 - k0 + 1 + p0 * 2, a->ne[2], 1, 1,};
     struct ggml_tensor* result = ggml_new_tensor(ctx, GGML_TYPE_F32, 2, ne);
 
+    ggml_scratch_save(ctx);
+    struct ggml_tensor* c = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, 3);
+    ((int32_t*)c->data)[0] = s0;
+    ((int32_t*)c->data)[1] = p0;
+    ((int32_t*)c->data)[2] = d0;
+    ggml_scratch_load(ctx);
+
     result->op = GGML_OP_CONV_1D;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src0 = a;
     result->src1 = b;
+    result->opt[0] = c;
 
     return result;
 }
