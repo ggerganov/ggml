@@ -3447,6 +3447,7 @@ inline static void ggml_vec_log_f32  (const int n, float * y, const float * x) {
 inline static void ggml_vec_abs_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = fabsf(x[i]); }
 inline static void ggml_vec_sgn_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? 1.f : ((x[i] < 0.f) ? -1.f : 0.f); }
 inline static void ggml_vec_step_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? 1.f : 0.f; }
+inline static void ggml_vec_elu_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? x[i] : expf(x[i])-1; }
 inline static void ggml_vec_relu_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? x[i] : 0.f; }
 
 static const float GELU_COEF_A    = 0.044715f;
@@ -3713,6 +3714,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "SGN",
     "NEG",
     "STEP",
+    "ELU",
     "RELU",
     "GELU",
     "GELU_QUICK",
@@ -3765,7 +3767,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS_BACK",
 };
 
-static_assert(GGML_OP_COUNT == 64, "GGML_OP_COUNT != 64");
+static_assert(GGML_OP_COUNT == 65, "GGML_OP_COUNT != 65");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -3789,6 +3791,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "sgn(x)",
     "-x",
     "step(x)",
+    "elu(x)",
     "relu(x)",
     "gelu(x)",
     "gelu_quick(x)",
@@ -3841,7 +3844,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "cross_entropy_loss_back(x,y)",
 };
 
-static_assert(GGML_OP_COUNT == 64, "GGML_OP_COUNT != 64");
+static_assert(GGML_OP_COUNT == 65, "GGML_OP_COUNT != 65");
 
 static_assert(sizeof(struct ggml_object)%GGML_MEM_ALIGN == 0, "ggml_object size must be a multiple of GGML_MEM_ALIGN");
 static_assert(sizeof(struct ggml_tensor)%GGML_MEM_ALIGN == 0, "ggml_tensor size must be a multiple of GGML_MEM_ALIGN");
@@ -5594,6 +5597,40 @@ struct ggml_tensor * ggml_step_inplace(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
     return ggml_step_impl(ctx, a, true);
+}
+
+// ggml_elu
+
+struct ggml_tensor * ggml_elu_impl(
+        struct ggml_context * ctx,
+        struct ggml_tensor * a,
+        bool inplace) {
+    bool is_node = false;
+
+    if (!inplace && (a->grad)) {
+        is_node = true;  
+    }
+
+    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
+
+    result->op   = GGML_OP_ELU;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->src0 = a;
+    result->src1 = NULL;
+
+    return result;
+}
+
+struct ggml_tensor * ggml_elu(
+    struct ggml_context * ctx,
+    struct ggml_tensor  * a) {
+    return ggml_elu_impl(ctx, a, false);
+}
+
+struct ggml_tensor * ggml_elu_inplace(
+    struct ggml_context * ctx,
+    struct ggml_tensor  * a) {
+    return ggml_elu_impl(ctx, a, true);
 }
 
 // ggml_relu
@@ -9914,6 +9951,48 @@ static void ggml_compute_forward_step(
         case GGML_TYPE_F32:
             {
                 ggml_compute_forward_step_f32(params, src0, dst);
+            } break;
+        default:
+            {
+                GGML_ASSERT(false);
+            } break;
+    }
+}
+
+// ggml_compute_forward_elu
+
+static void ggml_compute_forward_elu_f32(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src0,
+        struct ggml_tensor * dst) {
+    assert(params->ith == 0);
+    assert(ggml_are_same_shape(src0, dst));
+
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+        return;
+    }
+
+    const int n  = ggml_nrows(src0);
+    const int nc = src0->ne[0];
+
+    assert(dst->nb[0]  == sizeof(float));
+    assert(src0->nb[0] == sizeof(float));
+
+    for (int i = 0; i < n; i++) {
+        ggml_vec_elu_f32(nc,
+                (float *) ((char *) dst->data  + i*( dst->nb[1])),
+                (float *) ((char *) src0->data + i*(src0->nb[1])));
+    }
+}
+
+static void ggml_compute_forward_elu(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src0,
+        struct ggml_tensor * dst) {
+    switch (src0->type) {
+        case GGML_TYPE_F32:
+            {
+                ggml_compute_forward_elu_f32(params, src0, dst);
             } break;
         default:
             {
@@ -15455,6 +15534,10 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_step(params, tensor->src0, tensor);
             } break;
+        case GGML_OP_ELU:
+            {
+                ggml_compute_forward_elu(params, tensor->src0, tensor);
+            } break;
         case GGML_OP_RELU:
             {
                 ggml_compute_forward_relu(params, tensor->src0, tensor);
@@ -15882,6 +15965,10 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                 if (src0->grad) {
                     // noop
                 }
+            } break;
+        case GGML_OP_ELU:
+            {
+                GGML_ASSERT(false); // TODO: not implemented
             } break;
         case GGML_OP_RELU:
             {
@@ -16929,6 +17016,7 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
                 case GGML_OP_SGN:
                 case GGML_OP_NEG:
                 case GGML_OP_STEP:
+                case GGML_OP_ELU:
                 case GGML_OP_RELU:
                     {
                         node->n_tasks = 1;
