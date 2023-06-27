@@ -1099,12 +1099,14 @@ extern "C" {
     //        int                   d0,
     //        int                   d1);
 
-    // alias for ggml_conv_1d(a, b, s, a->ne[0]/2, 1)
-    GGML_API struct ggml_tensor* ggml_conv_1d_ph_d1(
+    // conv_1d with padding = half
+    // alias for ggml_conv_1d(a, b, s, a->ne[0]/2, d)
+    GGML_API struct ggml_tensor* ggml_conv_1d_ph(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             struct ggml_tensor  * b,
-            int                   s);
+            int                   s,
+            int                   d);
 
     // kernel size is a->ne[0] x a->ne[1]
     // stride is equal to kernel size

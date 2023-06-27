@@ -6973,14 +6973,15 @@ GGML_API struct ggml_tensor * ggml_conv_1d(
     return result;
 }
 
-// ggml_conv_1d_ph_d1
+// ggml_conv_1d_ph
 
-struct ggml_tensor* ggml_conv_1d_ph_d1(
+struct ggml_tensor* ggml_conv_1d_ph(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * b,
-        int                   s) {
-    ggml_conv_1d(ctx, a, b, s, a->ne[0] / 2, 1);
+        int                   s,
+        int                   d) {
+    ggml_conv_1d(ctx, a, b, s, a->ne[0] / 2, d);
 }
 
 // ggml_conv_2d_sk_p0
