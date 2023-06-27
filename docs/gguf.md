@@ -197,6 +197,8 @@ If a particular community key is widely used, it may be promoted to a standardiz
 
 ### General
 
+#### Required
+
 - **`general.architecture: string`**: describes what architecture this model implements. All lowercase ASCII, with only `[a-z0-9]+` characters allowed. Known values include:
   - `llama`
   - `mpt`
@@ -207,9 +209,20 @@ If a particular community key is widely used, it may be promoted to a standardiz
   - `falcon`
   - `rwkv`
 - **`general.quantization_version: u32`**: version of quantization scheme
+
+#### General metadata
+
+- `general.name`: The name of the model. This should be a human-readable name that can be used to identify the model. It should be unique within the community that the model is defined in.
+- `general.author`: The author of the model.
+- `general.url`: URL to the model's homepage. This can be a GitHub repo, a paper, etc.
+- `general.description: string`: free-form description of the model including anything that isn't covered by the other fields
 - `general.file_type: string`: type of the majority of the tensors in the file. This shouldn't have any semantic meaning and should be purely informational, hence the use of `string`.
 - `general.license: string`: SPDX license of the model
-- `general.description: string`: free-form description of the model including anything that isn't covered by the other fields
+
+#### Source metadata
+
+Information about where this model came from. This is useful for tracking the provenance of the model, and for finding the original source if the model is modified. For a model that was converted from GGML, for example, these keys would point to the model that was converted from.
+
 - `general.source.url: string`: URL to the source of the model. Can be a GitHub repo, a paper, etc.
 - `general.source.huggingface.repository: string`: Hugging Face model repository that this model is either hosted on or based on
 
@@ -217,16 +230,16 @@ If a particular community key is widely used, it may be promoted to a standardiz
 
 In the following, `[llm]` is used to fill in for the name of a specific LLM architecture. They will be used in each architecture's section.
 
-- `[llm].context_length: u32`: size of the maximum supported context
+- `[llm].context_length: u32`: length of the context (in tokens) that the model was trained on. For most architectures, this is the hard limit on the length of the input. Architectures, like RWKV, that are not reliant on transformer-style attention may be able to handle larger inputs, but this is not guaranteed.
 - `[llm].hidden_size: u32`: embedding layer size
-- `[llm].num_layers: u32`: number of layers
-- `[llm].num_ff: u32`: The length of the feedforward layer.
+- `[llm].n_layers: u32`: the number of attention+feedforward layers (i.e. the bulk of the LLM). Does not include the input or embedding layers.
+- `[llm].n_ff: u32`: the length of the feedforward layer
 - `[llm].use_parallel_residual: bool`: whether or not the parallel residual logic should be used
-- `[llm].max_seq_len: u32`: Maximum sequence length
-- `[llm].attention.num_heads: u32`: number of attention heads
-- `[llm].attention.alibi_bias_max: f32`: The maximum bias to use for ALiBI
-- `[llm].attention.clip_kqv: f32`: Value (`C`) to clamp the values of the `Q`, `K`, and `V` tensors between (`[-C, C]`).
-- `[llm].rope.num_dims: u32`: The number of rotary dimensions for RoPE.
+- `[llm].attention.n_heads: u32`: number of attention heads
+- `[llm].attention.max_alibi_bias: f32`: The maximum bias to use for ALiBI
+- `[llm].attention.clamp_kqv: f32`: value (`C`) to clamp the values of the `Q`, `K`, and `V` tensors between (`[-C, C]`)
+- `[llm].rope.n_dims: u32`: the number of rotary dimensions for RoPE
+- `[llm].rope.scale: f32`: a scale factor for RoPE to adjust the context length
 
 #### Models
 
@@ -236,17 +249,21 @@ The following sections describe the metadata for each model architecture. Each k
 
 - `llama.context_length`
 - `llama.hidden_size`
-- `llama.num_layers`
-- `llama.num_ff`
-- `llama.rope.num_dims`
-- `llama.attention.num_heads`
+- `llama.n_layers`
+- `llama.n_ff`
+- `llama.rope.n_dims`
+- `llama.attention.n_heads`
+
+###### Optional
+
+- `llama.rope.scale`
 
 ##### MPT
 
-- `mpt.max_seq_len`
+- `mpt.context_length`
 - `mpt.hidden_size`
-- `mpt.num_layers`
-- `mpt.attention.num_heads`
+- `mpt.n_layers`
+- `mpt.attention.n_heads`
 - `mpt.attention.alibi_bias_max`
 - `mpt.attention.clip_kqv`
 
@@ -254,37 +271,50 @@ The following sections describe the metadata for each model architecture. Each k
 
 - `gptneox.context_length`
 - `gptneox.hidden_size`
-- `gptneox.num_layers`
+- `gptneox.n_layers`
 - `gptneox.use_parallel_residual`
-- `gptneox.rope.num_dims`
-- `gptneox.attention.num_heads`
+- `gptneox.rope.n_dims`
+- `gptneox.attention.n_heads`
+
+###### Optional
+
+- `gptneox.rope.scale`
 
 ##### GPT-J
 
 - `gptj.context_length`
 - `gptj.hidden_size`
-- `gptj.num_layers`
-- `gptj.rope.num_dims`
-- `gptj.attention.num_heads`
+- `gptj.n_layers`
+- `gptj.rope.n_dims`
+- `gptj.attention.n_heads`
+
+###### Optional
+
+- `gptj.rope.scale`
 
 ##### GPT-2
 
 - `gpt2.context_length`
 - `gpt2.hidden_size`
-- `gpt2.num_layers`
-- `gpt2.attention.num_heads`
+- `gpt2.n_layers`
+- `gpt2.attention.n_heads`
 
 ##### BLOOM
 
 - `bloom.context_length`
 - `bloom.hidden_size`
-- `bloom.num_layers`
-- `bloom.num_ff`
-- `bloom.attention.num_heads`
+- `bloom.n_layers`
+- `bloom.n_ff`
+- `bloom.attention.n_heads`
 
 ##### Falcon
 
-**TODO**.
+- `falcon.context_length`
+- `falcon.hidden_size`
+- `falcon.n_layers`
+- `falcon.attention.num_heads`
+- `falcon.attention.num_heads_kv`
+- `falcon.attention.use_norm`
 
 ##### RWKV
 
@@ -293,6 +323,15 @@ The following sections describe the metadata for each model architecture. Each k
 #### Prompting
 
 **TODO**: Include prompt format, and/or metadata about how it should be used (instruction, conversation, autocomplete, etc).
+
+### LoRA
+
+**TODO**: Figure out what metadata is needed for LoRA. Probably desired features:
+
+- match an existing model exactly, so that it can't be misapplied
+- be marked as a LoRA so executors won't try to run it by itself
+
+Should this be an architecture, or should it share the details of the original model with additional fields to mark it as a LoRA?
 
 ### Tokenizer
 
@@ -306,6 +345,11 @@ It is not guaranteed to be standardized across models, and may change in the fut
 
 - `tokenizer.ggml.tokens: array[string]`: A list of tokens.
 - `tokenizer.ggml.scores: array[f32]`: If present, the score/probability of each token. If not present, all tokens are assumed to have equal probability. Must be the same length as `tokens`.
+- `tokenizer.ggml.bos_token_id: u32`: Beginning of sequence marker
+- `tokenizer.ggml.eos_token_id: u32`: End of sequence marker
+- `tokenizer.ggml.unk_token_id: u32`: Unknown token
+- `tokenizer.ggml.sep_token_id: u32`: Separator token
+- `tokenizer.ggml.pad_token_id: u32`: Padding token
 
 #### Hugging Face
 
