@@ -332,6 +332,7 @@ extern "C" {
         GGML_OP_ROPE_BACK,
         GGML_OP_ALIBI,
         GGML_OP_CLAMP,
+        GGML_OP_CONV_1D,
         GGML_OP_CONV_1D_S1_PH,
         GGML_OP_CONV_1D_S2_PH,
         GGML_OP_CONV_2D_SK_P0,
@@ -1081,14 +1082,13 @@ extern "C" {
             float                 min,
             float                 max);
 
-    // TODO: implement general-purpose convolutions
-    // GGML_API struct ggml_tensor * ggml_conv_1d(
-    //        struct ggml_context * ctx,
-    //        struct ggml_tensor  * a,
-    //        struct ggml_tensor  * b,
-    //        int                   s0
-    //        int                   p0,
-    //        int                   d0);
+     GGML_API struct ggml_tensor * ggml_conv_1d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
+            int                   s0,  // stride
+            int                   p0,  // padding
+            int                   d0); // dilation
     //
     // GGML_API struct ggml_tensor * ggml_conv_2d(
     //        struct ggml_context * ctx,

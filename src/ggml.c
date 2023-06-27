@@ -3744,6 +3744,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "ROPE_BACK",
     "ALIBI",
     "CLAMP",
+    "CONV_1D",
     "CONV_1D_S1_PH",
     "CONV_1D_S2_PH",
     "CONV_2D_SK_P0",
@@ -3765,7 +3766,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS_BACK",
 };
 
-static_assert(GGML_OP_COUNT == 64, "GGML_OP_COUNT != 64");
+static_assert(GGML_OP_COUNT == 65, "GGML_OP_COUNT != 64");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -3820,6 +3821,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "rope_back(x)",
     "alibi(x)",
     "clamp(x)",
+    "conv_1d(x)",
     "conv_1d_s1_ph(x)",
     "conv_1d_s2_ph(x)",
     "conv_2d_sk_p0(x)",
@@ -3841,7 +3843,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "cross_entropy_loss_back(x,y)",
 };
 
-static_assert(GGML_OP_COUNT == 64, "GGML_OP_COUNT != 64");
+static_assert(GGML_OP_COUNT == 65, "GGML_OP_COUNT != 64");
 
 static_assert(sizeof(struct ggml_object)%GGML_MEM_ALIGN == 0, "ggml_object size must be a multiple of GGML_MEM_ALIGN");
 static_assert(sizeof(struct ggml_tensor)%GGML_MEM_ALIGN == 0, "ggml_tensor size must be a multiple of GGML_MEM_ALIGN");
@@ -6937,6 +6939,35 @@ struct ggml_tensor * ggml_clamp(
     return result;
 }
 
+// ggml_conv_1d
+
+GGML_API struct ggml_tensor * ggml_conv_1d(
+        struct ggml_context * ctx,
+        struct ggml_tensor * a,
+        struct ggml_tensor * b,
+        int                   s0,
+        int                   p0,
+        int                   d0) {
+    GGML_ASSERT(ggml_is_matrix(b));
+    GGML_ASSERT(a->ne[1] == b->ne[1]);
+    bool is_node = false;
+
+    if (a->grad || b->grad) {
+        GGML_ASSERT(false); // TODO: implement backward
+        is_node = true;
+    }
+
+    const int64_t k0 = a->ne[0] * d0;
+    const int64_t ne[4] = {b->ne[0]/s0 - k0 + 1 + p0 * 2, a->ne[2], 1, 1,};
+    struct ggml_tensor* result = ggml_new_tensor(ctx, GGML_TYPE_F32, 2, ne);
+
+    result->op = GGML_OP_CONV_1D;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->src0 = a;
+    result->src1 = b;
+
+    return result;
+}
 // ggml_conv_1d_s1_ph
 
 struct ggml_tensor * ggml_conv_1d_s1_ph(
@@ -12988,7 +13019,7 @@ static void ggml_compute_forward_rope_back(
     }
 }
 
-// ggml_compute_forward_conv_1d_s1_ph
+// ggml_compute_forward_conv_1d
 
 static void ggml_compute_forward_conv_1d_s1_ph_f16_f32(
         const struct ggml_compute_params * params,
@@ -13251,8 +13282,6 @@ static void ggml_compute_forward_conv_1d_s1_ph(
     }
 }
 
-// ggml_compute_forward_conv_1d_s2_ph
-
 static void ggml_compute_forward_conv_1d_s2_ph_f16_f32(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
@@ -13512,6 +13541,26 @@ static void ggml_compute_forward_conv_1d_s2_ph(
                 GGML_ASSERT(false);
             } break;
     }
+}
+
+static void ggml_compute_forward_conv_1d(
+    const struct ggml_compute_params * params,
+    const struct ggml_tensor * src0,
+    const struct ggml_tensor * src1,
+    const struct ggml_tensor * opt0,
+    struct ggml_tensor * dst) {
+    const int32_t s0 = ((const int32_t*)(opt0->data))[0];
+    const int32_t p0 = ((const int32_t*)(opt0->data))[1];
+    const int32_t d0 = ((const int32_t*)(opt0->data))[2];
+    GGML_ASSERT(d0 == 1); // dilation not supported
+    GGML_ASSERT(p0 == src0->ne[0]/2); // only half padding supported
+    if (s0 == 1) {
+        ggml_compute_forward_conv_1d_s1_ph(params, src0, src1, dst);
+    } else if (s0 == 2) {
+        ggml_compute_forward_conv_1d_s2_ph(params, src0, src1, dst);
+    } else {
+        GGML_ASSERT(false); // only stride 1 and 2 supported
+    };
 }
 
 // ggml_compute_forward_conv_2d_sk_p0
@@ -15571,6 +15620,10 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_clamp(params, tensor->src0, tensor->src1, tensor);
             } break;
+        case GGML_OP_CONV_1D:
+            {
+                ggml_compute_forward_conv_1d(params, tensor->src0, tensor->src1, tensor->opt[0], tensor);
+            } break;
         case GGML_OP_CONV_1D_S1_PH:
             {
                 ggml_compute_forward_conv_1d_s1_ph(params, tensor->src0, tensor->src1, tensor);
@@ -16265,6 +16318,10 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                 if (src1->grad) {
                     // noop
                 }
+            } break;
+        case GGML_OP_CONV_1D:
+            {
+                GGML_ASSERT(false); // TODO: not implemented
             } break;
         case GGML_OP_CONV_1D_S1_PH:
             {
@@ -17042,6 +17099,7 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
                     {
                         node->n_tasks = 1; //TODO
                     } break;
+                case GGML_OP_CONV_1D:
                 case GGML_OP_CONV_1D_S1_PH:
                 case GGML_OP_CONV_1D_S2_PH:
                     {
