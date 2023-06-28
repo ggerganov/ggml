@@ -3745,7 +3745,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "ALIBI",
     "CLAMP",
     "CONV_1D",
-    "CONV_2D_SK_P0",
+    "CONV_2D",
 
     "FLASH_ATTN",
     "FLASH_FF",
@@ -3820,7 +3820,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "alibi(x)",
     "clamp(x)",
     "conv_1d(x)",
-    "conv_2d_sk_p0(x)",
+    "conv_2d(x)",
 
     "flash_attn(x)",
     "flash_ff(x)",
@@ -6994,8 +6994,6 @@ struct ggml_tensor* ggml_conv_2d(
 
     GGML_ASSERT(b->ne[3] == 1);
     GGML_ASSERT(a->ne[2] == b->ne[2]);
-    GGML_ASSERT(b->ne[0] % a->ne[0] == 0);
-    GGML_ASSERT(b->ne[1] % a->ne[1] == 0);
     bool is_node = false;
 
     if (a->grad || b->grad) {
@@ -7010,10 +7008,21 @@ struct ggml_tensor* ggml_conv_2d(
     };
     struct ggml_tensor* result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
 
-    result->op = GGML_OP_CONV_2D_SK_P0;
+    ggml_scratch_save(ctx);
+    struct ggml_tensor* c = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, 6);
+    ((int32_t*)c->data)[0] = s0;
+    ((int32_t*)c->data)[1] = s1;
+    ((int32_t*)c->data)[2] = p0;
+    ((int32_t*)c->data)[3] = p1;
+    ((int32_t*)c->data)[4] = d0;
+    ((int32_t*)c->data)[5] = d1;
+    ggml_scratch_load(ctx);
+
+    result->op = GGML_OP_CONV_2D;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src0 = a;
     result->src1 = b;
+    result->opt[0] = c;
 
     return result;
 
@@ -7028,34 +7037,6 @@ struct ggml_tensor* ggml_conv_1d_ph(
         int                   s,
         int                   d) {
     return ggml_conv_1d(ctx, a, b, s, a->ne[0] / 2, d);
-}
-
-// ggml_conv_2d_sk_p0
-
-struct ggml_tensor * ggml_conv_2d_sk_p0(
-        struct ggml_context * ctx,
-        struct ggml_tensor  * a,
-        struct ggml_tensor  * b) {
-    GGML_ASSERT(b->ne[3] == 1);
-    GGML_ASSERT(a->ne[2] == b->ne[2]);
-    GGML_ASSERT(b->ne[0] %  a->ne[0] == 0);
-    GGML_ASSERT(b->ne[1] %  a->ne[1] == 0);
-    bool is_node = false;
-
-    if (a->grad || b->grad) {
-        GGML_ASSERT(false); // TODO: implement backward
-        is_node = true;
-    }
-
-    const int64_t ne[4] = { b->ne[0]/a->ne[0], b->ne[1]/a->ne[1], a->ne[3], 1, };
-    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
-
-    result->op   = GGML_OP_CONV_2D_SK_P0;
-    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
-    result->src0 = a;
-    result->src1 = b;
-
-    return result;
 }
 
 // ggml_flash_attn
@@ -13551,6 +13532,8 @@ static void ggml_compute_forward_conv_1d_s2_ph(
     }
 }
 
+// ggml_compute_forward_conv_1d
+
 static void ggml_compute_forward_conv_1d(
     const struct ggml_compute_params * params,
     const struct ggml_tensor * src0,
@@ -13706,6 +13689,34 @@ static void ggml_compute_forward_conv_2d_sk_p0(
             } break;
     }
 }
+
+// ggml_compute_forward_conv_2d
+
+static void ggml_compute_forward_conv_2d(
+    const struct ggml_compute_params* params,
+    const struct ggml_tensor* src0,
+    const struct ggml_tensor* src1,
+    const struct ggml_tensor* opt0,
+    struct ggml_tensor* dst) {
+    const int32_t s0 = ((const int32_t*)(opt0->data))[0];
+    const int32_t s1 = ((const int32_t*)(opt0->data))[1];
+    const int32_t p0 = ((const int32_t*)(opt0->data))[2];
+    const int32_t p1 = ((const int32_t*)(opt0->data))[3];
+    const int32_t d0 = ((const int32_t*)(opt0->data))[4];
+    const int32_t d1 = ((const int32_t*)(opt0->data))[5];
+    GGML_ASSERT(d0 == 1); // dilation not supported
+    GGML_ASSERT(d1 == 1);
+    GGML_ASSERT(p0 == 0); // padding not supported
+    GGML_ASSERT(p1 == 0);
+
+    if (s0 == src0->ne[0] && s1 == src0->ne[1]) {
+        ggml_compute_forward_conv_2d_sk_p0(params, src0, src1, dst);
+    }
+    else {
+        GGML_ASSERT(false); // only stride equal to kernel size is supported
+    };
+}
+
 
 // ggml_compute_forward_flash_attn
 
@@ -15632,9 +15643,9 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_conv_1d(params, tensor->src0, tensor->src1, tensor->opt[0], tensor);
             } break;
-        case GGML_OP_CONV_2D_SK_P0:
+        case GGML_OP_CONV_2D:
             {
-                ggml_compute_forward_conv_2d_sk_p0(params, tensor->src0, tensor->src1, tensor);
+                ggml_compute_forward_conv_2d(params, tensor->src0, tensor->src1, tensor->opt[0], tensor);
             } break;
         case GGML_OP_FLASH_ATTN:
             {
@@ -16323,7 +16334,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             {
                 GGML_ASSERT(false); // TODO: not implemented
             } break;
-        case GGML_OP_CONV_2D_SK_P0:
+        case GGML_OP_CONV_2D:
             {
                 GGML_ASSERT(false); // TODO: not implemented
             } break;
@@ -17120,7 +17131,7 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
 
                         work_size = MAX(work_size, cur);
                     } break;
-                case GGML_OP_CONV_2D_SK_P0:
+                case GGML_OP_CONV_2D:
                     {
                         node->n_tasks = n_threads;
 

@@ -333,7 +333,7 @@ extern "C" {
         GGML_OP_ALIBI,
         GGML_OP_CLAMP,
         GGML_OP_CONV_1D,
-        GGML_OP_CONV_2D_SK_P0,
+        GGML_OP_CONV_2D,
 
         GGML_OP_FLASH_ATTN,
         GGML_OP_FLASH_FF,
@@ -1107,19 +1107,6 @@ extern "C" {
             struct ggml_tensor  * b,
             int                   s,
             int                   d);
-
-    // kernel size is a->ne[0] x a->ne[1]
-    // stride is equal to kernel size
-    // padding is zero
-    // example:
-    // a:     16   16    3  768
-    // b:   1024 1024    3    1
-    // res:   64   64  768    1
-    // used in sam
-    GGML_API struct ggml_tensor * ggml_conv_2d_sk_p0(
-            struct ggml_context * ctx,
-            struct ggml_tensor  * a,
-            struct ggml_tensor  * b);
 
     GGML_API struct ggml_tensor * ggml_flash_attn(
             struct ggml_context * ctx,
