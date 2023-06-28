@@ -936,7 +936,7 @@ int main(int argc, char ** argv) {
 
     ggml_free(model.ctx);
 
-    if (params.interactive_port && close(sockfd) < 0) {
+    if (params.interactive_port != -1 && close(sockfd) < 0) {
         std::cerr << "Failed to close server socket\n";
     }
 
