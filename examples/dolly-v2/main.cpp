@@ -9,6 +9,7 @@
 #include <cstring>
 #include <cinttypes>
 #include <fstream>
+#include <iostream>
 #include <map>
 #include <string>
 #include <vector>
@@ -698,25 +699,26 @@ bool dollyv2_eval(
     return true;
 }
 
-void execute_prompt(const dollyv2_model &model, 
-                           gpt_vocab &vocab,
-                           const std::string &prompt,
-                           gpt_params &params,
-                           std::mt19937 &rng,
-                           int64_t t_load_us,
-                           int64_t t_sample_us,
-                           int64_t t_predict_us,
-                           size_t mem_per_token,
-                           int n_past)
+std::string execute_prompt(const dollyv2_model &model,
+                    gpt_vocab &vocab,
+                    const std::string &prompt,
+                    gpt_params &params,
+                    std::mt19937 &rng,
+                    int64_t t_load_us,
+                    int64_t t_sample_us,
+                    int64_t t_predict_us,
+                    size_t mem_per_token,
+                    int n_past)
 {
 
+    std::string output = "";
     std::vector<float> logits;
 
     // tokenize the prompt
     std::vector<gpt_vocab::id> embd_inp = ::gpt_tokenize(vocab, prompt);
 
     params.n_predict = std::min(params.n_predict, model.hparams.n_ctx - (int)embd_inp.size());
-
+    
     printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
     for (int i = 0; i < embd_inp.size(); i++)
     {
@@ -740,8 +742,7 @@ void execute_prompt(const dollyv2_model &model,
             if (!dollyv2_eval(model, params.n_threads, n_past, embd, logits, mem_per_token))
             {
                 printf("Failed to predict\n");
-                
-                return;
+                return output;
             }
 
             t_predict_us += ggml_time_us() - t_start_us;
@@ -789,19 +790,18 @@ void execute_prompt(const dollyv2_model &model,
         // display text
         for (auto id : embd)
         {
-            printf("%s", vocab.id_to_token[id].c_str());
+            output += vocab.id_to_token[id];
+            //    printf("%s", vocab.id_to_token[id].c_str());
         }
-        
-        fflush(stdout);
+        // fflush(stdout);
 
-        
         // end of text token
         if (embd.back() == 0 || (end_token > 0 && embd.back() == end_token))
         {
-            return;
+            return output;
         }
     }
-    
+    return output;
 }
 
 int main(int argc, char **argv)
@@ -826,12 +826,12 @@ int main(int argc, char **argv)
     printf("%s: seed = %d\n", __func__, params.seed);
 
     std::mt19937 rng(params.seed);
-    if (params.prompt.empty())
-    {
-        params.prompt = gpt_random_prompt(rng);
-    }
+    //if (params.prompt.empty())
+    //{
+    //    params.prompt = gpt_random_prompt(rng);
+    //}
 
-    const std::string prompt = prompt_for_generation(params.prompt);
+    //const std::string prompt = prompt_for_generation(params.prompt);
 
     int64_t t_load_us = 0;
     int64_t t_sample_us = 0;
@@ -859,9 +859,22 @@ int main(int argc, char **argv)
 
         test_gpt_tokenizer(vocab, params.token_test);
     }
-    // call the model
-    execute_prompt(model, vocab, prompt, params, rng, t_load_us, t_sample_us, t_predict_us, mem_per_token, n_past);
 
+    while (true)
+    {
+        std::string prompt_input;
+        printf("Please enter your quesiton:>");
+        std::getline(std::cin, prompt_input);
+        if (strcmp(prompt_input.c_str(), "exit") == 0) {
+            break;
+        }
+
+        const std::string prompt = prompt_for_generation(prompt_input);
+        // call the model
+        const std::string output = execute_prompt(model, vocab, prompt, params, rng, t_load_us, t_sample_us, t_predict_us, mem_per_token, n_past);
+        printf(output.c_str());
+        fflush(stdout);
+    }
     // report timing
     {
         const int64_t t_main_end_us = ggml_time_us();
