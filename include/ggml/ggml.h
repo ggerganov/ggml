@@ -210,6 +210,13 @@
     } while (0)
 
 #ifdef  __cplusplus
+    // restrict not standard in C++
+#define GGML_RESTRICT
+#else
+#define GGML_RESTRICT restrict
+#endif
+
+#ifdef  __cplusplus
 extern "C" {
 #endif
 
@@ -224,8 +231,8 @@ extern "C" {
     GGML_API float       ggml_fp16_to_fp32(ggml_fp16_t x);
     GGML_API ggml_fp16_t ggml_fp32_to_fp16(float x);
 
-    GGML_API void ggml_fp16_to_fp32_row(const ggml_fp16_t * x, float * y, size_t n);
-    GGML_API void ggml_fp32_to_fp16_row(const float * x, ggml_fp16_t * y, size_t n);
+    GGML_API void ggml_fp16_to_fp32_row(const void * GGML_RESTRICT vx, float * GGML_RESTRICT y, size_t n);
+    GGML_API void ggml_fp32_to_fp16_row(const float * GGML_RESTRICT x, void * GGML_RESTRICT vy, size_t n);
 
     struct ggml_object;
     struct ggml_context;
@@ -1512,15 +1519,8 @@ extern "C" {
     //
     // Internal types and functions exposed for tests and benchmarks
     //
-
-#ifdef  __cplusplus
-    // restrict not standard in C++
-#define GGML_RESTRICT
-#else
-#define GGML_RESTRICT restrict
-#endif
-    typedef void (*dequantize_row_q_t)(const void * GGML_RESTRICT x, float * GGML_RESTRICT y, int k);
-    typedef void (*quantize_row_q_t)  (const float * GGML_RESTRICT x, void * GGML_RESTRICT y, int k);
+    typedef void (*dequantize_row_q_t)(const void * GGML_RESTRICT x, float * GGML_RESTRICT y, size_t k);
+    typedef void (*quantize_row_q_t)  (const float * GGML_RESTRICT x, void * GGML_RESTRICT y, size_t k);
     typedef void (*vec_dot_q_t)       (const int n, float * GGML_RESTRICT s, const void * GGML_RESTRICT x, const void * GGML_RESTRICT y);
 
     typedef struct {
