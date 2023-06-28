@@ -14,6 +14,11 @@
 #include <string>
 #include <vector>
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 #if defined(_MSC_VER)
 #pragma warning(disable : 4244 4267) // possible loss of data
 #endif
@@ -700,15 +705,16 @@ bool dollyv2_eval(
 }
 
 std::string execute_prompt(const dollyv2_model &model,
-                    gpt_vocab &vocab,
-                    const std::string &prompt,
-                    gpt_params &params,
-                    std::mt19937 &rng,
-                    int64_t t_load_us,
-                    int64_t t_sample_us,
-                    int64_t t_predict_us,
-                    size_t mem_per_token,
-                    int n_past)
+                           gpt_vocab &vocab,
+                           const std::string &prompt,
+                           gpt_params &params,
+                           std::mt19937 &rng,
+                           int64_t t_load_us,
+                           int64_t t_sample_us,
+                           int64_t t_predict_us,
+                           size_t mem_per_token,
+                           int n_past,
+                           bool stream_response_to_cout = false)
 {
 
     std::string output = "";
@@ -718,7 +724,7 @@ std::string execute_prompt(const dollyv2_model &model,
     std::vector<gpt_vocab::id> embd_inp = ::gpt_tokenize(vocab, prompt);
 
     params.n_predict = std::min(params.n_predict, model.hparams.n_ctx - (int)embd_inp.size());
-    
+
     printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
     for (int i = 0; i < embd_inp.size(); i++)
     {
@@ -791,9 +797,15 @@ std::string execute_prompt(const dollyv2_model &model,
         for (auto id : embd)
         {
             output += vocab.id_to_token[id];
-            //    printf("%s", vocab.id_to_token[id].c_str());
+            if (stream_response_to_cout)
+            {
+                printf("%s", vocab.id_to_token[id].c_str());
+            }
         }
-        // fflush(stdout);
+        if (stream_response_to_cout)
+        {
+            fflush(stdout);
+        }
 
         // end of text token
         if (embd.back() == 0 || (end_token > 0 && embd.back() == end_token))
@@ -802,6 +814,36 @@ std::string execute_prompt(const dollyv2_model &model,
         }
     }
     return output;
+}
+
+int setup_port()
+{
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0)
+    {
+        std::cerr << "Failed to create socket\n";
+        return -1;
+    }
+
+    sockaddr_in servaddr;
+    std::memset(&servaddr, 0, sizeof(servaddr));
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(8080);
+
+    if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
+    {
+        std::cerr << "Failed to bind to port\n";
+        return -1;
+    }
+
+    if (listen(sockfd, 10) < 0)
+    {
+        std::cerr << "Failed to listen on socket\n";
+        return -1;
+    }
+    return sockfd;
 }
 
 int main(int argc, char **argv)
@@ -826,12 +868,6 @@ int main(int argc, char **argv)
     printf("%s: seed = %d\n", __func__, params.seed);
 
     std::mt19937 rng(params.seed);
-    //if (params.prompt.empty())
-    //{
-    //    params.prompt = gpt_random_prompt(rng);
-    //}
-
-    //const std::string prompt = prompt_for_generation(params.prompt);
 
     int64_t t_load_us = 0;
     int64_t t_sample_us = 0;
@@ -860,23 +896,85 @@ int main(int argc, char **argv)
         test_gpt_tokenizer(vocab, params.token_test);
     }
 
-    while (true)
+    int sockfd;
+    if (params.interactive_port)
     {
-        std::string prompt_input;
-        printf("Please enter your quesiton:\n>");
-        fflush(stdout);
+        printf("Initalising interactive port");
+        sockfd = setup_port();
+        if (sockfd == -1)
+        {
+            return 1;
+        }
+    }
 
-        std::getline(std::cin, prompt_input);
-        if (strcmp(prompt_input.c_str(), "exit") == 0) {
-            break;
+    if (params.interactive or params.interactive_port)
+    {
+        while (true)
+        {
+            if (params.interactive_port)
+            {
+                sockaddr_in clientaddr;
+                socklen_t clientaddrlen = sizeof(clientaddr);
+                int clientfd = accept(sockfd, (struct sockaddr *)&clientaddr, &clientaddrlen);
+
+                if (clientfd < 0)
+                {
+                    std::cerr << "Failed to accept new connection\n";
+                    continue;
+                }
+
+                char buffer[4096];
+                std::memset(buffer, 0, sizeof(buffer));
+                std::string response = "Hello, client!\n";
+                if (read(clientfd, buffer, sizeof(buffer)) < 0)
+                {
+                    std::cerr << "Failed to read from client\n";
+                }
+                else
+                {
+                    std::cout << "Received: " << buffer;
+                    if (write(clientfd, response.c_str(), response.size()) < 0)
+                    {
+                        std::cerr << "Failed to write to client\n";
+                    }
+                }
+
+                if (close(clientfd) < 0)
+                {
+                    std::cerr << "Failed to close client socket\n";
+                }
+            }
+            else
+            {
+                std::string prompt_input;
+                printf("Please enter your quesiton:\n>");
+                fflush(stdout);
+
+                std::getline(std::cin, prompt_input);
+                if (strcmp(prompt_input.c_str(), "exit") == 0)
+                {
+                    break;
+                }
+
+                const std::string prompt = prompt_for_generation(prompt_input);
+                // call the model
+                const std::string output = execute_prompt(model, vocab, prompt, params, rng, t_load_us, t_sample_us, t_predict_us, mem_per_token, n_past);
+                printf("%s\n\n", output.c_str());
+                fflush(stdout);
+            }
+        }
+    }
+    else
+    {
+        if (params.prompt.empty())
+        {
+            params.prompt = gpt_random_prompt(rng);
         }
 
-        const std::string prompt = prompt_for_generation(prompt_input);
-        // call the model
-        const std::string output = execute_prompt(model, vocab, prompt, params, rng, t_load_us, t_sample_us, t_predict_us, mem_per_token, n_past);
-        printf("%s\n\n", output.c_str());
-        fflush(stdout);
+        const std::string prompt = prompt_for_generation(params.prompt);
+        execute_prompt(model, vocab, prompt, params, rng, t_load_us, t_sample_us, t_predict_us, mem_per_token, n_past, true);
     }
+
     // report timing
     {
         const int64_t t_main_end_us = ggml_time_us();
@@ -890,6 +988,11 @@ int main(int argc, char **argv)
     }
 
     ggml_free(model.ctx);
+
+    if (params.interactive_port && close(sockfd) < 0)
+    {
+        std::cerr << "Failed to close server socket\n";
+    }
 
     return 0;
 }

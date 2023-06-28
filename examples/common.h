@@ -32,6 +32,7 @@ struct gpt_params
         std::string token_test = "";
 
         bool interactive = false;
+        bool interactive_port = false;
 };
 
 bool gpt_params_parse(int argc, char **argv, gpt_params &params);
