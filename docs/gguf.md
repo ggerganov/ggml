@@ -208,7 +208,7 @@ If a particular community key is widely used, it may be promoted to a standardiz
   - `bloom`
   - `falcon`
   - `rwkv`
-- **`general.quantization_version: u32`**: version of quantization scheme
+- **`general.quantization_version: u32`**: version of quantization scheme. Not required if the model is not quantized (i.e. no tensors are quantized). If any tensors are quantized, this _must_ be present.
 
 #### General metadata
 
