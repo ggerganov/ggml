@@ -848,9 +848,6 @@ int setup_port(const int port)
 
 std::string read_from_port(int sockfd, int clientfd)
 {
-    sockaddr_in clientaddr;
-    socklen_t clientaddrlen = sizeof(clientaddr);
-    clientfd = accept(sockfd, (struct sockaddr *)&clientaddr, &clientaddrlen);
     if (clientfd < 0)
     {
         std::cerr << "Failed to accept new connection\n";
@@ -942,7 +939,9 @@ int main(int argc, char **argv)
             int clientfd;
             if (params.interactive_port != -1)
             {
-
+                sockaddr_in clientaddr;
+                socklen_t clientaddrlen = sizeof(clientaddr);
+                clientfd = accept(sockfd, (struct sockaddr *)&clientaddr, &clientaddrlen);   
                 prompt_input = read_from_port(sockfd, clientfd);
             }
             else
