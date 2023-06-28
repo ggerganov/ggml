@@ -698,7 +698,7 @@ bool dollyv2_eval(
     return true;
 }
 
-std::string execute_prompt(const dollyv2_model &model, 
+void execute_prompt(const dollyv2_model &model, 
                            gpt_vocab &vocab,
                            const std::string &prompt,
                            gpt_params &params,
@@ -740,8 +740,8 @@ std::string execute_prompt(const dollyv2_model &model,
             if (!dollyv2_eval(model, params.n_threads, n_past, embd, logits, mem_per_token))
             {
                 printf("Failed to predict\n");
-                // fix up return here
-                return NULL;
+                
+                return;
             }
 
             t_predict_us += ggml_time_us() - t_start_us;
@@ -791,15 +791,17 @@ std::string execute_prompt(const dollyv2_model &model,
         {
             printf("%s", vocab.id_to_token[id].c_str());
         }
+        
         fflush(stdout);
 
+        
         // end of text token
         if (embd.back() == 0 || (end_token > 0 && embd.back() == end_token))
         {
-            return NULL;
+            return;
         }
     }
-    return NULL;
+    
 }
 
 int main(int argc, char **argv)
