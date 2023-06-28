@@ -741,7 +741,7 @@ std::string execute_prompt(const dollyv2_model &model,
             {
                 printf("Failed to predict\n");
                 // fix up return here
-                return;
+                return NULL;
             }
 
             t_predict_us += ggml_time_us() - t_start_us;
@@ -796,9 +796,10 @@ std::string execute_prompt(const dollyv2_model &model,
         // end of text token
         if (embd.back() == 0 || (end_token > 0 && embd.back() == end_token))
         {
-            break;
+            return NULL;
         }
     }
+    return NULL;
 }
 
 int main(int argc, char **argv)
