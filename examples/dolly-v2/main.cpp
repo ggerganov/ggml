@@ -816,7 +816,7 @@ std::string execute_prompt(const dollyv2_model &model,
     return output;
 }
 
-int setup_port()
+int setup_port(const int port)
 {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0)
@@ -830,7 +830,7 @@ int setup_port()
 
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(8080);
+    servaddr.sin_port = htons(port);
 
     if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
     {
@@ -844,6 +844,32 @@ int setup_port()
         return -1;
     }
     return sockfd;
+}
+
+std::string read_from_port(int sockfd, int clientfd)
+{
+    sockaddr_in clientaddr;
+    socklen_t clientaddrlen = sizeof(clientaddr);
+    clientfd = accept(sockfd, (struct sockaddr *)&clientaddr, &clientaddrlen);
+    if (clientfd < 0)
+    {
+        std::cerr << "Failed to accept new connection\n";
+        return "";
+    }
+
+    char buffer[4096];
+    std::memset(buffer, 0, sizeof(buffer));
+
+    if (read(clientfd, buffer, sizeof(buffer)) < 0)
+    {
+        std::cerr << "Failed to read from client\n";
+    }
+    else
+    {
+        std::cout << "Received: " << buffer;
+        return std::string(buffer);
+    }
+    return std::string("");
 }
 
 int main(int argc, char **argv)
@@ -897,46 +923,50 @@ int main(int argc, char **argv)
     }
 
     int sockfd;
-    if (params.interactive_port)
+    if (params.interactive_port != -1)
     {
-        printf("Initalising interactive port");
-        sockfd = setup_port();
+        sockfd = setup_port(params.interactive_port);
         if (sockfd == -1)
         {
             return 1;
         }
+        fprintf(stdout, "Model is ready on port %i\n", params.interactive_port);
+        fflush(stdout);
     }
 
-    if (params.interactive or params.interactive_port)
+    if (params.interactive or params.interactive_port != -1)
     {
         while (true)
         {
-            if (params.interactive_port)
+            std::string prompt_input;
+            int clientfd;
+            if (params.interactive_port != -1)
             {
-                sockaddr_in clientaddr;
-                socklen_t clientaddrlen = sizeof(clientaddr);
-                int clientfd = accept(sockfd, (struct sockaddr *)&clientaddr, &clientaddrlen);
 
-                if (clientfd < 0)
-                {
-                    std::cerr << "Failed to accept new connection\n";
-                    continue;
-                }
+                prompt_input = read_from_port(sockfd, clientfd);
+            }
+            else
+            {
+                printf("Please enter your quesiton:\n>");
+                fflush(stdout);
 
-                char buffer[4096];
-                std::memset(buffer, 0, sizeof(buffer));
-                std::string response = "Hello, client!\n";
-                if (read(clientfd, buffer, sizeof(buffer)) < 0)
+                std::getline(std::cin, prompt_input);
+            }
+
+            if (strcmp(prompt_input.c_str(), "exit") == 0)
+            {
+                break;
+            }
+
+            const std::string prompt = prompt_for_generation(prompt_input);
+            // call the model
+            const std::string response = execute_prompt(model, vocab, prompt, params, rng, t_load_us, t_sample_us, t_predict_us, mem_per_token, n_past, true);
+
+            if (params.interactive_port != -1)
+            {
+                if (write(clientfd, response.c_str(), response.size()) < 0)
                 {
-                    std::cerr << "Failed to read from client\n";
-                }
-                else
-                {
-                    std::cout << "Received: " << buffer;
-                    if (write(clientfd, response.c_str(), response.size()) < 0)
-                    {
-                        std::cerr << "Failed to write to client\n";
-                    }
+                    std::cerr << "Failed to write to client\n";
                 }
 
                 if (close(clientfd) < 0)
@@ -946,22 +976,9 @@ int main(int argc, char **argv)
             }
             else
             {
-                std::string prompt_input;
-                printf("Please enter your quesiton:\n>");
-                fflush(stdout);
-
-                std::getline(std::cin, prompt_input);
-                if (strcmp(prompt_input.c_str(), "exit") == 0)
-                {
-                    break;
-                }
-
-                const std::string prompt = prompt_for_generation(prompt_input);
-                // call the model
-                const std::string output = execute_prompt(model, vocab, prompt, params, rng, t_load_us, t_sample_us, t_predict_us, mem_per_token, n_past);
-                printf("%s\n\n", output.c_str());
-                fflush(stdout);
+                printf("%s\n\n", response.c_str());
             }
+            fflush(stdout);
         }
     }
     else
