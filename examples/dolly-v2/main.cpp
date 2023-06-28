@@ -863,7 +863,9 @@ int main(int argc, char **argv)
     while (true)
     {
         std::string prompt_input;
-        printf("Please enter your quesiton:>");
+        printf("Please enter your quesiton:\n>");
+        fflush(stdout);
+
         std::getline(std::cin, prompt_input);
         if (strcmp(prompt_input.c_str(), "exit") == 0) {
             break;
@@ -872,7 +874,7 @@ int main(int argc, char **argv)
         const std::string prompt = prompt_for_generation(prompt_input);
         // call the model
         const std::string output = execute_prompt(model, vocab, prompt, params, rng, t_load_us, t_sample_us, t_predict_us, mem_per_token, n_past);
-        printf(output.c_str());
+        printf("%s\n\n", output.c_str());
         fflush(stdout);
     }
     // report timing
