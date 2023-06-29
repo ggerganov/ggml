@@ -33,6 +33,8 @@ struct gpt_params {
 
     bool    interactive      = false;
     int32_t interactive_port = -1;
+
+    int32_t n_gpu_layers     = 0;
 };
 
 bool gpt_params_parse(int argc, char ** argv, gpt_params & params);
