@@ -6997,7 +6997,7 @@ struct ggml_tensor * ggml_conv_2d_sk_p0(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * b) {
-    GGML_ASSERT(b->ne[3] == 1);
+    //GGML_ASSERT(b->ne[3] == 1);
     GGML_ASSERT(a->ne[2] == b->ne[2]);
     GGML_ASSERT(b->ne[0] %  a->ne[0] == 0);
     GGML_ASSERT(b->ne[1] %  a->ne[1] == 0);
@@ -7008,7 +7008,7 @@ struct ggml_tensor * ggml_conv_2d_sk_p0(
         is_node = true;
     }
 
-    const int64_t ne[4] = { b->ne[0]/a->ne[0], b->ne[1]/a->ne[1], a->ne[3], 1, };
+    const int64_t ne[4] = { b->ne[0]/a->ne[0], b->ne[1]/a->ne[1], a->ne[3], b->ne[3], };
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
 
     result->op   = GGML_OP_CONV_2D_SK_P0;
@@ -17076,7 +17076,7 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
                     {
                         node->n_tasks = n_threads;
 
-                        GGML_ASSERT(node->src1->ne[3] == 1);
+                        //GGML_ASSERT(node->src1->ne[3] == 1);
 
                         const int64_t ne00 = node->src0->ne[0]; // W
                         const int64_t ne01 = node->src0->ne[1]; // H
