@@ -18,7 +18,7 @@ pub fn main() !void {
     var opt_params = c.ggml_opt_default_params(c.GGML_OPT_LBFGS);
     
     const nthreads = try Thread.getCpuCount();
-    opt_params.n_threads = @intCast(c_int, nthreads);
+    opt_params.n_threads = @intCast(nthreads);
     std.debug.print("test2: n_threads:{}\n", .{opt_params.n_threads});
 
     const xi = [_]f32{  1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,  8.0,  9.0,  10.0 };
@@ -33,8 +33,10 @@ pub fn main() !void {
     const y = c.ggml_new_tensor_1d(ctx0, c.GGML_TYPE_F32, n);
 
     for (0..n) |i| {
-        @ptrCast([*]f32, @alignCast(@alignOf(f32), x.*.data))[i] = xi[i];
-        @ptrCast([*]f32, @alignCast(@alignOf(f32), y.*.data))[i] = yi[i];
+        const x_data_pointer: [*]f32 = @ptrCast(@alignCast(x.*.data));
+        x_data_pointer[i] = xi[i];
+        const y_data_pointer: [*]f32 = @ptrCast(@alignCast(y.*.data));
+        y_data_pointer[i] = yi[i];
     }
 
     {

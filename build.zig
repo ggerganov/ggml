@@ -1,29 +1,29 @@
 const std = @import("std");
 
-// Zig Version: 0.11.0-dev.3798+a5e15eced
+// Zig Version: 0.11.0-dev.3886+0c1bfe271
 // Zig Build Command: zig build
-// Zig Run Command: zig build -h  
-//     zig build run_dolly-v2           
-//     zig build run_gpt-2                
-//     zig build run_gpt-j                 
-//     zig build run_gpt-neox               
-//     zig build run_mnist                  
-//     zig build run_mpt                 
-//     zig build run_replit        
-//     zig build run_starcoder            
-//     zig build run_test-grad0            
-//     zig build run_test-mul-mat0          
-//     zig build run_test-mul-mat2         
-//     zig build run_test-opt               
-//     zig build run_test-vec1               
-//     zig build run_test0                 
-//     zig build run_test1                  
-//     zig build run_test2              
+// Zig Run Command: zig build -h
+//     zig build run_dolly-v2
+//     zig build run_gpt-2
+//     zig build run_gpt-j
+//     zig build run_gpt-neox
+//     zig build run_mnist
+//     zig build run_mpt
+//     zig build run_replit
+//     zig build run_starcoder
+//     zig build run_test-grad0
+//     zig build run_test-mul-mat0
+//     zig build run_test-mul-mat2
+//     zig build run_test-opt
+//     zig build run_test-vec1
+//     zig build run_test0
+//     zig build run_test1
+//     zig build run_test2
 //     zig build run_test3
 //     zig build run_zig_test0
-//     zig build run_zig_test1    
+//     zig build run_zig_test1
 //     zig build run_zig_test2
-//     zig build run_zig_test3 
+//     zig build run_zig_test3
 pub fn build(b: *std.build.Builder) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});

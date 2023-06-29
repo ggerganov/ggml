@@ -19,7 +19,7 @@ pub fn main() !void {
     var opt_params = c.ggml_opt_default_params(c.GGML_OPT_LBFGS);
     
     const nthreads = try Thread.getCpuCount();
-    opt_params.n_threads = @intCast(c_int, nthreads);
+    opt_params.n_threads = @intCast(nthreads);
 
     const NP = 1 << 12;
     const NF = 1 << 8;
@@ -35,15 +35,18 @@ pub fn main() !void {
 
     c.srand(0);
 
+    const l_data_pointer: [*]f32 = @ptrCast(@alignCast(l.*.data));
+    const f_data_pointer: [*]f32 = @ptrCast(@alignCast(F.*.data));
     for (0..NP) |j| {
         const ll = if (j < NP/2) @as(f32, 1.0) else @as(f32, -1.0);
-        @ptrCast([*]f32, @alignCast(@alignOf(f32), l.*.data))[j] = ll;
+        l_data_pointer[j] = ll;
         
         for (0..NF) |i| {
-            @ptrCast([*]f32, @alignCast(@alignOf(f32), F.*.data))[j*NF + i] = 
+            const c_rand: f32 = @floatFromInt(c.rand());
+            f_data_pointer[j*NF + i] = 
                 ((if (ll > 0 and i < NF/2) @as(f32, 1.0) else 
                     if (ll < 0 and i >= NF/2) @as(f32, 1.0) else @as(f32, 0.0)) + 
-                        (@floatFromInt(f32, c.rand())/c.RAND_MAX - 0.5)*0.1) / (0.5*NF);
+                        (c_rand/c.RAND_MAX - 0.5) * 0.1) / (0.5 * NF);
         }
     }
 
@@ -75,21 +78,22 @@ pub fn main() !void {
 
         try std.testing.expect(res == c.GGML_OPT_OK);
 
+        const x_data_pointer: [*]f32 = @ptrCast(@alignCast(x.*.data));
         // print results
         for (0..16) |i| {
-            std.debug.print("x[{d:3}] = {d:.6}\n", .{i, @ptrCast([*]f32, @alignCast(@alignOf(f32), x.*.data))[i]});
+            std.debug.print("x[{d:3}] = {d:.6}\n", .{i, x_data_pointer[i]});
         }
         std.debug.print("...\n", .{});
         for (NF - 16..NF) |i| {
-            std.debug.print("x[{d:3}] = {d:.6}\n", .{i, @ptrCast([*]f32, @alignCast(@alignOf(f32), x.*.data))[i]});
+            std.debug.print("x[{d:3}] = {d:.6}\n", .{i, x_data_pointer[i]});
         }
         std.debug.print("\n", .{});
 
         for (0..NF) |i| {
             if (i < NF/2) {
-                try std.testing.expect(is_close(@ptrCast([*]f32, @alignCast(@alignOf(f32), x.*.data))[i], 1.0, 1e-2));
+                try std.testing.expect(is_close(x_data_pointer[i], 1.0, 1e-2));
             } else {
-                try std.testing.expect(is_close(@ptrCast([*]f32, @alignCast(@alignOf(f32), x.*.data))[i], -1.0, 1e-2));
+                try std.testing.expect(is_close(x_data_pointer[i], -1.0, 1e-2));
             }
         }
     }
