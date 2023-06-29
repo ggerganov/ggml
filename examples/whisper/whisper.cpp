@@ -812,7 +812,7 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
     {
         uint32_t magic;
         read_safe(loader, magic);
-        if (magic != 0x67676d6c) {
+        if (magic != GGML_FILE_MAGIC) {
             fprintf(stderr, "%s: invalid model data (bad magic)\n", __func__);
             return false;
         }
