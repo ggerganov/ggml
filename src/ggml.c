@@ -13531,12 +13531,12 @@ static void ggml_compute_forward_conv_2d_sk_p0_f16_f32(
     const int ne10 = src1->ne[0];
     //const int ne11 = src1->ne[1];
     const int ne12 = src1->ne[2];
-    //const int ne13 = src1->ne[3];
+    const int ne13 = src1->ne[3];
 
     const int ne0  = dst->ne[0];
     const int ne1  = dst->ne[1];
     const int ne2  = dst->ne[2];
-    //const int ne3  = dst->ne[3];
+    const int ne3  = dst->ne[3];
     //const int ne   = ne0*ne1*ne2*ne3;
 
     const int nb00 = src0->nb[0];
@@ -13547,12 +13547,12 @@ static void ggml_compute_forward_conv_2d_sk_p0_f16_f32(
     const int nb10 = src1->nb[0];
     //const int nb11 = src1->nb[1];
     const int nb12 = src1->nb[2];
-    //const int nb13 = src1->nb[3];
+    const int nb13 = src1->nb[3];
 
     //const int nb0  = dst->nb[0];
     //const int nb1  = dst->nb[1];
     const int nb2  = dst->nb[2];
-    //const int nb3  = dst->nb[3];
+    const int nb3  = dst->nb[3];
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -13574,16 +13574,18 @@ static void ggml_compute_forward_conv_2d_sk_p0_f16_f32(
         {
             ggml_fp16_t * const wdata = (ggml_fp16_t *) params->wdata + 0;
 
-            for (int i12 = 0; i12 < ne12; i12++) {
-                const float * const src = (float *)((char *) src1->data + i12*nb12);
-                ggml_fp16_t * dst_data = wdata;
+            for (int i13 = 0; i13 < ne13; i13++) {
+                for (int i12 = 0; i12 < ne12; i12++) {
+                    const float * const src = (float *)((char *) src1->data + i13*nb13 + i12*nb12);
+                    ggml_fp16_t * dst_data = wdata + i13*(ne1*ne0*ew0+ne12*(nk1*nk0));
 
-                for (int i1 = 0; i1 < ne1; i1++) {
-                    for (int i0 = 0; i0 < ne0; i0++) {
-                        for (int ik1 = 0; ik1 < nk1; ik1++) {
-                            for (int ik0 = 0; ik0 < nk0; ik0++) {
-                                dst_data[(i1*ne0 + i0)*ew0 + i12*(nk0*nk1) + ik1*nk0 + ik0] =
-                                    GGML_FP32_TO_FP16(src[(i1*nk1 + ik1)*ne10 + (i0*nk0 + ik0)]);
+                    for (int i1 = 0; i1 < ne1; i1++) {
+                        for (int i0 = 0; i0 < ne0; i0++) {
+                            for (int ik1 = 0; ik1 < nk1; ik1++) {
+                                for (int ik0 = 0; ik0 < nk0; ik0++) {
+                                    dst_data[(i1*ne0 + i0)*ew0 + i12*(nk0*nk1) + ik1*nk0 + ik0] =
+                                        GGML_FP32_TO_FP16(src[(i1*nk1 + ik1)*ne10 + (i0*nk0 + ik0)]);
+                                }
                             }
                         }
                     }
@@ -13610,14 +13612,16 @@ static void ggml_compute_forward_conv_2d_sk_p0_f16_f32(
 
     ggml_fp16_t * const wdata = (ggml_fp16_t *) params->wdata + 0;
 
-    for (int i2 = ip0; i2 < ip1; i2++) {
-        float * dst_data = (float *)((char *) dst->data + i2*nb2);
+    for (int i3 = 0; i3 < ne3; i3++) {
+        for (int i2 = ip0; i2 < ip1; i2++) {
+            float * dst_data = (float *)((char *) dst->data + i3*nb3 + i2*nb2);
 
-        for (int i1 = 0; i1 < ne1; ++i1) {
-            for (int i0 = 0; i0 < ne0; ++i0) {
-                ggml_vec_dot_f16(ew0, dst_data + i1*ne0 + i0,
-                        (ggml_fp16_t *) ((char *) src0->data + i2*nb03),
-                        (ggml_fp16_t *)                wdata + (i1*ne0 + i0)*ew0);
+            for (int i1 = 0; i1 < ne1; ++i1) {
+                for (int i0 = 0; i0 < ne0; ++i0) {
+                    ggml_vec_dot_f16(ew0, dst_data + i1*ne0 + i0,
+                            (ggml_fp16_t *) ((char *) src0->data + i2*nb03),
+                            (ggml_fp16_t *)                wdata + i3*nb3 + (i1*ne0 + i0)*ew0);
+                }
             }
         }
     }
