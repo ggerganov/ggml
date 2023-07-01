@@ -1816,11 +1816,11 @@ void ggml_init_cublas() {
         CUDA_CHECK(cudaGetDeviceCount(&g_device_count));
         GGML_ASSERT(g_device_count <= GGML_CUDA_MAX_DEVICES);
         int64_t total_vram = 0;
-        fprintf(stderr, "%s: found %d CUDA devices:\n", __func__, g_device_count);
+        //fprintf(stderr, "%s: found %d CUDA devices:\n", __func__, g_device_count);
         for (int id = 0; id < g_device_count; ++id) {
             cudaDeviceProp prop;
             CUDA_CHECK(cudaGetDeviceProperties(&prop, id));
-            fprintf(stderr, "  Device %d: %s\n", id, prop.name);
+            //fprintf(stderr, "  Device %d: %s\n", id, prop.name);
             g_tensor_split[id] = total_vram;
             total_vram += prop.totalGlobalMem;
         }
