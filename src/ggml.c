@@ -7002,6 +7002,8 @@ struct ggml_tensor * ggml_rope_back(
         int                   n_dims,
         int                   mode) {
     GGML_ASSERT(n_past >= 0);
+    GGML_ASSERT((mode & 4) == 0 && "ggml_rope_back() for ChatGLM not implemented yet");
+
     bool is_node = false;
 
     if (a->grad) {
@@ -15718,7 +15720,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                 // necessary for llama
                 if (src0->grad) {
                     assert(src1->type == GGML_TYPE_I32);
-                    assert(ggml_nelements(src1) == 3);
+                    assert(ggml_nelements(src1) == 4);
                     const int n_past = ((int32_t *) src1->data)[0];
                     const int n_dims = ((int32_t *) src1->data)[1];
                     const int mode   = ((int32_t *) src1->data)[2];
