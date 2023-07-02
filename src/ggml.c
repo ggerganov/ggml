@@ -193,6 +193,24 @@ inline static void* ggml_aligned_malloc(size_t size) {
 #define UNUSED GGML_UNUSED
 #define SWAP(x, y, T) do { T SWAP = x; x = y; y = SWAP; } while (0)
 
+//
+// tensor access macros
+//
+
+#define GGML_TENSOR_UNARY_OP_LOCALS \
+    GGML_TENSOR_LOCALS(int64_t, ne0, src0, ne); \
+    GGML_TENSOR_LOCALS(size_t,  nb0, src0, nb); \
+    GGML_TENSOR_LOCALS(int64_t, ne,  dst,  ne); \
+    GGML_TENSOR_LOCALS(size_t,  nb,  dst,  nb);
+
+#define GGML_TENSOR_BINARY_OP_LOCALS \
+    GGML_TENSOR_LOCALS(int64_t, ne0, src0, ne); \
+    GGML_TENSOR_LOCALS(size_t,  nb0, src0, nb); \
+    GGML_TENSOR_LOCALS(int64_t, ne1, src1, ne); \
+    GGML_TENSOR_LOCALS(size_t,  nb1, src1, nb); \
+    GGML_TENSOR_LOCALS(int64_t, ne,  dst,  ne); \
+    GGML_TENSOR_LOCALS(size_t,  nb,  dst,  nb);
+
 #if defined(GGML_USE_ACCELERATE)
 #include <Accelerate/Accelerate.h>
 #if defined(GGML_USE_CLBLAST) // allow usage of CLBlast alongside Accelerate functions
