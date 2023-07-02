@@ -16655,7 +16655,7 @@ typedef pthread_t ggml_thread_t;
 
 #define ggml_thread_create pthread_create
 #define ggml_thread_join   pthread_join
-#define ggml_thread_kill   pthread_kill
+#define ggml_thread_cancel   pthread_cancel
 
 #else
 
@@ -16781,7 +16781,7 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
 
     while (true) {
         if (state->ith == 0 && state->shared->abort_callback()) {
-            return 0;
+            return GGML_EXIT_ABORTED;
         }
         if (atomic_fetch_sub(&state->shared->n_active, 1) == 1) {
             // all other threads are finished and spinning
@@ -16865,7 +16865,7 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
         }
     }
 
-    return 0;
+    return GGML_EXIT_SUCCESS;
 }
 
 bool always_false() { return false; }
@@ -17253,7 +17253,7 @@ void ggml_graph_compute_with_abort(struct ggml_context * ctx, struct ggml_cgraph
     const int64_t perf_start_time_us = ggml_perf_time_us();
 
     // this is a work thread too
-    ggml_graph_compute_thread(&workers[0]);
+    int compute_status = ggml_graph_compute_thread(&workers[0]);
 
     // don't leave affinity set on the main thread
     clear_numa_thread_affinity();
@@ -17261,10 +17261,10 @@ void ggml_graph_compute_with_abort(struct ggml_context * ctx, struct ggml_cgraph
     // join or kill thread pool
     if (n_threads > 1) {
         for (int j = 1; j < n_threads; j++) {
-            if (abort_callback()) {
-                const int rc = ggml_thread_kill(workers[j].thrd, SIGKILL);
+            if (compute_status == GGML_EXIT_ABORTED) {
+                const int rc = ggml_thread_cancel(workers[j].thrd);
                 GGML_ASSERT(rc == 0);
-            } else {
+            } else if (compute_status == GGML_EXIT_SUCCESS) {
                 const int rc = ggml_thread_join(workers[j].thrd, NULL);
                 GGML_ASSERT(rc == 0);
             }
