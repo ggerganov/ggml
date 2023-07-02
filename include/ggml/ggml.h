@@ -1271,6 +1271,7 @@ extern "C" {
     GGML_API struct ggml_cgraph ggml_build_backward(struct ggml_context * ctx, struct ggml_cgraph * gf, bool keep);
 
     GGML_API void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph);
+    GGML_API void ggml_graph_compute_with_abort(struct ggml_context * ctx, struct ggml_cgraph * cgraph, bool (*abort_callback)());
     GGML_API void ggml_graph_reset  (struct ggml_cgraph * cgraph);
 
     GGML_API struct ggml_tensor * ggml_graph_get_tensor(struct ggml_cgraph * cgraph, const char * name);

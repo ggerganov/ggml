@@ -25,6 +25,7 @@
 #include <float.h>
 #include <limits.h>
 #include <stdarg.h>
+#include <signal.h>
 
 #ifdef GGML_USE_METAL
 #include <unistd.h>
@@ -16654,6 +16655,7 @@ typedef pthread_t ggml_thread_t;
 
 #define ggml_thread_create pthread_create
 #define ggml_thread_join   pthread_join
+#define ggml_thread_kill   pthread_kill
 
 #else
 
@@ -16749,6 +16751,8 @@ struct ggml_compute_state_shared {
     // synchronization primitives
     atomic_int n_active; // num active threads
     atomic_int node_n;   // active graph node
+
+    bool (*abort_callback)(); // abort ggml_graph_compute when true
 };
 
 struct ggml_compute_state {
@@ -16776,6 +16780,9 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
     int node_n = -1;
 
     while (true) {
+        if (state->ith == 0 && state->shared->abort_callback()) {
+            return 0;
+        }
         if (atomic_fetch_sub(&state->shared->n_active, 1) == 1) {
             // all other threads are finished and spinning
             // do finalize and init here so we don't have synchronize again
@@ -16793,6 +16800,7 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
                 params.nth = node->n_tasks;
                 ggml_compute_forward(&params, node);
                 ggml_graph_compute_perf_stats_node(node, state->shared);
+
             }
 
             // distribute new work or execute it direct if 1T
@@ -16819,6 +16827,10 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
                     ggml_compute_forward(&params, node);
                     ggml_graph_compute_perf_stats_node(node, state->shared);
                 } else {
+                    break;
+                }
+
+                if (state->shared->abort_callback()) {
                     break;
                 }
             }
@@ -16856,7 +16868,12 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
     return 0;
 }
 
+bool always_false() { return false; }
 void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) {
+    ggml_graph_compute_with_abort(ctx, cgraph, always_false);
+}
+
+void ggml_graph_compute_with_abort(struct ggml_context * ctx, struct ggml_cgraph * cgraph, bool (*abort_callback)(void)) {
     const int n_threads = cgraph->n_threads;
 
     struct ggml_compute_state_shared state_shared = {
@@ -16866,6 +16883,7 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
         /*.n_threads               =*/ n_threads,
         /*.n_active                =*/ n_threads,
         /*.node_n                  =*/ -1,
+        /*.abort_callback          =*/ abort_callback,
     };
     struct ggml_compute_state * workers = alloca(sizeof(struct ggml_compute_state)*n_threads);
 
@@ -17240,11 +17258,16 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
     // don't leave affinity set on the main thread
     clear_numa_thread_affinity();
 
-    // join thread pool
+    // join or kill thread pool
     if (n_threads > 1) {
         for (int j = 1; j < n_threads; j++) {
-            const int rc = ggml_thread_join(workers[j].thrd, NULL);
-            GGML_ASSERT(rc == 0);
+            if (abort_callback()) {
+                const int rc = ggml_thread_kill(workers[j].thrd, SIGKILL);
+                GGML_ASSERT(rc == 0);
+            } else {
+                const int rc = ggml_thread_join(workers[j].thrd, NULL);
+                GGML_ASSERT(rc == 0);
+            }
         }
     }
 
