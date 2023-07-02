@@ -201,6 +201,9 @@
 #define GGML_MAX_NAME          48
 #define GGML_DEFAULT_N_THREADS 4
 
+#define GGML_EXIT_SUCCESS 0
+#define GGML_EXIT_ABORTED 1
+
 #define GGML_ASSERT(x) \
     do { \
         if (!(x)) { \
