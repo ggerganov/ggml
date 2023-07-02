@@ -361,9 +361,8 @@ extern "C" {
         GGML_OP_ROPE_BACK,
         GGML_OP_ALIBI,
         GGML_OP_CLAMP,
-        GGML_OP_CONV_1D_S1_PH,
-        GGML_OP_CONV_1D_S2_PH,
-        GGML_OP_CONV_2D_SK_P0,
+        GGML_OP_CONV_1D,
+        GGML_OP_CONV_2D,
 
         GGML_OP_FLASH_ATTN,
         GGML_OP_FLASH_FF,
@@ -1134,58 +1133,33 @@ extern "C" {
             float                 min,
             float                 max);
 
-    // TODO: implement general-purpose convolutions
-    // GGML_API struct ggml_tensor * ggml_conv_1d(
-    //        struct ggml_context * ctx,
-    //        struct ggml_tensor  * a,
-    //        struct ggml_tensor  * b,
-    //        int                   s0
-    //        int                   p0,
-    //        int                   d0);
-    //
-    // GGML_API struct ggml_tensor * ggml_conv_2d(
-    //        struct ggml_context * ctx,
-    //        struct ggml_tensor  * a,
-    //        struct ggml_tensor  * b,
-    //        int                   s0,
-    //        int                   s1,
-    //        int                   p0,
-    //        int                   p1,
-    //        int                   d0,
-    //        int                   d1);
-
-    // padding = half
-    // TODO: we don't support extra parameters for now
-    //       that's why we are hard-coding the stride, padding, and dilation
-    //       not great ..
-    // example:
-    // a:      3   80  768    1
-    // b:   3000   80    1    1
-    // res: 3000  768    1    1
-    // used in whisper
-    GGML_API struct ggml_tensor * ggml_conv_1d_s1_ph(
+    GGML_API struct ggml_tensor * ggml_conv_1d(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
-            struct ggml_tensor  * b);
+            struct ggml_tensor  * b,
+            int                   s0,  // stride
+            int                   p0,  // padding
+            int                   d0); // dilation
 
-    // used in whisper
-    GGML_API struct ggml_tensor * ggml_conv_1d_s2_ph(
+    GGML_API struct ggml_tensor * ggml_conv_2d(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
-            struct ggml_tensor  * b);
+            struct ggml_tensor  * b,
+            int                   s0,
+            int                   s1,
+            int                   p0,
+            int                   p1,
+            int                   d0,
+            int                   d1);
 
-    // kernel size is a->ne[0] x a->ne[1]
-    // stride is equal to kernel size
-    // padding is zero
-    // example:
-    // a:     16   16    3  768
-    // b:   1024 1024    3    1
-    // res:   64   64  768    1
-    // used in sam
-    GGML_API struct ggml_tensor * ggml_conv_2d_sk_p0(
+    // conv_1d with padding = half
+    // alias for ggml_conv_1d(a, b, s, a->ne[0]/2, d)
+    GGML_API struct ggml_tensor* ggml_conv_1d_ph(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
-            struct ggml_tensor  * b);
+            struct ggml_tensor  * b,
+            int                   s,
+            int                   d);
 
     GGML_API struct ggml_tensor * ggml_flash_attn(
             struct ggml_context * ctx,
