@@ -9,9 +9,15 @@
 #include <cstring>
 #include <cinttypes>
 #include <fstream>
+#include <iostream>
 #include <map>
 #include <string>
 #include <vector>
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 #if defined(_MSC_VER)
 #pragma warning(disable: 4244 4267) // possible loss of data
@@ -671,6 +677,148 @@ bool dollyv2_eval(
     return true;
 }
 
+std::string execute_prompt(
+        const dollyv2_model &model,
+        gpt_vocab &vocab,
+        const std::string &prompt,
+        gpt_params &params,
+        std::mt19937 &rng,
+        int64_t t_load_us,
+        int64_t t_sample_us,
+        int64_t t_predict_us,
+        size_t mem_per_token,
+        int n_past,
+        bool stream_response_to_cout = false) {
+    std::string output = "";
+    std::vector<float> logits;
+
+    // tokenize the prompt
+    std::vector<gpt_vocab::id> embd_inp = ::gpt_tokenize(vocab, prompt);
+
+    params.n_predict = std::min(params.n_predict, model.hparams.n_ctx - (int)embd_inp.size());
+
+    printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
+    for (int i = 0; i < embd_inp.size(); i++) {
+        printf("%s: token[%d] = %6d, %s\n", __func__, i, embd_inp[i], vocab.id_to_token.at(embd_inp[i]).c_str());
+    }
+    printf("\n");
+
+    std::vector<gpt_vocab::id> embd;
+
+    dollyv2_eval(model, params.n_threads, 0, {0, 1, 2, 3}, logits, mem_per_token);
+
+    const int32_t end_token = vocab.token_to_id["### End"];
+
+    for (int i = embd.size(); i < embd_inp.size() + params.n_predict; i++) {
+        // predict
+        if (embd.size() > 0) {
+            const int64_t t_start_us = ggml_time_us();
+
+            if (!dollyv2_eval(model, params.n_threads, n_past, embd, logits, mem_per_token)) {
+                printf("Failed to predict\n");
+                return output;
+            }
+
+            t_predict_us += ggml_time_us() - t_start_us;
+        }
+
+        n_past += embd.size();
+        embd.clear();
+
+        if (i >= embd_inp.size()) {
+            // sample next token
+            const int top_k = params.top_k;
+            const float top_p = params.top_p;
+            const float temp = params.temp;
+
+            const int n_vocab = model.hparams.n_vocab;
+
+            gpt_vocab::id id = 0;
+
+            {
+                const int64_t t_start_sample_us = ggml_time_us();
+
+                id = gpt_sample_top_k_top_p(vocab, logits.data() + (logits.size() - n_vocab), top_k, top_p, temp, rng);
+
+                t_sample_us += ggml_time_us() - t_start_sample_us;
+            }
+
+            // add it to the context
+            embd.push_back(id);
+        } else {
+            // if here, it means we are still processing the input prompt
+            for (int k = i; k < embd_inp.size(); k++) {
+                embd.push_back(embd_inp[k]);
+                if (embd.size() > params.n_batch) {
+                    break;
+                }
+            }
+            i += embd.size() - 1;
+        }
+
+        // display text
+        for (auto id : embd) {
+            output += vocab.id_to_token[id];
+            if (stream_response_to_cout) {
+                printf("%s", vocab.id_to_token[id].c_str());
+            }
+        }
+        if (stream_response_to_cout) {
+            fflush(stdout);
+        }
+
+        // end of text token
+        if (embd.back() == 0 || (end_token > 0 && embd.back() == end_token)) {
+            return output;
+        }
+    }
+    return output;
+}
+
+int setup_port(const int port) {
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        std::cerr << "Failed to create socket\n";
+        return -1;
+    }
+
+    sockaddr_in servaddr;
+    std::memset(&servaddr, 0, sizeof(servaddr));
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(port);
+
+    if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
+        std::cerr << "Failed to bind to port\n";
+        return -1;
+    }
+
+    if (listen(sockfd, 10) < 0) {
+        std::cerr << "Failed to listen on socket\n";
+        return -1;
+    }
+    return sockfd;
+}
+
+std::string read_from_port(int sockfd, int clientfd) {
+    if (clientfd < 0) {
+        std::cerr << "Failed to accept new connection\n";
+        return "";
+    }
+
+    char buffer[4096];
+    std::memset(buffer, 0, sizeof(buffer));
+
+    if (read(clientfd, buffer, sizeof(buffer)) < 0) {
+        std::cerr << "Failed to read from client\n";
+    } else {
+        std::cout << "Received: " << buffer;
+        return std::string(buffer);
+    }
+    return std::string("");
+}
+
 int main(int argc, char ** argv) {
     ggml_time_init();
 
@@ -690,13 +838,15 @@ int main(int argc, char ** argv) {
     printf("%s: seed = %d\n", __func__, params.seed);
 
     std::mt19937 rng(params.seed);
-    if (params.prompt.empty()) {
-        params.prompt = gpt_random_prompt(rng);
-    }
-
-    const std::string prompt = prompt_for_generation(params.prompt);
 
     int64_t t_load_us = 0;
+    int64_t t_sample_us = 0;
+    int64_t t_predict_us = 0;
+
+    // determine the required inference memory per token:
+    size_t mem_per_token = 0;
+
+    int n_past = 0;
 
     gpt_vocab vocab;
     dollyv2_model model;
@@ -715,90 +865,61 @@ int main(int argc, char ** argv) {
         test_gpt_tokenizer(vocab, params.token_test);
     }
 
-    int n_past = 0;
-
-    int64_t t_sample_us  = 0;
-    int64_t t_predict_us = 0;
-
-    std::vector<float> logits;
-
-    // tokenize the prompt
-    std::vector<gpt_vocab::id> embd_inp = ::gpt_tokenize(vocab, prompt);
-
-    params.n_predict = std::min(params.n_predict, model.hparams.n_ctx - (int) embd_inp.size());
-
-    printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
-    for (int i = 0; i < embd_inp.size(); i++) {
-        printf("%s: token[%d] = %6d, %s\n", __func__, i, embd_inp[i], vocab.id_to_token.at(embd_inp[i]).c_str());
-    }
-    printf("\n");
-
-    std::vector<gpt_vocab::id> embd;
-
-    // determine the required inference memory per token:
-    size_t mem_per_token = 0;
-    dollyv2_eval(model, params.n_threads, 0, { 0, 1, 2, 3 }, logits, mem_per_token);
-
-    const int32_t end_token = vocab.token_to_id["### End"];
-
-    for (int i = embd.size(); i < embd_inp.size() + params.n_predict; i++) {
-        // predict
-        if (embd.size() > 0) {
-            const int64_t t_start_us = ggml_time_us();
-
-            if (!dollyv2_eval(model, params.n_threads, n_past, embd, logits, mem_per_token)) {
-                printf("Failed to predict\n");
-                return 1;
-            }
-
-            t_predict_us += ggml_time_us() - t_start_us;
+    int sockfd;
+    if (params.interactive_port != -1) {
+        sockfd = setup_port(params.interactive_port);
+        if (sockfd == -1) {
+            return 1;
         }
+        fprintf(stdout, "Model is ready on port %i\n", params.interactive_port);
+        fflush(stdout);
+    }
 
-        n_past += embd.size();
-        embd.clear();
+    if (params.interactive or params.interactive_port != -1) {
+        while (true) {
+            std::string prompt_input;
+            int clientfd;
+            if (params.interactive_port != -1) {
+                sockaddr_in clientaddr;
+                socklen_t clientaddrlen = sizeof(clientaddr);
+                clientfd = accept(sockfd, (struct sockaddr *)&clientaddr, &clientaddrlen);   
+                prompt_input = read_from_port(sockfd, clientfd);
+            } else {
+                printf("Please enter your quesiton:\n>");
+                fflush(stdout);
 
-        if (i >= embd_inp.size()) {
-            // sample next token
-            const int   top_k = params.top_k;
-            const float top_p = params.top_p;
-            const float temp  = params.temp;
-
-            const int n_vocab = model.hparams.n_vocab;
-
-            gpt_vocab::id id = 0;
-
-            {
-                const int64_t t_start_sample_us = ggml_time_us();
-
-                id = gpt_sample_top_k_top_p(vocab, logits.data() + (logits.size() - n_vocab), top_k, top_p, temp, rng);
-
-                t_sample_us += ggml_time_us() - t_start_sample_us;
+                std::getline(std::cin, prompt_input);
             }
 
-            // add it to the context
-            embd.push_back(id);
+            if (strcmp(prompt_input.c_str(), "exit") == 0) {
+                break;
+            }
 
-        } else {
-            // if here, it means we are still processing the input prompt
-            for (int k = i; k < embd_inp.size(); k++) {
-                embd.push_back(embd_inp[k]);
-                if (embd.size() > params.n_batch) {
-                    break;
+            const std::string prompt = prompt_for_generation(prompt_input);
+            // call the model
+            const std::string response = execute_prompt(model, vocab, prompt, params, rng, t_load_us, t_sample_us, t_predict_us, mem_per_token, n_past, true);
+
+            if (params.interactive_port != -1) {
+                if (write(clientfd, response.c_str(), response.size()) < 0) {
+                    std::cerr << "Failed to write to client\n";
+                }
+
+                if (close(clientfd) < 0) {
+                    std::cerr << "Failed to close client socket\n";
                 }
             }
-            i += embd.size() - 1;
+            else {
+                printf("%s\n\n", response.c_str());
+            }
+            fflush(stdout);
+        }
+    } else {
+        if (params.prompt.empty()) {
+            params.prompt = gpt_random_prompt(rng);
         }
 
-        // display text
-        for (auto id : embd) {
-            printf("%s", vocab.id_to_token[id].c_str());
-        }
-        fflush(stdout);
-
-        // end of text token
-        if (embd.back() == 0 || (end_token > 0 && embd.back() == end_token)) {
-            break;
-        }
+        const std::string prompt = prompt_for_generation(params.prompt);
+        execute_prompt(model, vocab, prompt, params, rng, t_load_us, t_sample_us, t_predict_us, mem_per_token, n_past, true);
     }
 
     // report timing
@@ -807,13 +928,17 @@ int main(int argc, char ** argv) {
 
         printf("\n\n");
         printf("%s: mem per token = %8zu bytes\n", __func__, mem_per_token);
-        printf("%s:     load time = %8.2f ms\n", __func__, t_load_us/1000.0f);
-        printf("%s:   sample time = %8.2f ms\n", __func__, t_sample_us/1000.0f);
-        printf("%s:  predict time = %8.2f ms / %.2f ms per token\n", __func__, t_predict_us/1000.0f, t_predict_us/1000.0f/n_past);
-        printf("%s:    total time = %8.2f ms\n", __func__, (t_main_end_us - t_main_start_us)/1000.0f);
+        printf("%s:     load time = %8.2f ms\n", __func__, t_load_us / 1000.0f);
+        printf("%s:   sample time = %8.2f ms\n", __func__, t_sample_us / 1000.0f);
+        printf("%s:  predict time = %8.2f ms / %.2f ms per token\n", __func__, t_predict_us / 1000.0f, t_predict_us / 1000.0f / n_past);
+        printf("%s:    total time = %8.2f ms\n", __func__, (t_main_end_us - t_main_start_us) / 1000.0f);
     }
 
     ggml_free(model.ctx);
+
+    if (params.interactive_port != -1 && close(sockfd) < 0) {
+        std::cerr << "Failed to close server socket\n";
+    }
 
     return 0;
 }
