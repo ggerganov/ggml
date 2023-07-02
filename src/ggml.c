@@ -16945,13 +16945,6 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
                     fwrite(&nb, sizeof(uint64_t), 1, fout);
                 }
 
-                // store the pointer address
-                {
-                    const uint64_t ptr = (uint64_t) tensor->data;
-
-                    fwrite(&ptr, sizeof(uint64_t), 1, fout);
-                }
-
                 fwrite(tensor->name, sizeof(char), GGML_MAX_NAME, fout);
 
                 // dump the data
@@ -16983,13 +16976,6 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
 
                     fwrite(&ne, sizeof(uint64_t), 1, fout);
                     fwrite(&nb, sizeof(uint64_t), 1, fout);
-                }
-
-                // store the pointer address
-                {
-                    const uint64_t ptr = (uint64_t) tensor->data;
-
-                    fwrite(&ptr, sizeof(uint64_t), 1, fout);
                 }
 
                 fwrite(tensor->name, sizeof(char), GGML_MAX_NAME, fout);
@@ -17176,8 +17162,6 @@ struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** 
 
                 tensor->op = (enum ggml_op) op;
 
-                uint64_t ptr_cur = *(const uint64_t *) ptr; ptr += sizeof(ptr_cur);
-
                 memcpy(tensor->name, ptr, GGML_MAX_NAME); ptr += GGML_MAX_NAME;
 
                 tensor->data = (void *) ptr;
@@ -17222,8 +17206,6 @@ struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** 
                     ne[j] = ne_cur;
                     nb[j] = nb_cur;
                 }
-
-                uint64_t ptr_cur = *(const uint64_t *) ptr; ptr += sizeof(ptr_cur); // TODO: not yet used
 
                 const char * ptr_name = ptr; ptr += GGML_MAX_NAME;
 
