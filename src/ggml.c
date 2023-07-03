@@ -16875,7 +16875,8 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
     ggml_graph_compute_with_abort(ctx, cgraph, always_false, NULL);
 }
 
-void ggml_graph_compute_with_abort(struct ggml_context * ctx, struct ggml_cgraph * cgraph, bool (*abort_callback)(void*), void *abort_callback_data) {
+void ggml_graph_compute_with_abort(struct ggml_context * ctx, struct ggml_cgraph * cgraph,
+        bool (*abort_callback)(void * data), void *abort_callback_data) {
     const int n_threads = cgraph->n_threads;
 
     struct ggml_compute_state_shared state_shared = {
