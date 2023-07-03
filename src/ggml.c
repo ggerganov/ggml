@@ -16443,7 +16443,7 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
     ggml_graph_compute_with_abort(ctx, cgraph, always_false, NULL);
 }
 
-void ggml_graph_compute_with_abort(struct ggml_context * ctx, struct ggml_cgraph * cgraph,
+int ggml_graph_compute_with_abort(struct ggml_context * ctx, struct ggml_cgraph * cgraph,
         bool (*abort_callback)(void * data), void *abort_callback_data) {
     const int n_threads = cgraph->n_threads;
 
@@ -16861,6 +16861,8 @@ void ggml_graph_compute_with_abort(struct ggml_context * ctx, struct ggml_cgraph
                 (double) perf_time_us_cur     / 1000.0,
                 (double) cgraph->perf_time_us / 1000.0 / cgraph->perf_runs);
     }
+
+    return compute_status;
 }
 
 void ggml_graph_reset(struct ggml_cgraph * cgraph) {
