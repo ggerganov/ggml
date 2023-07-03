@@ -16868,7 +16868,8 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
     return GGML_EXIT_SUCCESS;
 }
 
-bool always_false() { return false; }
+static bool always_false() { return false; }
+
 void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) {
     ggml_graph_compute_with_abort(ctx, cgraph, always_false);
 }
