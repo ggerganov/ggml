@@ -778,7 +778,7 @@ std::string execute_prompt(
 int setup_port(const int port) {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
-        std::cerr << "Failed to create socket\n";
+        fprintf(stderr, "%s: Failed to create new socket\n", __func__);
         return -1;
     }
 
@@ -790,12 +790,12 @@ int setup_port(const int port) {
     servaddr.sin_port = htons(port);
 
     if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
-        std::cerr << "Failed to bind to port\n";
+        fprintf(stderr, "%s: Failed to bind to port %i\n", __func__, port);
         return -1;
     }
 
     if (listen(sockfd, 10) < 0) {
-        std::cerr << "Failed to listen on socket\n";
+        fprintf(stderr, "%s: Failed to listen to socket on port %i\n", __func__, port);
         return -1;
     }
     return sockfd;
@@ -803,7 +803,7 @@ int setup_port(const int port) {
 
 std::string read_from_port(int sockfd, int clientfd) {
     if (clientfd < 0) {
-        std::cerr << "Failed to accept new connection\n";
+        fprintf(stderr, "%s: Failed to accept new connection\n", __func__);
         return "";
     }
 
@@ -811,7 +811,7 @@ std::string read_from_port(int sockfd, int clientfd) {
     std::memset(buffer, 0, sizeof(buffer));
 
     if (read(clientfd, buffer, sizeof(buffer)) < 0) {
-        std::cerr << "Failed to read from client\n";
+        fprintf(stderr, "%s: Failed to read from client\n", __func__);
     } else {
         std::cout << "Received: " << buffer;
         return std::string(buffer);
@@ -901,11 +901,11 @@ int main(int argc, char ** argv) {
 
             if (params.interactive_port != -1) {
                 if (write(clientfd, response.c_str(), response.size()) < 0) {
-                    std::cerr << "Failed to write to client\n";
+                    fprintf(stderr, "%s: Failed to write answer '%s' to client\n", __func__, response.c_str());
                 }
 
                 if (close(clientfd) < 0) {
-                    std::cerr << "Failed to close client socket\n";
+                    fprintf(stderr, "%s: Failed to close client socket\n", __func__);
                 }
             }
             else {
@@ -937,7 +937,7 @@ int main(int argc, char ** argv) {
     ggml_free(model.ctx);
 
     if (params.interactive_port != -1 && close(sockfd) < 0) {
-        std::cerr << "Failed to close server socket\n";
+        fprintf(stderr, "%s: Failed to close server socket\n", __func__);
     }
 
     return 0;
