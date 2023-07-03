@@ -23,12 +23,17 @@ struct gpt_params {
     int32_t top_k = 40;
     float   top_p = 0.9f;
     float   temp  = 0.9f;
+    int32_t repeat_last_n  = 64;
+    float   repeat_penalty = 1.00f;
 
     int32_t n_batch = 8; // batch size for prompt processing
 
     std::string model      = "models/gpt-2-117M/ggml-model.bin"; // model path
     std::string prompt     = "";
     std::string token_test = "";
+
+    bool interactive = false;
+    int interactive_port = -1;
 };
 
 bool gpt_params_parse(int argc, char ** argv, gpt_params & params);
