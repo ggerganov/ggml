@@ -16752,7 +16752,8 @@ struct ggml_compute_state_shared {
     atomic_int n_active; // num active threads
     atomic_int node_n;   // active graph node
 
-    bool (*abort_callback)(); // abort ggml_graph_compute when true
+    bool (*abort_callback)(void * data); // abort ggml_graph_compute when true
+    void * abort_callback_data;
 };
 
 struct ggml_compute_state {
@@ -16780,7 +16781,7 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
     int node_n = -1;
 
     while (true) {
-        if (state->ith == 0 && state->shared->abort_callback()) {
+        if (state->ith == 0 && state->shared->abort_callback(state->shared->abort_callback_data)) {
             return GGML_EXIT_ABORTED;
         }
         if (atomic_fetch_sub(&state->shared->n_active, 1) == 1) {
@@ -16830,7 +16831,7 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
                     break;
                 }
 
-                if (state->shared->abort_callback()) {
+                if (state->shared->abort_callback(state->shared->abort_callback_data)) {
                     break;
                 }
             }
@@ -16868,13 +16869,13 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
     return GGML_EXIT_SUCCESS;
 }
 
-static bool always_false() { return false; }
+static bool always_false(void * data) { return false; }
 
 void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) {
-    ggml_graph_compute_with_abort(ctx, cgraph, always_false);
+    ggml_graph_compute_with_abort(ctx, cgraph, always_false, NULL);
 }
 
-void ggml_graph_compute_with_abort(struct ggml_context * ctx, struct ggml_cgraph * cgraph, bool (*abort_callback)(void)) {
+void ggml_graph_compute_with_abort(struct ggml_context * ctx, struct ggml_cgraph * cgraph, bool (*abort_callback)(void*), void *abort_callback_data) {
     const int n_threads = cgraph->n_threads;
 
     struct ggml_compute_state_shared state_shared = {
@@ -16885,6 +16886,7 @@ void ggml_graph_compute_with_abort(struct ggml_context * ctx, struct ggml_cgraph
         /*.n_active                =*/ n_threads,
         /*.node_n                  =*/ -1,
         /*.abort_callback          =*/ abort_callback,
+        /*.abort_callback_data     =*/ abort_callback_data,
     };
     struct ggml_compute_state * workers = alloca(sizeof(struct ggml_compute_state)*n_threads);
 
