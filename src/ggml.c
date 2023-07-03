@@ -13577,7 +13577,7 @@ static void ggml_compute_forward_conv_2d_sk_p0_f16_f32(
             for (int i13 = 0; i13 < ne13; i13++) {
                 for (int i12 = 0; i12 < ne12; i12++) {
                     const float * const src = (float *)((char *) src1->data + i13*nb13 + i12*nb12);
-                    ggml_fp16_t * dst_data = wdata + i13*(ne1*ne0*ew0+ne12*(nk1*nk0));
+                    ggml_fp16_t * dst_data = wdata + i13*(ne1*ne0*ew0);
 
                     for (int i1 = 0; i1 < ne1; i1++) {
                         for (int i0 = 0; i0 < ne0; i0++) {
