@@ -260,7 +260,7 @@ if (GGML_CUDA_SOURCES)
     target_link_libraries(ggml PUBLIC stdc++)
 endif()
 
-set (GGML_PUBLIC_HEADERS ${CMAKE_SOURCE_DIR}/include/ggml/ggml.h)
+set (GGML_PUBLIC_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml.h)
 set_target_properties(${TARGET} PROPERTIES
                       PUBLIC_HEADER "${GGML_PUBLIC_HEADERS}")
 
