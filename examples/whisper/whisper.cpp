@@ -2777,12 +2777,12 @@ int whisper_ctx_init_openvino_encoder(
         path_cache = cache_dir;
     }
 
-    fprintf(stderr, "%s: loading OpenVINO model from '%s'\n", __func__, path_openvino.c_str());
+    fprintf(stderr, "%s: loading OpenVINO model from '%s'\n", __func__, path_encoder.c_str());
     fprintf(stderr, "%s: first run on a device may take a while ...\n", __func__);
 
-    ctx->state->ctx_openvino = whisper_openvino_init(path_openvino.c_str(), device, path_cache.c_str());
+    ctx->state->ctx_openvino = whisper_openvino_init(path_encoder.c_str(), device, path_cache.c_str());
     if (!ctx->state->ctx_openvino) {
-        fprintf(stderr, "%s: failed to init OpenVINO encoder from '%s'\n", __func__, path_openvino.c_str());
+        fprintf(stderr, "%s: failed to init OpenVINO encoder from '%s'\n", __func__, path_encoder.c_str());
         return 1;
     } else {
         fprintf(stderr, "%s: OpenVINO model loaded\n", __func__);
