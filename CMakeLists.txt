@@ -30,6 +30,7 @@ option(GGML_NO_ACCELERATE           "ggml: disable Accelerate framework" OFF)
 option(GGML_OPENBLAS                "ggml: use OpenBLAS"                 OFF)
 option(GGML_CLBLAST                 "ggml: use clBLAST"                  OFF)
 option(GGML_CUBLAS                  "ggml: use cuBLAS"                   OFF)
+option(GGML_MPI                     "ggml: use MPI"                      OFF)
 
 # sanitizers
 

@@ -381,6 +381,9 @@ extern "C" {
         GGML_OP_CROSS_ENTROPY_LOSS_BACK,
 
         GGML_OP_COUNT,
+
+        GGML_OP_SEND,
+        GGML_OP_RECV,
     };
 
 
@@ -431,8 +434,7 @@ extern "C" {
         char name[GGML_MAX_NAME];
 
         void * extra; // extra things e.g. for ggml-cuda.cu
-
-        char padding[4];
+        int tag; // custom metadata that doesn't require a full pointer
     };
 
     static const size_t GGML_TENSOR_SIZE = sizeof(struct ggml_tensor);
