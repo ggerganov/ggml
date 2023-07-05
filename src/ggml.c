@@ -16216,7 +16216,6 @@ typedef pthread_t ggml_thread_t;
 
 #define ggml_thread_create pthread_create
 #define ggml_thread_join   pthread_join
-#define ggml_thread_cancel   pthread_cancel
 
 #else
 
@@ -16343,7 +16342,7 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
     int node_n = -1;
 
     while (true) {
-        if (state->ith == 0 && state->shared->abort_callback(state->shared->abort_callback_data)) {
+        if (state->shared->abort_callback(state->shared->abort_callback_data)) {
             return GGML_EXIT_ABORTED;
         }
         if (atomic_fetch_sub(&state->shared->n_active, 1) == 1) {
@@ -16835,13 +16834,8 @@ int ggml_graph_compute_with_abort(struct ggml_context * ctx, struct ggml_cgraph 
     // join or kill thread pool
     if (n_threads > 1) {
         for (int j = 1; j < n_threads; j++) {
-            if (compute_status == GGML_EXIT_ABORTED) {
-                const int rc = ggml_thread_cancel(workers[j].thrd);
-                GGML_ASSERT(rc == 0);
-            } else if (compute_status == GGML_EXIT_SUCCESS) {
-                const int rc = ggml_thread_join(workers[j].thrd, NULL);
-                GGML_ASSERT(rc == 0);
-            }
+            const int rc = ggml_thread_join(workers[j].thrd, NULL);
+            GGML_ASSERT(rc == 0);
         }
     }
 
