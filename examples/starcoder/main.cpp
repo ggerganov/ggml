@@ -905,7 +905,7 @@ int main(int argc, char ** argv) {
             break;
         }
         // Handle StarChat "<|end|>" token.
-        else if (embd.back() == starchat_end_token) {
+        else if (embd.back() == starchat_end_token && i >= embd_inp.size()) {
             break;
         }
     }
