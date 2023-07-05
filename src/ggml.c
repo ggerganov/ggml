@@ -7265,7 +7265,7 @@ struct ggml_tensor * ggml_flash_ff(
     result->src[1] = b0;
     result->src[2] = b1;
     result->src[3] = c0;
-    result->opt[2] = c1;
+    result->src[4] = c1;
 
     return result;
 }
@@ -7329,7 +7329,7 @@ struct ggml_tensor * ggml_flash_attn_back(
     result->src[1] = k;
     result->src[2] = v;
     result->src[3] = d;
-    result->opt[2] = ggml_new_i32(ctx, masked ? 1 : 0);
+    result->src[4] = ggml_new_i32(ctx, masked ? 1 : 0);
 
     return result;
 }
@@ -14792,11 +14792,11 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             } break;
         case GGML_OP_FLASH_FF:
             {
-                ggml_compute_forward_flash_ff(params, tensor->src[0], tensor->src[1], tensor->src[2], tensor->src[3], tensor->opt[2], tensor);
+                ggml_compute_forward_flash_ff(params, tensor->src[0], tensor->src[1], tensor->src[2], tensor->src[3], tensor->src[4], tensor);
             } break;
         case GGML_OP_FLASH_ATTN_BACK:
             {
-                int32_t t = ggml_get_i32_1d(tensor->opt[2], 0);
+                int32_t t = ggml_get_i32_1d(tensor->src[4], 0);
                 GGML_ASSERT(t == 0 || t == 1);
                 bool masked = t != 0;
                 ggml_compute_forward_flash_attn_back(params, tensor->src[0], tensor->src[1], tensor->src[2], tensor->src[3], masked, tensor);
