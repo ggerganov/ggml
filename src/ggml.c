@@ -15716,8 +15716,8 @@ static void ggml_visit_parents(struct ggml_cgraph * cgraph, struct ggml_tensor *
     }
 
     for (int i = 0; i < GGML_MAX_OPT; ++i) {
-        if (node->opt[i]) {
-            ggml_visit_parents(cgraph, node->opt[i]);
+        if (node->src[i]) {
+            ggml_visit_parents(cgraph, node->src[i]);
         }
     }
 
@@ -16576,8 +16576,8 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
             }
 
             for (int j = 0; j < GGML_MAX_OPT; ++j) {
-                if (cgraph->nodes[i]->opt[j]) {
-                    ggml_graph_export_node(cgraph->nodes[i]->opt[j], "OPT", fout);
+                if (cgraph->nodes[i]->src[j]) {
+                    ggml_graph_export_node(cgraph->nodes[i]->src[j], "OPT", fout);
                 }
             }
 
@@ -16674,7 +16674,7 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
                     args[1] = tensor->src[1];
 
                     for (int j = 0; j < GGML_MAX_OPT; ++j) {
-                        args[2 + j] = tensor->opt[j];
+                        args[2 + j] = tensor->src[j];
                     }
 
                     for (int j = 0; j < 2 + GGML_MAX_OPT; ++j) {
@@ -16961,7 +16961,7 @@ struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** 
                 tensor->src[1] = args[1];
 
                 for (int j = 0; j < GGML_MAX_OPT; ++j) {
-                    tensor->opt[j] = args[2 + j];
+                    tensor->src[j] = args[2 + j];
                 }
 
                 result.nodes[i] = tensor;
@@ -17169,10 +17169,10 @@ void ggml_graph_dump_dot(const struct ggml_cgraph * gb, const struct ggml_cgraph
         }
 
         for (int j = 0; j < GGML_MAX_OPT; j++) {
-            if (node->opt[j]) {
+            if (node->src[j]) {
                 char label[16];
                 snprintf(label, sizeof(label), "opt %d", j);
-                ggml_graph_dump_dot_node_edge(fp, gb, node, node->opt[j], label);
+                ggml_graph_dump_dot_node_edge(fp, gb, node, node->src[j], label);
             }
         }
     }
@@ -17189,10 +17189,10 @@ void ggml_graph_dump_dot(const struct ggml_cgraph * gb, const struct ggml_cgraph
         }
 
         for (int j = 0; j < GGML_MAX_OPT; j++) {
-            if (node->opt[j]) {
+            if (node->src[j]) {
                 char label[16];
                 snprintf(label, sizeof(label), "opt %d", j);
-                ggml_graph_dump_dot_leaf_edge(fp, node, node->opt[j], label);
+                ggml_graph_dump_dot_leaf_edge(fp, node, node->src[j], label);
             }
         }
     }
