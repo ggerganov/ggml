@@ -76,3 +76,9 @@ endif ()
 if (GGML_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif ()
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/ggml.pc.in
+               ${CMAKE_CURRENT_BINARY_DIR}/ggml.pc
+               @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ggml.pc
+        DESTINATION share/pkgconfig)
