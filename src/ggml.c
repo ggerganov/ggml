@@ -16658,20 +16658,14 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
 
                 // output the op arguments
                 {
-                    struct ggml_tensor * args[GGML_MAX_OPT] = { NULL };
-
                     for (int j = 0; j < GGML_MAX_OPT; ++j) {
-                        args[j] = tensor->src[j];
-                    }
-
-                    for (int j = 0; j < GGML_MAX_OPT; ++j) {
-                        if (args[j]) {
+                        if (tensor->src[j]) {
                             int32_t idx = -1;
 
                             // check if leaf
                             {
                                 for (int k = 0; k < cgraph->n_leafs; ++k) {
-                                    if (args[j] == cgraph->leafs[k]) {
+                                    if (tensor->src[j] == cgraph->leafs[k]) {
                                         idx = k;
                                         break;
                                     }
@@ -16681,7 +16675,7 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
                             // check if node
                             if (idx == -1) {
                                 for (int k = 0; k < cgraph->n_nodes; ++k) {
-                                    if (args[j] == cgraph->nodes[k]) {
+                                    if (tensor->src[j] == cgraph->nodes[k]) {
                                         idx = GGML_MAX_NODES + k;
                                         break;
                                     }
