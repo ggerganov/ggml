@@ -1520,9 +1520,9 @@ extern "C" {
 #else
 #define GGML_RESTRICT restrict
 #endif
-    typedef void (*ggml_to_float_t)(const void * GGML_RESTRICT x, float * GGML_RESTRICT y, int k);
-    typedef void (*ggml_from_float_t)(const float * GGML_RESTRICT x, void * GGML_RESTRICT y, int k);
-    typedef void (*ggml_vec_dot_t)(const int n, float * GGML_RESTRICT s, const void * GGML_RESTRICT x, const void * GGML_RESTRICT y);
+    typedef void (*ggml_to_float_t)  (const void  * GGML_RESTRICT x, float * GGML_RESTRICT y, int k);
+    typedef void (*ggml_from_float_t)(const float * GGML_RESTRICT x, void  * GGML_RESTRICT y, int k);
+    typedef void (*ggml_vec_dot_t)   (const int n, float * GGML_RESTRICT s, const void * GGML_RESTRICT x, const void * GGML_RESTRICT y);
 
     typedef struct {
         ggml_to_float_t   to_float;
