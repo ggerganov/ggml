@@ -327,8 +327,8 @@ int mnist_mtl_eval(
                         encoder = [command_buffer computeCommandEncoder];
                     }
 
-                    id<MTLBuffer> id_src0 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src0, &offs_src0);
-                    id<MTLBuffer> id_src1 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src1, &offs_src1);
+                    id<MTLBuffer> id_src0 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src[0], &offs_src0);
+                    id<MTLBuffer> id_src1 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src[1], &offs_src1);
                     id<MTLBuffer> id_dst  = mnist_mtl_get_buffer(ctx, gf->nodes[i],       &offs_dst);
 
                     [encoder setComputePipelineState:ctx->pipeline_add];
@@ -346,7 +346,7 @@ int mnist_mtl_eval(
                         encoder = [command_buffer computeCommandEncoder];
                     }
 
-                    id<MTLBuffer> id_src = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src0, &offs_src0);
+                    id<MTLBuffer> id_src = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src[0], &offs_src0);
                     id<MTLBuffer> id_dst = mnist_mtl_get_buffer(ctx, gf->nodes[i],       &offs_dst);
 
                     [encoder setComputePipelineState:ctx->pipeline_relu];
@@ -385,7 +385,7 @@ int mnist_mtl_eval(
                         encoder = [command_buffer computeCommandEncoder];
                     }
 
-                    id<MTLBuffer> id_src = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src0, &offs_src0);
+                    id<MTLBuffer> id_src = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src[0], &offs_src0);
                     id<MTLBuffer> id_dst = mnist_mtl_get_buffer(ctx, gf->nodes[i],       &offs_dst);
 
                     [encoder setComputePipelineState:ctx->pipeline_soft_max];
@@ -403,15 +403,15 @@ int mnist_mtl_eval(
                     }
 
                     // use MPSMatrixMultiplication
-                    id<MTLBuffer> id_src0 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src0, &offs_src0);
-                    id<MTLBuffer> id_src1 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src1, &offs_src1);
+                    id<MTLBuffer> id_src0 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src[0], &offs_src0);
+                    id<MTLBuffer> id_src1 = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src[1], &offs_src1);
                     id<MTLBuffer> id_dst  = mnist_mtl_get_buffer(ctx, gf->nodes[i],       &offs_dst);
 
-                    const int64_t ncols0 = gf->nodes[i]->src0->ne[0];
-                    const int64_t nrows0 = gf->nodes[i]->src0->ne[1];
+                    const int64_t ncols0 = gf->nodes[i]->src[0]->ne[0];
+                    const int64_t nrows0 = gf->nodes[i]->src[0]->ne[1];
 
-                    const int64_t ncols1 = gf->nodes[i]->src1->ne[0];
-                    const int64_t nrows1 = gf->nodes[i]->src1->ne[1];
+                    const int64_t ncols1 = gf->nodes[i]->src[1]->ne[0];
+                    const int64_t nrows1 = gf->nodes[i]->src[1]->ne[1];
 
                     const int64_t ncols2 = gf->nodes[i]->ne[0];
                     const int64_t nrows2 = gf->nodes[i]->ne[1];
@@ -419,9 +419,9 @@ int mnist_mtl_eval(
                     GGML_ASSERT(ncols0 == ncols1);
 
                     MPSMatrixDescriptor * desc0 = [MPSMatrixDescriptor
-                        matrixDescriptorWithRows:nrows0 columns:ncols0 rowBytes:gf->nodes[i]->src0->nb[1] dataType:MPSDataTypeFloat32];
+                        matrixDescriptorWithRows:nrows0 columns:ncols0 rowBytes:gf->nodes[i]->src[0]->nb[1] dataType:MPSDataTypeFloat32];
                     MPSMatrixDescriptor * desc1 = [MPSMatrixDescriptor
-                        matrixDescriptorWithRows:nrows1 columns:ncols1 rowBytes:gf->nodes[i]->src1->nb[1] dataType:MPSDataTypeFloat32];
+                        matrixDescriptorWithRows:nrows1 columns:ncols1 rowBytes:gf->nodes[i]->src[1]->nb[1] dataType:MPSDataTypeFloat32];
                     MPSMatrixDescriptor * desc2 = [MPSMatrixDescriptor
                         matrixDescriptorWithRows:nrows2 columns:ncols2 rowBytes:gf->nodes[i]->nb[1] dataType:MPSDataTypeFloat32];
 
