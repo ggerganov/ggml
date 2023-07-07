@@ -13309,6 +13309,118 @@ static void ggml_compute_forward_conv_2d_sk_p0_f16_f32(
     }
 }
 
+static void ggml_compute_forward_conv_2d_s1_f16_f32(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src0,
+        const struct ggml_tensor * src1,
+        const struct ggml_tensor * opt0,
+              struct ggml_tensor * dst) {
+    GGML_ASSERT(src0->type == GGML_TYPE_F16);
+    GGML_ASSERT(src1->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+
+    int64_t t0 = ggml_perf_time_us();
+    UNUSED(t0);
+    const int32_t p0 = ((const int32_t*)(opt0->data))[2];
+    const int32_t p1 = ((const int32_t*)(opt0->data))[3];
+
+    GGML_TENSOR_BINARY_OP_LOCALS;
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int nk0 = ne00;
+    const int nk1 = ne01;
+
+    const int ew0 = nk0*nk1*ne02;
+
+    GGML_ASSERT(nb00 == sizeof(ggml_fp16_t));
+    GGML_ASSERT(nb10 == sizeof(float));
+
+    if (params->type == GGML_TASK_INIT) {
+        memset(params->wdata, 0, params->wsize);
+
+        // prepare source data (src1)
+        {
+            ggml_fp16_t * const wdata = (ggml_fp16_t *) params->wdata + 0;
+
+            for (int i12 = 0; i12 < ne12; i12++) {
+                const float * const src = (float *)((char *) src1->data + i12*nb12);
+                ggml_fp16_t * dst_data = wdata;
+
+                for (int i1 = 0; i1 < ne1; i1++) {
+                    for (int i0 = 0; i0 < ne0; i0++) {
+                        for (int ik1 = 0; ik1 < nk1; ik1++) {
+                            for (int ik0 = 0; ik0 < nk0; ik0++) {
+                                const int idx1 = i1 + ik1 - p1;
+                                const int idx0 = i0 + ik0 - p0;
+                                if (!(idx1 < 0 || idx1 >= ne11 || idx0 < 0 || idx0 >= ne10)) {
+                                    dst_data[(i1*ne0 + i0)*ew0 + i12*(nk0*nk1) + ik1*nk0 + ik0] =
+                                        GGML_FP32_TO_FP16(src[idx1 * ne10 + idx0]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return;
+    }
+
+    if (params->type == GGML_TASK_FINALIZE) {
+        return;
+    }
+
+    // total patches in dst
+    const int np = ne2;
+
+    // patches per thread
+    const int dp = (np + nth - 1)/nth;
+
+    // patch range for this thread
+    const int ip0 = dp*ith;
+    const int ip1 = MIN(ip0 + dp, np);
+
+    ggml_fp16_t * const wdata = (ggml_fp16_t *) params->wdata + 0;
+
+    for (int i2 = ip0; i2 < ip1; i2++) {
+        float * dst_data = (float *)((char *) dst->data + i2*nb2);
+
+        for (int i1 = 0; i1 < ne1; ++i1) {
+            for (int i0 = 0; i0 < ne0; ++i0) {
+                ggml_vec_dot_f16(ew0, dst_data + i1*ne0 + i0,
+                        (ggml_fp16_t *) ((char *) src0->data + i2*nb03),
+                        (ggml_fp16_t *)                wdata + (i1*ne0 + i0)*ew0);
+            }
+
+        }
+    }
+}
+static void ggml_compute_forward_conv_2d_s1(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src0,
+        const struct ggml_tensor * src1,
+        const struct ggml_tensor * opt0,
+        struct ggml_tensor * dst
+    ) {
+    switch (src0->type) {
+        case GGML_TYPE_F16:
+            {
+                ggml_compute_forward_conv_2d_s1_f16_f32(params, src0, src1, opt0, dst);
+            } break;
+        case GGML_TYPE_F32:
+            {
+                //ggml_compute_forward_conv_2d_s1_f32(params, src0, src1, opt0, dst);
+                GGML_ASSERT(false);
+            } break;
+        default:
+            {
+                GGML_ASSERT(false);
+            } break;
+    }
+
+}
 static void ggml_compute_forward_conv_2d_sk_p0(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
@@ -13347,11 +13459,11 @@ static void ggml_compute_forward_conv_2d(
     const int32_t d1 = ((const int32_t*)(opt0->data))[5];
     GGML_ASSERT(d0 == 1); // dilation not supported
     GGML_ASSERT(d1 == 1);
-    GGML_ASSERT(p0 == 0); // padding not supported
-    GGML_ASSERT(p1 == 0);
 
-    if (s0 == src0->ne[0] && s1 == src0->ne[1]) {
+    if (s0 == src0->ne[0] && s1 == src0->ne[1] && p0 == 0 && p1 == 0) {
         ggml_compute_forward_conv_2d_sk_p0(params, src0, src1, dst);
+    } else if (s0 == 1 && s1 == 1) {
+        ggml_compute_forward_conv_2d_s1(params, src0, src1, opt0, dst);
     }
     else {
         GGML_ASSERT(false); // only stride equal to kernel size is supported
@@ -16658,17 +16770,21 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
                         const int64_t ne11 = node->src1->ne[1]; // H
                         const int64_t ne12 = node->src1->ne[2]; // C
 
+                        const int64_t ne0 = node->ne[0];
+                        const int64_t ne1 = node->ne[1];
+                        const int64_t ne2 = node->ne[2];
                         const int64_t nk = ne00*ne01;
+                        const int64_t ew0 = nk * ne02;
 
                         UNUSED(ne02);
                         UNUSED(ne03);
                         UNUSED(nk);
 
                         size_t cur = 0;
-
+                        
                         if (node->src0->type == GGML_TYPE_F16 &&
                             node->src1->type == GGML_TYPE_F32) {
-                            cur = sizeof(ggml_fp16_t)*(ne10*ne11*ne12);
+                            cur = sizeof(ggml_fp16_t)*(ne0*ne1*ew0);
                         } else if (node->src0->type == GGML_TYPE_F32 &&
                                    node->src1->type == GGML_TYPE_F32) {
                             cur = sizeof(float)*      (ne10*ne11*ne12);
