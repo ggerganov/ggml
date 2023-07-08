@@ -1284,6 +1284,10 @@ extern "C" {
             struct ggml_tensor          * b,
             struct ggml_tensor          * c);
 
+    // Fast Inverse Square Root
+    // Used for scaling in the self-attention layer
+    float ggml_fast_inv_sqrt(float a);
+
     //
     // automatic differentiation
     //

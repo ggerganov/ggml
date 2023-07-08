@@ -18220,6 +18220,16 @@ size_t ggml_quantize_chunk(enum ggml_type type, const float * src, void * dst, i
     }
     return result;
 }
+////////////////////////////////////////////////////////////////////////////////
+
+float ggml_fast_inv_sqrt(float a){
+        float xhalf = 0.5f * a;
+        int i = *(int*)&a;            // store floating-point bits in integer
+        i = 0x5f3759df - (i >> 1);    // initial guess for Newton's method
+        a = *(float*)&i;              // convert new bits into float
+        a = a*(1.5f - xhalf*a*a);     // One round of Newton's method
+        return a;
+    }
 
 ////////////////////////////////////////////////////////////////////////////////
 
