@@ -46,6 +46,7 @@ args = parser.parse_args()
 use_f16 = not args.use_f32
 
 fname_out = args.outfile
+os.makedirs(os.path.dirname(fname_out), exist_ok=True)
 
 print("Loading model: ", args.model_name_or_path)
 tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
