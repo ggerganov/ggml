@@ -230,16 +230,16 @@ Information about where this model came from. This is useful for tracking the pr
 
 In the following, `[llm]` is used to fill in for the name of a specific LLM architecture. They will be used in each architecture's section.
 
-- `[llm].context_length: u32`: length of the context (in tokens) that the model was trained on. For most architectures, this is the hard limit on the length of the input. Architectures, like RWKV, that are not reliant on transformer-style attention may be able to handle larger inputs, but this is not guaranteed.
-- `[llm].hidden_size: u32`: embedding layer size
-- `[llm].n_layers: u32`: the number of attention+feedforward layers (i.e. the bulk of the LLM). Does not include the input or embedding layers.
-- `[llm].n_ff: u32`: the length of the feedforward layer
-- `[llm].use_parallel_residual: bool`: whether or not the parallel residual logic should be used
-- `[llm].attention.n_heads: u32`: number of attention heads
-- `[llm].attention.max_alibi_bias: f32`: The maximum bias to use for ALiBI
-- `[llm].attention.clamp_kqv: f32`: value (`C`) to clamp the values of the `Q`, `K`, and `V` tensors between (`[-C, C]`)
-- `[llm].rope.n_dims: u32`: the number of rotary dimensions for RoPE
-- `[llm].rope.scale: f32`: a scale factor for RoPE to adjust the context length
+- `[llm].context_length: u32`: Also known as `n_ctx`. length of the context (in tokens) that the model was trained on. For most architectures, this is the hard limit on the length of the input. Architectures, like RWKV, that are not reliant on transformer-style attention may be able to handle larger inputs, but this is not guaranteed.
+- `[llm].embedding_length: u32`: Also known as `n_embd`. Embedding layer size.
+- `[llm].layer_count: u32`: Also known as `n_layers`. The number of attention+feedforward layers (i.e. the bulk of the LLM). Does not include the input or embedding layers.
+- `[llm].feedforward_length: u32`: Also known as `n_ff`. The length of the feedforward layer.
+- `[llm].use_parallel_residual: bool`: Whether or not the parallel residual logic should be used.
+- `[llm].attention.head_count: u32`: Also known as `n_head`. Number of attention heads.
+- `[llm].attention.max_alibi_bias: f32`: The maximum bias to use for ALiBI.
+- `[llm].attention.clamp_kqv: f32`: Value (`C`) to clamp the values of the `Q`, `K`, and `V` tensors between (`[-C, C]`).
+- `[llm].rope.dimension_count: u32`: The number of rotary dimensions for RoPE.
+- `[llm].rope.scale: f32`: A scale factor for RoPE to adjust the context length.
 
 #### Models
 
@@ -248,11 +248,11 @@ The following sections describe the metadata for each model architecture. Each k
 ##### LLaMA
 
 - `llama.context_length`
-- `llama.hidden_size`
-- `llama.n_layers`
-- `llama.n_ff`
-- `llama.rope.n_dims`
-- `llama.attention.n_heads`
+- `llama.embedding_length`
+- `llama.layer_count`
+- `llama.feedforward_length`
+- `llama.rope.dimension_count`
+- `llama.attention.head_count`
 
 ###### Optional
 
@@ -261,20 +261,20 @@ The following sections describe the metadata for each model architecture. Each k
 ##### MPT
 
 - `mpt.context_length`
-- `mpt.hidden_size`
-- `mpt.n_layers`
-- `mpt.attention.n_heads`
+- `mpt.embedding_length`
+- `mpt.layer_count`
+- `mpt.attention.head_count`
 - `mpt.attention.alibi_bias_max`
 - `mpt.attention.clip_kqv`
 
 ##### GPT-NeoX
 
 - `gptneox.context_length`
-- `gptneox.hidden_size`
-- `gptneox.n_layers`
+- `gptneox.embedding_length`
+- `gptneox.layer_count`
 - `gptneox.use_parallel_residual`
-- `gptneox.rope.n_dims`
-- `gptneox.attention.n_heads`
+- `gptneox.rope.dimension_count`
+- `gptneox.attention.head_count`
 
 ###### Optional
 
@@ -283,10 +283,10 @@ The following sections describe the metadata for each model architecture. Each k
 ##### GPT-J
 
 - `gptj.context_length`
-- `gptj.hidden_size`
-- `gptj.n_layers`
-- `gptj.rope.n_dims`
-- `gptj.attention.n_heads`
+- `gptj.embedding_length`
+- `gptj.layer_count`
+- `gptj.rope.dimension_count`
+- `gptj.attention.head_count`
 
 ###### Optional
 
@@ -295,30 +295,47 @@ The following sections describe the metadata for each model architecture. Each k
 ##### GPT-2
 
 - `gpt2.context_length`
-- `gpt2.hidden_size`
-- `gpt2.n_layers`
-- `gpt2.attention.n_heads`
+- `gpt2.embedding_length`
+- `gpt2.layer_count`
+- `gpt2.attention.head_count`
 
 ##### BLOOM
 
 - `bloom.context_length`
-- `bloom.hidden_size`
-- `bloom.n_layers`
-- `bloom.n_ff`
-- `bloom.attention.n_heads`
+- `bloom.embedding_length`
+- `bloom.layer_count`
+- `bloom.feedforward_length`
+- `bloom.attention.head_count`
 
 ##### Falcon
 
 - `falcon.context_length`
-- `falcon.hidden_size`
-- `falcon.n_layers`
-- `falcon.attention.num_heads`
-- `falcon.attention.num_heads_kv`
+- `falcon.embedding_length`
+- `falcon.layer_count`
+- `falcon.attention.head_count`
+- `falcon.attention.head_count_kv`
 - `falcon.attention.use_norm`
 
 ##### RWKV
 
 **TODO**.
+
+##### Whisper
+
+Keys that do not have types defined should be assumed to share definitions with `llm.` keys.
+(For example, `whisper.context_length` is equivalent to `llm.context_length`.)
+This is because they are both transformer models.
+
+- `whisper.encoder.context_length`
+- `whisper.encoder.embedding_length`
+- `whisper.encoder.layer_count`
+- `whisper.encoder.mels_count: u32`
+- `whisper.encoder.attention.head_count`
+
+- `whisper.decoder.context_length`
+- `whisper.decoder.embedding_length`
+- `whisper.decoder.layer_count`
+- `whisper.decoder.attention.head_count`
 
 #### Prompting
 
@@ -347,9 +364,9 @@ It is not guaranteed to be standardized across models, and may change in the fut
 - `tokenizer.ggml.scores: array[f32]`: If present, the score/probability of each token. If not present, all tokens are assumed to have equal probability. Must be the same length as `tokens`.
 - `tokenizer.ggml.bos_token_id: u32`: Beginning of sequence marker
 - `tokenizer.ggml.eos_token_id: u32`: End of sequence marker
-- `tokenizer.ggml.unk_token_id: u32`: Unknown token
-- `tokenizer.ggml.sep_token_id: u32`: Separator token
-- `tokenizer.ggml.pad_token_id: u32`: Padding token
+- `tokenizer.ggml.unknown_token_id: u32`: Unknown token
+- `tokenizer.ggml.separator_token_id: u32`: Separator token
+- `tokenizer.ggml.padding_token_id: u32`: Padding token
 
 #### Hugging Face
 
