@@ -258,8 +258,17 @@ if (GGML_CUDA_SOURCES)
     set_property(TARGET ggml  PROPERTY CUDA_ARCHITECTURES OFF)
     set_property(TARGET ggml  PROPERTY CUDA_SELECT_NVCC_ARCH_FLAGS "Auto")
     # Windows native does not link stdc++
-    if(NOT (("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows") OR WIN32))
+    if (NOT (("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows") OR WIN32))
         target_link_libraries(ggml PUBLIC stdc++)
+    else()
+        # Set the minimum standard, CMake can still decide to use -std=c++17
+        # if the given compilers support C++17
+        target_compile_features(ggml PRIVATE cuda_std_14)
+        set_target_properties(ggml  PROPERTIES
+                CUDA_RUNTIME_LIBRARY Shared
+                # CUDA_STANDARD 14  # This one cannot be changed by CMake
+                # CUDA_SEPARABLE_COMPILATION ON  # Optional
+        )
     endif()
 endif()
 
