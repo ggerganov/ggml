@@ -132,10 +132,10 @@
 //   {
 //       struct ggml_tensor * a = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 2, 3);
 //
-//       // a[1, 2] = 1.0f;
+//       // a[2, 1] = 1.0f;
 //       *(float *) ((char *) a->data + 2*a->nb[1] + 1*a->nb[0]) = 1.0f;
 //
-//       // a[2, 0] = 2.0f;
+//       // a[0, 2] = 2.0f;
 //       *(float *) ((char *) a->data + 0*a->nb[1] + 2*a->nb[0]) = 2.0f;
 //
 //       ...
