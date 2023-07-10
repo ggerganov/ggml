@@ -153,7 +153,8 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
                 "<fim-prefix>",
                 "<fim-middle>",
                 "<fim-suffix>",
-                "<fim-pad>"
+                "<fim-pad>",
+                "<|end_of_turn|>"
             }) {
             if (vocab.token_to_id.find(token) != vocab.token_to_id.end()) {
                 vocab.add_special_token(token);
@@ -813,12 +814,17 @@ int main(int argc, char ** argv) {
     }
     printf("\n\n");
 
-    // Handle StarChat "<|end|>" token.
+    // Handle StarChat "<|end|>" and OpenCoder "<|end_of_turn>" tokens.
     gpt_vocab::id starchat_end_token = -1;
     {
         const auto it = vocab.token_to_id.find("<|end|>");
         if (it != vocab.token_to_id.end()) {
             starchat_end_token = it->second;
+        } else {
+            const auto eot_token_id = vocab.token_to_id.find("<|end_of_turn|>");
+            if (eot_token_id != vocab.token_to_id.end()) {
+              starchat_end_token = eot_token_id->second;
+            }
         }
     }
 
@@ -898,7 +904,7 @@ int main(int argc, char ** argv) {
             break;
         }
         // Handle StarChat "<|end|>" token.
-        else if (embd.back() == starchat_end_token) {
+        else if (embd.back() == starchat_end_token && i >= embd_inp.size()) {
             break;
         }
     }
