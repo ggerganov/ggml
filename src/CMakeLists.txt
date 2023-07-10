@@ -257,7 +257,10 @@ if (GGML_CUDA_SOURCES)
     message(STATUS "GGML CUDA sources found, configuring CUDA architecture")
     set_property(TARGET ggml  PROPERTY CUDA_ARCHITECTURES OFF)
     set_property(TARGET ggml  PROPERTY CUDA_SELECT_NVCC_ARCH_FLAGS "Auto")
-    target_link_libraries(ggml PUBLIC stdc++)
+    # Windows native does not link stdc++
+    if(NOT (("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows") OR WIN32))
+        target_link_libraries(ggml PUBLIC stdc++)
+    endif()
 endif()
 
 set (GGML_PUBLIC_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml.h)
