@@ -15981,7 +15981,7 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
     int node_n = -1;
 
     while (true) {
-        if (state->shared->abort_callback(state->shared->abort_callback_data)) {
+        if (cplan->abort_callback && cplan->abort_callback(cplan->abort_callback_data)) {
             return GGML_EXIT_ABORTED;
         }
         if (atomic_fetch_sub(&state->shared->n_active, 1) == 1) {
@@ -16038,7 +16038,7 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
                     break;
                 }
 
-                if (state->shared->abort_callback(state->shared->abort_callback_data)) {
+                if (cplan->abort_callback && cplan->abort_callback(cplan->abort_callback_data)) {
                     break;
                 }
             }
@@ -16415,7 +16415,7 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
     return cplan;
 }
 
-void ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {
+int ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {
     {
         GGML_ASSERT(cplan);
         GGML_ASSERT(cplan->n_threads > 0);
