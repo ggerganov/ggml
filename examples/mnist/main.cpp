@@ -186,7 +186,6 @@ int mnist_eval(
 
     struct ggml_context * ctx0 = ggml_init(params);
     struct ggml_cgraph gf = {};
-    gf.n_threads = n_threads;
 
     struct ggml_tensor * input = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, hparams.n_input);
     memcpy(input->data, digit.data(), ggml_nbytes(input));
@@ -202,7 +201,7 @@ int mnist_eval(
 
     // build / export / run the computation graph
     ggml_build_forward_expand(&gf, probs);
-    ggml_graph_compute       (ctx0, &gf);
+    ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
     //ggml_graph_print   (&gf);
     ggml_graph_dump_dot(&gf, NULL, "mnist.dot");

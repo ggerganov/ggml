@@ -14,10 +14,16 @@
 #include <string>
 #include <vector>
 
+#if !defined(_WIN32)
+#define DOLLY_INTERACTIVE_PORT
+#endif
+
+#if defined(DOLLY_INTERACTIVE_PORT)
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#endif
 
 #if defined(_MSC_VER)
 #pragma warning(disable: 4244 4267) // possible loss of data
@@ -490,7 +496,6 @@ bool dollyv2_eval(
 
     struct ggml_context * ctx0 = ggml_init(params);
     struct ggml_cgraph gf = { };
-    gf.n_threads = n_threads;
 
     struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
     memcpy(embd->data, embd_inp.data(), N*ggml_element_size(embd));
@@ -653,7 +658,7 @@ bool dollyv2_eval(
 
     // run the computation
     ggml_build_forward_expand(&gf, inpL);
-    ggml_graph_compute       (ctx0, &gf);
+    ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
     //if (n_past%100 == 0) {
     //    ggml_graph_print   (&gf);
@@ -775,10 +780,11 @@ std::string execute_prompt(
     return output;
 }
 
+#if defined(DOLLY_INTERACTIVE_PORT)
 int setup_port(const int port) {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
-        std::cerr << "Failed to create socket\n";
+        fprintf(stderr, "%s: Failed to create new socket\n", __func__);
         return -1;
     }
 
@@ -790,12 +796,12 @@ int setup_port(const int port) {
     servaddr.sin_port = htons(port);
 
     if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
-        std::cerr << "Failed to bind to port\n";
+        fprintf(stderr, "%s: Failed to bind to port %i\n", __func__, port);
         return -1;
     }
 
     if (listen(sockfd, 10) < 0) {
-        std::cerr << "Failed to listen on socket\n";
+        fprintf(stderr, "%s: Failed to listen to socket on port %i\n", __func__, port);
         return -1;
     }
     return sockfd;
@@ -803,7 +809,7 @@ int setup_port(const int port) {
 
 std::string read_from_port(int sockfd, int clientfd) {
     if (clientfd < 0) {
-        std::cerr << "Failed to accept new connection\n";
+        fprintf(stderr, "%s: Failed to accept new connection\n", __func__);
         return "";
     }
 
@@ -811,13 +817,14 @@ std::string read_from_port(int sockfd, int clientfd) {
     std::memset(buffer, 0, sizeof(buffer));
 
     if (read(clientfd, buffer, sizeof(buffer)) < 0) {
-        std::cerr << "Failed to read from client\n";
+        fprintf(stderr, "%s: Failed to read from client\n", __func__);
     } else {
         std::cout << "Received: " << buffer;
         return std::string(buffer);
     }
     return std::string("");
 }
+#endif
 
 int main(int argc, char ** argv) {
     ggml_time_init();
@@ -865,6 +872,7 @@ int main(int argc, char ** argv) {
         test_gpt_tokenizer(vocab, params.token_test);
     }
 
+#if defined(DOLLY_INTERACTIVE_PORT)
     int sockfd;
     if (params.interactive_port != -1) {
         sockfd = setup_port(params.interactive_port);
@@ -874,17 +882,21 @@ int main(int argc, char ** argv) {
         fprintf(stdout, "Model is ready on port %i\n", params.interactive_port);
         fflush(stdout);
     }
+#endif
 
-    if (params.interactive or params.interactive_port != -1) {
+    if (params.interactive || params.interactive_port != -1) {
         while (true) {
             std::string prompt_input;
+#if defined(DOLLY_INTERACTIVE_PORT)
             int clientfd;
             if (params.interactive_port != -1) {
                 sockaddr_in clientaddr;
                 socklen_t clientaddrlen = sizeof(clientaddr);
-                clientfd = accept(sockfd, (struct sockaddr *)&clientaddr, &clientaddrlen);   
+                clientfd = accept(sockfd, (struct sockaddr *)&clientaddr, &clientaddrlen);
                 prompt_input = read_from_port(sockfd, clientfd);
-            } else {
+            } else
+#endif
+            {
                 printf("Please enter your quesiton:\n>");
                 fflush(stdout);
 
@@ -899,16 +911,18 @@ int main(int argc, char ** argv) {
             // call the model
             const std::string response = execute_prompt(model, vocab, prompt, params, rng, t_load_us, t_sample_us, t_predict_us, mem_per_token, n_past, true);
 
+#if defined(DOLLY_INTERACTIVE_PORT)
             if (params.interactive_port != -1) {
                 if (write(clientfd, response.c_str(), response.size()) < 0) {
-                    std::cerr << "Failed to write to client\n";
+                    fprintf(stderr, "%s: Failed to write answer '%s' to client\n", __func__, response.c_str());
                 }
 
                 if (close(clientfd) < 0) {
-                    std::cerr << "Failed to close client socket\n";
+                    fprintf(stderr, "%s: Failed to close client socket\n", __func__);
                 }
-            }
-            else {
+            } else
+#endif
+            {
                 printf("%s\n\n", response.c_str());
             }
             fflush(stdout);
@@ -936,9 +950,11 @@ int main(int argc, char ** argv) {
 
     ggml_free(model.ctx);
 
+#if defined(DOLLY_INTERACTIVE_PORT)
     if (params.interactive_port != -1 && close(sockfd) < 0) {
-        std::cerr << "Failed to close server socket\n";
+        fprintf(stderr, "%s: Failed to close server socket\n", __func__);
     }
+#endif
 
     return 0;
 }

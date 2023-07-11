@@ -153,7 +153,8 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
                 "<fim-prefix>",
                 "<fim-middle>",
                 "<fim-suffix>",
-                "<fim-pad>"
+                "<fim-pad>",
+                "<|end_of_turn|>"
             }) {
             if (vocab.token_to_id.find(token) != vocab.token_to_id.end()) {
                 vocab.add_special_token(token);
@@ -463,7 +464,6 @@ bool starcoder_eval(
 
     struct ggml_context * ctx0 = ggml_init(params);
     struct ggml_cgraph gf = {};
-    gf.n_threads = n_threads;
 
     struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
     memcpy(embd->data, embd_inp.data(), N*ggml_element_size(embd));
@@ -716,7 +716,7 @@ bool starcoder_eval(
 
     // run the computation
     ggml_build_forward_expand(&gf, inpL);
-    ggml_graph_compute       (ctx0, &gf);
+    ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
     //if (n_past%100 == 0) {
     //    ggml_graph_print   (&gf);
@@ -791,7 +791,7 @@ int main(int argc, char ** argv) {
     printf("%s: top_p          = %.3f\n", __func__, params.top_p);
     printf("%s: repeat_last_n  = %d\n",   __func__, params.repeat_last_n);
     printf("%s: repeat_penalty = %.3f\n", __func__, params.repeat_penalty);
-    
+
     int n_past = 0;
 
     int64_t t_sample_us  = 0;
@@ -801,7 +801,7 @@ int main(int argc, char ** argv) {
 
     std::vector<int32_t> last_n_tokens(model.hparams.n_ctx);
     std::fill(last_n_tokens.begin(), last_n_tokens.end(), 0);
-    
+
     // tokenize the prompt
     std::vector<gpt_vocab::id> embd_inp = ::gpt_tokenize(vocab, params.prompt);
 
@@ -814,12 +814,17 @@ int main(int argc, char ** argv) {
     }
     printf("\n\n");
 
-    // Handle StarChat "<|end|>" token.
+    // Handle StarChat "<|end|>" and OpenCoder "<|end_of_turn>" tokens.
     gpt_vocab::id starchat_end_token = -1;
     {
         const auto it = vocab.token_to_id.find("<|end|>");
         if (it != vocab.token_to_id.end()) {
             starchat_end_token = it->second;
+        } else {
+            const auto eot_token_id = vocab.token_to_id.find("<|end_of_turn|>");
+            if (eot_token_id != vocab.token_to_id.end()) {
+              starchat_end_token = eot_token_id->second;
+            }
         }
     }
 
@@ -868,14 +873,14 @@ int main(int argc, char ** argv) {
             embd.push_back(id);
 
             last_n_tokens.erase(last_n_tokens.begin());
-            last_n_tokens.push_back(id);            
+            last_n_tokens.push_back(id);
         } else {
             // if here, it means we are still processing the input prompt
             for (int k = i; k < embd_inp.size(); k++) {
                 embd.push_back(embd_inp[k]);
 
                 last_n_tokens.erase(last_n_tokens.begin());
-                last_n_tokens.push_back(embd_inp[k]); 
+                last_n_tokens.push_back(embd_inp[k]);
 
                 if (embd.size() >= params.n_batch) {
                     break;
@@ -899,7 +904,7 @@ int main(int argc, char ** argv) {
             break;
         }
         // Handle StarChat "<|end|>" token.
-        else if (embd.back() == starchat_end_token) {
+        else if (embd.back() == starchat_end_token && i >= embd_inp.size()) {
             break;
         }
     }

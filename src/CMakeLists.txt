@@ -260,7 +260,12 @@ if (GGML_CUDA_SOURCES)
     target_link_libraries(ggml PUBLIC stdc++)
 endif()
 
+set (GGML_PUBLIC_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml.h)
+set_target_properties(${TARGET} PROPERTIES
+                      PUBLIC_HEADER "${GGML_PUBLIC_HEADERS}")
+
 install(TARGETS ${TARGET}
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib/static
+    PUBLIC_HEADER DESTINATION include/ggml
     )
