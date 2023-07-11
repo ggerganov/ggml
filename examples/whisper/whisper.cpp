@@ -1830,8 +1830,8 @@ static bool whisper_encode_internal(
 
         // TODO: hack to disconnect the encoded features from the previous graph
         cur->op = GGML_OP_NONE;
-        cur->src0 = nullptr;
-        cur->src1 = nullptr;
+        cur->src[0] = nullptr;
+        cur->src[1] = nullptr;
 
         for (int il = 0; il < model.hparams.n_text_layer; ++il) {
             auto& layer = model.layers_decoder[il];

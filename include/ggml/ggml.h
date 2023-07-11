@@ -197,7 +197,7 @@
 #define GGML_MAX_NODES         4096
 #define GGML_MAX_PARAMS        256
 #define GGML_MAX_CONTEXTS      64
-#define GGML_MAX_OPT           4
+#define GGML_MAX_SRC           6
 #define GGML_MAX_NAME          48
 #define GGML_DEFAULT_N_THREADS 4
 
@@ -414,9 +414,7 @@ extern "C" {
         bool is_param;
 
         struct ggml_tensor * grad;
-        struct ggml_tensor * src0;
-        struct ggml_tensor * src1;
-        struct ggml_tensor * opt[GGML_MAX_OPT];
+        struct ggml_tensor * src[GGML_MAX_SRC];
 
         // performance
         int     perf_runs;
