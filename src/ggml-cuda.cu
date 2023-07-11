@@ -3225,7 +3225,7 @@ void ggml_cuda_assign_buffers_impl(struct ggml_tensor * tensor, bool scratch, bo
         char * src0_ddc = (char *) src0_extra->data_device[g_main_device];
         size_t offset = 0;
         if (tensor->op == GGML_OP_VIEW) {
-            memcpy(&offset, tensor->opt[0]->data, sizeof(size_t));
+            memcpy(&offset, tensor->src[2]->data, sizeof(size_t));
         }
         extra->data_device[g_main_device] = src0_ddc + offset;
     } else if (tensor->op == GGML_OP_CPY) {
