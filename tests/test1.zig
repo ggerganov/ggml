@@ -4,6 +4,8 @@ const c = @cImport({
 });
 
 pub fn main() !void {
+    const n_threads = 2;
+
     const params = .{
         .mem_size   = 128*1024*1024,
         .mem_buffer = null,
@@ -36,7 +38,7 @@ pub fn main() !void {
         c.ggml_graph_reset(@constCast(&gf));
         _ = c.ggml_set_f32(f.*.grad, 1.0);
 
-        c.ggml_graph_compute(ctx0, @constCast(&gb));
+        c.ggml_graph_compute_with_ctx(ctx0, @constCast(&gb), n_threads);
 
         std.debug.print("f     = {d:.6}\n", .{c.ggml_get_f32_1d(f, 0)});
         std.debug.print("df/dx = {d:.6}\n", .{c.ggml_get_f32_1d(x.*.grad, 0)});
@@ -49,7 +51,7 @@ pub fn main() !void {
         c.ggml_graph_reset(@constCast(&gf));
         _ = c.ggml_set_f32(f.*.grad, 1.0);
 
-        c.ggml_graph_compute(ctx0, @constCast(&gb));
+        c.ggml_graph_compute_with_ctx(ctx0, @constCast(&gb), n_threads);
 
         std.debug.print("f     = {d:.6}\n", .{c.ggml_get_f32_1d(f, 0)});
         std.debug.print("df/dx = {d:.6}\n", .{c.ggml_get_f32_1d(x.*.grad, 0)});
@@ -83,7 +85,7 @@ pub fn main() !void {
         c.ggml_graph_reset(@constCast(&gf));
         _ = c.ggml_set_f32(y.*.grad, 1.0);
 
-        c.ggml_graph_compute(ctx0, @constCast(&gb));
+        c.ggml_graph_compute_with_ctx(ctx0, @constCast(&gb), n_threads);
 
         std.debug.print("y      = {d:.6}\n", .{c.ggml_get_f32_1d(y, 0)});
         std.debug.print("df/dx1 = {d:.6}\n", .{c.ggml_get_f32_1d(x1.*.grad, 0)});
@@ -102,7 +104,7 @@ pub fn main() !void {
         _ = c.ggml_set_f32(g1.*.grad, 1.0);
         _ = c.ggml_set_f32(g2.*.grad, 1.0);
 
-        c.ggml_graph_compute(ctx0, @constCast(&gbb));
+        c.ggml_graph_compute_with_ctx(ctx0, @constCast(&gbb), n_threads);
 
         std.debug.print("H * [1, 1] = [ {d:.6} {d:.6} ]\n", .{c.ggml_get_f32_1d(x1.*.grad, 0), c.ggml_get_f32_1d(x2.*.grad, 0)});
 
@@ -133,7 +135,7 @@ pub fn main() !void {
         c.ggml_graph_reset(@constCast(&gf));
         _ = c.ggml_set_f32(y.*.grad, 1.0);
 
-        c.ggml_graph_compute(ctx0, @constCast(&gb));
+        c.ggml_graph_compute_with_ctx(ctx0, @constCast(&gb), n_threads);
 
         std.debug.print("y      = {d:.6}\n", .{c.ggml_get_f32_1d(y, 0)});
         std.debug.print("df/dx1 = {d:.6}\n", .{c.ggml_get_f32_1d(x1.*.grad, 0)});
@@ -170,7 +172,7 @@ pub fn main() !void {
         c.ggml_graph_reset(@constCast(&gf));
         _ = c.ggml_set_f32(y.*.grad, 1.0);
 
-        c.ggml_graph_compute(ctx0, @constCast(&gb));
+        c.ggml_graph_compute_with_ctx(ctx0, @constCast(&gb), n_threads);
 
         std.debug.print("y      = {d:.6}\n", .{c.ggml_get_f32_1d(y, 0)});
         std.debug.print("df/dx1 = {d:.6}\n", .{c.ggml_get_f32_1d(x1.*.grad, 0)});
@@ -193,7 +195,7 @@ pub fn main() !void {
         _ = c.ggml_set_f32(g2.*.grad, 1.0);
         _ = c.ggml_set_f32(g3.*.grad, 1.0);
 
-        c.ggml_graph_compute(ctx0, @constCast(&gbb));
+        c.ggml_graph_compute_with_ctx(ctx0, @constCast(&gbb), n_threads);
 
         std.debug.print("H * [1, 1, 1] = [ {d:.6} {d:.6} {d:.6}]\n",
             .{
@@ -230,7 +232,7 @@ pub fn main() !void {
         c.ggml_graph_reset(@constCast(&gf));
         _ = c.ggml_set_f32(y.*.grad, 1.0);
 
-        c.ggml_graph_compute(ctx0, @constCast(&gb));
+        c.ggml_graph_compute_with_ctx(ctx0, @constCast(&gb), n_threads);
 
         std.debug.print("y      = {d:.6}\n", .{c.ggml_get_f32_1d(y, 0)});
         std.debug.print("df/dx1 = {d:.6} {d:.6} {d:.6}\n",
@@ -287,7 +289,7 @@ pub fn main() !void {
         c.ggml_graph_reset(@constCast(&gf));
         _ = c.ggml_set_f32(y.*.grad, 1.0);
 
-        c.ggml_graph_compute(ctx0, @constCast(&gb));
+        c.ggml_graph_compute_with_ctx(ctx0, @constCast(&gb), n_threads);
 
         std.debug.print("y      = {d:.6}\n", .{c.ggml_get_f32_1d(y, 0)});
         std.debug.print("df/dx1 = {d:.6} {d:.6} {d:.6}\n",
@@ -344,7 +346,7 @@ pub fn main() !void {
         c.ggml_graph_reset(@constCast(&gf));
         _ = c.ggml_set_f32(y.*.grad, 1.0);
 
-        c.ggml_graph_compute(ctx0, @constCast(&gb));
+        c.ggml_graph_compute_with_ctx(ctx0, @constCast(&gb), n_threads);
 
         std.debug.print("y      = {d:.6}\n", .{c.ggml_get_f32_1d(y, 0)});
         std.debug.print("df/dx1 = {d:.6} {d:.6} {d:.6}\n",
@@ -395,7 +397,7 @@ pub fn main() !void {
         c.ggml_graph_reset(@constCast(&gf));
         _ = c.ggml_set_f32(y.*.grad, 1.0);
 
-        c.ggml_graph_compute(ctx0, @constCast(&gb));
+        c.ggml_graph_compute_with_ctx(ctx0, @constCast(&gb), n_threads);
 
         std.debug.print("y      = {d:.6}\n", .{c.ggml_get_f32_1d(y, 0)});
         std.debug.print("df/dx1 = {d:.6} {d:.6} {d:.6}\n",
@@ -425,7 +427,7 @@ pub fn main() !void {
         c.ggml_graph_reset(@constCast(&gf));
         _ = c.ggml_set_f32(y.*.grad, 1.0);
 
-        c.ggml_graph_compute(ctx0, @constCast(&gb));
+        c.ggml_graph_compute_with_ctx(ctx0, @constCast(&gb), n_threads);
 
         std.debug.print("y      = {d:.6}\n", .{c.ggml_get_f32_1d(y, 0)});
         std.debug.print("df/dx1 = {d:.6} {d:.6} {d:.6}\n",
