@@ -13067,7 +13067,8 @@ static void ggml_compute_forward_conv_2d_f16_f32(
     const int32_t s1 = ((const int32_t*)(opt0->data))[1];
     const int32_t p0 = ((const int32_t*)(opt0->data))[2];
     const int32_t p1 = ((const int32_t*)(opt0->data))[3];
-
+    const int32_t d0 = ((const int32_t*)(opt0->data))[4];
+    const int32_t d1 = ((const int32_t*)(opt0->data))[5];
     GGML_TENSOR_BINARY_OP_LOCALS;
 
     const int ith = params->ith;
@@ -13096,11 +13097,8 @@ static void ggml_compute_forward_conv_2d_f16_f32(
                     for (int i0 = 0; i0 < ne0; i0++) {
                         for (int ik1 = 0; ik1 < nk1; ik1++) {
                             for (int ik0 = 0; ik0 < nk0; ik0++) {
-                                /* const int idx1 = i1 + ik1 - p1; */
-                                /* const int idx0 = i0 + ik0 - p0; */
-                                /* Compute the indexes but include stride */
-                                const int idx1 = i1*s1 + ik1 - p1;
-                                const int idx0 = i0*s0 + ik0 - p0;
+                                const int idx1 = i1*s1 + ik1*d1 - p1;
+                                const int idx0 = i0*s0 + ik0*d0 - p0;
                                 
                                 if (!(idx1 < 0 || idx1 >= ne11 || idx0 < 0 || idx0 >= ne10)) {
                                     dst_data[(i1*ne0 + i0)*ew0 + i12*(nk0*nk1) + ik1*nk0 + ik0] =
@@ -13233,8 +13231,6 @@ static void ggml_compute_forward_conv_2d(
     const int32_t p1 = ((const int32_t*)(opt0->data))[3];
     const int32_t d0 = ((const int32_t*)(opt0->data))[4];
     const int32_t d1 = ((const int32_t*)(opt0->data))[5];
-    GGML_ASSERT(d0 == 1); // dilation not supported
-    GGML_ASSERT(d1 == 1);
 
     if (s0 == src0->ne[0] && s1 == src0->ne[1] && p0 == 0 && p1 == 0) {
         ggml_compute_forward_conv_2d_sk_p0(params, src0, src1, dst);
