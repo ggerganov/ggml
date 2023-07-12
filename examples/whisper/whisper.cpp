@@ -1782,10 +1782,9 @@ static bool whisper_encode_internal(
         // run the computation
         {
             struct ggml_cgraph gf = {};
-            gf.n_threads = n_threads;
 
             ggml_build_forward_expand(&gf, cur);
-            ggml_graph_compute(ctx0, &gf);
+            ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
             //ggml_graph_print(&gf);
         }
@@ -1828,12 +1827,11 @@ static bool whisper_encode_internal(
     // pre-compute cross-attention memory
     {
         struct ggml_cgraph gf = {};
-        gf.n_threads = n_threads;
 
         // TODO: hack to disconnect the encoded features from the previous graph
         cur->op = GGML_OP_NONE;
-        cur->src0 = nullptr;
-        cur->src1 = nullptr;
+        cur->src[0] = nullptr;
+        cur->src[1] = nullptr;
 
         for (int il = 0; il < model.hparams.n_text_layer; ++il) {
             auto& layer = model.layers_decoder[il];
@@ -1871,7 +1869,7 @@ static bool whisper_encode_internal(
             ggml_build_forward_expand(&gf, ggml_cpy(ctx0, Vcross, v));
         }
 
-        ggml_graph_compute(ctx0, &gf);
+        ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
         //ggml_graph_print(&gf);
     }
 
@@ -1942,7 +1940,6 @@ static bool whisper_decode_internal(
     struct ggml_context * ctx0 = ggml_init(params);
 
     struct ggml_cgraph gf = {};
-    gf.n_threads = n_threads;
 
     struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
     memcpy(embd->data, tokens, N*ggml_element_size(embd));
@@ -2286,7 +2283,7 @@ static bool whisper_decode_internal(
     // run the computation
     {
         ggml_build_forward_expand(&gf, logits);
-        ggml_graph_compute       (ctx0, &gf);
+        ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
     }
 
     // extract logits for all N tokens
@@ -5098,17 +5095,15 @@ WHISPER_API const char * whisper_bench_ggml_mul_mat_str(int n_threads) {
 
             struct ggml_cgraph gf = ggml_build_forward(c);
 
-            gf.n_threads = n_threads;
-
             double tsum = 0.0;
 
             // heat-up
-            ggml_graph_compute(ctx0, &gf);
+            ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
             for (int i = 0; i < n_max; ++i) {
                 const int64_t t0 = ggml_time_us();
 
-                ggml_graph_compute(ctx0, &gf);
+                ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
                 const int64_t t1 = ggml_time_us();
 

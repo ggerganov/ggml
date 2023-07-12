@@ -36,16 +36,15 @@ int mnist_eval(
     struct ggml_context * ctx_eval = NULL;
 
     struct ggml_cgraph gf = ggml_graph_import(fname_cgraph, &ctx_data, &ctx_eval);
-    gf.n_threads = 1;
 
     // allocate work context
-    static size_t buf_size = gf.work_size; // TODO
+    static size_t buf_size = 128ull*1024*1024; // TODO
     static void * buf = malloc(buf_size);
 
     struct ggml_init_params params = {
-        .mem_size   = buf_size,
-        .mem_buffer = buf,
-        .no_alloc   = false,
+        /*.mem_size   =*/ buf_size,
+        /*.mem_buffer =*/ buf,
+        /*.no_alloc   =*/ false,
     };
 
     struct ggml_context * ctx_work = ggml_init(params);

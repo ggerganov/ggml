@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <cinttypes>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
@@ -342,7 +343,7 @@ bool replit_model_load(const std::string & fname, replit_model & model, replit_t
 
         const size_t memory_size = ggml_nbytes(model.memory_k) + ggml_nbytes(model.memory_v);
 
-        printf("%s: memory_size = %8.2f MB, n_mem = %lld\n", __func__, memory_size / 1024.0 / 1024.0, n_mem);
+        printf("%s: memory_size = %8.2f MB, n_mem = %" PRIu64 "\n", __func__, memory_size / 1024.0 / 1024.0, n_mem);
     }
 
     // load weights
@@ -475,7 +476,6 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
 
     struct ggml_context * ctx0 = ggml_init(params);
     struct ggml_cgraph gf = {};
-    gf.n_threads = n_threads;
 
     struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
     memcpy(embd->data, embd_inp.data(), N * ggml_element_size(embd));
@@ -614,7 +614,7 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
 
     // run the computation
     ggml_build_forward_expand(&gf, inpL);
-    ggml_graph_compute(ctx0, &gf);
+    ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
     // std::cout << "Qcur" << std::endl;
     // print_tensor(Qcur);
