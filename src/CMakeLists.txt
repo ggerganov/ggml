@@ -116,9 +116,13 @@ endif()
 
 if (GGML_BUILD_TESTS)
     if (GGML_BUILD_TEST_COVERAGE)
-        set(CMAKE_C_FLAGS "$(CMAKE_C_FLAGS) -fprofile-instr-generate -fcoverage-mapping")
-    endif ()
-endif ()
+        if (CMAKE_C_COMPILER_ID MATCHES "Clang")
+            set(CMAKE_C_FLAGS "$(CMAKE_C_FLAGS) -fprofile-instr-generate -fcoverage-mapping")
+        else()
+            message(WARNING "Test coverage is only supported for Clang")
+        endif()
+    endif()
+endif()
 
 
 # ggml

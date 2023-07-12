@@ -90,9 +90,13 @@ endif()
 
 if (GGML_BUILD_TESTS)
     if (GGML_BUILD_TEST_COVERAGE)
-        set(GGML_C_FLAGS "$(GGML_C_FLAGS) -fprofile-instr-generate -fcoverage-mapping")
-    endif ()
-endif ()
+        if (CMAKE_C_COMPILER_ID MATCHES "Clang")
+            set(GGML_C_FLAGS "$(GGML_C_FLAGS) -fprofile-instr-generate -fcoverage-mapping")
+        else()
+            message(WARNING "Test coverage is only supported for Clang")
+        endif()
+    endif()
+endif()
 
 # on APPLE - include Accelerate framework
 if (APPLE AND NOT GGML_NO_ACCELERATE)
