@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <cinttypes>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
@@ -342,7 +343,7 @@ bool replit_model_load(const std::string & fname, replit_model & model, replit_t
 
         const size_t memory_size = ggml_nbytes(model.memory_k) + ggml_nbytes(model.memory_v);
 
-        printf("%s: memory_size = %8.2f MB, n_mem = %lld\n", __func__, memory_size / 1024.0 / 1024.0, n_mem);
+        printf("%s: memory_size = %8.2f MB, n_mem = %" PRIu64 "\n", __func__, memory_size / 1024.0 / 1024.0, n_mem);
     }
 
     // load weights

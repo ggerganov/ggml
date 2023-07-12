@@ -21,11 +21,11 @@ int main(int argc, const char** argv) {
 
     // avg pool 1d
     {
-        struct ggml_context* ctx = make_ctx();
-        struct ggml_tensor* t = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 10, 2);
+        struct ggml_context * ctx = make_ctx();
+        struct ggml_tensor * t = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 10, 2);
         memcpy(t->data, buf_f32, ggml_nbytes(t));
 
-        struct ggml_tensor* t_pooled = ggml_pool_1d(ctx, t, GGML_POOL_AVG, 3, 3, 0);
+        struct ggml_tensor * t_pooled = ggml_pool_1d(ctx, t, GGML_OP_POOL_AVG, 3, 3, 0);
         GGML_ASSERT(t_pooled->ne[0] == 3);
         GGML_ASSERT(t_pooled->ne[1] == 2);
         GGML_ASSERT(t_pooled->ne[2] == 1);
@@ -34,7 +34,8 @@ int main(int argc, const char** argv) {
 
         ggml_graph_compute_with_ctx(ctx, &graph, 4);
 
-        const float* output = ggml_get_data_f32(t_pooled);
+        const float * output = ggml_get_data_f32(t_pooled);
+
         GGML_ASSERT(output[0] == 2);
         GGML_ASSERT(output[1] == 5);
         GGML_ASSERT(output[2] == 8);
@@ -47,11 +48,11 @@ int main(int argc, const char** argv) {
 
     // max pool 1d
     {
-        struct ggml_context* ctx = make_ctx();
-        struct ggml_tensor* t = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 10, 2);
+        struct ggml_context * ctx = make_ctx();
+        struct ggml_tensor * t = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 10, 2);
         memcpy(t->data, buf_f32, ggml_nbytes(t));
 
-        struct ggml_tensor* t_pooled = ggml_pool_1d(ctx, t, GGML_POOL_MAX, 3, 3, 0);
+        struct ggml_tensor * t_pooled = ggml_pool_1d(ctx, t, GGML_OP_POOL_MAX, 3, 3, 0);
         GGML_ASSERT(t_pooled->ne[0] == 3);
         GGML_ASSERT(t_pooled->ne[1] == 2);
         GGML_ASSERT(t_pooled->ne[2] == 1);
@@ -60,7 +61,7 @@ int main(int argc, const char** argv) {
 
         ggml_graph_compute_with_ctx(ctx, &graph, 4);
 
-        const float* output = ggml_get_data_f32(t_pooled);
+        const float * output = ggml_get_data_f32(t_pooled);
         GGML_ASSERT(output[0] == 3);
         GGML_ASSERT(output[1] == 6);
         GGML_ASSERT(output[2] == 9);
@@ -73,11 +74,11 @@ int main(int argc, const char** argv) {
 
     // avg pool 2d
     {
-        struct ggml_context* ctx = make_ctx();
-        struct ggml_tensor* t = ggml_new_tensor_3d(ctx, GGML_TYPE_F32, 10, 10, 2);
+        struct ggml_context * ctx = make_ctx();
+        struct ggml_tensor * t = ggml_new_tensor_3d(ctx, GGML_TYPE_F32, 10, 10, 2);
         memcpy(t->data, buf_f32, ggml_nbytes(t));
 
-        struct ggml_tensor* t_pooled = ggml_pool_2d(ctx, t, GGML_POOL_AVG, 3, 4, 3, 4, 0, 0);
+        struct ggml_tensor * t_pooled = ggml_pool_2d(ctx, t, GGML_OP_POOL_AVG, 3, 4, 3, 4, 0, 0);
         GGML_ASSERT(t_pooled->ne[0] == 3);
         GGML_ASSERT(t_pooled->ne[1] == 2);
         GGML_ASSERT(t_pooled->ne[2] == 2);
@@ -87,7 +88,7 @@ int main(int argc, const char** argv) {
 
         ggml_graph_compute_with_ctx(ctx, &graph, 4);
 
-        const float* output = ggml_get_data_f32(t_pooled);
+        const float * output = ggml_get_data_f32(t_pooled);
         GGML_ASSERT(output[0] == 17);
         GGML_ASSERT(output[1] == 20);
         GGML_ASSERT(output[2] == 23);
@@ -107,11 +108,11 @@ int main(int argc, const char** argv) {
 
     // max pool 2d
     {
-        struct ggml_context* ctx = make_ctx();
-        struct ggml_tensor* t = ggml_new_tensor_3d(ctx, GGML_TYPE_F32, 10, 10, 2);
+        struct ggml_context * ctx = make_ctx();
+        struct ggml_tensor * t = ggml_new_tensor_3d(ctx, GGML_TYPE_F32, 10, 10, 2);
         memcpy(t->data, buf_f32, ggml_nbytes(t));
 
-        struct ggml_tensor* t_pooled = ggml_pool_2d(ctx, t, GGML_POOL_MAX, 3, 4, 3, 4, 0, 0);
+        struct ggml_tensor * t_pooled = ggml_pool_2d(ctx, t, GGML_OP_POOL_MAX, 3, 4, 3, 4, 0, 0);
         GGML_ASSERT(t_pooled->ne[0] == 3);
         GGML_ASSERT(t_pooled->ne[1] == 2);
         GGML_ASSERT(t_pooled->ne[2] == 2);
@@ -121,7 +122,7 @@ int main(int argc, const char** argv) {
 
         ggml_graph_compute_with_ctx(ctx, &graph, 4);
 
-        const float* output = ggml_get_data_f32(t_pooled);
+        const float * output = ggml_get_data_f32(t_pooled);
         GGML_ASSERT(output[0] == 33);
         GGML_ASSERT(output[1] == 36);
         GGML_ASSERT(output[2] == 39);

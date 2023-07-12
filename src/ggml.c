@@ -3889,6 +3889,8 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
 
 static_assert(GGML_OP_COUNT == 68, "GGML_OP_COUNT != 68");
 
+static_assert(GGML_OP_POOL_COUNT == 2, "GGML_OP_POOL_COUNT != 2");
+
 static_assert(sizeof(struct ggml_object)%GGML_MEM_ALIGN == 0, "ggml_object size must be a multiple of GGML_MEM_ALIGN");
 static_assert(sizeof(struct ggml_tensor)%GGML_MEM_ALIGN == 0, "ggml_tensor size must be a multiple of GGML_MEM_ALIGN");
 
@@ -7230,7 +7232,7 @@ static int64_t ggml_calc_pool_output_size(int64_t ins, int ks, int s, int p) {
 struct ggml_tensor* ggml_pool_1d(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
-        enum ggml_pool_op     op,
+        enum ggml_op_pool     op,
         int                   k0,
         int                   s0,
         int                   p0) {
@@ -7269,7 +7271,7 @@ struct ggml_tensor* ggml_pool_1d(
 struct ggml_tensor* ggml_pool_2d(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
-        enum ggml_pool_op     op,
+        enum ggml_op_pool     op,
         int                   k0,
         int                   k1,
         int                   s0,
@@ -13113,7 +13115,7 @@ static void ggml_compute_forward_conv_2d(
 
 static void ggml_compute_forward_pool_1d_sk_p0(
         const struct ggml_compute_params * params,
-        const enum ggml_pool_op op,
+        const enum ggml_op_pool op,
         const struct ggml_tensor * src,
         const int k,
         struct ggml_tensor * dst) {
@@ -13124,44 +13126,40 @@ static void ggml_compute_forward_pool_1d_sk_p0(
         return;
     }
 
-    const char* cdata = (const char*)src->data;
-    const char* const data_end = cdata + ggml_nbytes(src);
-    float* drow = (float*)dst->data;
+    const char * cdata = (const char *)src->data;
+    const char * const data_end = cdata + ggml_nbytes(src);
+    float * drow = (float *)dst->data;
+
     const int64_t rs = dst->ne[0];
+
     while (cdata < data_end) {
-        const float* const srow = (const float*)cdata;
+        const float * const srow = (const float *)cdata;
 
         int j = 0;
-        static_assert(GGML_NUM_POOL_OPS == 2, "GGML_NUM_POOL_OPS != 2");
+
         for (int64_t i = 0; i < rs; ++i) {
             switch (op) {
-            case GGML_POOL_AVG:
-                drow[i] = 0;
-                break;
-            case GGML_POOL_MAX:
-                drow[i] = -FLT_MAX;
-                break;
+                case GGML_OP_POOL_AVG:   drow[i] = 0;        break;
+                case GGML_OP_POOL_MAX:   drow[i] = -FLT_MAX; break;
+                case GGML_OP_POOL_COUNT: GGML_ASSERT(false); break;
             }
             for (int ki = 0; ki < k; ++ki) {
                 switch (op) {
-                case GGML_POOL_AVG:
-                    drow[i] += srow[j];
-                    break;
-                case GGML_POOL_MAX:
-                    if (srow[j] > drow[i]) drow[i] = srow[j];
-                    break;
+                    case GGML_OP_POOL_AVG:                          drow[i] += srow[j]; break;
+                    case GGML_OP_POOL_MAX:   if (srow[j] > drow[i]) drow[i]  = srow[j]; break;
+                    case GGML_OP_POOL_COUNT:                        GGML_ASSERT(false); break;
                 }
                 ++j;
             }
             switch (op) {
-            case GGML_POOL_AVG:
-                drow[i] /= k;
-                break;
+                case GGML_OP_POOL_AVG:         drow[i] /= k; break;
+                case GGML_OP_POOL_MAX:                       break;
+                case GGML_OP_POOL_COUNT: GGML_ASSERT(false); break;
             }
         }
 
         cdata += src->nb[1];
-        drow += rs;
+        drow  += rs;
     }
 }
 
@@ -13174,7 +13172,7 @@ static void ggml_compute_forward_pool_1d(
     struct ggml_tensor* dst) {
     GGML_ASSERT(opt0->ne[0] == 4);
     const int* opts = (const int*)opt0->data;
-    enum ggml_pool_op op = opts[0];
+    enum ggml_op_pool op = opts[0];
     const int k0 = opts[1];
     const int s0 = opts[2];
     const int p0 = opts[3];
@@ -13188,7 +13186,7 @@ static void ggml_compute_forward_pool_1d(
 
 static void ggml_compute_forward_pool_2d_sk_p0(
     const struct ggml_compute_params * params,
-    const enum ggml_pool_op op,
+    const enum ggml_op_pool op,
     const struct ggml_tensor * src,
     const int k0,
     const int k1,
@@ -13200,55 +13198,51 @@ static void ggml_compute_forward_pool_2d_sk_p0(
         return;
     }
 
-    const char* cdata = (const char*)src->data;
-    const char* const data_end = cdata + ggml_nbytes(src);
+    const char * cdata = (const char*)src->data;
+    const char * const data_end = cdata + ggml_nbytes(src);
 
     const int64_t px = dst->ne[0];
     const int64_t py = dst->ne[1];
     const int64_t pa = px * py;
-    float* dplane = (float*)dst->data;
+
+    float * dplane = (float *)dst->data;
 
     const int ka = k0 * k1;
 
     while (cdata < data_end) {
-        static_assert(GGML_NUM_POOL_OPS == 2, "GGML_NUM_POOL_OPS != 2");
         for (int oy = 0; oy < py; ++oy) {
             float * const drow = dplane + oy * px;
             for (int ox = 0; ox < px; ++ox) {
                 float * const out =  drow + ox;
                 switch (op) {
-                case GGML_POOL_AVG:
-                    *out = 0;
-                    break;
-                case GGML_POOL_MAX:
-                    *out = -FLT_MAX;
-                    break;
+                    case GGML_OP_POOL_AVG:     *out = 0;        break;
+                    case GGML_OP_POOL_MAX:     *out = -FLT_MAX; break;
+                    case GGML_OP_POOL_COUNT: GGML_ASSERT(false); break;
                 }
+
                 const int ix = ox * k0;
                 const int iy = oy * k1;
+
                 for (int ky = 0; ky < k1; ++ky) {
-                    const float* const srow = (const float*)(cdata + src->nb[1] * (iy + ky));
+                    const float * const srow = (const float *)(cdata + src->nb[1] * (iy + ky));
                     for (int kx = 0; kx < k0; ++kx) {
                         int j = ix + kx;
                         switch (op) {
-                        case GGML_POOL_AVG:
-                            *out += srow[j];
-                            break;
-                        case GGML_POOL_MAX:
-                            if (srow[j] > *out) *out = srow[j];
-                            break;
+                            case GGML_OP_POOL_AVG:                     *out += srow[j]; break;
+                            case GGML_OP_POOL_MAX: if (srow[j] > *out) *out  = srow[j]; break;
+                            case GGML_OP_POOL_COUNT:                GGML_ASSERT(false); break;
                         }
                     }
                 }
                 switch (op) {
-                case GGML_POOL_AVG:
-                    *out /= ka;
-                    break;
+                    case GGML_OP_POOL_AVG:           *out /= ka; break;
+                    case GGML_OP_POOL_MAX:                       break;
+                    case GGML_OP_POOL_COUNT: GGML_ASSERT(false); break;
                 }
             }
         }
 
-        cdata += src->nb[2];
+        cdata  += src->nb[2];
         dplane += pa;
     }
 }
@@ -13262,7 +13256,7 @@ static void ggml_compute_forward_pool_2d(
     struct ggml_tensor * dst) {
     GGML_ASSERT(opt0->ne[0] == 7);
     const int* opts = (const int*)opt0->data;
-    enum ggml_pool_op op = opts[0];
+    enum ggml_op_pool op = opts[0];
     const int k0 = opts[1];
     const int k1 = opts[2];
     const int s0 = opts[3];

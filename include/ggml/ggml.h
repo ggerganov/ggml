@@ -1175,16 +1175,16 @@ extern "C" {
             int                   s,
             int                   d);
 
-    enum ggml_pool_op {
-        GGML_POOL_MAX,
-        GGML_POOL_AVG,
-        GGML_NUM_POOL_OPS
+    enum ggml_op_pool {
+        GGML_OP_POOL_MAX,
+        GGML_OP_POOL_AVG,
+        GGML_OP_POOL_COUNT,
     };
 
     GGML_API struct ggml_tensor* ggml_pool_1d(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
-            enum ggml_pool_op     op,
+            enum ggml_op_pool     op,
             int                   k0, // kernel size
             int                   s0, // stride
             int                   p0); // padding
@@ -1192,7 +1192,7 @@ extern "C" {
     GGML_API struct ggml_tensor* ggml_pool_2d(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
-            enum ggml_pool_op     op,
+            enum ggml_op_pool     op,
             int                   k0,
             int                   k1,
             int                   s0,
