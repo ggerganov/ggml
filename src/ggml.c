@@ -13238,8 +13238,6 @@ static void ggml_compute_forward_conv_2d(
 
     if (s0 == src0->ne[0] && s1 == src0->ne[1] && p0 == 0 && p1 == 0) {
         ggml_compute_forward_conv_2d_sk_p0(params, src0, src1, dst);
-    } else if (s0 == 1 && s1 == 1) {
-        ggml_compute_forward_conv_2d_s1(params, src0, src1, opt0, dst);
     }
     else {
         ggml_compute_forward_conv_2d_any(params, src0, src1, opt0, dst);
