@@ -377,6 +377,8 @@ extern "C" {
         GGML_OP_FLASH_ATTN_BACK,
         GGML_OP_WIN_PART,
         GGML_OP_WIN_UNPART,
+        GGML_OP_GET_REL_POS,
+        GGML_OP_ADD_REL_POS,
 
         GGML_OP_UNARY,
 
@@ -1242,6 +1244,15 @@ extern "C" {
             int                   p0,  // padding
             int                   d0); // dilation
 
+    // conv_1d with padding = half
+    // alias for ggml_conv_1d(a, b, s, a->ne[0]/2, d)
+    GGML_API struct ggml_tensor* ggml_conv_1d_ph(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b,
+            int                   s,
+            int                   d);
+
     GGML_API struct ggml_tensor * ggml_conv_2d(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
@@ -1253,14 +1264,32 @@ extern "C" {
             int                   d0,
             int                   d1);
 
-    // conv_1d with padding = half
-    // alias for ggml_conv_1d(a, b, s, a->ne[0]/2, d)
-    GGML_API struct ggml_tensor * ggml_conv_1d_ph(
+
+    // kernel size is a->ne[0] x a->ne[1]
+    // stride is equal to kernel size
+    // padding is zero
+    // example:
+    // a:     16   16    3  768
+    // b:   1024 1024    3    1
+    // res:   64   64  768    1
+    // used in sam
+    GGML_API struct ggml_tensor * ggml_conv_2d_sk_p0(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
-            struct ggml_tensor  * b,
-            int                   s,
-            int                   d);
+            struct ggml_tensor  * b);
+
+    // kernel size is a->ne[0] x a->ne[1]
+    // stride is 1
+    // padding is half
+    // example:
+    // a:      3    3    256  256
+    // b:     64   64    256    1
+    // res:   64   64    256    1
+    // used in sam
+    GGML_API struct ggml_tensor * ggml_conv_2d_s1_ph(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
 
     enum ggml_op_pool {
         GGML_OP_POOL_MAX,
@@ -1339,6 +1368,20 @@ extern "C" {
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         enum ggml_unary_op op);
+
+    // used in sam
+    GGML_API struct ggml_tensor * ggml_get_rel_pos(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            int                   qh,
+            int                   kh);
+
+    // used in sam
+    GGML_API struct ggml_tensor * ggml_add_rel_pos(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * pw,
+            struct ggml_tensor  * ph);
 
     // custom operators
 
