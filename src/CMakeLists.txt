@@ -114,6 +114,12 @@ else()
     endif()
 endif()
 
+if (GGML_BUILD_TESTS)
+    if (GGML_BUILD_TEST_COVERAGE)
+        set(CMAKE_C_FLAGS "$(CMAKE_C_FLAGS) -fprofile-instr-generate -fcoverage-mapping")
+    endif ()
+endif ()
+
 
 # ggml
 
