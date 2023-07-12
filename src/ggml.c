@@ -16701,7 +16701,7 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
                     UNUSED(ne2);
 
                     size_t cur = 0;
-                        
+
                     if (node->src[0]->type == GGML_TYPE_F16 &&
                         node->src[1]->type == GGML_TYPE_F32) {
                         cur = sizeof(ggml_fp16_t)*(ne0*ne1*ew0);
@@ -16712,7 +16712,7 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
                         GGML_ASSERT(false);
                     }
 
-                    work_size = MAX(work_size, cur);                   
+                    work_size = MAX(work_size, cur);
                 } break;
             case GGML_OP_POOL_1D:
             case GGML_OP_POOL_2D:
