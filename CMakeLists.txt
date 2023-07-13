@@ -57,6 +57,10 @@ endif()
 set(CMAKE_C_STANDARD   11)
 set(CMAKE_CXX_STANDARD 11)
 
+if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
+    # Note: it must be performed before the Threads package finding (CMAKE_HAVE_LIBC_PTHREAD testing)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pthread")
+endif()
 find_package(Threads REQUIRED)
 
 # main

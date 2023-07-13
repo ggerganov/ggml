@@ -255,9 +255,19 @@ endif()
 
 if (GGML_CUDA_SOURCES)
     message(STATUS "GGML CUDA sources found, configuring CUDA architecture")
-    set_property(TARGET ggml  PROPERTY CUDA_ARCHITECTURES OFF)
+    if(NOT ${CMAKE_CUDA_ARCHITECTURES})
+        set_property(TARGET ggml  PROPERTY CUDA_ARCHITECTURES all)  # all o OFF
+    endif()
     set_property(TARGET ggml  PROPERTY CUDA_SELECT_NVCC_ARCH_FLAGS "Auto")
-    target_link_libraries(ggml PUBLIC stdc++)
+    # Set the minimum standard, CMake can still decide to use -std=c++17
+    # if the given compilers support C++17
+    target_compile_features(ggml PUBLIC cuda_std_11)
+    # Note: Windows native does not link [non-cuda] stdc++ statically
+    set_target_properties(ggml  PROPERTIES
+            CUDA_RUNTIME_LIBRARY SHARED
+            # CUDA_STANDARD 11  # This one cannot be changed by CMake
+            # CUDA_SEPARABLE_COMPILATION ON  # Optional
+    )
 endif()
 
 set (GGML_PUBLIC_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml.h)
