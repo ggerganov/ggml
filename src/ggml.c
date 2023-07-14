@@ -10836,7 +10836,7 @@ static void ggml_compute_forward_mul_mat(
         //       the original src1 data pointer, so we should index using the indices directly
         // TODO: this is a bit of a hack, we should probably have a better way to handle this
         const char * src1_col = (const char *) wdata +
-            (src1_cont
+            (src1_cont || src1->type != vec_dot_type
              ? (i11      + i12*ne11 + i13*ne12*ne11)*row_size
              : (i11*nb11 + i12*nb12 + i13*nb13));
 
