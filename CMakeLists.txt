@@ -22,9 +22,10 @@ option(GGML_SANITIZE_THREAD         "ggml: enable thread sanitizer"    OFF)
 option(GGML_SANITIZE_ADDRESS        "ggml: enable address sanitizer"   OFF)
 option(GGML_SANITIZE_UNDEFINED      "ggml: enable undefined sanitizer" OFF)
 
-option(GGML_BUILD_TESTS             "ggml: build tests"             ${GGML_STANDALONE})
-option(GGML_BUILD_TEST_COVERAGE     "ggml: build test coverage"     ${GGML_STANDALONE})
-option(GGML_BUILD_EXAMPLES          "ggml: build examples"          ${GGML_STANDALONE})
+option(GGML_BUILD_TESTS             "ggml: build tests"    ${GGML_STANDALONE})
+option(GGML_BUILD_EXAMPLES          "ggml: build examples" ${GGML_STANDALONE})
+
+option(GGML_TEST_COVERAGE           "ggml: enable test coverage" OFF)
 
 option(GGML_PERF                    "ggml: enable perf timings"          OFF)
 option(GGML_NO_ACCELERATE           "ggml: disable Accelerate framework" OFF)
@@ -66,6 +67,17 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo")
 endif ()
+
+if (GGML_BUILD_TESTS)
+    if (GGML_BUILD_TEST_COVERAGE)
+        if (CMAKE_C_COMPILER_ID MATCHES "Clang")
+            set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fprofile-instr-generate -fcoverage-mapping")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-instr-generate -fcoverage-mapping")
+        else()
+            message(WARNING "Test coverage is only supported for Clang")
+        endif()
+    endif()
+endif()
 
 add_subdirectory(src)
 

@@ -114,17 +114,6 @@ else()
     endif()
 endif()
 
-if (GGML_BUILD_TESTS)
-    if (GGML_BUILD_TEST_COVERAGE)
-        if (CMAKE_C_COMPILER_ID MATCHES "Clang")
-            set(CMAKE_C_FLAGS "$(CMAKE_C_FLAGS) -fprofile-instr-generate -fcoverage-mapping")
-        else()
-            message(WARNING "Test coverage is only supported for Clang")
-        endif()
-    endif()
-endif()
-
-
 # ggml
 
 set(TARGET ggml)
@@ -189,6 +178,7 @@ if (GGML_CLBLAST)
         message(WARNING "clBLAST not found")
     endif()
 endif()
+
 if (GGML_CUBLAS)
     cmake_minimum_required(VERSION 3.17)
 
