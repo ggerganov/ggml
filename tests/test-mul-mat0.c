@@ -95,14 +95,15 @@ bool check_gradient(
         float eps,
         float max_error_abs,
         float max_error_rel) {
+    const int n_threads = 1;
 
     struct ggml_cgraph gf = ggml_build_forward (f);
     struct ggml_cgraph gb = ggml_build_backward(ctx0, &gf, false);
 
-    ggml_graph_compute(ctx0, &gf);
+    ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
     ggml_graph_reset  (&gf);
     ggml_set_f32      (f->grad, 1.0f);
-    ggml_graph_compute(ctx0, &gb);
+    ggml_graph_compute_with_ctx(ctx0, &gb, n_threads);
 
     ggml_graph_dump_dot(&gf, NULL, "test-grad0-forward.dot");
     ggml_graph_dump_dot(&gb, &gf,  "test-grad0-backward.dot");
@@ -114,12 +115,12 @@ bool check_gradient(
             const float x0 = get_element(x[i], k);
 
             set_element(x[i], k, x0 + eps);
-            ggml_graph_compute(ctx0, &gf);
+            ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
             const float f0 = ggml_get_f32_1d(f, 0);
 
             set_element(x[i], k, x0 - eps);
-            ggml_graph_compute(ctx0, &gf);
+            ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
             const float f1 = ggml_get_f32_1d(f, 0);
 
@@ -130,7 +131,7 @@ bool check_gradient(
             // compute gradient using backward graph
             ggml_graph_reset  (&gf);
             ggml_set_f32      (f->grad, 1.0f);
-            ggml_graph_compute(ctx0, &gb);
+            ggml_graph_compute_with_ctx(ctx0, &gb, n_threads);
 
             const float g1 = get_element(x[i]->grad, k);
 
@@ -247,6 +248,9 @@ int main(int argc, const char ** argv) {
     if (argc > 1) {
         niter = atoi(argv[1]);
     }
+
+    int n_threads = 1;
+
     for (int iter = 0; iter < niter; ++iter) {
         printf("test-mul-mat0: iter:%d/%d\n", iter, niter);
         struct ggml_context * ctx0 = ggml_init(params);
@@ -283,7 +287,7 @@ int main(int argc, const char ** argv) {
                     check_gradient("mul_mat", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, INFINITY);
                 } else {
                     struct ggml_cgraph gf = ggml_build_forward(m);
-                    ggml_graph_compute(ctx0, &gf);
+                    ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
                 }
 
                 check_mat_mul(m, x[1], x[0]);
@@ -319,7 +323,7 @@ int main(int argc, const char ** argv) {
                     check_gradient("mul_mat", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, INFINITY);
                 } else {
                     struct ggml_cgraph gf = ggml_build_forward(m);
-                    ggml_graph_compute(ctx0, &gf);
+                    ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
                 }
 
                 check_mat_mul(m, x[1], x[0]);

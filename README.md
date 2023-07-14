@@ -29,10 +29,11 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [ ] Example of FLAN-T5 inference https://github.com/ggerganov/ggml/pull/12
 - [X] Example of LLaMA inference [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp)
 - [X] Example of LLaMA training [ggerganov/llama.cpp/examples/baby-llama](https://github.com/ggerganov/llama.cpp/tree/master/examples/baby-llama)
+- [X] Example of Falcon inference [cmp-nct/ggllm.cpp](https://github.com/cmp-nct/ggllm.cpp)
 - [X] Example of BLOOM inference [NouamaneTazi/bloomz.cpp](https://github.com/NouamaneTazi/bloomz.cpp)
 - [X] Example of RWKV inference [saharNooby/rwkv.cpp](https://github.com/saharNooby/rwkv.cpp)
 - [ ] Example of [SAM](https://github.com/facebookresearch/segment-anything) inference
-- [ ] Idea for GPU support: https://github.com/ggerganov/llama.cpp/discussions/915
+- [X] Idea for GPU support: https://github.com/ggerganov/llama.cpp/discussions/915
 - [X] Example of StableLM (GPT-NeoX) inference [examples/gpt-neox](https://github.com/ggerganov/ggml/tree/master/examples/gpt-neox)
 - [X] Example of BERT inference [skeskinen/bert.cpp](https://github.com/skeskinen/bert.cpp)
 - [X] Example of 💫 StarCoder inference [examples/starcoder](https://github.com/ggerganov/ggml/tree/master/examples/starcoder)
