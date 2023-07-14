@@ -517,7 +517,7 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
             if (0) {
                 printf("%24s - [%5d, %5d], type = %6s, %6.2f MB, %9zu bytes\n", name.data(), ne[0], ne[1], ggml_type_name(ggml_type(ttype)), ggml_nbytes(tensor)/1024.0/1024.0, ggml_nbytes(tensor));
             }
-            
+
             const size_t bpe = ggml_type_size(ggml_type(ttype));
 
             if ((nelements*bpe)/ggml_blck_size(tensor->type) != ggml_nbytes(tensor)) {
@@ -550,7 +550,7 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
 
     fin.close();
 
-    #ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_CUBLAS
     {
         const auto & hparams = model.hparams;
         const int n_gpu = std::min(n_gpu_layers, int(hparams.n_layer));
@@ -562,20 +562,21 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
         for (int i = 0; i < n_gpu; ++i) {
             const auto & layer = model.layers[i];
 
-	    layer.c_attn_attn_w->backend = GGML_BACKEND_GPU;
+            layer.c_attn_attn_w->backend = GGML_BACKEND_GPU;
             ggml_cuda_transform_tensor((uint8_t *)layer.c_attn_attn_w->data, layer.c_attn_attn_w); vram_total += ggml_nbytes(layer.c_attn_attn_w);
 
-	    layer.c_attn_proj_w->backend = GGML_BACKEND_GPU;
+            layer.c_attn_proj_w->backend = GGML_BACKEND_GPU;
             ggml_cuda_transform_tensor((uint8_t *)layer.c_attn_proj_w->data, layer.c_attn_proj_w); vram_total += ggml_nbytes(layer.c_attn_proj_w);
 
-	    layer.c_mlp_fc_w->backend = GGML_BACKEND_GPU;
+            layer.c_mlp_fc_w->backend = GGML_BACKEND_GPU;
             ggml_cuda_transform_tensor((uint8_t *)layer.c_mlp_fc_w->data, layer.c_mlp_fc_w); vram_total += ggml_nbytes(layer.c_mlp_fc_w);
-	    
-	    layer.c_mlp_proj_w->backend = GGML_BACKEND_GPU;
-            ggml_cuda_transform_tensor((uint8_t *)layer.c_mlp_proj_w->data, layer.c_mlp_proj_w); vram_total += ggml_nbytes(layer.c_mlp_proj_w);
 
+            layer.c_mlp_proj_w->backend = GGML_BACKEND_GPU;
+            ggml_cuda_transform_tensor((uint8_t *)layer.c_mlp_proj_w->data, layer.c_mlp_proj_w); vram_total += ggml_nbytes(layer.c_mlp_proj_w);
         }
-        
+
+        ggml_cuda_set_scratch_size(0); // disable scratch
+
         //if (n_gpu_layers > (int) hparams.n_layer) {
         //    fprintf(stderr, "%s: [cublas] offloading output layer to GPU\n", __func__);
         //    ggml_cuda_transform_tensor(model.output); vram_total += ggml_nbytes(model.output);
@@ -670,7 +671,6 @@ bool starcoder_eval(
 
     struct ggml_context * ctx0 = ggml_init(params);
     struct ggml_cgraph gf = {};
-    gf.n_threads = n_threads;
 
     struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
 
@@ -925,7 +925,7 @@ bool starcoder_eval(
 
     // run the computation
     ggml_build_forward_expand(&gf, inpL);
-    ggml_graph_compute       (ctx0, &gf);
+    ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
     //if (n_past%100 == 0) {
     //    ggml_graph_print   (&gf);
