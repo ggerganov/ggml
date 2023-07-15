@@ -15,12 +15,14 @@ function gg_ci_0 {
     cd build-ci-0
 
     set -e
+    set -o pipefail
 
     time cmake -DCMAKE_BUILD_TYPE=Debug .. | tee $OUT/ci-0-cmake.log
     time make -j4 | tee $OUT/ci-0-make.log
 
     time ctest -E test-opt | tee $OUT/ci-0-ctest.log
 
+    set +o pipefail
     set +e
 }
 
@@ -31,12 +33,14 @@ function gg_ci_1 {
     cd build-ci-1
 
     set -e
+    set -o pipefail
 
     time cmake -DCMAKE_BUILD_TYPE=Debug .. | tee $OUT/ci-1-cmake.log
     time make -j4 | tee $OUT/ci-1-make.log
 
     time ctest | tee $OUT/ci-1-ctest.log
 
+    set +o pipefail
     set +e
 }
 
