@@ -16,6 +16,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - ADAM and L-BFGS optimizers
 - Optimized for Apple Silicon
 - On x86 architectures utilizes AVX / AVX2 intrinsics
+- On ppc64 architectures utilizes VSX intrinsics
 - No third-party dependencies
 - Zero memory allocations during runtime
 
