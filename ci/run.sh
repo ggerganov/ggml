@@ -8,10 +8,11 @@ OUT=$1
 
 ## dependencies
 
-if [ ! -f /etc/lsb-release ]; then
+if [ ! -f /etc/lsb-release ] ; then
     sudo apt-get install -y cmake gcc g++
 else
     # TODO: add support for other distros
+    printf "..\n"
 fi
 
 ## ci
