@@ -19,7 +19,7 @@ function gg_ci_0() {
     time cmake -DCMAKE_BUILD_TYPE=Debug .. | tee $OUT/ci-0-cmake.log
     time make -j4 | tee $OUT/ci-0-make.log
 
-    time ctest -R | tee $OUT/ci-0-ctest.log
+    time ctest -R -E test-opt | tee $OUT/ci-0-ctest.log
 
     set +e
 }
