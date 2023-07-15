@@ -6,6 +6,16 @@ cd $sd/../
 SRC=`pwd`
 OUT=$1
 
+## dependencies
+
+if [ ! -f /etc/lsb-release ]; then
+    sudo apt-get install -y cmake gcc g++
+else
+    # TODO: add support for other distros
+fi
+
+## ci
+
 function gg_ci_0() {
     cd $SRC
 
@@ -25,6 +35,8 @@ function gg_ci_0() {
 function gg_ci_1() {
     return 1
 }
+
+## main
 
 ret=0
 
