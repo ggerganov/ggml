@@ -8,7 +8,7 @@ OUT=$1
 
 ## ci
 
-function gg_ci_0() {
+function gg_ci_0 {
     cd $SRC
 
     mkdir build-ci-0
@@ -24,8 +24,20 @@ function gg_ci_0() {
     set +e
 }
 
-function gg_ci_1() {
-    exit 1
+function gg_ci_1 {
+    cd $SRC
+
+    mkdir build-ci-1
+    cd build-ci-1
+
+    set -e
+
+    time cmake -DCMAKE_BUILD_TYPE=Debug .. | tee $OUT/ci-1-cmake.log
+    time make -j4 | tee $OUT/ci-1-make.log
+
+    time ctest | tee $OUT/ci-1-ctest.log
+
+    set +e
 }
 
 ## main
