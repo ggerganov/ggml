@@ -16,10 +16,9 @@ function gg_ci_0 {
 
     set -e
 
-    time cmake -DCMAKE_BUILD_TYPE=Debug .. | tee $OUT/ci-0-cmake.log
-    time make -j4 | tee $OUT/ci-0-make.log
-
-    time ctest -E test-opt | tee $OUT/ci-0-ctest.log
+    (time cmake -DCMAKE_BUILD_TYPE=Debug .. ) 2>&1 | tee $OUT/ci-0-cmake.log
+    (time make -j4                          ) 2>&1 | tee $OUT/ci-0-make.log
+    (time ctest -E test-opt                 ) 2>&1 | tee $OUT/ci-0-ctest.log
 
     set +e
 }
@@ -32,10 +31,9 @@ function gg_ci_1 {
 
     set -e
 
-    time cmake -DCMAKE_BUILD_TYPE=Debug .. | tee $OUT/ci-1-cmake.log
-    time make -j4 | tee $OUT/ci-1-make.log
-
-    time ctest | tee $OUT/ci-1-ctest.log
+    (time cmake -DCMAKE_BUILD_TYPE=Debug .. ) 2>&1 | tee $OUT/ci-1-cmake.log
+    (time make -j4                          ) 2>&1 | tee $OUT/ci-1-make.log
+    (time ctest                             ) 2>&1 | tee $OUT/ci-1-ctest.log
 
     set +e
 }

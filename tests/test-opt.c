@@ -118,8 +118,6 @@ void set_element(struct ggml_tensor * t, int idx, float value) {
 }
 
 int main(void) {
-    return 12;
-
     struct ggml_init_params params = {
         .mem_size   = 1024*1024*1024,
         .mem_buffer = NULL,
