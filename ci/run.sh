@@ -60,11 +60,7 @@ function gg_run_ctest_debug {
     (time cmake -DCMAKE_BUILD_TYPE=Debug ..     ) 2>&1 | tee -a $OUT/${ci}-cmake.log
     (time make -j                               ) 2>&1 | tee -a $OUT/${ci}-make.log
 
-    if [ -z $GG_BUILD_LOW_PERF ]; then
-        (time ctest --output-on-failure ) 2>&1 | tee -a $OUT/${ci}-ctest.log
-    else
-        (time ctest --output-on-failure -E test-opt ) 2>&1 | tee -a $OUT/${ci}-ctest.log
-    fi
+    (time ctest --output-on-failure -E test-opt ) 2>&1 | tee -a $OUT/${ci}-ctest.log
 
     set +e
 }
