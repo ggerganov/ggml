@@ -59,7 +59,7 @@ set +o pipefail
 ## generate README.md with summary
 
 function gg_printf {
-    printf -- "$@" >> README.md
+    printf -- "$@" >> $OUT/README.md
 }
 
 gg_printf "### ci-0\n\n"
