@@ -32,11 +32,13 @@ function gg_run {
     ci=$1
 
     set -o pipefail
+    set -x
 
     gg_run_$ci | tee $OUT/$ci.log
     cur=$?
     echo "$cur" > $OUT/$ci.exit
 
+    set +x
     set +o pipefail
 
     gg_sum_$ci
@@ -51,7 +53,7 @@ function gg_run {
 function gg_run_ctest_debug {
     cd $SRC
 
-    rm -rf build-ci && mkdir build-ci && cd build-ci
+    rm -rf build-ci-debug && mkdir build-ci-debug && cd build-ci-debug
 
     set -e
 
@@ -78,7 +80,7 @@ function gg_sum_ctest_debug {
 function gg_run_ctest_release {
     cd $SRC
 
-    rm -rf build-ci && mkdir build-ci && cd build-ci
+    rm -rf build-ci-release && mkdir build-ci-release && cd build-ci-release
 
     set -e
 
@@ -106,13 +108,15 @@ function gg_run_gpt_2 {
 
     gg_wget models/gpt-2 https://huggingface.co/ggerganov/ggml/resolve/main/ggml-model-gpt-2-117M.bin
 
-    rm -rf build-ci && mkdir build-ci && cd build-ci
+    cd build-ci-release
 
     set -e
 
-    cmake -DCMAKE_BUILD_TYPE=Release .. && make -j4
+    model="../models/gpt-2/ggml-model-gpt-2-117M.bin"
+    prompts="../examples/prompts/gpt-2.txt"
 
-    (time ./bin/gpt-2 --model ../models/gpt-2/ggml-model-gpt-2-117M.bin -s 1234 -n 64 -t 4 ) 2>&1 | tee $OUT/${ci}-tg.log
+    (time ./bin/gpt-2 --model ${models} -s 1234 -n 64 -t 4 -tt ${prompts}                       ) 2>&1 | tee $OUT/${ci}-tg.log
+    (time ./bin/gpt-2 --model ${models} -s 1234 -n 64 -t 4 -p "I believe the meaning of life is") 2>&1 | tee $OUT/${ci}-tg.log
 
     set +e
 }
