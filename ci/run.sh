@@ -131,8 +131,8 @@ function gg_sum_gpt_2 {
 
 ret=0
 
-$ret && gg_run ctest_debug
-$ret && gg_run ctest_release
-$ret && gg_run gpt_2
+test $ret -eq 0 && gg_run ctest_debug
+test $ret -eq 0 && gg_run ctest_release
+test $ret -eq 0 && gg_run gpt_2
 
 exit $ret
