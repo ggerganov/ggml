@@ -114,6 +114,9 @@ function gg_run_gpt_2 {
 
     ./bin/gpt-2 --model ../models/gpt-2/ggml-model-gpt-2-117M.bin -s 1234 -n 64 -t 4 > $OUT/${ci}.log 2>&1
 
+    # cat so we have it in the diff
+    cat $OUT/${ci}.log
+
     set +e
 }
 
