@@ -150,6 +150,7 @@ function gg_run_mpt {
     gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/tokenizer.json
     gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/tokenizer_config.json
     gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/pytorch_model.bin.index.json
+    gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/configuration_mpt.py
     gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/resolve/main/pytorch_model-00001-of-00002.bin
     gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/resolve/main/pytorch_model-00002-of-00002.bin
 
