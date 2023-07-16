@@ -31,7 +31,7 @@ function gg_ci_1 {
 
     set -e
 
-    (time cmake -DCMAKE_BUILD_TYPE=Debug ..     ) 2>&1 | tee $OUT/ci-1-cmake.log
+    (time cmake -DCMAKE_BUILD_TYPE=Release ..   ) 2>&1 | tee $OUT/ci-1-cmake.log
     (time make -j4                              ) 2>&1 | tee $OUT/ci-1-make.log
     (time ctest --output-on-failure -E test-opt ) 2>&1 | tee $OUT/ci-1-ctest.log
 
