@@ -60,37 +60,27 @@ set +o pipefail
 
 status="$(if [ $ret -eq 0 ]; then echo "SUCCESS"; else echo "FAILURE ($ret)"; fi)"
 
-printf "## Summary\n" > $OUT/README.md
+gg_printf README.md "## Summary\n\n"
 
-printf "\n"                                           >> $OUT/README.md
+gg_printf README.md "- status: ${status}\n"
+gg_printf README.md "- date:   $(date)\n"
+gg_printf README.md "- repo:   ${GG_CI_REPO}\n"
+gg_printf README.md "- author: ${GG_CI_COMMIT_AUTHOR}\n"
+gg_printf README.md "- commit: ${GG_CI_COMMIT_URL}\n"
+gg_printf README.md "\`\`\`\n${GG_CI_COMMIT_MSG}\n\`\`\`\n"
+gg_printf README.md "\n"
 
-printf "\- status: ${status}\n"                       >> $OUT/README.md
-printf "\- date:   $(date)\n"                         >> $OUT/README.md
-printf "\- repo:   ${GG_CI_REPO}\n"                   >> $OUT/README.md
-printf "\- author: ${GG_CI_COMMIT_AUTHOR}\n"          >> $OUT/README.md
-printf "\- commit: ${GG_CI_COMMIT_URL}\n"             >> $OUT/README.md
-printf "  \`\`\`\n${GG_CI_COMMIT_MSG}\n\`\`\`\n"      >> $OUT/README.md
+gg_printf README.md "### ci-0\n\n"
 
-printf "\n"                                           >> $OUT/README.md
+gg_printf README.md "\`\`\`\n"
+gg_printf README.md "$(cat $OUT/ci-0-ctest.log)"
+gg_printf README.md "\`\`\`\n"
+gg_printf README.md "\n"
 
-printf "### ci-0\n"                                   >> $OUT/README.md
+gg_printf README.md "### ci-1\n\n"
 
-printf "\n"                                           >> $OUT/README.md
-
-printf "\`\`\`\n"                                     >> $OUT/README.md
-cat $OUT/ci-0-ctest.log                               >> $OUT/README.md
-printf "\`\`\`\n"                                     >> $OUT/README.md
-
-printf "\n"                                           >> $OUT/README.md
-
-printf "### ci-1\n"                                   >> $OUT/README.md
-
-printf "\n"                                           >> $OUT/README.md
-
-printf "\`\`\`\n"                                     >> $OUT/README.md
-cat $OUT/ci-1-ctest.log                               >> $OUT/README.md
-printf "\`\`\`\n"                                     >> $OUT/README.md
-
-printf "\n"                                           >> $OUT/README.md
+gg_printf README.md "\`\`\`\n"
+gg_printf README.md "$(cat $OUT/ci-1-ctest.log)"
+gg_printf README.md "\`\`\`\n"
 
 exit $ret
