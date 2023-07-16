@@ -150,7 +150,7 @@ function gg_run_mpt {
     model_f16="${path_models}/ggml-model-f16.bin"
     model_q4_0="${path_models}/ggml-model-q4_0.bin"
 
-    python3 ../examples/mpt/7B/convert-h5-to-ggml.py ${path_models} 1
+    python3 ../examples/mpt/convert-h5-to-ggml.py ${path_models} 1
     ./bin/mpt-quantize ${model_f16} ${model_q4_0} q4_0
 
     (time ./bin/mpt --model ${model_f16} -s 1234 -n 64 -t 8 -p "I believe the meaning of life is") 2>&1 | tee -a $OUT/${ci}-tg.log
