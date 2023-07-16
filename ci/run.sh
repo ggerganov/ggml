@@ -18,9 +18,10 @@ function gg_run {
     gg_run_$ci
     cur=$?
     echo "$cur" > $OUT/$ci.exit
-    ret=$(($ret + $cur))
 
     gg_sum_$ci
+
+    return $cur
 }
 
 ## ci
@@ -42,6 +43,7 @@ function gg_run_ci_0 {
 function gg_sum_ci_0 {
     gg_printf '### ci-0\n\n'
 
+    gg_printf '- status: ' "$(cat $OUT/ci-0.exit)"
     gg_printf '```\n'
     gg_printf '%s\n' "$(cat $OUT/ci-0-ctest.log)"
     gg_printf '```\n'
@@ -65,6 +67,7 @@ function gg_run_ci_1 {
 function gg_sum_ci_1 {
     gg_printf '### ci-1\n\n'
 
+    gg_printf '- status: ' "$(cat $OUT/ci-1.exit)"
     gg_printf '```\n'
     gg_printf '%s\n' "$(cat $OUT/ci-1-ctest.log)"
     gg_printf '```\n'
@@ -74,7 +77,7 @@ function gg_sum_ci_1 {
 
 ret=0
 
-gg_run ci_0
-gg_run ci_1
+ret=$(($ret + $(gg_run ci_0)))
+ret=$(($ret + $(gg_run ci_1)))
 
 exit $ret
