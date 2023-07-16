@@ -56,7 +56,7 @@ ret=$(($ret + $cur))
 
 set +o pipefail
 
-## generate README.md with summary
+## summary
 
 function gg_printf {
     printf -- "$@" >> $OUT/README.md
