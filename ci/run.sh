@@ -57,9 +57,9 @@ function gg_run_ctest_debug {
 
     set -e
 
-    (time cmake -DCMAKE_BUILD_TYPE=Debug ..     ) 2>&1 | tee $OUT/${ci}-cmake.log
-    (time make -j4                              ) 2>&1 | tee $OUT/${ci}-make.log
-    (time ctest --output-on-failure -E test-opt ) 2>&1 | tee $OUT/${ci}-ctest.log
+    (time cmake -DCMAKE_BUILD_TYPE=Debug ..     ) 2>&1 | tee -a $OUT/${ci}-cmake.log
+    (time make -j4                              ) 2>&1 | tee -a $OUT/${ci}-make.log
+    (time ctest --output-on-failure -E test-opt ) 2>&1 | tee -a $OUT/${ci}-ctest.log
 
     set +e
 }
@@ -84,9 +84,9 @@ function gg_run_ctest_release {
 
     set -e
 
-    (time cmake -DCMAKE_BUILD_TYPE=Release ..   ) 2>&1 | tee $OUT/${ci}-cmake.log
-    (time make -j4                              ) 2>&1 | tee $OUT/${ci}-make.log
-    (time ctest --output-on-failure -E test-opt ) 2>&1 | tee $OUT/${ci}-ctest.log
+    (time cmake -DCMAKE_BUILD_TYPE=Release ..   ) 2>&1 | tee -a $OUT/${ci}-cmake.log
+    (time make -j4                              ) 2>&1 | tee -a $OUT/${ci}-make.log
+    (time ctest --output-on-failure -E test-opt ) 2>&1 | tee -a $OUT/${ci}-ctest.log
 
     set +e
 }
@@ -115,8 +115,8 @@ function gg_run_gpt_2 {
     model="../models/gpt-2/ggml-model-gpt-2-117M.bin"
     prompts="../examples/prompts/gpt-2.txt"
 
-    (time ./bin/gpt-2 --model ${model} -s 1234 -n 64 -t 4 -tt ${prompts}                       ) 2>&1 | tee $OUT/${ci}-tg.log
-    (time ./bin/gpt-2 --model ${model} -s 1234 -n 64 -t 4 -p "I believe the meaning of life is") 2>&1 | tee $OUT/${ci}-tg.log
+    (time ./bin/gpt-2 --model ${model} -s 1234 -n 64 -t 4 -tt ${prompts}                       ) 2>&1 | tee -a $OUT/${ci}-tg.log
+    (time ./bin/gpt-2 --model ${model} -s 1234 -n 64 -t 4 -p "I believe the meaning of life is") 2>&1 | tee -a $OUT/${ci}-tg.log
 
     set +e
 }
