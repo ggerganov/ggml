@@ -56,4 +56,37 @@ ret=$(($ret + $cur))
 
 set +o pipefail
 
+## generate README.md with summary
+
+printf "## Summary\n" > $OUT/README.md
+
+printf "\n"                                           >> $OUT/README.md
+
+printf "repo:   ${GG_CI_REPO}\n"                      >> $OUT/README.md
+printf "author: ${GG_CI_COMMIT_AUTHOR}\n"             >> $OUT/README.md
+printf "commit: ${GG_CI_COMMIT_URL}\n"                >> $OUT/README.md
+printf "```\n${GG_CI_COMMIT_MSG}\n```\n"              >> $OUT/README.md
+
+printf "\n"                                           >> $OUT/README.md
+
+printf "### ci-0\n"                                   >> $OUT/README.md
+
+printf "\n"                                           >> $OUT/README.md
+
+printf "```\n"                                        >> $OUT/README.md
+cat $OUT/ci-0-ctest.log                               >> $OUT/README.md
+printf "```\n"                                        >> $OUT/README.md
+
+printf "\n"                                           >> $OUT/README.md
+
+printf "### ci-1\n"                                   >> $OUT/README.md
+
+printf "\n"                                           >> $OUT/README.md
+
+printf "```\n"                                        >> $OUT/README.md
+cat $OUT/ci-1-ctest.log                               >> $OUT/README.md
+printf "```\n"                                        >> $OUT/README.md
+
+printf "\n"                                           >> $OUT/README.md
+
 exit $ret
