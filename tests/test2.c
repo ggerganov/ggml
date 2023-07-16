@@ -79,6 +79,8 @@ int main(int argc, const char ** argv) {
         printf("t0 = %f\n", ggml_get_f32_1d(t0, 0));
         printf("t1 = %f\n", ggml_get_f32_1d(t1, 0));
 
+        GGML_ASSERT(false);
+
         GGML_ASSERT(res == GGML_OPT_OK);
 
         GGML_ASSERT(is_close(ggml_get_f32_1d(t0, 0),  5.0f, 1e-3f));
