@@ -81,7 +81,7 @@ function gg_sum_ci_1 {
 
 ret=0
 
-ret=$(($ret + $(gg_run ci_0)))
-ret=$(($ret + $(gg_run ci_1)))
+gg_run ci_0 || ret=$?
+gg_run ci_1 || ret=$?
 
 exit $ret
