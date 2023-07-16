@@ -112,10 +112,7 @@ function gg_run_gpt_2 {
 
     cmake -DCMAKE_BUILD_TYPE=Release .. && make -j4
 
-    ./bin/gpt-2 --model ../models/gpt-2/ggml-model-gpt-2-117M.bin -s 1234 -n 64 -t 4 > $OUT/${ci}.log 2>&1
-
-    # cat so we have it in the diff
-    cat $OUT/${ci}.log
+    (time ./bin/gpt-2 --model ../models/gpt-2/ggml-model-gpt-2-117M.bin -s 1234 -n 64 -t 4 ) 2>&1 | tee $OUT/${ci}-tg.log
 
     set +e
 }
@@ -126,7 +123,7 @@ function gg_sum_gpt_2 {
     gg_printf 'Runs short GPT-2 text generation\n'
     gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
     gg_printf '```\n'
-    gg_printf '%s\n' "$(cat $OUT/${ci}.log)"
+    gg_printf '%s\n' "$(cat $OUT/${ci}-tg.log)"
     gg_printf '```\n'
 }
 
