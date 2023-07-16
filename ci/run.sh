@@ -58,29 +58,21 @@ set +o pipefail
 
 ## generate README.md with summary
 
-status="$(if [ $ret -eq 0 ]; then echo "SUCCESS"; else echo "FAILURE ($ret)"; fi)"
+function gg_printf {
+    printf -- "$@" >> README.md
+}
 
-gg_printf README.md "## Summary\n\n"
+gg_printf "### ci-0\n\n"
 
-gg_printf README.md "- status: ${status}\n"
-gg_printf README.md "- date:   $(date)\n"
-gg_printf README.md "- repo:   ${GG_CI_REPO}\n"
-gg_printf README.md "- author: ${GG_CI_COMMIT_AUTHOR}\n"
-gg_printf README.md "- commit: ${GG_CI_COMMIT_URL}\n"
-gg_printf README.md "\`\`\`\n${GG_CI_COMMIT_MSG}\n\`\`\`\n"
-gg_printf README.md "\n"
+gg_printf "\`\`\`\n"
+gg_printf "$(cat $OUT/ci-0-ctest.log)"
+gg_printf "\`\`\`\n"
+gg_printf "\n"
 
-gg_printf README.md "### ci-0\n\n"
+gg_printf "### ci-1\n\n"
 
-gg_printf README.md "\`\`\`\n"
-gg_printf README.md "$(cat $OUT/ci-0-ctest.log)"
-gg_printf README.md "\`\`\`\n"
-gg_printf README.md "\n"
-
-gg_printf README.md "### ci-1\n\n"
-
-gg_printf README.md "\`\`\`\n"
-gg_printf README.md "$(cat $OUT/ci-1-ctest.log)"
-gg_printf README.md "\`\`\`\n"
+gg_printf "\`\`\`\n"
+gg_printf "$(cat $OUT/ci-1-ctest.log)"
+gg_printf "\`\`\`\n"
 
 exit $ret
