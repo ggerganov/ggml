@@ -59,7 +59,12 @@ function gg_run_ctest_debug {
 
     (time cmake -DCMAKE_BUILD_TYPE=Debug ..     ) 2>&1 | tee -a $OUT/${ci}-cmake.log
     (time make -j                               ) 2>&1 | tee -a $OUT/${ci}-make.log
-    (time ctest --output-on-failure -E test-opt ) 2>&1 | tee -a $OUT/${ci}-ctest.log
+
+    if [ -z $GG_BUILD_LOW_PERF ]; then
+        (time ctest --output-on-failure -E test-opt ) 2>&1 | tee -a $OUT/${ci}-ctest.log
+    else
+        (time ctest --output-on-failure ) 2>&1 | tee -a $OUT/${ci}-ctest.log
+    fi
 
     set +e
 }
@@ -86,7 +91,12 @@ function gg_run_ctest_release {
 
     (time cmake -DCMAKE_BUILD_TYPE=Release ..   ) 2>&1 | tee -a $OUT/${ci}-cmake.log
     (time make -j                               ) 2>&1 | tee -a $OUT/${ci}-make.log
-    (time ctest --output-on-failure -E test-opt ) 2>&1 | tee -a $OUT/${ci}-ctest.log
+
+    if [ -z $GG_BUILD_LOW_PERF ]; then
+        (time ctest --output-on-failure -E test-opt ) 2>&1 | tee -a $OUT/${ci}-ctest.log
+    else
+        (time ctest --output-on-failure ) 2>&1 | tee -a $OUT/${ci}-ctest.log
+    fi
 
     set +e
 }
@@ -136,6 +146,7 @@ function gg_sum_gpt_2 {
 function gg_run_mpt {
     cd ${SRC}
 
+    gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/config.json
     gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/tokenizer.json
     gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/tokenizer_config.json
     gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/pytorch_model.bin.index.json
