@@ -58,7 +58,7 @@ function gg_run_ctest_debug {
     set -e
 
     (time cmake -DCMAKE_BUILD_TYPE=Debug ..     ) 2>&1 | tee -a $OUT/${ci}-cmake.log
-    (time make -j4                              ) 2>&1 | tee -a $OUT/${ci}-make.log
+    (time make -j                               ) 2>&1 | tee -a $OUT/${ci}-make.log
     (time ctest --output-on-failure -E test-opt ) 2>&1 | tee -a $OUT/${ci}-ctest.log
 
     set +e
@@ -85,7 +85,7 @@ function gg_run_ctest_release {
     set -e
 
     (time cmake -DCMAKE_BUILD_TYPE=Release ..   ) 2>&1 | tee -a $OUT/${ci}-cmake.log
-    (time make -j4                              ) 2>&1 | tee -a $OUT/${ci}-make.log
+    (time make -j                               ) 2>&1 | tee -a $OUT/${ci}-make.log
     (time ctest --output-on-failure -E test-opt ) 2>&1 | tee -a $OUT/${ci}-ctest.log
 
     set +e
@@ -174,7 +174,7 @@ function gg_sum_mpt {
 if [ -z $GG_BUILD_LOW_PERF ]; then
     rm -rf ${SRC}/models
 
-    mkdir -p ${GG_GGML_MNT}/models
+    mkdir -p $(realpath ${GG_GGML_MNT}/models)
     ln -sfn ${GG_GGML_MNT}/models ${SRC}/models
 
     python3 -m pip install -r ${SRC}/requirements.txt
