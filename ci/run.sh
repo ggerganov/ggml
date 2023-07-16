@@ -15,9 +15,13 @@ function gg_printf {
 function gg_run {
     ci=$1
 
-    gg_run_$ci
+    set -o pipefail
+
+    gg_run_$ci | tee $OUT/$ci.log
     cur=$?
     echo "$cur" > $OUT/$ci.exit
+
+    set +o pipefail
 
     gg_sum_$ci
 
@@ -77,11 +81,7 @@ function gg_sum_ci_1 {
 
 ret=0
 
-set -o pipefail
-
 ret=$(($ret + $(gg_run ci_0)))
 ret=$(($ret + $(gg_run ci_1)))
-
-set +o pipefail
 
 exit $ret
