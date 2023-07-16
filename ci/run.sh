@@ -25,7 +25,7 @@ function gg_run {
 
     gg_sum_$ci
 
-    return $cur
+    ret=$((ret | cur))
 }
 
 ## ci
@@ -81,7 +81,7 @@ function gg_sum_ci_1 {
 
 ret=0
 
-gg_run ci_0 || ret=$?
-gg_run ci_1 || ret=$?
+gg_run ci_0
+gg_run ci_1
 
 exit $ret
