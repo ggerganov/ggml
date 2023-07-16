@@ -82,7 +82,7 @@ int main(int argc, const char ** argv) {
 
         for (int i = 0; i < NF; ++i) {
             if (i < NF/2) {
-                GGML_ASSERT(is_close(((float *)x->data)[i],  1.0f, 1e-2f));
+                GGML_ASSERT(is_close(((float *)x->data)[i],  10.0f, 1e-2f));
             } else {
                 GGML_ASSERT(is_close(((float *)x->data)[i], -1.0f, 1e-2f));
             }
