@@ -112,7 +112,8 @@ function gg_run_gpt_2 {
 
     cmake -DCMAKE_BUILD_TYPE=Release .. && make -j4
 
-    (time ./bin/gpt-2 --model ../models/gpt-2/ggml-model-gpt-2-117M.bin -s 1234 -n 64 -t 4 ) 2>&1 | tee $OUT/${ci}.log
+    time ./bin/gpt-2 --model ../models/gpt-2/ggml-model-gpt-2-117M.bin -s 1234 -n 64 -t 4 > $OUT/${ci}.log 2>&1
+    cat $OUT/${ci}.log
 
     set +e
 }
