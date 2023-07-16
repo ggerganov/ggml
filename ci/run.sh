@@ -64,11 +64,11 @@ printf "## Summary\n" > $OUT/README.md
 
 printf "\n"                                           >> $OUT/README.md
 
-printf "- status: ${status}\n"                        >> $OUT/README.md
-printf "- date:   $(date)\n"                          >> $OUT/README.md
-printf "- repo:   ${GG_CI_REPO}\n"                    >> $OUT/README.md
-printf "- author: ${GG_CI_COMMIT_AUTHOR}\n"           >> $OUT/README.md
-printf "- commit: ${GG_CI_COMMIT_URL}\n"              >> $OUT/README.md
+printf "\- status: ${status}\n"                       >> $OUT/README.md
+printf "\- date:   $(date)\n"                         >> $OUT/README.md
+printf "\- repo:   ${GG_CI_REPO}\n"                   >> $OUT/README.md
+printf "\- author: ${GG_CI_COMMIT_AUTHOR}\n"          >> $OUT/README.md
+printf "\- commit: ${GG_CI_COMMIT_URL}\n"             >> $OUT/README.md
 printf "  \`\`\`\n${GG_CI_COMMIT_MSG}\n\`\`\`\n"      >> $OUT/README.md
 
 printf "\n"                                           >> $OUT/README.md
