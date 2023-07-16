@@ -8,6 +8,22 @@ OUT=$1
 
 ## helpers
 
+# download a file if it does not exist or if it is outdated
+function gg_wget {
+    local out=$1
+    local url=$2
+
+    local cwd=`pwd`
+
+    mkdir -p $out
+    cd $out
+
+    # should not re-download if file is the same
+    wget -N $url
+
+    cd $cwd
+}
+
 function gg_printf {
     printf -- "$@" >> $OUT/README.md
 }
@@ -30,7 +46,9 @@ function gg_run {
 
 ## ci
 
-function gg_run_ci_0 {
+# ctest_debug
+
+function gg_run_ctest_debug {
     cd $SRC
 
     rm -rf build-ci && mkdir build-ci && cd build-ci
@@ -44,9 +62,10 @@ function gg_run_ci_0 {
     set +e
 }
 
-function gg_sum_ci_0 {
+function gg_sum_ctest_debug {
     gg_printf '### %s\n\n' "${ci}"
 
+    gg_printf 'Runs ctest in debug mode\n'
     gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
     gg_printf '```\n'
     gg_printf '%s\n' "$(cat $OUT/${ci}-ctest.log)"
@@ -54,7 +73,9 @@ function gg_sum_ci_0 {
     gg_printf '\n'
 }
 
-function gg_run_ci_1 {
+# ctest_release
+
+function gg_run_ctest_release {
     cd $SRC
 
     rm -rf build-ci && mkdir build-ci && cd build-ci
@@ -68,12 +89,41 @@ function gg_run_ci_1 {
     set +e
 }
 
-function gg_sum_ci_1 {
+function gg_sum_ctest_release {
     gg_printf '### %s\n\n' "${ci}"
 
+    gg_printf 'Runs ctest in release mode\n'
     gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
     gg_printf '```\n'
     gg_printf '%s\n' "$(cat $OUT/${ci}-ctest.log)"
+    gg_printf '```\n'
+}
+
+# gpt_2
+
+function gg_run_gpt_2 {
+    cd $SRC
+
+    gg_wget models/gpt-2 https://huggingface.co/ggerganov/ggml/resolve/main/ggml-model-gpt-2-117M.bin
+
+    rm -rf build-ci && mkdir build-ci && cd build-ci
+
+    set -e
+
+    cmake -DCMAKE_BUILD_TYPE=Release .. && make -j4
+
+    ./bin/main --model ../models/gpt-2/ggml-model-gpt-2-117M.bin -n 32 -t 4 > $OUT/${ci}.log 2>&1
+
+    set +e
+}
+
+function gg_sum_gpt_2 {
+    gg_printf '### %s\n\n' "${ci}"
+
+    gg_printf 'Runs short GPT-2 text generation\n'
+    gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
+    gg_printf '```\n'
+    gg_printf '%s\n' "$(cat $OUT/${ci}.log)"
     gg_printf '```\n'
 }
 
@@ -81,7 +131,8 @@ function gg_sum_ci_1 {
 
 ret=0
 
-gg_run ci_0
-gg_run ci_1
+gg_run ctest_debug
+gg_run ctest_release
+gg_run gpt_2
 
 exit $ret
