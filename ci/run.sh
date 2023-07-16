@@ -65,14 +65,14 @@ function gg_printf {
 gg_printf "### ci-0\n\n"
 
 gg_printf "\`\`\`\n"
-gg_printf "$(cat $OUT/ci-0-ctest.log)"
+gg_printf "$(cat $OUT/ci-0-ctest.log)\n"
 gg_printf "\`\`\`\n"
 gg_printf "\n"
 
 gg_printf "### ci-1\n\n"
 
 gg_printf "\`\`\`\n"
-gg_printf "$(cat $OUT/ci-1-ctest.log)"
+gg_printf "$(cat $OUT/ci-1-ctest.log)\n"
 gg_printf "\`\`\`\n"
 
 exit $ret
