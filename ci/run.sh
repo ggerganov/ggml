@@ -37,19 +37,19 @@ function gg_run_ci_0 {
 
     set -e
 
-    (time cmake -DCMAKE_BUILD_TYPE=Debug ..     ) 2>&1 | tee $OUT/ci-0-cmake.log
-    (time make -j4                              ) 2>&1 | tee $OUT/ci-0-make.log
-    (time ctest --output-on-failure -E test-opt ) 2>&1 | tee $OUT/ci-0-ctest.log
+    (time cmake -DCMAKE_BUILD_TYPE=Debug ..     ) 2>&1 | tee $OUT/${ci}-cmake.log
+    (time make -j4                              ) 2>&1 | tee $OUT/${ci}-make.log
+    (time ctest --output-on-failure -E test-opt ) 2>&1 | tee $OUT/${ci}-ctest.log
 
     set +e
 }
 
 function gg_sum_ci_0 {
-    gg_printf '### ci-0\n\n'
+    gg_printf '### %s\n\n' "${ci}"
 
-    gg_printf '- status: %s\n' "$(cat $OUT/ci-0.exit)"
+    gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
     gg_printf '```\n'
-    gg_printf '%s\n' "$(cat $OUT/ci-0-ctest.log)"
+    gg_printf '%s\n' "$(cat $OUT/${ci}-ctest.log)"
     gg_printf '```\n'
     gg_printf '\n'
 }
@@ -61,19 +61,19 @@ function gg_run_ci_1 {
 
     set -e
 
-    (time cmake -DCMAKE_BUILD_TYPE=Release ..   ) 2>&1 | tee $OUT/ci-1-cmake.log
-    (time make -j4                              ) 2>&1 | tee $OUT/ci-1-make.log
-    (time ctest --output-on-failure -E test-opt ) 2>&1 | tee $OUT/ci-1-ctest.log
+    (time cmake -DCMAKE_BUILD_TYPE=Release ..   ) 2>&1 | tee $OUT/${ci}-cmake.log
+    (time make -j4                              ) 2>&1 | tee $OUT/${ci}-make.log
+    (time ctest --output-on-failure -E test-opt ) 2>&1 | tee $OUT/${ci}-ctest.log
 
     set +e
 }
 
 function gg_sum_ci_1 {
-    gg_printf '### ci-1\n\n'
+    gg_printf '### %s\n\n' "${ci}"
 
-    gg_printf '- status: %s\n' "$(cat $OUT/ci-1.exit)"
+    gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
     gg_printf '```\n'
-    gg_printf '%s\n' "$(cat $OUT/ci-1-ctest.log)"
+    gg_printf '%s\n' "$(cat $OUT/${ci}-ctest.log)"
     gg_printf '```\n'
 }
 
