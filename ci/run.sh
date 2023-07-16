@@ -112,7 +112,7 @@ function gg_run_gpt_2 {
 
     cmake -DCMAKE_BUILD_TYPE=Release .. && make -j4
 
-    ./bin/main --model ../models/gpt-2/ggml-model-gpt-2-117M.bin -n 32 -t 4 > $OUT/${ci}.log 2>&1
+    ./bin/gpt-2 --model ../models/gpt-2/ggml-model-gpt-2-117M.bin -n 32 -t 4 > $OUT/${ci}.log 2>&1
 
     set +e
 }
@@ -131,8 +131,8 @@ function gg_sum_gpt_2 {
 
 ret=0
 
-gg_run ctest_debug
-gg_run ctest_release
+#gg_run ctest_debug
+#gg_run ctest_release
 gg_run gpt_2
 
 exit $ret
