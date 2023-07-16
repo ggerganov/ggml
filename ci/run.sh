@@ -6,13 +6,29 @@ cd $sd/../
 SRC=`pwd`
 OUT=$1
 
+## helpers
+
+function gg_printf {
+    printf -- "$@" >> $OUT/README.md
+}
+
+function gg_run {
+    ci=$1
+
+    gg_run_$ci
+    cur=$?
+    echo "$cur" > $OUT/$ci.exit
+    ret=$(($ret + $cur))
+
+    gg_sum_$ci
+}
+
 ## ci
 
-function gg_ci_0 {
+function gg_run_ci_0 {
     cd $SRC
 
-    mkdir build-ci-0
-    cd build-ci-0
+    rm -rf build-ci && mkdir build-ci && cd build-ci
 
     set -e
 
@@ -23,11 +39,19 @@ function gg_ci_0 {
     set +e
 }
 
-function gg_ci_1 {
+function gg_sum_ci_0 {
+    gg_printf '### ci-0\n\n'
+
+    gg_printf '```\n'
+    gg_printf '%s\n' "$(cat $OUT/ci-0-ctest.log)"
+    gg_printf '```\n'
+    gg_printf '\n'
+}
+
+function gg_run_ci_1 {
     cd $SRC
 
-    mkdir build-ci-1
-    cd build-ci-1
+    rm -rf build-ci && mkdir build-ci && cd build-ci
 
     set -e
 
@@ -38,41 +62,19 @@ function gg_ci_1 {
     set +e
 }
 
+function gg_sum_ci_1 {
+    gg_printf '### ci-1\n\n'
+
+    gg_printf '```\n'
+    gg_printf '%s\n' "$(cat $OUT/ci-1-ctest.log)"
+    gg_printf '```\n'
+}
+
 ## main
 
 ret=0
 
-set -o pipefail
-
-gg_ci_0 | tee $OUT/ci-0.log
-cur=$?
-echo "$cur" > $OUT/ci-0.exit
-ret=$(($ret + $cur))
-
-gg_ci_1 | tee $OUT/ci-1.log
-cur=$?
-echo "$cur" > $OUT/ci-1.exit
-ret=$(($ret + $cur))
-
-set +o pipefail
-
-## summary
-
-function gg_printf {
-    printf -- "$@" >> $OUT/README.md
-}
-
-gg_printf '### ci-0\n\n'
-
-gg_printf '```\n'
-gg_printf '%s\n' "$(cat $OUT/ci-0-ctest.log)"
-gg_printf '```\n'
-gg_printf '\n'
-
-gg_printf '### ci-1\n\n'
-
-gg_printf '```\n'
-gg_printf '%s\n' "$(cat $OUT/ci-1-ctest.log)"
-gg_printf '```\n'
+gg_run ci_0
+gg_run ci_1
 
 exit $ret
