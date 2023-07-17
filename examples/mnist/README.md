@@ -41,6 +41,8 @@ mkdir build && cd build
 cmake ..
 make -j4 mnist
 
+# Convert pytroch model to GGML format first for quickstart.
+cd ../examples/mnist/ && python convert-h5-to-ggml.py models/mnist/mnist_model.state_dict && cd ../../build
 # Run the MNIST model
 ./bin/mnist ../examples/mnist/models/mnist/ggml-model-f32.bin ../examples/mnist/models/mnist/t10k-images.idx3-ubyte
 ```
