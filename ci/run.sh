@@ -4,7 +4,8 @@ sd=`dirname $0`
 cd $sd/../
 
 SRC=`pwd`
-OUT=$1
+OUT="$1"
+MNT="$2"
 
 ## helpers
 
@@ -112,13 +113,13 @@ function gg_sum_ctest_release {
 function gg_run_gpt_2 {
     cd ${SRC}
 
-    gg_wget models/gpt-2 https://huggingface.co/ggerganov/ggml/resolve/main/ggml-model-gpt-2-117M.bin
+    gg_wget models-mnt/gpt-2 https://huggingface.co/ggerganov/ggml/resolve/main/ggml-model-gpt-2-117M.bin
 
     cd build-ci-release
 
     set -e
 
-    model="../models/gpt-2/ggml-model-gpt-2-117M.bin"
+    model="../models-mnt/gpt-2/ggml-model-gpt-2-117M.bin"
     prompts="../examples/prompts/gpt-2.txt"
 
     (time ./bin/gpt-2 --model ${model} -s 1234 -n 64 -t 4 -tt ${prompts}                       ) 2>&1 | tee -a $OUT/${ci}-tg.log
@@ -142,19 +143,19 @@ function gg_sum_gpt_2 {
 function gg_run_mpt {
     cd ${SRC}
 
-    gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/config.json
-    gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/tokenizer.json
-    gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/tokenizer_config.json
-    gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/pytorch_model.bin.index.json
-    gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/configuration_mpt.py
-    gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/resolve/main/pytorch_model-00001-of-00002.bin
-    gg_wget models/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/resolve/main/pytorch_model-00002-of-00002.bin
+    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/config.json
+    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/tokenizer.json
+    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/tokenizer_config.json
+    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/pytorch_model.bin.index.json
+    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/configuration_mpt.py
+    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/resolve/main/pytorch_model-00001-of-00002.bin
+    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/resolve/main/pytorch_model-00002-of-00002.bin
 
     cd build-ci-release
 
     set -e
 
-    path_models="../models/mpt/7B"
+    path_models="../models-mnt/mpt/7B"
     model_f16="${path_models}/ggml-model-f16.bin"
     model_q4_0="${path_models}/ggml-model-q4_0.bin"
 
@@ -180,10 +181,10 @@ function gg_sum_mpt {
 ## main
 
 if [ -z $GG_BUILD_LOW_PERF ]; then
-    rm -rf ${SRC}/models
+    rm -rf ${SRC}/models-mnt
 
-    mkdir -p $(realpath ${GG_GGML_MNT}/models)
-    ln -sfn ${GG_GGML_MNT}/models ${SRC}/models
+    mkdir -p $(realpath ${MNT}/models)
+    ln -sfn ${MNT}/models ${SRC}/models-mnt
 
     python3 -m pip install -r ${SRC}/requirements.txt
 fi
