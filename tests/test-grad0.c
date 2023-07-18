@@ -620,6 +620,40 @@ int main(int argc, const char ** argv) {
             }
         }
 
+        // mean, not yet fully implemented
+        if(0)
+        {
+            const int nargs = 1;
+
+            for (int ndims = 1; ndims <= 4; ++ndims) {
+                for (int i = 0; i < nargs; ++i) {
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
+                    ggml_set_param(ctx0, x[i]);
+                }
+
+                struct ggml_tensor * f = ggml_sum(ctx0, ggml_mean(ctx0, x[0]));
+
+                check_gradient("mean", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, 1e-3f);
+            }
+        }
+
+        // argmax
+        if (0)
+        {
+            const int nargs = 1;
+
+            for (int ndims = 1; ndims <= 4; ++ndims) {
+                for (int i = 0; i < nargs; ++i) {
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
+                    ggml_set_param(ctx0, x[i]);
+                }
+
+                struct ggml_tensor * f = ggml_sum(ctx0, ggml_argmax(ctx0, x[0]));
+
+                check_gradient("argmax", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, 1e-3f);
+            }
+        }
+
         // repeat
         {
             int64_t ne2[4];
@@ -640,7 +674,28 @@ int main(int argc, const char ** argv) {
 
                 check_gradient("repeat", ctx0, x, f, ndims, nargs, 1e-3f, 1e-2f, INFINITY);
             }
+        }
 
+        // repeat back
+        {
+            int64_t ne2[4];
+            get_random_dims(ne2, 4);
+
+            ne2[0] = ne[0] * ne2[0];
+            ne2[1] = ne[1] * ne2[1];
+            ne2[2] = 1;
+            ne2[3] = 1;
+
+            const int nargs = 1;
+            for (int ndims = 1; ndims <= 2; ++ndims) {
+                x[0] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
+                x[1] = get_random_tensor_f32(ctx0, ndims, ne2, -1.0f, 1.0f);
+                ggml_set_param(ctx0, x[0]);
+
+                struct ggml_tensor * f = ggml_sum(ctx0, ggml_sqr(ctx0, ggml_sub(ctx0, x[0], ggml_repeat_back(ctx0, x[1], x[0]))));
+
+                check_gradient("repeat back", ctx0, x, f, ndims, nargs, 1e-3f, 1e-2f, INFINITY);
+            }
         }
 
         // abs (finite differences do not work)
@@ -658,6 +713,72 @@ int main(int argc, const char ** argv) {
         //        check_gradient("abs", ctx0, x, f, ndims, nargs, 1e-3f, INFINITY, 1e-3f);
         //    }
         //}
+
+        // sgn
+        {
+            const int nargs = 1;
+
+            for (int ndims = 1; ndims <= 4; ++ndims) {
+                for (int i = 0; i < nargs; ++i) {
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
+                    ggml_set_param(ctx0, x[i]);
+                }
+
+                struct ggml_tensor* f = ggml_sum(ctx0, ggml_sgn(ctx0, x[0]));
+
+                check_gradient("sgn", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, 1e-3f);
+            }
+        }
+
+
+        // neg
+        {
+            const int nargs = 1;
+
+            for (int ndims = 1; ndims <= 4; ++ndims) {
+                for (int i = 0; i < nargs; ++i) {
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
+                    ggml_set_param(ctx0, x[i]);
+                }
+
+                struct ggml_tensor* f = ggml_sum(ctx0, ggml_neg(ctx0, x[0]));
+
+                check_gradient("neg", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, 1e-3f);
+            }
+        }
+
+        // step
+        {
+            const int nargs = 1;
+
+            for (int ndims = 1; ndims <= 4; ++ndims) {
+                for (int i = 0; i < nargs; ++i) {
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
+                    ggml_set_param(ctx0, x[i]);
+                }
+
+                struct ggml_tensor* f = ggml_sum(ctx0, ggml_step(ctx0, x[0]));
+
+                check_gradient("step", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, 1e-3f);
+            }
+        }
+
+        // tanh, not yet fully implemented
+        if(0)
+        {
+            const int nargs = 1;
+
+            for (int ndims = 1; ndims <= 4; ++ndims) {
+                for (int i = 0; i < nargs; ++i) {
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
+                    ggml_set_param(ctx0, x[i]);
+                }
+
+                struct ggml_tensor* f = ggml_sum(ctx0, ggml_tanh(ctx0, x[0]));
+
+                check_gradient("tanh", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, 1e-3f);
+            }
+        }
 
         // mul_mat
         {
@@ -1304,7 +1425,7 @@ int main(int argc, const char ** argv) {
             }
         }
 
-        // flash_attn
+        // flash_attn f32
         {
             const int nargs = 3;
 
@@ -1339,7 +1460,48 @@ int main(int argc, const char ** argv) {
 
                     struct ggml_tensor * f = ggml_sum(ctx0, ggml_flash_attn(ctx0, x[0], x[1], x[2], (masked == 0)));
 
-                    check_gradient("flash_attn", ctx0, x, f, ndims, nargs, 1.5e-4f, INFINITY, 3.5f);
+                    check_gradient("flash_attn f32", ctx0, x, f, ndims, nargs, 1.5e-4f, INFINITY, 3.5f);
+                }
+            }
+        }
+
+        // flash_attn f16, not yet fully implemented
+        if(0)
+        {
+            const int nargs = 3;
+
+            int64_t ne2[4];
+
+            get_random_dims(ne2, 4);
+            int64_t D = ne2[0];
+            int64_t N = ne2[1];
+            int64_t M = ne2[2] + N;
+            int64_t B = ne2[3];
+
+            for (int masked = 0; masked <= 1; ++masked) {
+                for (int ndims = 2; ndims <= 4; ++ndims) {
+                    int64_t neq[4] = { D, N, B, ne[3] };
+                    int64_t nek[4] = { D, M, B, ne[3] };
+                    int64_t nev[4] = { M, D, B, ne[3] };
+                    if (ndims == 2) {
+                        neq[2] = 1; neq[3] = 1;
+                        nek[2] = 1; nek[3] = 1;
+                        nev[2] = 1; nev[3] = 1;
+                    } else if (ndims == 3) {
+                        neq[3] = 1;
+                        nek[3] = 1;
+                        nev[3] = 1;
+                    }
+                    x[0] = get_random_tensor_f16(ctx0, ndims, neq, -0.1250f, 0.1250f);
+                    x[1] = get_random_tensor_f16(ctx0, ndims, nek, -0.1250f, 0.1250f);
+                    x[2] = get_random_tensor_f16(ctx0, ndims, nev, -0.1250f, 0.1250f);
+                    ggml_set_param(ctx0, x[0]);
+                    ggml_set_param(ctx0, x[1]);
+                    ggml_set_param(ctx0, x[2]);
+
+                    struct ggml_tensor * f = ggml_sum(ctx0, ggml_flash_attn(ctx0, x[0], x[1], x[2], (masked == 0)));
+
+                    check_gradient("flash_attn f16", ctx0, x, f, ndims, nargs, 1.5e-4f, INFINITY, 3.5f);
                 }
             }
         }
