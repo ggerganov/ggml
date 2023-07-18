@@ -852,7 +852,7 @@ int main(int argc, const char ** argv) {
 
                 struct ggml_tensor* f = ggml_sum(ctx0, ggml_gelu(ctx0, x[0]));
 
-                check_gradient("gelu", ctx0, x, f, ndims, nargs, , 1e-3f, 1e-3f, 1e-3f);
+                check_gradient("gelu", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, 1e-3f);
             }
         }
 
