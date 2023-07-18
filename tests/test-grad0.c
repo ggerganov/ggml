@@ -730,7 +730,6 @@ int main(int argc, const char ** argv) {
             }
         }
 
-
         // neg
         {
             const int nargs = 1;
@@ -803,6 +802,57 @@ int main(int argc, const char ** argv) {
 
                 check_gradient("mul_mat", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, INFINITY);
                 check_mat_mul(m, x[1], x[0]);
+            }
+        }
+
+        // elu, not yet fully implemented
+        if(0)
+        {
+            const int nargs = 1;
+
+            for (int ndims = 1; ndims <= 4; ++ndims) {
+                for (int i = 0; i < nargs; ++i) {
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
+                    ggml_set_param(ctx0, x[i]);
+                }
+
+                struct ggml_tensor* f = ggml_sum(ctx0, ggml_elu(ctx0, x[0]));
+
+                check_gradient("elu", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, 1e-3f);
+            }
+        }
+
+        // relu
+        {
+            const int nargs = 1;
+
+            for (int ndims = 1; ndims <= 4; ++ndims) {
+                for (int i = 0; i < nargs; ++i) {
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
+                    ggml_set_param(ctx0, x[i]);
+                }
+
+                struct ggml_tensor* f = ggml_sum(ctx0, ggml_relu(ctx0, x[0]));
+
+                // TODO: do we really need such a large relative error or does this indicate a problem?
+                check_gradient("relu", ctx0, x, f, ndims, nargs, 1e-3f, 3, INFINITY);
+            }
+        }
+
+        // gelu, not yet fully implemented
+        if(0)
+        {
+            const int nargs = 1;
+
+            for (int ndims = 1; ndims <= 4; ++ndims) {
+                for (int i = 0; i < nargs; ++i) {
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
+                    ggml_set_param(ctx0, x[i]);
+                }
+
+                struct ggml_tensor* f = ggml_sum(ctx0, ggml_gelu(ctx0, x[0]));
+
+                check_gradient("gelu", ctx0, x, f, ndims, nargs, , 1e-3f, 1e-3f, 1e-3f);
             }
         }
 
