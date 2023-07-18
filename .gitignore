@@ -1,7 +1,15 @@
 build/
 build-debug/
-build-*/
+build-release/
+build-sanitize-addr/
+build-sanitize-thread/
+build-cov/
+build-ci-debug/
+build-ci-release/
 out/
+tmp/
+models/
+models-mnt
 
 compile_commands.json
 CMakeSettings.json
