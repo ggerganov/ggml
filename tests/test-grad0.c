@@ -64,7 +64,7 @@ void get_random_dims(int64_t * dims, int ndims) {
     }
 }
 
-struct ggml_tensor * get_random_tensor(
+struct ggml_tensor * get_random_tensor_f32(
         struct ggml_context * ctx0,
         int ndims,
         int64_t ne[],
@@ -112,7 +112,55 @@ struct ggml_tensor * get_random_tensor(
     return result;
 }
 
-struct ggml_tensor * get_random_tensor_int(
+struct ggml_tensor * get_random_tensor_f16(
+        struct ggml_context * ctx0,
+        int ndims,
+        int64_t ne[],
+        float fmin,
+        float fmax) {
+    struct ggml_tensor * result = ggml_new_tensor(ctx0, GGML_TYPE_F16, ndims, ne);
+
+    switch (ndims) {
+        case 1:
+            for (int i0 = 0; i0 < ne[0]; i0++) {
+                ((ggml_fp16_t *)result->data)[i0] = ggml_fp32_to_fp16(frand()*(fmax - fmin) + fmin);
+            }
+            break;
+        case 2:
+            for (int i1 = 0; i1 < ne[1]; i1++) {
+                for (int i0 = 0; i0 < ne[0]; i0++) {
+                    ((ggml_fp16_t *)result->data)[i1*ne[0] + i0] = ggml_fp32_to_fp16(frand()*(fmax - fmin) + fmin);
+                }
+            }
+            break;
+        case 3:
+            for (int i2 = 0; i2 < ne[2]; i2++) {
+                for (int i1 = 0; i1 < ne[1]; i1++) {
+                    for (int i0 = 0; i0 < ne[0]; i0++) {
+                        ((ggml_fp16_t *)result->data)[i2*ne[1]*ne[0] + i1*ne[0] + i0] = ggml_fp32_to_fp16(frand()*(fmax - fmin) + fmin);
+                    }
+                }
+            }
+            break;
+        case 4:
+            for (int i3 = 0; i3 < ne[3]; i3++) {
+                for (int i2 = 0; i2 < ne[2]; i2++) {
+                    for (int i1 = 0; i1 < ne[1]; i1++) {
+                        for (int i0 = 0; i0 < ne[0]; i0++) {
+                            ((ggml_fp16_t *)result->data)[i3*ne[2]*ne[1]*ne[0] + i2*ne[1]*ne[0] + i1*ne[0] + i0] = ggml_fp32_to_fp16(frand()*(fmax - fmin) + fmin);
+                        }
+                    }
+                }
+            }
+            break;
+        default:
+            assert(false);
+    };
+
+    return result;
+}
+
+struct ggml_tensor * get_random_tensor_i32(
         struct ggml_context * ctx0,
         int ndims,
         int64_t ne[],
@@ -161,20 +209,39 @@ struct ggml_tensor * get_random_tensor_int(
 }
 
 float get_element(const struct ggml_tensor * t, int idx) {
-    if (t->type == GGML_TYPE_F32) {
-        return ((float *)t->data)[idx];
+    switch (t->type) {
+        case GGML_TYPE_F32:
+            return ((float *)t->data)[idx];
+        case GGML_TYPE_I32:
+            return ((int32_t *)t->data)[idx];
+        case GGML_TYPE_F16:
+            return ggml_fp16_to_fp32(((ggml_fp16_t *)t->data)[idx]);
+        case GGML_TYPE_I16:
+            return ((int16_t *)t->data)[idx];
+        default:
+            assert(false);
     }
-
-    if (t->type == GGML_TYPE_I32) {
-        return ((int32_t *)t->data)[idx];
-    }
-
-    assert(false);
     return INFINITY;
 }
 
 void set_element(struct ggml_tensor * t, int idx, float value) {
-    ((float *)t->data)[idx] = value;
+    switch (t->type) {
+        case GGML_TYPE_F32:
+            ((float *)t->data)[idx] = value;
+            break;
+        case GGML_TYPE_I32:
+            ((int32_t *)t->data)[idx] = value;
+            break;
+        case GGML_TYPE_F16:
+            ((ggml_fp16_t*)t->data)[idx] = ggml_fp32_to_fp16(value);
+            break;
+        case GGML_TYPE_I16:
+            ((int16_t *)t->data)[idx] = value;
+            break;
+        default:
+            assert(false);
+    }
+    ;
 }
 
 void print_elements(const char* label, const struct ggml_tensor * t) {
@@ -392,19 +459,35 @@ int main(int argc, const char ** argv) {
 
         struct ggml_tensor * x[MAX_NARGS];
 
-        // add
+        // add f32
         {
             const int nargs = 2;
 
             for (int ndims = 1; ndims <= 4; ++ndims) {
                 for (int i = 0; i < nargs; ++i) {
-                    x[i] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                     ggml_set_param(ctx0, x[i]);
                 }
 
                 struct ggml_tensor * f = ggml_sum(ctx0, ggml_add(ctx0, x[0], x[1]));
 
-                check_gradient("add", ctx0, x, f, ndims, nargs, 1e-3f, 2e-3f, 2e-3f);
+                check_gradient("add f32", ctx0, x, f, ndims, nargs, 1e-3f, 2e-3f, 2e-3f);
+            }
+        }
+
+        // add f16
+        {
+            const int nargs = 2;
+
+            for (int ndims = 1; ndims <= 4; ++ndims) {
+                for (int i = 0; i < nargs; ++i) {
+                    x[i] = get_random_tensor_f16(ctx0, ndims, ne, -1.0f, 1.0f);
+                    ggml_set_param(ctx0, x[i]);
+                }
+
+                struct ggml_tensor * f = ggml_sum(ctx0, ggml_add(ctx0, x[0], x[1]));
+
+                check_gradient("add f16", ctx0, x, f, ndims, nargs, 1e-1f, 2e-1f, 2e-1f);
             }
         }
 
@@ -414,7 +497,7 @@ int main(int argc, const char ** argv) {
 
             for (int ndims = 1; ndims <= 4; ++ndims) {
                 for (int i = 0; i < nargs; ++i) {
-                    x[i] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                     ggml_set_param(ctx0, x[i]);
                 }
 
@@ -430,7 +513,7 @@ int main(int argc, const char ** argv) {
 
             for (int ndims = 1; ndims <= 4; ++ndims) {
                 for (int i = 0; i < nargs; ++i) {
-                    x[i] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                     ggml_set_param(ctx0, x[i]);
                 }
 
@@ -446,7 +529,7 @@ int main(int argc, const char ** argv) {
 
             for (int ndims = 1; ndims <= 4; ++ndims) {
                 for (int i = 0; i < nargs; ++i) {
-                    x[i] = get_random_tensor(ctx0, ndims, ne, 0.5f, 1.0f);
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, 0.5f, 1.0f);
                     ggml_set_param(ctx0, x[i]);
                 }
 
@@ -462,7 +545,7 @@ int main(int argc, const char ** argv) {
 
             for (int ndims = 1; ndims <= 2; ++ndims) {
                 for (int i = 0; i < nargs; ++i) {
-                    x[i] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                     ggml_set_param(ctx0, x[i]);
                 }
 
@@ -478,7 +561,7 @@ int main(int argc, const char ** argv) {
 
             for (int ndims = 1; ndims <= 2; ++ndims) {
                 for (int i = 0; i < nargs; ++i) {
-                    x[i] = get_random_tensor(ctx0, ndims, ne, 2.0f*1e-3f, 1.0f);
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, 2.0f*1e-3f, 1.0f);
                     ggml_set_param(ctx0, x[i]);
                 }
 
@@ -494,7 +577,7 @@ int main(int argc, const char ** argv) {
 
             for (int ndims = 1; ndims <= 2; ++ndims) {
                 for (int i = 0; i < nargs; ++i) {
-                    x[i] = get_random_tensor(ctx0, ndims, ne, 2.0f*1e-3f, 1.0f);
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, 2.0f*1e-3f, 1.0f);
                     ggml_set_param(ctx0, x[i]);
                 }
 
@@ -510,7 +593,7 @@ int main(int argc, const char ** argv) {
 
             for (int ndims = 1; ndims <= 2; ++ndims) {
                 for (int i = 0; i < nargs; ++i) {
-                    x[i] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                     ggml_set_param(ctx0, x[i]);
                 }
 
@@ -527,7 +610,7 @@ int main(int argc, const char ** argv) {
 
             for (int ndims = 1; ndims <= 4; ++ndims) {
                 for (int i = 0; i < nargs; ++i) {
-                    x[i] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                     ggml_set_param(ctx0, x[i]);
                 }
 
@@ -549,8 +632,8 @@ int main(int argc, const char ** argv) {
 
             const int nargs = 1;
             for (int ndims = 1; ndims <= 2; ++ndims) {
-                x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
-                x[1] = get_random_tensor(ctx0, ndims, ne2, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
+                x[1] = get_random_tensor_f32(ctx0, ndims, ne2, -1.0f, 1.0f);
                 ggml_set_param(ctx0, x[0]);
 
                 struct ggml_tensor * f = ggml_sum(ctx0, ggml_sqr(ctx0, ggml_sub(ctx0, x[1], ggml_repeat(ctx0, x[0], x[1]))));
@@ -566,7 +649,7 @@ int main(int argc, const char ** argv) {
 
         //    for (int ndims = 1; ndims <= 2; ++ndims) {
         //        for (int i = 0; i < nargs; ++i) {
-        //            x[i] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+        //            x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
         //            ggml_set_param(ctx0, x[i]);
         //        }
 
@@ -581,12 +664,12 @@ int main(int argc, const char ** argv) {
             const int nargs = 2;
 
             for (int ndims = 2; ndims <= 2; ++ndims) {
-                x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                 {
                     int64_t ne2[4];
                     get_random_dims(ne2, 4);
                     ne2[0] = ne[0];
-                    x[1] = get_random_tensor(ctx0, ndims, ne2, -1.0f, 1.0f);
+                    x[1] = get_random_tensor_f32(ctx0, ndims, ne2, -1.0f, 1.0f);
                 }
 
                 ggml_set_param(ctx0, x[0]);
@@ -608,7 +691,7 @@ int main(int argc, const char ** argv) {
 
             for (int ndims = 1; ndims <= 2; ++ndims) {
                 for (int i = 0; i < nargs; ++i) {
-                    x[i] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                     ggml_set_param(ctx0, x[i]);
                 }
 
@@ -629,7 +712,7 @@ int main(int argc, const char ** argv) {
 
             for (int ndims = 1; ndims <= 2; ++ndims) {
                 for (int i = 0; i < nargs; ++i) {
-                    x[i] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                     ggml_set_param(ctx0, x[i]);
                 }
 
@@ -647,8 +730,8 @@ int main(int argc, const char ** argv) {
             ne2[0] = 1;
 
             for (int ndims = 1; ndims <= 2; ++ndims) {
-                x[1] = get_random_tensor(ctx0, 1, ne2, -1.0f, 1.0f);
-                x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                x[1] = get_random_tensor_f32(ctx0, 1, ne2, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
 
                 ggml_set_param(ctx0, x[0]);
                 ggml_set_param(ctx0, x[1]);
@@ -659,20 +742,37 @@ int main(int argc, const char ** argv) {
             }
         }
 
-        // cpy
+        // cpy f32
         {
             const int nargs = 2;
 
             for (int ndims = 1; ndims <= 2; ++ndims) {
                 for (int i = 0; i < nargs; ++i) {
-                    x[i] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                    x[i] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                     ggml_set_param(ctx0, x[i]);
                 }
                 // x[1] is overwritten by x[0], so the gradients don't propagate to x[1]
 
                 struct ggml_tensor * f = ggml_sum(ctx0, ggml_cpy(ctx0, x[0], x[1]));
 
-                check_gradient("cpy", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, INFINITY);
+                check_gradient("cpy f32", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, INFINITY);
+            }
+        }
+
+        // cpy f16
+        {
+            const int nargs = 2;
+
+            for (int ndims = 1; ndims <= 2; ++ndims) {
+                for (int i = 0; i < nargs; ++i) {
+                    x[i] = get_random_tensor_f16(ctx0, ndims, ne, -1.0f, 1.0f);
+                    ggml_set_param(ctx0, x[i]);
+                }
+                // x[1] is overwritten by x[0], so the gradients don't propagate to x[1]
+
+                struct ggml_tensor * f = ggml_sum(ctx0, ggml_cpy(ctx0, x[0], x[1]));
+
+                check_gradient("cpy f16", ctx0, x, f, ndims, nargs, 1e-1f, 1e-1f, INFINITY);
             }
         }
 
@@ -689,8 +789,8 @@ int main(int argc, const char ** argv) {
                 for (int i = 0; i < ndims; ++i) {
                     ne2[0] *= ne[i];
                 }
-                x[0] = get_random_tensor(ctx0, 1, ne2, -1.0f, 1.0f);
-                x[1] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, 1, ne2, -1.0f, 1.0f);
+                x[1] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                 ggml_set_param(ctx0, x[0]);
 
 
@@ -712,8 +812,8 @@ int main(int argc, const char ** argv) {
                 for (int i = 0; i < ndims; ++i) {
                     ne2[0] *= ne[i];
                 }
-                x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
-                x[1] = get_random_tensor(ctx0, 1, ne2, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
+                x[1] = get_random_tensor_f32(ctx0, 1, ne2, -1.0f, 1.0f);
                 ggml_set_param(ctx0, x[0]);
 
 
@@ -729,7 +829,7 @@ int main(int argc, const char ** argv) {
             const int nargs = 2;
             for (int ndims = 1; ndims <= 4; ++ndims) {
 
-                x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                 ggml_set_param(ctx0, x[0]);
 
                 get_random_dims(ne2, 1);
@@ -737,7 +837,7 @@ int main(int argc, const char ** argv) {
                     get_random_dims(ne2, 1);
                 }
 
-                x[1] = get_random_tensor(ctx0, 1, ne2, -1.0f, 1.0f);
+                x[1] = get_random_tensor_f32(ctx0, 1, ne2, -1.0f, 1.0f);
                 ggml_set_param(ctx0, x[1]);
 
                 const int max_offset = MAX(0, ggml_nelements(x[0]) - ggml_nelements(x[1]));
@@ -758,7 +858,7 @@ int main(int argc, const char ** argv) {
             const int nargs = 2;
             for (int ndims = 2; ndims <= 4; ++ndims) {
 
-                x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                 ggml_set_param(ctx0, x[0]);
 
                 get_random_dims(ne2, 2);
@@ -766,7 +866,7 @@ int main(int argc, const char ** argv) {
                     get_random_dims(ne2, 2);
                 }
 
-                x[1] = get_random_tensor(ctx0, 2, ne2, -1.0f, 1.0f);
+                x[1] = get_random_tensor_f32(ctx0, 2, ne2, -1.0f, 1.0f);
                 ggml_set_param(ctx0, x[1]);
 
                 max_offsets[0] = MAX(0, x[0]->ne[0] - x[1]->ne[0]);
@@ -790,7 +890,7 @@ int main(int argc, const char ** argv) {
             const int nargs = 2;
             for (int ndims = 3; ndims <= 4; ++ndims) {
 
-                x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                 ggml_set_param(ctx0, x[0]);
 
                 get_random_dims(ne2, 3);
@@ -798,7 +898,7 @@ int main(int argc, const char ** argv) {
                     get_random_dims(ne2, 3);
                 }
 
-                x[1] = get_random_tensor(ctx0, 3, ne2, -1.0f, 1.0f);
+                x[1] = get_random_tensor_f32(ctx0, 3, ne2, -1.0f, 1.0f);
                 ggml_set_param(ctx0, x[1]);
 
                 max_offsets[0] = MAX(0, x[0]->ne[0] - x[1]->ne[0]);
@@ -824,7 +924,7 @@ int main(int argc, const char ** argv) {
             const int nargs = 2;
             for (int ndims = 4; ndims <= 4; ++ndims) {
 
-                x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                 ggml_set_param(ctx0, x[0]);
 
                 get_random_dims(ne2, 4);
@@ -832,7 +932,7 @@ int main(int argc, const char ** argv) {
                     get_random_dims(ne2, 4);
                 }
 
-                x[1] = get_random_tensor(ctx0, 4, ne2, -1.0f, 1.0f);
+                x[1] = get_random_tensor_f32(ctx0, 4, ne2, -1.0f, 1.0f);
                 ggml_set_param(ctx0, x[1]);
 
                 max_offsets[0] = MAX(0, x[0]->ne[0] - x[1]->ne[0]);
@@ -858,7 +958,7 @@ int main(int argc, const char ** argv) {
             const int nargs = 2;
             for (int ndims = 1; ndims <= 4; ++ndims) {
 
-                x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                 ggml_set_param(ctx0, x[0]);
 
                 get_random_dims(ne2, 1);
@@ -866,7 +966,7 @@ int main(int argc, const char ** argv) {
                     get_random_dims(ne2, 1);
                 }
 
-                x[1] = get_random_tensor(ctx0, 1, ne2, -1.0f, 1.0f);
+                x[1] = get_random_tensor_f32(ctx0, 1, ne2, -1.0f, 1.0f);
                 ggml_set_param(ctx0, x[1]);
 
                 const int max_offset = MAX(0, ggml_nelements(x[0]) - ggml_nelements(x[1]));
@@ -887,7 +987,7 @@ int main(int argc, const char ** argv) {
             const int nargs = 1;
             for (int ndims = 2; ndims <= 4; ++ndims) {
 
-                x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
                 ggml_set_param(ctx0, x[0]);
 
                 get_random_dims(ne2, 2);
@@ -895,7 +995,7 @@ int main(int argc, const char ** argv) {
                     get_random_dims(ne2, 2);
                 }
 
-                x[1] = get_random_tensor(ctx0, 2, ne2, -1.0f, 1.0f);
+                x[1] = get_random_tensor_f32(ctx0, 2, ne2, -1.0f, 1.0f);
                 ggml_set_param(ctx0, x[1]);
 
                 max_offsets[0] = MAX(0, x[0]->ne[0] - x[1]->ne[0]);
@@ -915,7 +1015,7 @@ int main(int argc, const char ** argv) {
             const int nargs = 1;
             for (int ndims = 1; ndims <= 4; ++ndims) {
 
-                x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
 
                 ggml_set_param(ctx0, x[0]);
 
@@ -941,7 +1041,7 @@ int main(int argc, const char ** argv) {
             const int nargs = 1;
             for (int ndims = 1; ndims <= 4; ++ndims) {
 
-                x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
 
                 get_random_dims(ne2, 2);
                 while (ne2[0]*ne2[1] > ggml_nelements(x[0])) {
@@ -971,7 +1071,7 @@ int main(int argc, const char ** argv) {
             const int nargs = 1;
             for (int ndims = 1; ndims <= 4; ++ndims) {
 
-                x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
 
                 get_random_dims(ne2, 3);
                 while (ne2[0]*ne2[1]*ne2[2] > ggml_nelements(x[0])) {
@@ -1010,7 +1110,7 @@ int main(int argc, const char ** argv) {
                 for (int i=ndims; i<4; ++i) {
                     ne2[i] = 1;
                 }
-                x[0] = get_random_tensor(ctx0, 4, ne2, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, 4, ne2, -1.0f, 1.0f);
 
                 ggml_set_param(ctx0, x[0]);
 
@@ -1043,7 +1143,7 @@ int main(int argc, const char ** argv) {
                 for (int i=ndims; i<4; ++i) {
                     ne2[i] = 1;
                 }
-                x[0] = get_random_tensor(ctx0, 4, ne2, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, 4, ne2, -1.0f, 1.0f);
 
                 ggml_set_param(ctx0, x[0]);
 
@@ -1060,8 +1160,8 @@ int main(int argc, const char ** argv) {
             int64_t ne3[4] = {1+irand(ne[1]), 1, 1, 1};
             const int nargs = 1;
             const int ndims = 2;
-            x[0] = get_random_tensor(ctx0, ndims, ne2, -1.0f, 1.0f);
-            x[1] = get_random_tensor_int(ctx0, 1, ne3, 0, ne2[1]);
+            x[0] = get_random_tensor_f32(ctx0, ndims, ne2, -1.0f, 1.0f);
+            x[1] = get_random_tensor_i32(ctx0, 1, ne3, 0, ne2[1]);
 
             ggml_set_param(ctx0, x[0]);
 
@@ -1075,7 +1175,7 @@ int main(int argc, const char ** argv) {
             const int nargs = 1;
             const int ndims = 2;
 
-            x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+            x[0] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
             ggml_set_param(ctx0, x[0]);
 
             int n_past = irand(ne[0]);
@@ -1090,7 +1190,7 @@ int main(int argc, const char ** argv) {
             const int nargs = 1;
             const int ndims = 2;
 
-            x[0] = get_random_tensor(ctx0, ndims, ne, -1.0f, 1.0f);
+            x[0] = get_random_tensor_f32(ctx0, ndims, ne, -1.0f, 1.0f);
             ggml_set_param(ctx0, x[0]);
 
             int n_past = irand(ne[0]);
@@ -1108,7 +1208,7 @@ int main(int argc, const char ** argv) {
             get_random_dims(ne2, 4);
 
             for (int ndims = 1; ndims <= 3; ++ndims) {
-                x[0] = get_random_tensor(ctx0, ndims, ne2, -1.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, ndims, ne2, -1.0f, 1.0f);
                 ggml_set_param(ctx0, x[0]);
 
                 struct ggml_tensor * f = ggml_sum(ctx0, ggml_soft_max(ctx0, x[0]));
@@ -1125,8 +1225,8 @@ int main(int argc, const char ** argv) {
             get_random_dims(ne2, 4);
 
             for (int ndims = 1; ndims <= 3; ++ndims) {
-                x[0] = get_random_tensor(ctx0, ndims, ne2, -1.0f, 1.0f);
-                x[1] = get_random_tensor(ctx0, ndims, ne2, 0.0f, 1.0f);
+                x[0] = get_random_tensor_f32(ctx0, ndims, ne2, -1.0f, 1.0f);
+                x[1] = get_random_tensor_f32(ctx0, ndims, ne2, 0.0f, 1.0f);
                 ggml_set_param(ctx0, x[0]);
 
                 struct ggml_tensor * f = ggml_sum(ctx0, ggml_cross_entropy_loss(ctx0, x[0], x[1]));
@@ -1136,7 +1236,7 @@ int main(int argc, const char ** argv) {
             }
         }
 
-        // rope
+        // rope f32
         {
             const int nargs = 1;
 
@@ -1148,7 +1248,7 @@ int main(int argc, const char ** argv) {
             for (int ndims = 3; ndims <= 4; ++ndims) {
                 for (int mode = 0; mode < 4; ++mode) {
                     for (int n_past = 1; n_past < ne2[2]; ++n_past) {
-                        x[0] = get_random_tensor(ctx0, ndims, ne2, -1.0f, 1.0f);
+                        x[0] = get_random_tensor_f32(ctx0, ndims, ne2, -1.0f, 1.0f);
 
                         ggml_set_param(ctx0, x[0]);
 
@@ -1163,8 +1263,42 @@ int main(int argc, const char ** argv) {
 
                         struct ggml_tensor * f = ggml_sum(ctx0, ggml_rope(ctx0, x[0], n_past, n_rot, mode, 0));
 
-                        GGML_PRINT_DEBUG("rope: n_past: %d n_rot: %d mode: %d\n", n_past, n_rot, mode);
-                        check_gradient("rope", ctx0, x, f, ndims, nargs, 1e-2f, 1e-3f, INFINITY);
+                        GGML_PRINT_DEBUG("rope f32: n_past: %d n_rot: %d mode: %d\n", n_past, n_rot, mode);
+                        check_gradient("rope f32", ctx0, x, f, ndims, nargs, 1e-2f, 1e-3f, INFINITY);
+                    }
+                }
+            }
+        }
+
+        // rope f16
+        {
+            const int nargs = 1;
+
+            int64_t ne2[4];
+            get_random_dims(ne2, 4);
+            ne2[0] += ne2[0] % 2;
+            int n_rot = ne2[0];
+
+            for (int ndims = 3; ndims <= 4; ++ndims) {
+                for (int mode = 0; mode < 4; ++mode) {
+                    for (int n_past = 1; n_past < ne2[2]; ++n_past) {
+                        x[0] = get_random_tensor_f16(ctx0, ndims, ne2, -1.0f, 1.0f);
+
+                        ggml_set_param(ctx0, x[0]);
+
+                        const bool skip_past = (mode & 1);
+                        if (skip_past) {
+                            // we have no past, so this would have to work on uninitialized memory.
+                            // we only test the gradients here;
+                            // skip_past should have no influence on gradient computation.
+                            // so when other modes work, we assume that this does as well.
+                            continue;
+                        }
+
+                        struct ggml_tensor * f = ggml_sum(ctx0, ggml_rope(ctx0, x[0], n_past, n_rot, mode, 0));
+
+                        GGML_PRINT_DEBUG("rope f16: n_past: %d n_rot: %d mode: %d\n", n_past, n_rot, mode);
+                        check_gradient("rope f16", ctx0, x, f, ndims, nargs, 1e-1f, 1e-1f, INFINITY);
                     }
                 }
             }
@@ -1196,9 +1330,9 @@ int main(int argc, const char ** argv) {
                         nek[3] = 1;
                         nev[3] = 1;
                     }
-                    x[0] = get_random_tensor(ctx0, ndims, neq, -0.1250f, 0.1250f);
-                    x[1] = get_random_tensor(ctx0, ndims, nek, -0.1250f, 0.1250f);
-                    x[2] = get_random_tensor(ctx0, ndims, nev, -0.1250f, 0.1250f);
+                    x[0] = get_random_tensor_f32(ctx0, ndims, neq, -0.1250f, 0.1250f);
+                    x[1] = get_random_tensor_f32(ctx0, ndims, nek, -0.1250f, 0.1250f);
+                    x[2] = get_random_tensor_f32(ctx0, ndims, nev, -0.1250f, 0.1250f);
                     ggml_set_param(ctx0, x[0]);
                     ggml_set_param(ctx0, x[1]);
                     ggml_set_param(ctx0, x[2]);
