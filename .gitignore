@@ -1,7 +1,11 @@
 build/
 build-debug/
-build-*/
+build-release/
+build-sanitize-addr/
+build-sanitize-thread/
+build-cov/
 out/
+models/
 
 compile_commands.json
 CMakeSettings.json

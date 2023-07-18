@@ -29,6 +29,8 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
             params.seed = std::stoi(argv[++i]);
         } else if (arg == "-t" || arg == "--threads") {
             params.n_threads = std::stoi(argv[++i]);
+        } else if (arg == "-ngl" || arg == "--gpu-layers" || arg == "--n-gpu-layers") {
+            params.n_gpu_layers = std::stoi(argv[++i]);
         } else if (arg == "-p" || arg == "--prompt") {
             params.prompt = argv[++i];
         } else if (arg == "-n" || arg == "--n_predict") {
@@ -89,6 +91,7 @@ void gpt_print_usage(int /*argc*/, char ** argv, const gpt_params & params) {
     fprintf(stderr, "  -h, --help            show this help message and exit\n");
     fprintf(stderr, "  -s SEED, --seed SEED  RNG seed (default: -1)\n");
     fprintf(stderr, "  -t N, --threads N     number of threads to use during computation (default: %d)\n", params.n_threads);
+    fprintf(stderr, "  -ngl N, --gpu-layers N  number of layers to offload to GPU on supported models (default: %d)\n", params.n_gpu_layers);
     fprintf(stderr, "  -p PROMPT, --prompt PROMPT\n");
     fprintf(stderr, "                        prompt to start generation with (default: random)\n");
     fprintf(stderr, "  -f FNAME, --file FNAME\n");
