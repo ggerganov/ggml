@@ -1,11 +1,23 @@
 #/bin/bash
 
+if [ -z "$2" ]; then
+    echo "usage: $0 <output-dir> <mnt-dir>"
+    exit 1
+fi
+
+mkdir -p "$1"
+mkdir -p "$2"
+
+OUT=$(realpath "$1")
+MNT=$(realpath "$2")
+
+rm -v $OUT/*.log
+rm -v $OUT/*.exit
+rm -v $OUT/*.md
+
 sd=`dirname $0`
 cd $sd/../
-
 SRC=`pwd`
-OUT="$1"
-MNT="$2"
 
 ## helpers
 
@@ -183,8 +195,9 @@ function gg_sum_mpt {
 if [ -z $GG_BUILD_LOW_PERF ]; then
     rm -rf ${SRC}/models-mnt
 
-    mkdir -p $(realpath ${MNT}/models)
-    ln -sfn ${MNT}/models ${SRC}/models-mnt
+    mnt_models=$(realpath ${MNT}/models)
+    mkdir -p ${mnt_models}
+    ln -sfn ${mnt_models} ${SRC}/models-mnt
 
     python3 -m pip install -r ${SRC}/requirements.txt
 fi
