@@ -209,7 +209,7 @@ if (GGML_METAL)
     find_library(METALKIT_FRAMEWORK         MetalKit                REQUIRED)
     find_library(METALPERFORMANCE_FRAMEWORK MetalPerformanceShaders REQUIRED)
 
-    set(GGML_SOURCES_METAL ggml-metal.m ggml-metal.h)
+    set(GGML_METAL_SOURCES ggml-metal.m ggml-metal.h)
 
     add_compile_definitions(GGML_METAL_NDEBUG)
 
@@ -235,7 +235,8 @@ add_library(${TARGET}
     ggml.c
     ../include/ggml/ggml.h
     ${GGML_CUDA_SOURCES}
-    ${GGML_OPENCL_SOURCES})
+    ${GGML_OPENCL_SOURCES}
+    ${GGML_METAL_SOURCES}})
 
 target_include_directories(${TARGET} PUBLIC
     .
@@ -264,6 +265,10 @@ if (BUILD_SHARED_LIBS)
     target_compile_definitions(${TARGET} PRIVATE
         GGML_BUILD
         )
+
+    if (GGML_METAL)
+        set_target_properties(${TARGET} PROPERTIES RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/ggml-metal.metal")
+    endif()
 endif()
 
 target_compile_definitions(${TARGET} PUBLIC
