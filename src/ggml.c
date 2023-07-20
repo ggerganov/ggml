@@ -74,7 +74,7 @@ static int sched_yield (void) {
     return 0;
 }
 
-#include "pthreads-win32.h"
+#include "pthread-win32.h"
 
 #else
 

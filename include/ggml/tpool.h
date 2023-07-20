@@ -2,9 +2,9 @@
 
 #if defined(_WIN32)
 #include <windows.h>
-#include "pthreads-win32.h"
+#include "pthread-win32.h"
 #else
-#include <pthreads.h>
+#include <pthread.h>
 #endif
 
 typedef void (*thread_func_t)(void *arg);
