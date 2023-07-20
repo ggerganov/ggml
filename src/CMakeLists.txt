@@ -209,7 +209,7 @@ if (GGML_METAL)
     find_library(METALKIT_FRAMEWORK         MetalKit                REQUIRED)
     find_library(METALPERFORMANCE_FRAMEWORK MetalPerformanceShaders REQUIRED)
 
-    set(GGML_METAL_SOURCES ggml-metal.m ggml-metal.h)
+    set(GGML_METAL_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/ggml-metal.m ${CMAKE_CURRENT_SOURCE_DIR}/ggml-metal.h)
 
     add_compile_definitions(GGML_METAL_NDEBUG)
 
@@ -217,7 +217,7 @@ if (GGML_METAL)
     #add_compile_definitions(GGML_METAL_DIR_KERNELS="${CMAKE_CURRENT_SOURCE_DIR}/")
 
     # copy ggml-metal.metal to bin directory
-    configure_file(ggml-metal.metal bin/ggml-metal.metal COPYONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/ggml-metal.metal bin/ggml-metal.metal COPYONLY)
 
     set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS}
         ${FOUNDATION_LIBRARY}
