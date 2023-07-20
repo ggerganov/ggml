@@ -80,7 +80,7 @@ bool mnist_model_load(const std::string & fname, mnist_model & model) {
             /*.mem_size   =*/ ctx_size + 1024*1024,
             /*.mem_buffer =*/ NULL,
             /*.no_alloc   =*/ false,
-            /*.n_threads  =*/ GGML_DEFAULT_N_THREADS,
+            /*.n_threads  =*/ 1,
         };
 
         model.ctx = ggml_init(params);

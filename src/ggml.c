@@ -102,7 +102,7 @@ typedef void * thread_ret_t;
 #endif
 
 /*#define GGML_PERF*/
-#define GGML_DEBUG 10
+#define GGML_DEBUG 0
 #define GGML_GELU_FP16
 #define GGML_GELU_QUICK_FP16
 #define GGML_SILU_FP16
@@ -233,7 +233,6 @@ inline static void* ggml_aligned_malloc(size_t size) {
 #include "ggml-opencl.h"
 #endif
 #elif defined(GGML_USE_OPENBLAS)
-#define GGML_BLAS_USE_MKL
 #if defined(GGML_BLAS_USE_MKL)
 #include <mkl.h>
 #else
@@ -18182,7 +18181,7 @@ enum ggml_opt_result ggml_opt(
             .mem_size   = 16*1024*1024,
             .mem_buffer = NULL,
             .no_alloc   = false,
-            .n_threads = 1,
+            .n_threads = GGML_DEFAULT_N_THREADS,
         };
 
         ctx = ggml_init(params_ctx);

@@ -231,7 +231,7 @@ bool dollyv2_model_load(const std::string & fname, dollyv2_model & model, gpt_vo
             /*.mem_size   =*/ ctx_size,
             /*.mem_buffer =*/ NULL,
             /*.no_alloc   =*/ false,
-            /*.n_threads  =*/ GGML_DEFAULT_N_THREADS,
+            /*.n_threads  =*/ 1,
         };
 
         model.ctx = ggml_init(params);

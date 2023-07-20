@@ -280,7 +280,7 @@ bool replit_model_load(const std::string & fname, replit_model & model, replit_t
             /*.mem_size   =*/ ctx_size,
             /*.mem_buffer =*/ NULL,
             /*.no_alloc   =*/ false,
-            /*.n_threads  =*/ GGML_DEFAULT_N_THREADS,
+            /*.n_threads  =*/ 1,
         };
 
         model.ctx = ggml_init(params);
