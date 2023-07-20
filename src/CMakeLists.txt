@@ -236,7 +236,7 @@ add_library(${TARGET}
     ../include/ggml/ggml.h
     ${GGML_CUDA_SOURCES}
     ${GGML_OPENCL_SOURCES}
-    ${GGML_METAL_SOURCES}})
+    ${GGML_METAL_SOURCES})
 
 target_include_directories(${TARGET} PUBLIC
     .
