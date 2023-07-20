@@ -29,7 +29,3 @@ zig-out/
 zig-cache/
 
 *.dot
-
-.gitignore/
-build-clang/
-build-icx/
