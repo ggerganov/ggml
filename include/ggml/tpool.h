@@ -102,8 +102,8 @@ static void *tpool_worker(void *arg)
 
     // printf("pthreads %p stops\n", arg);
     tm->thread_cnt--;
-    pthread_mutex_unlock(&tm->work_mutex);
     pthread_cond_signal(&tm->working_cond);
+    pthread_mutex_unlock(&tm->work_mutex);
     return NULL;
 }
 
@@ -162,8 +162,8 @@ static void tpool_destroy(tpool_t *tm)
         work = work2;
     }
     tm->stop = true;
-    pthread_mutex_unlock(&tm->work_mutex);
     pthread_cond_broadcast(&tm->work_cond);
+    pthread_mutex_unlock(&tm->work_mutex);
 
     tpool_wait(tm);
 
