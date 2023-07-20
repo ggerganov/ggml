@@ -75,7 +75,6 @@ static int sched_yield (void) {
 }
 
 #include "pthreads.h"
-
 #else
 #include <pthread.h>
 #include <stdatomic.h>
@@ -85,8 +84,9 @@ typedef void * thread_ret_t;
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
 #endif
+
+#include "tpool.h"
 
 // __FMA__ and __F16C__ are not defined in MSVC, however they are implied with AVX2/AVX512
 #if defined(_MSC_VER) && (defined(__AVX2__) || defined(__AVX512F__))
