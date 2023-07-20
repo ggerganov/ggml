@@ -1,6 +1,11 @@
 #pragma once
 
+#if defined(_WIN32)
+#include <windows.h>
 #include "pthreads.h"
+#else
+#include <pthreads.h>
+#endif
 
 typedef void (*thread_func_t)(void *arg);
 

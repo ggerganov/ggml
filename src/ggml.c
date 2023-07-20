@@ -75,7 +75,9 @@ static int sched_yield (void) {
 }
 
 #include "pthreads.h"
+
 #else
+
 #include <pthread.h>
 #include <stdatomic.h>
 
@@ -84,6 +86,7 @@ typedef void * thread_ret_t;
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
 #endif
 
 #include "tpool.h"
