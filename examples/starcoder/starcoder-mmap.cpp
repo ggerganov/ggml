@@ -352,6 +352,7 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
             /*.mem_size   =*/ ctx_size,
             /*.mem_buffer =*/ NULL,
             /*.no_alloc   =*/ true,
+            /*.n_threads  =*/ GGML_DEFAULT_N_THREADS,
         };
 
         model.ctx = ggml_init(params);
@@ -450,6 +451,7 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
         c_params.mem_size   = model.cache.buf.size;
         c_params.mem_buffer = model.cache.buf.addr;
         c_params.no_alloc   = false;
+        c_params.n_threads  = GGML_DEFAULT_N_THREADS;
 
         model.cache.ctx = ggml_init(c_params);
 
@@ -667,6 +669,7 @@ bool starcoder_eval(
         /*.mem_size   =*/ buf_size,
         /*.mem_buffer =*/ buf,
         /*.no_alloc   =*/ false,
+        /*.threads    =*/ n_threads,
     };
 
     struct ggml_context * ctx0 = ggml_init(params);

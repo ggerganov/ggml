@@ -122,6 +122,7 @@ int main(void) {
         .mem_size   = 1024*1024*1024,
         .mem_buffer = NULL,
         .no_alloc   = false,
+        .n_threads  = 1,
     };
     struct ggml_context * ctx = ggml_init(params);
 

@@ -45,6 +45,7 @@ int mnist_eval(
         /*.mem_size   =*/ buf_size,
         /*.mem_buffer =*/ buf,
         /*.no_alloc   =*/ false,
+        /*.n_threads  =*/ GGML_DEFAULT_N_THREADS,
     };
 
     struct ggml_context * ctx_work = ggml_init(params);

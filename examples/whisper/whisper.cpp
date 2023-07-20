@@ -741,6 +741,7 @@ static bool kv_cache_init(
         /*.mem_size   =*/ cache.buf.size(),
         /*.mem_buffer =*/ cache.buf.data(),
         /*.no_alloc   =*/ false,
+        /*.threads    =*/ GGML_DEFAULT_N_THREADS,
     };
 
     cache.ctx = ggml_init(params);
@@ -777,6 +778,7 @@ static bool kv_cache_reinit(struct whisper_kv_cache & cache) {
         /*.mem_size   =*/ cache.buf.size(),
         /*.mem_buffer =*/ cache.buf.data(),
         /*.no_alloc   =*/ false,
+        /*.threads    =*/ GGML_DEFAULT_N_THREADS,
     };
 
     cache.ctx = ggml_init(params);
@@ -1136,6 +1138,7 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
             /*.mem_size   =*/ wctx.model.buf->size(),
             /*.mem_buffer =*/ wctx.model.buf->data(),
             /*.no_alloc   =*/ false,
+            /*.threads    =*/ GGML_DEFAULT_N_THREADS,
         };
 
         model.ctx = ggml_init(params);
@@ -1456,6 +1459,7 @@ static bool whisper_encode_internal(
         /*.mem_size   =*/ wstate.buf_compute.size(),
         /*.mem_buffer =*/ wstate.buf_compute.data(),
         /*.no_alloc   =*/ false,
+        /*.threads    =*/ n_threads,
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
@@ -1935,6 +1939,7 @@ static bool whisper_decode_internal(
         /*.mem_size   =*/ wstate.buf_compute.size(),
         /*.mem_buffer =*/ wstate.buf_compute.data(),
         /*.no_alloc   =*/ false,
+        /*.threads    =*/ n_threads,
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
@@ -5084,6 +5089,7 @@ WHISPER_API const char * whisper_bench_ggml_mul_mat_str(int n_threads) {
                 /*.mem_size   =*/ buf.size(),
                 /*.mem_buffer =*/ buf.data(),
                 /*.no_alloc   =*/ false,
+                /*.threads    =*/ n_threads,
             };
 
             struct ggml_context * ctx0 = ggml_init(gparams);

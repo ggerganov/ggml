@@ -18,6 +18,7 @@ int main(int argc, const char ** argv) {
         .mem_size   = 128*1024*1024,
         .mem_buffer = NULL,
         .no_alloc   = false,
+        .n_threads  = GGML_DEFAULT_N_THREADS,
     };
 
     //struct ggml_opt_params opt_params = ggml_opt_default_params(GGML_OPT_ADAM);

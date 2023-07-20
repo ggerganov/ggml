@@ -235,6 +235,7 @@ int main(int argc, const char ** argv) {
         .mem_size   = 128*1024*1024,
         .mem_buffer = NULL,
         .no_alloc   = false,
+        .n_threads = GGML_DEFAULT_N_THREADS,
     };
 
     int64_t ne[4];

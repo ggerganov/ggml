@@ -482,6 +482,7 @@ extern "C" {
         size_t mem_size;   // bytes
         void * mem_buffer; // if NULL, memory will be allocated internally
         bool   no_alloc;   // don't allocate memory for the tensor data
+        int    n_threads;  // number of threads for the thread pool
     };
 
 
@@ -1350,7 +1351,7 @@ extern "C" {
     // ggml_graph_plan() has to be called before ggml_graph_compute()
     // when plan.work_size > 0, caller must allocate memory for plan.work_data
     GGML_API struct ggml_cplan ggml_graph_plan   (struct ggml_cgraph * cgraph, int n_threads /*= GGML_DEFAULT_N_THREADS*/);
-    GGML_API               int ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan);
+    GGML_API               int ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan, void * tpool);
     GGML_API              void ggml_graph_reset  (struct ggml_cgraph * cgraph);
 
     // same as ggml_graph_compute() but the work data is allocated as a part of the context

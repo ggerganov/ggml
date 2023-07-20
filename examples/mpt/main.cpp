@@ -298,6 +298,7 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
             /*.mem_size   =*/ ctx_size,
             /*.mem_buffer =*/ NULL,
             /*.no_alloc   =*/ false,
+            /*.n_threads  =*/ GGML_DEFAULT_N_THREADS,
         };
 
         model.ctx = ggml_init(params);
@@ -495,6 +496,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
         /*.mem_size   =*/ buf_size,
         /*.mem_buffer =*/ buf,
         /*.no_alloc   =*/ false,
+        /*.n_threads  =*/ n_threads,
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
