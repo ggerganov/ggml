@@ -540,8 +540,8 @@ bool sam_model_load(const std::string & fname, sam_model & model) {
                 ctx_size += (n_img_embd/2)*                               ggml_type_sizef(GGML_TYPE_F32);
 
                 // output_hypernetworks_mlps
-                ctx_size += 3*n_enc_out_chans*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += 3*n_enc_out_chans*                ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += n_hypernet_mpls_count*3*n_enc_out_chans*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
+                ctx_size += n_hypernet_mpls_count*3*n_enc_out_chans*                ggml_type_sizef(GGML_TYPE_F32);
 
                 // iou_prediction_head
                 ctx_size += 3*n_enc_out_chans*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
@@ -1619,6 +1619,8 @@ bool sam_decode_mask(
 
     struct ggml_context * ctx0 = ggml_init(params);
     struct ggml_cgraph gf = {};
+
+    return true;
 }
 
 int main(int argc, char ** argv) {
