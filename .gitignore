@@ -29,3 +29,5 @@ zig-out/
 zig-cache/
 
 *.dot
+
+*.sw?
