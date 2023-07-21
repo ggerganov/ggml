@@ -459,8 +459,6 @@ int main(int argc, const char ** argv) {
 
         struct ggml_tensor * x[MAX_NARGS];
 
-        goto test;
-
         // add f32
         {
             const int nargs = 2;
@@ -825,7 +823,6 @@ int main(int argc, const char ** argv) {
         }
 
         // relu
-        test:
         {
             const int nargs = 1;
 
@@ -840,7 +837,6 @@ int main(int argc, const char ** argv) {
                 check_gradient("relu", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, INFINITY);
             }
         }
-        continue;
 
         // gelu, not yet fully implemented
         if(0)
