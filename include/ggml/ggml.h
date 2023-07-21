@@ -329,16 +329,6 @@ extern "C" {
         GGML_OP_ARGMAX,
         GGML_OP_REPEAT,
         GGML_OP_REPEAT_BACK,
-        GGML_OP_ABS,
-        GGML_OP_SGN,
-        GGML_OP_NEG,
-        GGML_OP_STEP,
-        GGML_OP_TANH,
-        GGML_OP_ELU,
-        GGML_OP_RELU,
-        GGML_OP_GELU,
-        GGML_OP_GELU_QUICK,
-        GGML_OP_SILU,
         GGML_OP_SILU_BACK,
         GGML_OP_NORM, // normalize
         GGML_OP_RMS_NORM,
@@ -377,6 +367,8 @@ extern "C" {
         GGML_OP_WIN_PART,
         GGML_OP_WIN_UNPART,
 
+        GGML_OP_UNARY,
+
         GGML_OP_MAP_UNARY,
         GGML_OP_MAP_BINARY,
 
@@ -390,6 +382,18 @@ extern "C" {
         GGML_OP_COUNT,
     };
 
+    enum ggml_unary_op {
+        GGML_UNARY_OP_ABS,
+        GGML_UNARY_OP_SGN,
+        GGML_UNARY_OP_NEG,
+        GGML_UNARY_OP_STEP,
+        GGML_UNARY_OP_TANH,
+        GGML_UNARY_OP_ELU,
+        GGML_UNARY_OP_RELU,
+        GGML_UNARY_OP_GELU,
+        GGML_UNARY_OP_GELU_QUICK,
+        GGML_UNARY_OP_SILU,
+    };
 
     // ggml object
     struct ggml_object {
@@ -1262,6 +1266,16 @@ extern "C" {
     typedef void (*ggml_custom1_op_f32_t)(struct ggml_tensor *, const struct ggml_tensor *);
     typedef void (*ggml_custom2_op_f32_t)(struct ggml_tensor *, const struct ggml_tensor *, const struct ggml_tensor *);
     typedef void (*ggml_custom3_op_f32_t)(struct ggml_tensor *, const struct ggml_tensor *, const struct ggml_tensor *, const struct ggml_tensor *);
+
+    GGML_API struct ggml_tensor * ggml_unary(
+            struct ggml_context * ctx,
+             struct ggml_tensor * a,
+             enum ggml_unary_op op);
+
+    GGML_API struct ggml_tensor * ggml_unary_inplace(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        enum ggml_unary_op op);
 
     GGML_API struct ggml_tensor * ggml_map_unary_f32(
             struct ggml_context        * ctx,

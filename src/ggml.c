@@ -3750,16 +3750,6 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "ARGMAX",
     "REPEAT",
     "REPEAT_BACK",
-    "ABS",
-    "SGN",
-    "NEG",
-    "STEP",
-    "TANH",
-    "ELU",
-    "RELU",
-    "GELU",
-    "GELU_QUICK",
-    "SILU",
     "SILU_BACK",
     "NORM",
     "RMS_NORM",
@@ -3798,6 +3788,8 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "WIN_PART",
     "WIN_UNPART",
 
+    "UNARY",
+
     "MAP_UNARY",
     "MAP_BINARY",
 
@@ -3809,7 +3801,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS_BACK",
 };
 
-static_assert(GGML_OP_COUNT == 68, "GGML_OP_COUNT != 68");
+static_assert(GGML_OP_COUNT == 59, "GGML_OP_COUNT != 68");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -3830,16 +3822,6 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "argmax(x)",
     "repeat(x)",
     "repeat_back(x)",
-    "abs(x)",
-    "sgn(x)",
-    "-x",
-    "step(x)",
-    "tanh(x)",
-    "elu(x)",
-    "relu(x)",
-    "gelu(x)",
-    "gelu_quick(x)",
-    "silu(x)",
     "silu_back(x)",
     "norm(x)",
     "rms_norm(x)",
@@ -3878,6 +3860,8 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "win_part(x)",
     "win_unpart(x)",
 
+    "unary(x)",
+
     "f(x)",
     "f(x,y)",
 
@@ -3889,7 +3873,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "cross_entropy_loss_back(x,y)",
 };
 
-static_assert(GGML_OP_COUNT == 68, "GGML_OP_COUNT != 68");
+static_assert(GGML_OP_COUNT == 59, "GGML_OP_COUNT != 59");
 
 static_assert(GGML_OP_POOL_COUNT == 2, "GGML_OP_POOL_COUNT != 2");
 
@@ -5571,343 +5555,143 @@ struct ggml_tensor * ggml_repeat_back(
 
 // ggml_abs
 
-struct ggml_tensor * ggml_abs_impl(
-        struct ggml_context * ctx,
-        struct ggml_tensor * a,
-        bool inplace) {
-    bool is_node = false;
-
-    if (!inplace && (a->grad)) {
-        is_node = true;
-    }
-
-    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
-
-    result->op   = GGML_OP_ABS;
-    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
-    result->src[0] = a;
-    result->src[1] = NULL;
-
-    return result;
-}
-
 struct ggml_tensor * ggml_abs(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_abs_impl(ctx, a, false);
+    return ggml_unary(ctx, a, GGML_UNARY_OP_ABS);
 }
 
 struct ggml_tensor * ggml_abs_inplace(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_abs_impl(ctx, a, true);
+    return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_ABS);
 }
 
 
 // ggml_sgn
 
-struct ggml_tensor * ggml_sgn_impl(
-        struct ggml_context * ctx,
-        struct ggml_tensor * a,
-        bool inplace) {
-    bool is_node = false;
-
-    if (!inplace && (a->grad)) {
-        is_node = true;
-    }
-
-    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
-
-    result->op   = GGML_OP_SGN;
-    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
-    result->src[0] = a;
-    result->src[1] = NULL;
-
-    return result;
-}
-
 struct ggml_tensor * ggml_sgn(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_sgn_impl(ctx, a, false);
+    return ggml_unary(ctx, a, GGML_UNARY_OP_SGN);
 }
 
 struct ggml_tensor * ggml_sgn_inplace(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_sgn_impl(ctx, a, true);
+    return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_SGN);
 }
 
 // ggml_neg
 
-struct ggml_tensor * ggml_neg_impl(
-        struct ggml_context * ctx,
-        struct ggml_tensor * a,
-        bool inplace) {
-    bool is_node = false;
-
-    if (!inplace && (a->grad)) {
-        is_node = true;
-    }
-
-    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
-
-    result->op   = GGML_OP_NEG;
-    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
-    result->src[0] = a;
-    result->src[1] = NULL;
-
-    return result;
-}
-
 struct ggml_tensor * ggml_neg(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_neg_impl(ctx, a, false);
+    return ggml_unary(ctx, a, GGML_UNARY_OP_NEG);
 }
 
 struct ggml_tensor * ggml_neg_inplace(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_neg_impl(ctx, a, true);
+    return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_NEG);
 }
 
 // ggml_step
 
-struct ggml_tensor * ggml_step_impl(
-        struct ggml_context * ctx,
-        struct ggml_tensor * a,
-        bool inplace) {
-    bool is_node = false;
-
-    if (!inplace && (a->grad)) {
-        is_node = true;
-    }
-
-    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
-
-    result->op   = GGML_OP_STEP;
-    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
-    result->src[0] = a;
-    result->src[1] = NULL;
-
-    return result;
-}
-
 struct ggml_tensor * ggml_step(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_step_impl(ctx, a, false);
+    return ggml_unary(ctx, a, GGML_UNARY_OP_STEP);
 }
 
 struct ggml_tensor * ggml_step_inplace(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_step_impl(ctx, a, true);
+    return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_STEP);
 }
 
 // ggml_tanh
 
-struct ggml_tensor * ggml_tanh_impl(
-        struct ggml_context * ctx,
-        struct ggml_tensor * a,
-        bool inplace) {
-    bool is_node = false;
-
-    if (!inplace && (a->grad)) {
-        is_node = true;
-    }
-
-    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
-
-    result->op   = GGML_OP_TANH;
-    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
-    result->src[0] = a;
-    result->src[1] = NULL;
-
-    return result;
-}
-
 struct ggml_tensor * ggml_tanh(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_tanh_impl(ctx, a, false);
+    return ggml_unary(ctx, a, GGML_UNARY_OP_TANH);
 }
 
 struct ggml_tensor * ggml_tanh_inplace(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_tanh_impl(ctx, a, true);
+    return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_TANH);
 }
 
 // ggml_elu
 
-struct ggml_tensor * ggml_elu_impl(
-        struct ggml_context * ctx,
-        struct ggml_tensor * a,
-        bool inplace) {
-    bool is_node = false;
-
-    if (!inplace && (a->grad)) {
-        is_node = true;
-    }
-
-    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
-
-    result->op   = GGML_OP_ELU;
-    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
-    result->src[0] = a;
-    result->src[1] = NULL;
-
-    return result;
-}
-
 struct ggml_tensor * ggml_elu(
     struct ggml_context * ctx,
     struct ggml_tensor  * a) {
-    return ggml_elu_impl(ctx, a, false);
+    return ggml_unary(ctx, a, GGML_UNARY_OP_ELU);
 }
 
 struct ggml_tensor * ggml_elu_inplace(
     struct ggml_context * ctx,
     struct ggml_tensor  * a) {
-    return ggml_elu_impl(ctx, a, true);
+    return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_ELU);
 }
 
 // ggml_relu
 
-struct ggml_tensor * ggml_relu_impl(
-        struct ggml_context * ctx,
-        struct ggml_tensor * a,
-        bool inplace) {
-    bool is_node = false;
-
-    if (!inplace && (a->grad)) {
-        is_node = true;
-    }
-
-    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
-
-    result->op   = GGML_OP_RELU;
-    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
-    result->src[0] = a;
-    result->src[1] = NULL;
-
-    return result;
-}
-
 struct ggml_tensor * ggml_relu(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_relu_impl(ctx, a, false);
+    return ggml_unary(ctx, a, GGML_UNARY_OP_RELU);
 }
 
 struct ggml_tensor * ggml_relu_inplace(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_relu_impl(ctx, a, true);
+    return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_RELU);
 }
 
 // ggml_gelu
 
-struct ggml_tensor * ggml_gelu_impl(
-        struct ggml_context * ctx,
-        struct ggml_tensor * a,
-        bool inplace) {
-    bool is_node = false;
-
-    if (!inplace && (a->grad)) {
-        is_node = true;
-    }
-
-    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
-
-    result->op   = GGML_OP_GELU;
-    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
-    result->src[0] = a;
-    result->src[1] = NULL;
-
-    return result;
-}
-
 struct ggml_tensor * ggml_gelu(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_gelu_impl(ctx, a, false);
+    return ggml_unary(ctx, a, GGML_UNARY_OP_GELU);
 }
 
 struct ggml_tensor * ggml_gelu_inplace(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_gelu_impl(ctx, a, true);
+    return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_GELU);
 }
 
 // ggml_gelu_quick
 
-struct ggml_tensor * ggml_gelu_quick_impl(
-        struct ggml_context * ctx,
-        struct ggml_tensor * a,
-        bool inplace) {
-    bool is_node = false;
-
-    if (!inplace && (a->grad)) {
-        is_node = true;
-    }
-
-    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
-
-    result->op   = GGML_OP_GELU_QUICK;
-    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
-    result->src[0] = a;
-    result->src[1] = NULL;
-
-    return result;
-}
-
 struct ggml_tensor * ggml_gelu_quick(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_gelu_quick_impl(ctx, a, false);
+    return ggml_unary(ctx, a, GGML_UNARY_OP_GELU_QUICK);
 }
 
 struct ggml_tensor * ggml_gelu_quick_inplace(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_gelu_quick_impl(ctx, a, true);
+    return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_GELU_QUICK);
 }
 
 // ggml_silu
 
-struct ggml_tensor * ggml_silu_impl(
-        struct ggml_context * ctx,
-        struct ggml_tensor * a,
-        bool inplace) {
-    bool is_node = false;
-
-    if (!inplace && (a->grad)) {
-        is_node = true;
-    }
-
-    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
-
-    result->op   = GGML_OP_SILU;
-    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
-    result->src[0] = a;
-    result->src[1] = NULL;
-
-    return result;
-}
-
 struct ggml_tensor * ggml_silu(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_silu_impl(ctx, a, false);
+    return ggml_unary(ctx, a, GGML_UNARY_OP_SILU);
 }
 
 struct ggml_tensor * ggml_silu_inplace(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_silu_impl(ctx, a, true);
+    return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_SILU);
 }
 
 // ggml_silu_back
@@ -7536,6 +7320,47 @@ struct ggml_tensor * ggml_win_unpart(
     result->src[2] = b;
 
     return result;
+}
+
+// gmml_unary
+
+struct ggml_tensor * ggml_unary_impl(
+        struct ggml_context * ctx,
+        struct ggml_tensor * a,
+        enum ggml_unary_op op,
+        bool inplace) {
+    bool is_node = false;
+
+    if (!inplace && (a->grad)) {
+        is_node = true;
+    }
+
+    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
+
+    struct ggml_tensor * b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 1);
+    ((int *) b->data)[0] = op;
+
+
+    result->op   = GGML_OP_UNARY;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->src[0] = a;
+    result->src[1] = b;
+
+    return result;
+}
+
+struct ggml_tensor * ggml_unary(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        enum ggml_unary_op op) {
+    return ggml_unary_impl(ctx, a, op, false);
+}
+
+struct ggml_tensor * ggml_unary_inplace(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        enum ggml_unary_op op) {
+    return ggml_unary_impl(ctx, a, op, true);
 }
 
 // ggml_map_unary
@@ -10286,7 +10111,6 @@ static void ggml_compute_forward_silu(
             } break;
     }
 }
-
 
 // ggml_compute_forward_silu_back
 
@@ -14376,6 +14200,66 @@ static void ggml_compute_forward_win_unpart(
     }
 }
 
+//gmml_compute_forward_unary
+
+static void ggml_compute_forward_unary(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src0,
+        const struct ggml_tensor * src1,
+        struct ggml_tensor * dst) {
+    GGML_ASSERT(src1->type == GGML_TYPE_F32);
+    GGML_ASSERT(ggml_nelements(src1) == 1);
+
+    const enum ggml_unary_op op = ((int *) src1->data)[0];
+
+    switch (op) {
+        case GGML_UNARY_OP_ABS:
+            {
+                ggml_compute_forward_abs(params, src0, dst);
+            } break;
+        case GGML_UNARY_OP_SGN:
+            {
+                ggml_compute_forward_sgn(params, src0, dst);
+            } break;
+        case GGML_UNARY_OP_NEG:
+            {
+                ggml_compute_forward_neg(params, src0, dst);
+            } break;
+        case GGML_UNARY_OP_STEP:
+            {
+                ggml_compute_forward_step(params, src0, dst);
+            } break;
+        case GGML_UNARY_OP_TANH:
+            {
+                ggml_compute_forward_tanh(params, src0, dst);
+            } break;
+        case GGML_UNARY_OP_ELU:
+            {
+                ggml_compute_forward_elu(params, src0, dst);
+            } break;
+        case GGML_UNARY_OP_RELU:
+            {
+                ggml_compute_forward_relu(params, src0, dst);
+            } break;
+        case GGML_UNARY_OP_GELU:
+            {
+               GGML_ASSERT(false); // TODO: not implemented
+            } break;
+        case GGML_UNARY_OP_GELU_QUICK:
+            {
+               GGML_ASSERT(false); // TODO: not implemented
+            } break;
+        case GGML_UNARY_OP_SILU:
+            {
+                ggml_compute_forward_silu(params, src0, dst);
+            } break;
+        default:
+            {
+                GGML_ASSERT(false);
+            } break;
+    }
+}
+
 // ggml_compute_forward_map_unary
 
 static void ggml_compute_forward_map_unary_f32(
@@ -14936,46 +14820,6 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_repeat_back(params, tensor->src[0], tensor);
             } break;
-        case GGML_OP_ABS:
-            {
-                ggml_compute_forward_abs(params, tensor->src[0], tensor);
-            } break;
-        case GGML_OP_SGN:
-            {
-                ggml_compute_forward_sgn(params, tensor->src[0], tensor);
-            } break;
-        case GGML_OP_NEG:
-            {
-                ggml_compute_forward_neg(params, tensor->src[0], tensor);
-            } break;
-        case GGML_OP_STEP:
-            {
-                ggml_compute_forward_step(params, tensor->src[0], tensor);
-            } break;
-        case GGML_OP_TANH:
-            {
-                ggml_compute_forward_tanh(params, tensor->src[0], tensor);
-            } break;
-        case GGML_OP_ELU:
-            {
-                ggml_compute_forward_elu(params, tensor->src[0], tensor);
-            } break;
-        case GGML_OP_RELU:
-            {
-                ggml_compute_forward_relu(params, tensor->src[0], tensor);
-            } break;
-        case GGML_OP_GELU:
-            {
-                ggml_compute_forward_gelu(params, tensor->src[0], tensor);
-            } break;
-        case GGML_OP_GELU_QUICK:
-            {
-                ggml_compute_forward_gelu_quick(params, tensor->src[0], tensor);
-            } break;
-        case GGML_OP_SILU:
-            {
-                ggml_compute_forward_silu(params, tensor->src[0], tensor);
-            } break;
         case GGML_OP_SILU_BACK:
             {
                 ggml_compute_forward_silu_back(params, tensor->src[0], tensor->src[1], tensor);
@@ -15117,6 +14961,10 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
         case GGML_OP_WIN_UNPART:
             {
                 ggml_compute_forward_win_unpart(params, tensor->src[0], tensor->src[2], tensor);
+            } break;
+        case GGML_OP_UNARY:
+            {
+                ggml_compute_forward_unary(params, tensor->src[0], tensor->src[1], tensor);
             } break;
         case GGML_OP_MAP_UNARY:
             {
@@ -15360,73 +15208,6 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                     src0->grad = ggml_add_impl(ctx,
                             src0->grad,
                             ggml_repeat(ctx, tensor->grad, src0->grad),
-                            inplace);
-                }
-            } break;
-        case GGML_OP_ABS:
-            {
-                if (src0->grad) {
-                    src0->grad =
-                        ggml_add_impl(ctx,
-                                src0->grad,
-                                ggml_mul(ctx,
-                                    ggml_sgn(ctx, src0),
-                                    tensor->grad),
-                                inplace);
-                }
-            } break;
-        case GGML_OP_SGN:
-            {
-                if (src0->grad) {
-                    // noop
-                }
-            } break;
-        case GGML_OP_NEG:
-            {
-                if (src0->grad) {
-                    src0->grad = ggml_sub_impl(ctx, src0->grad, tensor->grad, inplace);
-                }
-            } break;
-        case GGML_OP_STEP:
-            {
-                if (src0->grad) {
-                    // noop
-                }
-            } break;
-        case GGML_OP_TANH:
-            {
-                GGML_ASSERT(false); // TODO: not implemented
-            } break;
-        case GGML_OP_ELU:
-            {
-                GGML_ASSERT(false); // TODO: not implemented
-            } break;
-        case GGML_OP_RELU:
-            {
-                if (src0->grad) {
-                    src0->grad = ggml_sub_impl(ctx,
-                            src0->grad,
-                            ggml_mul(ctx,
-                                ggml_step(ctx, src0),
-                                tensor->grad),
-                            inplace);
-                }
-            } break;
-        case GGML_OP_GELU:
-            {
-                GGML_ASSERT(false); // TODO: not implemented
-            } break;
-        case GGML_OP_GELU_QUICK:
-            {
-                GGML_ASSERT(false); // TODO: not implemented
-            } break;
-        case GGML_OP_SILU:
-            {
-                // necessary for llama
-                if (src0->grad) {
-                    src0->grad = ggml_add_impl(ctx,
-                            src0->grad,
-                            ggml_silu_back(ctx, src0, tensor->grad),
                             inplace);
                 }
             } break;
@@ -15967,6 +15748,80 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             } break;
         case GGML_OP_WIN_PART:
         case GGML_OP_WIN_UNPART:
+        case GGML_OP_UNARY:
+            {
+                switch((enum ggml_unary_op)tensor->src[0]) {
+                    case GGML_UNARY_OP_ABS:
+                    {
+                        if (src0->grad) {
+                            src0->grad =
+                                ggml_add_impl(ctx,
+                                        src0->grad,
+                                        ggml_mul(ctx,
+                                            ggml_sgn(ctx, src0),
+                                            tensor->grad),
+                                        inplace);
+                        }
+                    } break;
+                    case GGML_UNARY_OP_SGN:
+                    {
+                        if (src0->grad) {
+                            // noop
+                        }
+                    } break;
+                case GGML_UNARY_OP_NEG:
+                    {
+                        if (src0->grad) {
+                            src0->grad = ggml_sub_impl(ctx, src0->grad, tensor->grad, inplace);
+                        }
+                    } break;
+                case GGML_UNARY_OP_STEP:
+                    {
+                        if (src0->grad) {
+                            // noop
+                        }
+                    } break;
+                case GGML_UNARY_OP_TANH:
+                    {
+                        GGML_ASSERT(false); // TODO: not implemented
+                    } break;
+                case GGML_UNARY_OP_ELU:
+                    {
+                        GGML_ASSERT(false); // TODO: not implemented
+                    } break;
+                case GGML_UNARY_OP_RELU:
+                    {
+                        if (src0->grad) {
+                            src0->grad = ggml_sub_impl(ctx,
+                                    src0->grad,
+                                    ggml_mul(ctx,
+                                        ggml_step(ctx, src0),
+                                        tensor->grad),
+                                    inplace);
+                        }
+                    } break;
+                case GGML_UNARY_OP_GELU:
+                    {
+                        GGML_ASSERT(false); // TODO: not implemented
+                    } break;
+                case GGML_UNARY_OP_GELU_QUICK:
+                    {
+                        GGML_ASSERT(false); // TODO: not implemented
+                    } break;
+                case GGML_UNARY_OP_SILU:
+                    {
+                        // necessary for llama
+                        if (src0->grad) {
+                            src0->grad = ggml_add_impl(ctx,
+                                    src0->grad,
+                                    ggml_silu_back(ctx, src0, tensor->grad),
+                                    inplace);
+                        }
+                    } break;
+                default:
+                    GGML_ASSERT(false);
+                }
+            } break;
         case GGML_OP_MAP_UNARY:
         case GGML_OP_MAP_BINARY:
         case GGML_OP_MAP_CUSTOM1:
@@ -16459,21 +16314,34 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
             case GGML_OP_ARGMAX:
             case GGML_OP_REPEAT:
             case GGML_OP_REPEAT_BACK:
-            case GGML_OP_ABS:
-            case GGML_OP_SGN:
-            case GGML_OP_NEG:
-            case GGML_OP_STEP:
-            case GGML_OP_TANH:
-            case GGML_OP_ELU:
-            case GGML_OP_RELU:
-                {
+            {
                     n_tasks = 1;
                 } break;
-            case GGML_OP_MUL:
-            case GGML_OP_GELU:
-            case GGML_OP_GELU_QUICK:
-            case GGML_OP_SILU:
+
+            case GGML_OP_UNARY:
+                {
+                    switch ((enum ggml_unary_op)node->src[0]) {
+                        case GGML_UNARY_OP_ABS:
+                        case GGML_UNARY_OP_SGN:
+                        case GGML_UNARY_OP_NEG:
+                        case GGML_UNARY_OP_STEP:
+                        case GGML_UNARY_OP_TANH:
+                        case GGML_UNARY_OP_ELU:
+                        case GGML_UNARY_OP_RELU:
+                            {
+                                n_tasks = 1;
+                            } break;
+
+                        case GGML_UNARY_OP_GELU:
+                        case GGML_UNARY_OP_GELU_QUICK:
+                        case GGML_UNARY_OP_SILU:
+                            {
+                                n_tasks = n_threads;
+                            } break;
+                    }
+                } break;
             case GGML_OP_SILU_BACK:
+            case GGML_OP_MUL:
             case GGML_OP_NORM:
             case GGML_OP_RMS_NORM:
             case GGML_OP_RMS_NORM_BACK:
