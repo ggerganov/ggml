@@ -106,8 +106,112 @@ struct sam_encoder_prompt {
     //std::vector<struct ggml_tensor *> mask_down_b;
 };
 
-struct sam_layer_dec {
-    // TODO
+struct  sam_layer_dec_transformer_attn {
+    // q_proj
+    struct ggml_tensor * q_w;
+    struct ggml_tensor * q_b;
+
+    // k_proj
+    struct ggml_tensor * k_w;
+    struct ggml_tensor * k_b;
+
+    // v_proj
+    struct ggml_tensor * v_w;
+    struct ggml_tensor * v_b;
+
+    // out_proj
+    struct ggml_tensor * out_w;
+    struct ggml_tensor * out_b;
+};
+
+struct sam_layer_dec_transformer {
+    sam_layer_dec_transformer_attn self_attn;
+
+    // norm1
+    struct ggml_tensor * norm1_w;
+    struct ggml_tensor * norm1_b;
+
+    sam_layer_dec_transformer_attn cross_attn_token_to_img;
+
+    // norm2
+    struct ggml_tensor * norm2_w;
+    struct ggml_tensor * norm2_b;
+
+    // mlp.lin1
+    struct ggml_tensor * mlp_ln1_w;
+    struct ggml_tensor * mlp_ln1_b;
+
+    // mlp.lin2
+    struct ggml_tensor * mlp_ln2_w;
+    struct ggml_tensor * mlp_ln2_b;
+
+    // norm3
+    struct ggml_tensor * norm3_w;
+    struct ggml_tensor * norm3_b;
+
+    // norm4
+    struct ggml_tensor * norm4_w;
+    struct ggml_tensor * norm4_b;
+
+    sam_layer_dec_transformer_attn cross_attn_img_to_token;
+};
+
+struct sam_layer_dec_output_hypernet_mlps {
+    // mlps_*.layers.0
+    struct ggml_tensor * w_0;
+    struct ggml_tensor * b_0;
+
+    // mlps_*.layers.1
+    struct ggml_tensor * w_1;
+    struct ggml_tensor * b_1;
+
+    // mlps_*.layers.2
+    struct ggml_tensor * w_2;
+    struct ggml_tensor * b_2;
+};
+
+struct sam_decoder_mask {
+    std::vector<sam_layer_dec_transformer> transformer_layers;
+
+    // trasnformer.final_attn_token_to_image
+    sam_layer_dec_transformer_attn transformer_final_attn_token_to_img;
+
+    // transformer.norm_final
+    struct ggml_tensor * transformer_norm_final_w;
+    struct ggml_tensor * transformer_norm_final_b;
+
+    // output_upscaling.0
+    struct ggml_tensor * output_upscaling_0_w;
+    struct ggml_tensor * output_upscaling_0_b;
+
+    // output_upscaling.1
+    struct ggml_tensor * output_upscaling_1_w;
+    struct ggml_tensor * output_upscaling_1_b;
+
+    // output_upscaling.3
+    struct ggml_tensor * output_upscaling_3_w;
+    struct ggml_tensor * output_upscaling_3_b;
+
+    // output_hypernetworks_mlps
+    std::vector<sam_layer_dec_output_hypernet_mlps> output_hypernet_mlps;
+
+    // iou_prediction_head.0
+    struct ggml_tensor * iou_prediction_head_0_w;
+    struct ggml_tensor * iou_prediction_head_0_b;
+
+    // iou_prediction_head.1
+    struct ggml_tensor * iou_prediction_head_1_w;
+    struct ggml_tensor * iou_prediction_head_1_b;
+
+    // iou_prediction_head.2
+    struct ggml_tensor * iou_prediction_head_2_w;
+    struct ggml_tensor * iou_prediction_head_2_b;
+
+    // iou_token.weight
+    struct ggml_tensor * iou_token_w;
+
+    // mask_tokens.weight
+    struct ggml_tensor * mask_tokens_w;
 };
 
 struct sam_state {
@@ -126,8 +230,7 @@ struct sam_model {
 
     sam_encoder_image  enc_img;
     sam_encoder_prompt enc_prompt;
-
-    std::vector<sam_layer_dec> layers_dec;
+    sam_decoder_mask   dec;
 
     //
     struct ggml_context * ctx;
@@ -387,6 +490,70 @@ bool sam_model_load(const std::string & fname, sam_model & model) {
 
         ctx_size += (2 + n_pt_embd)*ggml_tensor_overhead();
 
+        // mask decoder
+        {
+            //transformer
+            {
+                const int tfm_layers_count = 2;
+                const int qkv_count = 3;
+                const int norm_count = 4;
+                const int n_hypernet_mpls_count = 4;
+
+                // self_attn
+                ctx_size += tfm_layers_count*qkv_count*n_enc_state*n_enc_state*ggml_type_sizef(GGML_TYPE_F16);
+                ctx_size += tfm_layers_count*qkv_count*n_enc_state*            ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*n_enc_state*                      ggml_type_sizef(GGML_TYPE_F32);
+
+                // all norms
+                ctx_size += tfm_layers_count*norm_count*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*norm_count*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
+
+                // cross_attn_token_to_img
+                ctx_size += tfm_layers_count*qkv_count*n_enc_state*(n_enc_state/2)*ggml_type_sizef(GGML_TYPE_F16);
+                ctx_size += tfm_layers_count*qkv_count*(n_enc_state/2)*            ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*n_enc_state*                          ggml_type_sizef(GGML_TYPE_F32);
+
+                // mlp
+                ctx_size += tfm_layers_count*8*n_enc_out_chans*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
+                ctx_size += tfm_layers_count*8*n_enc_out_chans*                ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*n_enc_out_chans*8*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
+                ctx_size += tfm_layers_count*n_enc_out_chans*                  ggml_type_sizef(GGML_TYPE_F32);
+
+                // cross_attn_img_to_token
+                ctx_size += tfm_layers_count*qkv_count*n_enc_state*(n_enc_state/2)*ggml_type_sizef(GGML_TYPE_F16);
+                ctx_size += tfm_layers_count*qkv_count*(n_enc_state/2)*            ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*n_enc_state*                          ggml_type_sizef(GGML_TYPE_F32);
+
+                // transformer_final_attn_token_to_img
+                ctx_size += qkv_count*n_enc_state*(n_enc_state/2)*ggml_type_sizef(GGML_TYPE_F16);
+                ctx_size += qkv_count*(n_enc_state/2)*            ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += n_enc_state*                          ggml_type_sizef(GGML_TYPE_F32);
+
+                // transformer_norm_final
+                ctx_size += norm_count*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += norm_count*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
+
+                // output_upscaling
+                ctx_size += n_enc_out_chans*n_img_embd*2*2*ggml_type_sizef(GGML_TYPE_F16);
+                ctx_size += 3*n_img_embd*                  ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += n_enc_out_chans*n_img_embd*(n_img_embd/2)*2*2*ggml_type_sizef(GGML_TYPE_F16);
+                ctx_size += (n_img_embd/2)*                               ggml_type_sizef(GGML_TYPE_F32);
+
+                // output_hypernetworks_mlps
+                ctx_size += 3*n_enc_out_chans*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
+                ctx_size += 3*n_enc_out_chans*                ggml_type_sizef(GGML_TYPE_F32);
+
+                // iou_prediction_head
+                ctx_size += 3*n_enc_out_chans*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
+                ctx_size += 3*n_enc_out_chans*                ggml_type_sizef(GGML_TYPE_F32);
+
+                // iou_token_w
+                ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
+
+                // mask_tokens_w
+                ctx_size += n_pt_embd*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
+            }
+        }
         fprintf(stderr, "%s: ggml ctx size = %6.2f MB\n", __func__, ctx_size/(1024.0*1024.0));
 
         return ctx_size;
@@ -528,7 +695,183 @@ bool sam_model_load(const std::string & fname, sam_model & model) {
             }
         }
 
-        // TODO: decoder
+        // mask decoder
+        {
+            auto & dec = model.dec;
+            auto & tfm_layers = dec.transformer_layers;
+
+            const int tfm_layers_count = 2;
+            tfm_layers.resize(tfm_layers_count);
+            for (int i = 0; i < tfm_layers_count; ++i) {
+                auto& l = tfm_layers[i];
+                l.self_attn.q_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, n_enc_out_chans);
+                l.self_attn.q_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+                l.self_attn.k_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, n_enc_out_chans);
+                l.self_attn.k_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+                l.self_attn.v_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, n_enc_out_chans);
+                l.self_attn.v_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+                l.self_attn.out_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, n_enc_out_chans);
+                l.self_attn.out_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+
+                l.norm1_w = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+                l.norm1_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+
+                l.cross_attn_token_to_img.q_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans/2, n_enc_out_chans);
+                l.cross_attn_token_to_img.q_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans/2);
+                l.cross_attn_token_to_img.k_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans/2, n_enc_out_chans);
+                l.cross_attn_token_to_img.k_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans/2);
+                l.cross_attn_token_to_img.v_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans/2, n_enc_out_chans);
+                l.cross_attn_token_to_img.v_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans/2);
+                l.cross_attn_token_to_img.out_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, n_enc_out_chans/2);
+                l.cross_attn_token_to_img.out_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+
+                l.norm2_w = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+                l.norm2_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+
+                l.mlp_ln1_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, 8*n_enc_out_chans, n_enc_out_chans);
+                l.mlp_ln1_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 8*n_enc_out_chans);
+                l.mlp_ln2_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, 8*n_enc_out_chans);
+                l.mlp_ln2_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+
+                l.norm3_w = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+                l.norm3_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+
+                l.norm4_w = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+                l.norm4_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+
+                l.cross_attn_img_to_token.q_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans/2, n_enc_out_chans);
+                l.cross_attn_img_to_token.q_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans/2);
+                l.cross_attn_img_to_token.k_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans/2, n_enc_out_chans);
+                l.cross_attn_img_to_token.k_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans/2);
+                l.cross_attn_img_to_token.v_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans/2, n_enc_out_chans);
+                l.cross_attn_img_to_token.v_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans/2);
+                l.cross_attn_img_to_token.out_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, n_enc_out_chans/2);
+                l.cross_attn_img_to_token.out_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+
+                const auto prefix = "mask_decoder.transformer.layers." + std::to_string(i) + ".";
+                model.tensors[prefix + "self_attn.q_proj.weight"] = l.self_attn.q_w;
+                model.tensors[prefix + "self_attn.q_proj.bias"]   = l.self_attn.q_b;
+                model.tensors[prefix + "self_attn.k_proj.weight"] = l.self_attn.k_w;
+                model.tensors[prefix + "self_attn.k_proj.bias"]   = l.self_attn.k_b;
+                model.tensors[prefix + "self_attn.v_proj.weight"] = l.self_attn.v_w;
+                model.tensors[prefix + "self_attn.v_proj.bias"]   = l.self_attn.v_b;
+                model.tensors[prefix + "self_attn.out_proj.weight"] = l.self_attn.out_w;
+                model.tensors[prefix + "self_attn.out_proj.bias"]   = l.self_attn.out_b;
+
+                model.tensors[prefix + "norm1.weight"] = l.norm1_w;
+                model.tensors[prefix + "norm1.bias"]   = l.norm1_b;
+
+                model.tensors[prefix + "cross_attn_token_to_image.q_proj.weight"] = l.cross_attn_token_to_img.q_w;
+                model.tensors[prefix + "cross_attn_token_to_image.q_proj.bias"]   = l.cross_attn_token_to_img.q_b;
+                model.tensors[prefix + "cross_attn_token_to_image.k_proj.weight"] = l.cross_attn_token_to_img.k_w;
+                model.tensors[prefix + "cross_attn_token_to_image.k_proj.bias"]   = l.cross_attn_token_to_img.k_b;
+                model.tensors[prefix + "cross_attn_token_to_image.v_proj.weight"] = l.cross_attn_token_to_img.v_w;
+                model.tensors[prefix + "cross_attn_token_to_image.v_proj.bias"]   = l.cross_attn_token_to_img.v_b;
+                model.tensors[prefix + "cross_attn_token_to_image.out_proj.weight"] = l.cross_attn_token_to_img.out_w;
+                model.tensors[prefix + "cross_attn_token_to_image.out_proj.bias"]   = l.cross_attn_token_to_img.out_b;
+
+                model.tensors[prefix + "norm2.weight"] = l.norm2_w;
+                model.tensors[prefix + "norm2.bias"]   = l.norm2_b;
+
+                model.tensors[prefix + "mlp_lin1.weight"] = l.mlp_ln1_w;
+                model.tensors[prefix + "mlp_lin1.bias"]   = l.mlp_ln1_b;
+                model.tensors[prefix + "mlp_lin2.weight"] = l.mlp_ln2_w;
+                model.tensors[prefix + "mlp_lin2.bias"]   = l.mlp_ln2_b;
+
+                model.tensors[prefix + "norm3.weight"] = l.norm3_w;
+                model.tensors[prefix + "norm3.bias"]   = l.norm3_b;
+                model.tensors[prefix + "norm4.weight"] = l.norm4_w;
+                model.tensors[prefix + "norm4.bias"]   = l.norm4_b;
+
+                model.tensors[prefix + "cross_attn_image_to_token.q_proj.weight"] = l.cross_attn_img_to_token.q_w;
+                model.tensors[prefix + "cross_attn_image_to_token.q_proj.bias"]   = l.cross_attn_img_to_token.q_b;
+                model.tensors[prefix + "cross_attn_image_to_token.k_proj.weight"] = l.cross_attn_img_to_token.k_w;
+                model.tensors[prefix + "cross_attn_image_to_token.k_proj.bias"]   = l.cross_attn_img_to_token.k_b;
+                model.tensors[prefix + "cross_attn_image_to_token.v_proj.weight"] = l.cross_attn_img_to_token.v_w;
+                model.tensors[prefix + "cross_attn_image_to_token.v_proj.bias"]   = l.cross_attn_img_to_token.v_b;
+                model.tensors[prefix + "cross_attn_image_to_token.out_proj.weight"] = l.cross_attn_img_to_token.out_w;
+                model.tensors[prefix + "cross_attn_image_to_token.out_proj.bias"]   = l.cross_attn_img_to_token.out_b;
+            }
+
+            dec.transformer_final_attn_token_to_img.q_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans/2, n_enc_out_chans);
+            dec.transformer_final_attn_token_to_img.q_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans/2);
+            dec.transformer_final_attn_token_to_img.k_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans/2, n_enc_out_chans);
+            dec.transformer_final_attn_token_to_img.k_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans/2);
+            dec.transformer_final_attn_token_to_img.v_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans/2, n_enc_out_chans);
+            dec.transformer_final_attn_token_to_img.v_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans/2);
+            dec.transformer_final_attn_token_to_img.out_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, n_enc_out_chans/2);
+            dec.transformer_final_attn_token_to_img.out_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+
+            model.tensors["mask_decoder.transformer.final_attn_token_to_image.q_proj.weight"] = dec.transformer_final_attn_token_to_img.q_w;
+            model.tensors["mask_decoder.transformer.final_attn_token_to_image.q_proj.bias"]   = dec.transformer_final_attn_token_to_img.q_b;
+            model.tensors["mask_decoder.transformer.final_attn_token_to_image.k_proj.weight"] = dec.transformer_final_attn_token_to_img.k_w;
+            model.tensors["mask_decoder.transformer.final_attn_token_to_image.k_proj.bias"]   = dec.transformer_final_attn_token_to_img.k_b;
+            model.tensors["mask_decoder.transformer.final_attn_token_to_image.v_proj.weight"] = dec.transformer_final_attn_token_to_img.v_w;
+            model.tensors["mask_decoder.transformer.final_attn_token_to_image.v_proj.bias"]   = dec.transformer_final_attn_token_to_img.v_b;
+            model.tensors["mask_decoder.transformer.final_attn_token_to_image.out_proj.weight"] = dec.transformer_final_attn_token_to_img.out_w;
+            model.tensors["mask_decoder.transformer.final_attn_token_to_image.out_proj.bias"]   = dec.transformer_final_attn_token_to_img.out_b;
+
+            dec.transformer_norm_final_w = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+            dec.transformer_norm_final_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+
+            model.tensors["mask_decoder.transformer.norm_final.weight"] = dec.transformer_norm_final_w;
+            model.tensors["mask_decoder.transformer.norm_final.bias"]   = dec.transformer_norm_final_b;
+
+            dec.output_upscaling_0_w = ggml_new_tensor_4d(ctx, GGML_TYPE_F16, n_enc_out_chans, n_img_embd, 2, 2);
+            dec.output_upscaling_0_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_img_embd);
+            dec.output_upscaling_1_w = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_img_embd);
+            dec.output_upscaling_1_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_img_embd);
+            dec.output_upscaling_3_w = ggml_new_tensor_4d(ctx, GGML_TYPE_F16, n_img_embd, n_img_embd/2, 2, 2);
+            dec.output_upscaling_3_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_img_embd/2);
+
+            model.tensors["mask_decoder.output_upscaling.0.weight"] = dec.output_upscaling_0_w;
+            model.tensors["mask_decoder.output_upscaling.0.bias"]   = dec.output_upscaling_0_b;
+            model.tensors["mask_decoder.output_upscaling.1.weight"] = dec.output_upscaling_1_w;
+            model.tensors["mask_decoder.output_upscaling.1.bias"]   = dec.output_upscaling_1_b;
+            model.tensors["mask_decoder.output_upscaling.3.weight"] = dec.output_upscaling_3_w;
+            model.tensors["mask_decoder.output_upscaling.3.bias"]   = dec.output_upscaling_3_b;
+
+            const int n_hypernet_mpls_count = 4;
+            dec.output_hypernet_mlps.resize(n_hypernet_mpls_count);
+            for (int i = 0; i < n_hypernet_mpls_count; ++i) {
+                auto& mlp = dec.output_hypernet_mlps[i];
+
+                mlp.w_0 = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, n_enc_out_chans);
+                mlp.b_0 = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+                mlp.w_1 = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, n_enc_out_chans);
+                mlp.b_1 = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+                mlp.w_2 = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, n_enc_out_chans);
+                mlp.b_2 = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+
+                const auto prefix = "mask_decoder.output_hypernetworks_mlps." + std::to_string(i) + ".";
+                model.tensors[prefix + "layers.0.weight"] = mlp.w_0;
+                model.tensors[prefix + "layers.0.bias"]   = mlp.b_0;
+                model.tensors[prefix + "layers.1.weight"] = mlp.w_1;
+                model.tensors[prefix + "layers.1.bias"]   = mlp.b_1;
+                model.tensors[prefix + "layers.2.weight"] = mlp.w_2;
+                model.tensors[prefix + "layers.2.bias"]   = mlp.b_2;
+            }
+
+            dec.iou_prediction_head_0_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, n_enc_out_chans);
+            dec.iou_prediction_head_0_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+            dec.iou_prediction_head_1_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, n_enc_out_chans);
+            dec.iou_prediction_head_1_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+            dec.iou_prediction_head_2_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, n_enc_out_chans);
+            dec.iou_prediction_head_2_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+
+            dec.iou_token_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, 1, n_enc_out_chans);
+            dec.mask_tokens_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_pt_embd, n_enc_out_chans);
+
+            model.tensors["mask_decoder.iou_prediction_head.layers.0.weight"] = dec.iou_prediction_head_0_w;
+            model.tensors["mask_decoder.iou_prediction_head.layers.0.bias"]   = dec.iou_prediction_head_0_b;
+            model.tensors["mask_decoder.iou_prediction_head.layers.1.weight"] = dec.iou_prediction_head_1_w;
+            model.tensors["mask_decoder.iou_prediction_head.layers.1.bias"]   = dec.iou_prediction_head_1_b;
+            model.tensors["mask_decoder.iou_prediction_head.layers.2.weight"] = dec.iou_prediction_head_2_w;
+            model.tensors["mask_decoder.iou_prediction_head.layers.2.bias"]   = dec.iou_prediction_head_2_b;
+
+            model.tensors["mask_decoder.iou_token.weight"] = dec.iou_token_w;
+            model.tensors["mask_decoder.mask_tokens.weight"] = dec.mask_tokens_w;
+        }
     }
 
     // key + value memory
@@ -1143,6 +1486,7 @@ bool sam_encode_prompt(
 
     cur = ggml_scale(ctx0, cur, ggml_new_f32(ctx0, 2.0f*M_PI));
 
+
     // concat
     // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/modeling/prompt_encoder.py#L192
     {
@@ -1256,6 +1600,27 @@ bool sam_encode_prompt(
     return true;
 }
 
+bool sam_decode_mask(
+        const sam_model     & model,
+                  sam_state & state,
+                        int   n_threads) {
+
+    const auto & hparams = model.hparams;
+    const auto & dec = model.dec;
+
+    static size_t buf_size = 256u*1024*1024;
+    static void * buf = malloc(buf_size);
+
+    struct ggml_init_params params = {
+        /*.mem_size   =*/ buf_size,
+        /*.mem_buffer =*/ buf,
+        /*.no_alloc   =*/ false,
+    };
+
+    struct ggml_context * ctx0 = ggml_init(params);
+    struct ggml_cgraph gf = {};
+}
+
 int main(int argc, char ** argv) {
     const int64_t t_main_start_us = ggml_time_us();
 
@@ -1357,6 +1722,11 @@ int main(int argc, char ** argv) {
 
     if (!sam_encode_prompt(model, state, img0.nx, img0.ny, pt, params.n_threads)) {
         fprintf(stderr, "%s: failed to encode prompt\n", __func__);
+        return 1;
+    }
+
+    if (!sam_decode_mask(model, state, params.n_threads)) {
+        fprintf(stderr, "%s: failed to decode mask\n", __func__);
         return 1;
     }
 
