@@ -15449,7 +15449,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
         case GGML_OP_RELU:
             {
                 if (src0->grad) {
-                    src0->grad = ggml_sub_impl(ctx,
+                    src0->grad = ggml_add_impl(ctx,
                             src0->grad,
                             ggml_mul(ctx,
                                 ggml_step(ctx, src0),

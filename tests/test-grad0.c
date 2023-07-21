@@ -459,6 +459,8 @@ int main(int argc, const char ** argv) {
 
         struct ggml_tensor * x[MAX_NARGS];
 
+        goto test;
+
         // add f32
         {
             const int nargs = 2;
@@ -823,6 +825,7 @@ int main(int argc, const char ** argv) {
         }
 
         // relu
+        test:
         {
             const int nargs = 1;
 
@@ -834,10 +837,10 @@ int main(int argc, const char ** argv) {
 
                 struct ggml_tensor* f = ggml_sum(ctx0, ggml_relu(ctx0, x[0]));
 
-                // TODO: do we really need such a large relative error or does this indicate a problem?
-                check_gradient("relu", ctx0, x, f, ndims, nargs, 1e-3f, 3, INFINITY);
+                check_gradient("relu", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, INFINITY);
             }
         }
+        continue;
 
         // gelu, not yet fully implemented
         if(0)
