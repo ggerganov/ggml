@@ -134,8 +134,8 @@ function gg_run_gpt_2 {
     model="../models-mnt/gpt-2/ggml-model-gpt-2-117M.bin"
     prompts="../examples/prompts/gpt-2.txt"
 
-    (time ./bin/gpt-2 --model ${model} -s 1234 -n 64 -t 4 -tt ${prompts}                       ) 2>&1 | tee -a $OUT/${ci}-tg.log
-    (time ./bin/gpt-2 --model ${model} -s 1234 -n 64 -t 4 -p "I believe the meaning of life is") 2>&1 | tee -a $OUT/${ci}-tg.log
+    (time ./bin/gpt-2 --model ${model} -s 1234 -n 64 -tt ${prompts}                       ) 2>&1 | tee -a $OUT/${ci}-tg.log
+    (time ./bin/gpt-2 --model ${model} -s 1234 -n 64 -p "I believe the meaning of life is") 2>&1 | tee -a $OUT/${ci}-tg.log
 
     set +e
 }
@@ -174,8 +174,8 @@ function gg_run_mpt {
     python3 ../examples/mpt/convert-h5-to-ggml.py ${path_models} 1
     ./bin/mpt-quantize ${model_f16} ${model_q4_0} q4_0
 
-    (time ./bin/mpt --model ${model_f16} -s 1234 -n 64 -t 8 -p "I believe the meaning of life is") 2>&1 | tee -a $OUT/${ci}-tg.log
-    (time ./bin/mpt --model ${model_q4_0} -s 1234 -n 64 -t 8 -p "I believe the meaning of life is") 2>&1 | tee -a $OUT/${ci}-tg.log
+    (time ./bin/mpt --model ${model_f16}  -s 1234 -n 64 -p "I believe the meaning of life is") 2>&1 | tee -a $OUT/${ci}-tg.log
+    (time ./bin/mpt --model ${model_q4_0} -s 1234 -n 64 -p "I believe the meaning of life is") 2>&1 | tee -a $OUT/${ci}-tg.log
 
     set +e
 }
