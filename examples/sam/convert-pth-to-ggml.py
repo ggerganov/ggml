@@ -71,11 +71,6 @@ for k, v in model.items():
     name = k
     shape = v.shape
 
-    # TODO: export only the Encoder -- after it works we will export the other stuff
-    if name[:13] != "image_encoder" and \
-       name[:14] != "prompt_encoder":
-        continue
-
     if name[:19] == "prompt_encoder.mask":
         continue
 
