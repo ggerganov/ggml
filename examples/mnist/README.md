@@ -41,8 +41,13 @@ mkdir build && cd build
 cmake ..
 make -j4 mnist
 
+# Generate ggml model
+mkdir -p models/mnist
+python3 ../examples/mnist/convert-h5-to-ggml.py ../examples/mnist/models/mnist/mnist_model.state_dict
+
 # Run the MNIST model
-./bin/mnist ../examples/mnist/models/mnist/ggml-model-f32.bin ../examples/mnist/models/mnist/t10k-images.idx3-ubyte
+
+./bin/mnist ./models/mnist/ggml-model-f32.bin ../examples/mnist/models/mnist/t10k-images.idx3-ubyte
 ```
 
 For more information, checkout the corresponding programs in the [examples](examples) folder.

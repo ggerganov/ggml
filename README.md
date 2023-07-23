@@ -16,6 +16,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - ADAM and L-BFGS optimizers
 - Optimized for Apple Silicon
 - On x86 architectures utilizes AVX / AVX2 intrinsics
+- On ppc64 architectures utilizes VSX intrinsics
 - No third-party dependencies
 - Zero memory allocations during runtime
 
@@ -42,6 +43,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [X] Example of BioGPT inference [PABannier/biogpt.cpp](https://github.com/PABannier/biogpt.cpp)
 - [X] Example of Encodec inference [PABannier/encodec.cpp](https://github.com/PABannier/encodec.cpp) 
 - [X] Example of CLIP inference [monatis/clip.cpp](https://github.com/monatis/clip.cpp)
+- [X] Example of MiniGPT4 inference [Maknee/minigpt4.cpp](https://github.com/Maknee/minigpt4.cpp) 
 
 ## Whisper inference (example)
 

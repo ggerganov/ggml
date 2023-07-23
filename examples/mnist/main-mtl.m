@@ -340,22 +340,32 @@ int mnist_mtl_eval(
 
                     [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
                 } break;
-            case GGML_OP_RELU:
-                {
-                    if (encoder == nil) {
-                        encoder = [command_buffer computeCommandEncoder];
-                    }
+            case GGML_OP_UNARY:
+                switch (ggml_get_unary_op(gf->nodes[i])) {
+                    case GGML_UNARY_OP_RELU:
+                        {
+                            if (encoder == nil) {
+                                encoder = [command_buffer computeCommandEncoder];
+                            }
 
-                    id<MTLBuffer> id_src = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src[0], &offs_src0);
-                    id<MTLBuffer> id_dst = mnist_mtl_get_buffer(ctx, gf->nodes[i],       &offs_dst);
+                            id<MTLBuffer> id_src = mnist_mtl_get_buffer(ctx, gf->nodes[i]->src[0], &offs_src0);
+                            id<MTLBuffer> id_dst = mnist_mtl_get_buffer(ctx, gf->nodes[i],       &offs_dst);
 
-                    [encoder setComputePipelineState:ctx->pipeline_relu];
-                    [encoder setBuffer:id_src offset:offs_src0 atIndex:0];
-                    [encoder setBuffer:id_dst offset:offs_dst  atIndex:1];
+                            [encoder setComputePipelineState:ctx->pipeline_relu];
+                            [encoder setBuffer:id_src offset:offs_src0 atIndex:0];
+                            [encoder setBuffer:id_dst offset:offs_dst  atIndex:1];
 
-                    const int64_t n = ggml_nelements(gf->nodes[i]);
+                            const int64_t n = ggml_nelements(gf->nodes[i]);
 
-                    [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+                            [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+                        } break;
+                    default:
+                        {
+                            fprintf(stderr, "%s: node %3d, op = %8s, unary op %d not implemented\n", __func__, i, ggml_op_name(gf->nodes[i]->op), (int) ggml_get_unary_op(gf->nodes[i]));
+                            GGML_ASSERT(false);
+                            return -1;
+                        }
+                        break;
                 } break;
             case GGML_OP_SOFT_MAX:
                 {
@@ -435,9 +445,11 @@ int mnist_mtl_eval(
                     [mul encodeToCommandBuffer:command_buffer leftMatrix:mat_src1 rightMatrix:mat_src0 resultMatrix:mat_dst];
                 } break;
             default:
-                fprintf(stderr, "%s: node %3d, op = %8s not implemented\n", __func__, i, ggml_op_name(gf->nodes[i]->op));
-                GGML_ASSERT(false);
-                return -1;
+                {
+                    fprintf(stderr, "%s: node %3d, op = %8s not implemented\n", __func__, i, ggml_op_name(gf->nodes[i]->op));
+                    GGML_ASSERT(false);
+                    return -1;
+                }
         }
     }
 
