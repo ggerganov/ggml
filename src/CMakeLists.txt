@@ -118,7 +118,6 @@ else()
     endif()
 endif()
 
-
 # ggml
 
 set(TARGET ggml)
@@ -183,6 +182,7 @@ if (GGML_CLBLAST)
         message(WARNING "clBLAST not found")
     endif()
 endif()
+
 if (GGML_CUBLAS)
     cmake_minimum_required(VERSION 3.17)
 

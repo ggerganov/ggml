@@ -22,6 +22,12 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: Dependencies for Ubuntu
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install llvm
+
     - name: Set GGML_N_THREADS for Ubuntu
       run: echo "GGML_N_THREADS=2" >> $GITHUB_ENV
       if: matrix.os == 'ubuntu-latest'
@@ -35,7 +41,7 @@ jobs:
 
     - name: Configure CMake
       working-directory: ./build
-      run: cmake ..
+      run: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DGGML_TEST_COVERAGE=ON ..
 
     - name: Build
       working-directory: ./build
@@ -44,3 +50,19 @@ jobs:
     - name: Test
       working-directory: ./build
       run: ctest --verbose --timeout 900
+
+    - name: Test Coverage for Ubuntu
+      if: matrix.os == 'ubuntu-latest'
+      working-directory: ./build
+      run: |
+        llvm-profdata merge -sparse tests/*.profraw -o ggml.profdata
+        llvm-cov      report ./bin/test-grad0 -instr-profile=ggml.profdata
+        llvm-cov      report ./bin/test-opt   -instr-profile=ggml.profdata
+
+    - name: Test Coverage for MacOS
+      if: matrix.os == 'macos-latest'
+      working-directory: ./build
+      run: |
+        xcrun llvm-profdata merge -sparse tests/*.profraw -o ggml.profdata
+        xcrun llvm-cov      report ./bin/test-grad0 -instr-profile=ggml.profdata
+        xcrun llvm-cov      report ./bin/test-opt   -instr-profile=ggml.profdata
