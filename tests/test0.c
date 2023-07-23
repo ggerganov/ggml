@@ -8,6 +8,7 @@ int main(int argc, const char ** argv) {
         .mem_size   = 128*1024*1024,
         .mem_buffer = NULL,
         .no_alloc   = false,
+        .n_threads  = GGML_DEFAULT_N_THREADS,
     };
 
     struct ggml_context * ctx0 = ggml_init(params);

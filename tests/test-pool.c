@@ -7,6 +7,7 @@
 struct ggml_context* make_ctx(void) {
     struct ggml_init_params params = {
         .mem_size = 2 * 1024 * 1024,
+        .n_threads = GGML_DEFAULT_N_THREADS,
     };
 
     return ggml_init(params);
