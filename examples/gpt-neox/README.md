@@ -24,7 +24,7 @@ python3 -m pip install -r ../requirements.txt
 python3 ../examples/gpt-neox/convert-h5-to-ggml.py ./stablelm-base-alpha-3b/ 1
 
 # run inference using FP16 precision
-make -j && ./bin/gpt_neox -m ./stablelm-base-alpha-3b/ggml-model-f16.bin -p "I believe the meaning of life is" -t 8 -n 64
+make -j && ./bin/gpt-neox -m ./stablelm-base-alpha-3b/ggml-model-f16.bin -p "I believe the meaning of life is" -t 8 -n 64
 
 main: seed = 1681940611
 gpt_neox_model_load: loading model from 'models/stablelm-base-alpha-3b/ggml-model-f16.bin' - please wait ...
@@ -63,10 +63,10 @@ main:    total time =  6911.26 ms
 
 ```bash
 # quantize the model to 5-bits using Q5_0 quantization
-./bin/gpt_neox-quantize ./stablelm-base-alpha-3b/ggml-model-f16.bin ./stablelm-base-alpha-3b/ggml-model-q5_0.bin q5_0
+./bin/gpt-neox-quantize ./stablelm-base-alpha-3b/ggml-model-f16.bin ./stablelm-base-alpha-3b/ggml-model-q5_0.bin q5_0
 
 # run the quantized model
-./bin/gpt_neox -m ./stablelm-base-alpha-3b/ggml-model-q5_0.bin -p "I believe the meaning of life is" -t 8 -n 64
+./bin/gpt-neox -m ./stablelm-base-alpha-3b/ggml-model-q5_0.bin -p "I believe the meaning of life is" -t 8 -n 64
 
 main: seed = 1682021489
 gpt_neox_model_load: loading model from 'models/stablelm-base-alpha-3b/ggml-model-q5_0.bin' - please wait ...
