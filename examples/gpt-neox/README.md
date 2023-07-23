@@ -21,7 +21,7 @@ git clone https://huggingface.co/stabilityai/gpt_neox-base-alpha-3b
 python3 -m pip install -r ../requirements.txt
 
 # convert model to FP16
-python3 ../examples/gpt_neox/convert-h5-to-ggml.py ./stablelm-base-alpha-3b/ 1
+python3 ../examples/gpt-neox/convert-h5-to-ggml.py ./stablelm-base-alpha-3b/ 1
 
 # run inference using FP16 precision
 make -j && ./bin/gpt_neox -m ./stablelm-base-alpha-3b/ggml-model-f16.bin -p "I believe the meaning of life is" -t 8 -n 64
