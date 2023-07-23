@@ -11,6 +11,7 @@ if (GGML_ALL_WARNINGS)
             -Wpointer-arith                 \
             -Wdouble-promotion              \
             -Wno-unused-function            \
+            -Wmissing-prototypes            \
         ")
     else()
         # todo : windows
