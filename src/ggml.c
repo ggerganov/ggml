@@ -4962,10 +4962,12 @@ float * ggml_get_data_f32(const struct ggml_tensor * tensor) {
 }
 
 enum ggml_unary_op ggml_get_unary_op(const struct ggml_tensor * tensor) {
+    GGML_ASSERT(tensor->op == GGML_OP_UNARY);
     return (enum ggml_unary_op) ggml_get_op_params_i32(tensor, 0);
 }
 
-void ggml_set_unary_op(struct ggml_tensor * tensor, enum ggml_unary_op op) {
+static void ggml_set_unary_op(struct ggml_tensor * tensor, enum ggml_unary_op op) {
+    GGML_ASSERT(tensor->op = GGML_OP_UNARY);
     ggml_set_op_params_i32(tensor, 0, (int32_t) op);
 }
 
@@ -7199,8 +7201,7 @@ static struct ggml_tensor * ggml_unary_impl(
 
     struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
 
-    int32_t params[] = { op };
-    ggml_set_op_params(result, &params, sizeof(params));
+    ggml_set_unary_op(result, op);
 
     result->op   = GGML_OP_UNARY;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;

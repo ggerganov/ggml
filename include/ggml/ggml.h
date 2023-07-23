@@ -624,7 +624,6 @@ extern "C" {
     GGML_API float * ggml_get_data_f32(const struct ggml_tensor * tensor);
 
     GGML_API enum ggml_unary_op ggml_get_unary_op(const struct ggml_tensor * tensor);
-    GGML_API void               ggml_set_unary_op(      struct ggml_tensor * tensor, enum ggml_unary_op op);
 
     GGML_API const char *         ggml_get_name   (const struct ggml_tensor * tensor);
     GGML_API struct ggml_tensor * ggml_set_name   (      struct ggml_tensor * tensor, const char * name);
