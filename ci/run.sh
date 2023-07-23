@@ -242,9 +242,9 @@ if [ -z $GG_BUILD_LOW_PERF ]; then
     mnt_models=${MNT}/models
     mkdir -p ${mnt_models}
     ln -sfn ${mnt_models} ${SRC}/models-mnt
-
-    python3 -m pip install -r ${SRC}/requirements.txt
 fi
+
+python3 -m pip install -r ${SRC}/requirements.txt
 
 ret=0
 
