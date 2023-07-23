@@ -271,6 +271,10 @@ if (BUILD_SHARED_LIBS)
     target_compile_definitions(${TARGET} PRIVATE
         GGML_BUILD
         )
+
+    if (GGML_METAL)
+        set_target_properties(${TARGET} PROPERTIES RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/ggml-metal.metal")
+    endif()
 endif()
 
 target_compile_definitions(${TARGET} PUBLIC
