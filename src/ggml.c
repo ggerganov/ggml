@@ -3440,7 +3440,9 @@ inline static void ggml_vec_mad_f32(const int n, float * restrict y, const float
 
 //inline static void ggml_vec_scale_f32(const int n, float * y, const float   v) { for (int i = 0; i < n; ++i) y[i] *= v;          }
 inline static void ggml_vec_scale_f32(const int n, float * y, const float   v) {
-#if defined(GGML_SIMD)
+#if defined(GGML_USE_ACCELERATE)
+    vDSP_vsmul(y, 1, &v, y, 1, n);
+#elif defined(GGML_SIMD)
     const int np = (n & ~(GGML_F32_STEP - 1));
 
     GGML_F32_VEC vx = GGML_F32_VEC_SET1(v);
