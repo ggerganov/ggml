@@ -75,7 +75,6 @@ static void *tpool_worker(void *arg)
     tpool_t      *tm = arg;
     tpool_work_t *work;
 
-    // printf("pthreads %p starts\n", arg);
     while (1) {
         pthread_mutex_lock(&tm->work_mutex);
         while (tm->work_first == NULL && !tm->stop)
@@ -86,24 +85,22 @@ static void *tpool_worker(void *arg)
         tm->working_cnt++;
         pthread_mutex_unlock(&tm->work_mutex);
 
-        // printf("pthreads %p works\n", arg);
         if (work != NULL) {
             work->func(work->arg);
             tpool_work_destroy(work);
         }
-        // printf("pthreads %p waits\n", arg);
 
         pthread_mutex_lock(&tm->work_mutex);
         tm->working_cnt--;
-        if (tm->working_cnt == 0 && tm->work_first == NULL)
-            pthread_cond_signal(&tm->working_cond);
+        bool predicate = tm->working_cnt == 0 && tm->work_first == NULL;
         pthread_mutex_unlock(&tm->work_mutex);
+        if(predicate)
+            pthread_cond_signal(&tm->working_cond);
     }
 
-    // printf("pthreads %p stops\n", arg);
     tm->thread_cnt--;
-    pthread_cond_signal(&tm->working_cond);
     pthread_mutex_unlock(&tm->work_mutex);
+    pthread_cond_signal(&tm->working_cond);
     return NULL;
 }
 
@@ -162,8 +159,8 @@ static void tpool_destroy(tpool_t *tm)
         work = work2;
     }
     tm->stop = true;
-    pthread_cond_broadcast(&tm->work_cond);
     pthread_mutex_unlock(&tm->work_mutex);
+    pthread_cond_broadcast(&tm->work_cond);
 
     tpool_wait(tm);
 
@@ -199,8 +196,8 @@ static bool tpool_add_work(tpool_t *tm, thread_func_t func, void *arg)
         tm->work_last       = work;
     }
 
-    pthread_cond_broadcast(&tm->work_cond);
     pthread_mutex_unlock(&tm->work_mutex);
+    pthread_cond_broadcast(&tm->work_cond);
 
     return true;
 }
