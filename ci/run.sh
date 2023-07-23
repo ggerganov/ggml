@@ -210,7 +210,10 @@ function gg_run_mnist {
 
     set -e
 
-    model_f32="../examples/mnist/models/mnist/ggml-model-f32.bin"
+    mkdir -p models/mnist
+    python3 ../examples/mnist/convert-h5-to-ggml.py ../examples/mnist/models/mnist/mnist_model.state_dict
+
+    model_f32="./models/mnist/ggml-model-f32.bin"
     samples="../examples/mnist/models/mnist/t10k-images.idx3-ubyte"
 
     # first command runs and exports "mnist.ggml", the second command runs the exported model
