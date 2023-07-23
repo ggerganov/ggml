@@ -9313,9 +9313,9 @@ static void ggml_compute_forward_sum_f32(
 }
 
 static void ggml_compute_forward_sum_f16(
-    const struct ggml_compute_params* params,
-    const struct ggml_tensor* src0,
-    struct ggml_tensor* dst) {
+    const struct ggml_compute_params * params,
+    const struct ggml_tensor * src0,
+          struct ggml_tensor * dst) {
     assert(params->ith == 0);
     assert(ggml_is_scalar(dst));
 
@@ -9323,11 +9323,10 @@ static void ggml_compute_forward_sum_f16(
         return;
     }
 
-    assert(ggml_is_scalar(dst));
     assert(src0->nb[0] == sizeof(ggml_fp16_t));
 
     GGML_TENSOR_LOCALS(int64_t, ne0, src0, ne);
-    GGML_TENSOR_LOCALS(size_t, nb0, src0, nb);
+    GGML_TENSOR_LOCALS(size_t,  nb0, src0, nb);
 
     float sum = 0;
     float row_sum = 0;
@@ -9337,12 +9336,12 @@ static void ggml_compute_forward_sum_f16(
             for (int64_t i01 = 0; i01 < ne01; i01++) {
                 ggml_vec_sum_f16_ggf(ne00,
                     &row_sum,
-                    (ggml_fp16_t*)((char*)src0->data + i01 * nb01 + i02 * nb02 + i03 * nb03));
+                    (ggml_fp16_t *) ((char *) src0->data + i01 * nb01 + i02 * nb02 + i03 * nb03));
                 sum += row_sum;
             }
         }
     }
-    ((ggml_fp16_t *)dst->data)[0] = GGML_FP32_TO_FP16(sum);
+    ((ggml_fp16_t *) dst->data)[0] = GGML_FP32_TO_FP16(sum);
 }
 
 static void ggml_compute_forward_sum(
