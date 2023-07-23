@@ -1,4 +1,15 @@
 #/bin/bash
+#
+# sample usage:
+#
+# mkdir tmp
+#
+# # CPU-only build
+# bash ./ci/run.sh ./tmp/results ./tmp/mnt
+#
+# # with CUDA support
+# GG_BUILD_CUDA=1 bash ./ci/run.sh ./tmp/results ./tmp/mnt
+#
 
 if [ -z "$2" ]; then
     echo "usage: $0 <output-dir> <mnt-dir>"
@@ -190,12 +201,42 @@ function gg_sum_mpt {
     gg_printf '```\n'
 }
 
+# mnist
+
+function gg_run_mnist {
+    cd ${SRC}
+
+    cd build-ci-release
+
+    set -e
+
+    model_f32="../examples/mnist/models/mnist/ggml-model-f32.bin"
+    samples="../examples/mnist/models/mnist/t10k-images.idx3-ubyte"
+
+    # first command runs and exports "mnist.ggml", the second command runs the exported model
+
+    (time ./bin/mnist     ${model_f32} ${samples} ) 2>&1 | tee -a $OUT/${ci}-mnist.log
+    (time ./bin/mnist-cpu ./mnist.ggml ${samples} ) 2>&1 | tee -a $OUT/${ci}-mnist.log
+
+    set +e
+}
+
+function gg_sum_mnist {
+    gg_printf '### %s\n\n' "${ci}"
+
+    gg_printf 'MNIST\n'
+    gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
+    gg_printf '```\n'
+    gg_printf '%s\n' "$(cat $OUT/${ci}-mnist.log)"
+    gg_printf '```\n'
+}
+
 ## main
 
 if [ -z $GG_BUILD_LOW_PERF ]; then
     rm -rf ${SRC}/models-mnt
 
-    mnt_models=$(realpath ${MNT}/models)
+    mnt_models=${MNT}/models
     mkdir -p ${mnt_models}
     ln -sfn ${mnt_models} ${SRC}/models-mnt
 
@@ -207,6 +248,7 @@ ret=0
 test $ret -eq 0 && gg_run ctest_debug
 test $ret -eq 0 && gg_run ctest_release
 test $ret -eq 0 && gg_run gpt_2
+test $ret -eq 0 && gg_run mnist
 
 if [ -z $GG_BUILD_LOW_PERF ]; then
     test $ret -eq 0 && gg_run mpt
