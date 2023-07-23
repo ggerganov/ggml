@@ -15440,9 +15440,6 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                             ggml_diag_mask_zero_impl(ctx, tensor->grad, n_past, false),
                         inplace);
                 }
-                if (src1->grad) {
-                    // noop
-                }
             } break;
         case GGML_OP_DIAG_MASK_ZERO:
             {
@@ -15453,9 +15450,6 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                         ggml_add_impl(ctx, src0->grad,
                             ggml_diag_mask_zero_impl(ctx, tensor->grad, n_past, false),
                         inplace);
-                }
-                if (src1->grad) {
-                    // noop
                 }
             } break;
         case GGML_OP_SOFT_MAX:
@@ -15491,9 +15485,6 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                                 n_ctx),
                             inplace);
                 }
-                if (src1->grad) {
-                    // noop
-                }
             } break;
         case GGML_OP_ROPE_BACK:
             {
@@ -15511,9 +15502,6 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                                 mode,
                                 n_ctx),
                             inplace);
-                }
-                if (src1->grad) {
-                    // noop
                 }
             } break;
         case GGML_OP_ALIBI:
