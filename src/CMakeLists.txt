@@ -11,6 +11,7 @@ if (GGML_ALL_WARNINGS)
             -Wpointer-arith                 \
             -Wdouble-promotion              \
             -Wno-unused-function            \
+            -Wmissing-prototypes            \
         ")
     else()
         # todo : windows
@@ -53,6 +54,9 @@ endif()
 if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
     message(STATUS "ARM detected")
     #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=apple-m1")
+elseif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "ppc64le" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "ppc64")
+    message(STATUS "PPC64 detected")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mpower9-vector")
 else()
     message(STATUS "x86 detected")
     #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx -mavx2 -mfma -mf16c")
@@ -113,7 +117,6 @@ else()
         set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -mfma -mf16c -mavx -mavx2")
     endif()
 endif()
-
 
 # ggml
 
@@ -179,6 +182,7 @@ if (GGML_CLBLAST)
         message(WARNING "clBLAST not found")
     endif()
 endif()
+
 if (GGML_CUBLAS)
     cmake_minimum_required(VERSION 3.17)
 
@@ -209,15 +213,16 @@ if (GGML_METAL)
     find_library(METALKIT_FRAMEWORK         MetalKit                REQUIRED)
     find_library(METALPERFORMANCE_FRAMEWORK MetalPerformanceShaders REQUIRED)
 
-    set(GGML_METAL_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/ggml-metal.m ${CMAKE_CURRENT_SOURCE_DIR}/ggml-metal.h)
+    set(GGML_METAL_SOURCES ggml-metal.m ggml-metal.h)
 
+    add_compile_definitions(GGML_USE_METAL)
     add_compile_definitions(GGML_METAL_NDEBUG)
 
     # get full path to the file
     #add_compile_definitions(GGML_METAL_DIR_KERNELS="${CMAKE_CURRENT_SOURCE_DIR}/")
 
     # copy ggml-metal.metal to bin directory
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/ggml-metal.metal bin/ggml-metal.metal COPYONLY)
+    configure_file(ggml-metal.metal ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ggml-metal.metal COPYONLY)
 
     set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS}
         ${FOUNDATION_LIBRARY}
@@ -236,7 +241,8 @@ add_library(${TARGET}
     ../include/ggml/ggml.h
     ${GGML_CUDA_SOURCES}
     ${GGML_OPENCL_SOURCES}
-    ${GGML_METAL_SOURCES})
+    ${GGML_METAL_SOURCES}
+    )
 
 target_include_directories(${TARGET} PUBLIC
     .

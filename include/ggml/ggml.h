@@ -199,6 +199,7 @@
 #define GGML_MAX_CONTEXTS      64
 #define GGML_MAX_SRC           6
 #define GGML_MAX_NAME          48
+#define GGML_MAX_OP_PARAMS     32
 #define GGML_DEFAULT_N_THREADS 4
 
 
@@ -418,6 +419,9 @@ extern "C" {
         // compute data
         enum ggml_op op;
 
+        // op params - allocated as int32_t for alignment
+        int32_t op_params[GGML_MAX_OP_PARAMS / sizeof(uint32_t)];
+
         bool is_param;
 
         struct ggml_tensor * grad;
@@ -554,6 +558,7 @@ extern "C" {
     GGML_API size_t  ggml_used_mem(const struct ggml_context * ctx);
 
     GGML_API size_t  ggml_set_scratch (struct ggml_context * ctx, struct ggml_scratch scratch);
+    GGML_API bool    ggml_get_no_alloc(struct ggml_context * ctx);
     GGML_API void    ggml_set_no_alloc(struct ggml_context * ctx, bool no_alloc);
 
     GGML_API void *  ggml_get_mem_buffer     (const struct ggml_context * ctx);
@@ -622,6 +627,11 @@ extern "C" {
     //
 
     GGML_API struct ggml_tensor * ggml_dup(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+    // in-place, returns view(a)
+    GGML_API struct ggml_tensor * ggml_dup_inplace(
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
 
@@ -948,8 +958,19 @@ extern "C" {
             struct ggml_tensor  * a,
             struct ggml_tensor  * b);
 
+    // a -> b, in-place, return view(b)
+    GGML_API struct ggml_tensor * ggml_cpy_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
+
     // make contiguous
     GGML_API struct ggml_tensor * ggml_cont(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+    // make contiguous, in-place
+    GGML_API struct ggml_tensor * ggml_cont_inplace(
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
 
@@ -1128,9 +1149,9 @@ extern "C" {
             int                   n_past,
             int                   n_dims,
             int                   mode,
+            int                   n_ctx,
             float                 freq_base,
-            float                 freq_scale,
-            int                   n_ctx);
+            float                 freq_scale);
 
     // rotary position embedding backward, i.e compute dx from dy
     // a - dy
@@ -1139,7 +1160,8 @@ extern "C" {
             struct ggml_tensor  * a,
             int                   n_past,
             int                   n_dims,
-            int                   mode);
+            int                   mode,
+            int                   n_ctx);
 
     // alibi position embedding
     // in-place, returns view(a)
