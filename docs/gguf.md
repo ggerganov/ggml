@@ -235,9 +235,19 @@ In the following, `[llm]` is used to fill in for the name of a specific LLM arch
 - `[llm].layer_count: u32`: Also known as `n_layers`. The number of attention+feedforward layers (i.e. the bulk of the LLM). Does not include the input or embedding layers.
 - `[llm].feedforward_length: u32`: Also known as `n_ff`. The length of the feedforward layer.
 - `[llm].use_parallel_residual: bool`: Whether or not the parallel residual logic should be used.
+- `[llm].tensor_data_layout: string`: When a model is converted to GGUF, tensors may be rearranged to improve performance. This key describes the layout of the tensor data. This is not required; if not present, it is assumed to be `reference`.
+  - `reference`: tensors are laid out in the same order as the original model
+  - further options can be found for each architecture in their respective sections
+
+#### Attention
+
 - `[llm].attention.head_count: u32`: Also known as `n_head`. Number of attention heads.
+- `[llm].attention.head_count_kv: u32`: The number of heads per group used in Grouped-Query-Attention. If not present, the model does not use GQA.
 - `[llm].attention.max_alibi_bias: f32`: The maximum bias to use for ALiBI.
 - `[llm].attention.clamp_kqv: f32`: Value (`C`) to clamp the values of the `Q`, `K`, and `V` tensors between (`[-C, C]`).
+
+#### RoPE
+
 - `[llm].rope.dimension_count: u32`: The number of rotary dimensions for RoPE.
 - `[llm].rope.scale: f32`: A scale factor for RoPE to adjust the context length.
 
@@ -257,6 +267,15 @@ The following sections describe the metadata for each model architecture. Each k
 ###### Optional
 
 - `llama.rope.scale`
+- `llama.attention.head_count_kv`
+- `llama.tensor_data_layout`:
+  - `llama.cpp`:
+    ```python
+    def permute(weights: NDArray, n_head: int) -> NDArray:
+        return (weights.reshape(n_head, 2, weights.shape[0] // n_head // 2, *weights.shape[1:])
+                    .swapaxes(1, 2)
+                    .reshape(weights.shape))
+    ```
 
 ##### MPT
 
@@ -316,9 +335,41 @@ The following sections describe the metadata for each model architecture. Each k
 - `falcon.attention.head_count_kv`
 - `falcon.attention.use_norm`
 
+###### Optional
+
+- `falcon.tensor_data_layout`:
+
+  - `llama.cpp` (this name may be inaccurate depending on where the Falcon implementation ends up):
+
+    ```python
+    # The original query_key_value tensor contains n_head_kv "kv groups",
+    # each consisting of n_head/n_head_kv query weights followed by one key
+    # and one value weight (shared by all query heads in the kv group).
+    # This layout makes it a big pain to work with in GGML.
+    # So we rearrange them here,, so that we have n_head query weights
+    # followed by n_head_kv key weights followed by n_head_kv value weights,
+    # in contiguous fashion.
+
+    if "query_key_value" in src:
+        qkv = model[src].view(
+            n_head_kv, n_head // n_head_kv + 2, head_dim, head_dim * n_head)
+
+        q = qkv[:, :-2 ].reshape(n_head * head_dim, head_dim * n_head)
+        k = qkv[:, [-2]].reshape(n_head_kv * head_dim, head_dim * n_head)
+        v = qkv[:, [-1]].reshape(n_head_kv * head_dim, head_dim * n_head)
+
+        model[src] = torch.cat((q,k,v)).reshape_as(model[src])
+    ```
+
 ##### RWKV
 
-**TODO**.
+The vocabulary size is the same as the number of rows in the `head` matrix.
+
+- `rwkv.architecture_version: u32`: The only allowed value currently is 4. Version 5 is expected to appear some time in the future.
+- `rwkv.context_length: u32`: Length of the context used during training or fine-tuning. RWKV is able to handle larger context than this limit, but the output quality may suffer.
+- `rwkv.layer_count: u32`
+- `rwkv.embedding_length: u32`
+- `rwkv.feedforward_length: u32`
 
 ##### Whisper
 
@@ -360,8 +411,14 @@ GGML supports an embedded vocabulary that may be lossily compressed from a more 
 
 It is not guaranteed to be standardized across models, and may change in the future. It is recommended that model authors use a more standardized tokenizer if possible.
 
-- `tokenizer.ggml.tokens: array[string]`: A list of tokens.
+- `tokenizer.ggml.model: string`: The name of the tokenizer model.
+  - `llama`: Llama style SentencePiece (tokens and scores extracted from HF `tokenizer.model`)
+  - `replit`: Replit style SentencePiece (tokens and scores extracted from HF `spiece.model`)
+  - `gpt2`: GPT-2 / GPT-NeoX style BPE (tokens extracted from HF `tokenizer.json`)
+  - `rwkv`: RWKV tokenizer
+- `tokenizer.ggml.tokens: array[string]`: A list of tokens indexed by the token ID used by the model.
 - `tokenizer.ggml.scores: array[f32]`: If present, the score/probability of each token. If not present, all tokens are assumed to have equal probability. Must be the same length as `tokens`.
+- `tokenizer.ggml.merges: array[string]`: If present, the merges of the tokenizer. If not present, the tokens are assumed to be atomic.
 - `tokenizer.ggml.bos_token_id: u32`: Beginning of sequence marker
 - `tokenizer.ggml.eos_token_id: u32`: End of sequence marker
 - `tokenizer.ggml.unknown_token_id: u32`: Unknown token
