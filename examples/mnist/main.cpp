@@ -119,6 +119,9 @@ bool mnist_model_load(const std::string & fname, mnist_model & model) {
             model.fc1_bias = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, model.hparams.n_hidden);
             fin.read(reinterpret_cast<char *>(model.fc1_bias->data), ggml_nbytes(model.fc1_bias));
             ggml_set_name(model.fc1_bias, "fc1_bias");
+
+            // just for testing purposes, set some parameters to non-zero
+            model.fc1_bias->op_params[0] = 0xdeadbeef;
         }
     }
 
