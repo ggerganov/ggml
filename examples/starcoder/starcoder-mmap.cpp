@@ -12,11 +12,16 @@
 #include <string>
 #include <vector>
 
+#if !defined(_WIN32)
 // mmap
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <fcntl.h>
+#else
+#define NOMINMAX
+#include <Windows.h>
+#endif
 
 #ifdef GGML_USE_CUBLAS
 #include "ggml-cuda.h"
@@ -625,7 +630,7 @@ bool starcoder_eval(
               std::vector<float>         & embd_w,
               size_t                     & mem_per_token) {
 
-    const int N = embd_inp.size();
+    const int N = int(embd_inp.size());
 
     const auto & hparams = model.hparams;
 
@@ -644,14 +649,14 @@ bool starcoder_eval(
 
     // use 2 scratch buffers
     // TODO: very hacky solution - reimplement in a more elegant way
-    static size_t scr0_size = 256u*1024*1024*2;
-    static void * scr0 = malloc(scr0_size);
+    static size_t scratch0_size = 256u*1024*1024*2;
+    static void * scratch0 = malloc(scratch0_size);
 
-    static size_t scr1_size = 256u*1024*1024*2;
-    static void * scr1 = malloc(scr1_size);
+    static size_t scratch1_size = 256u*1024*1024*2;
+    static void * scratch1 = malloc(scratch1_size);
 
     if (mem_per_token > 0 && mem_per_token*N > buf_size) {
-        const size_t buf_size_new = 1.1*(mem_per_token*N); // add 10% to account for ggml object overhead
+        const size_t buf_size_new = size_t(1.1*(mem_per_token*N)); // add 10% to account for ggml object overhead
         printf("\n%s: reallocating buffer from %zu to %zu bytes\n", __func__, buf_size, buf_size_new);
 
         // reallocate
@@ -691,7 +696,7 @@ bool starcoder_eval(
     for (int il = 0; il < n_layer; ++il) {
         struct ggml_tensor * cur;
 
-        ggml_set_scratch(ctx0, { 0, scr0_size, scr0, });
+        ggml_set_scratch(ctx0, { 0, scratch0_size, scratch0, });
 
         // norm
         {
@@ -839,7 +844,7 @@ bool starcoder_eval(
 
         struct ggml_tensor * inpFF = cur;
 
-        ggml_set_scratch(ctx0, { 0, scr1_size, scr1, });
+        ggml_set_scratch(ctx0, { 0, scratch1_size, scratch1, });
 
         // feed-forward network
         {
@@ -897,7 +902,7 @@ bool starcoder_eval(
         inpL = ggml_add(ctx0, cur, inpFF);
     }
 
-    ggml_set_scratch(ctx0, { 0, scr0_size, scr0, });
+    ggml_set_scratch(ctx0, { 0, scratch0_size, scratch0, });
 
     // norm
     {
@@ -963,7 +968,7 @@ int main(int argc, char ** argv) {
     }
 
     if (params.seed < 0) {
-        params.seed = time(NULL);
+        params.seed = int(time(NULL));
     }
 
     printf("%s: seed = %d\n", __func__, params.seed);
@@ -1029,7 +1034,7 @@ int main(int argc, char ** argv) {
     printf("Calling starcoder_eval\n");
     starcoder_eval(model, params.n_threads, 0, { 0, 1, 2, 3 }, logits, mem_per_token);
 
-    for (int i = embd.size(); i < embd_inp.size() + params.n_predict; i++) {
+    for (int i = int(embd.size()); i < embd_inp.size() + params.n_predict; i++) {
         // predict
         if (embd.size() > 0) {
             const int64_t t_start_us = ggml_time_us();
@@ -1045,7 +1050,7 @@ int main(int argc, char ** argv) {
             }
         }
 
-        n_past += embd.size();
+        n_past += int(embd.size());
         embd.clear();
 
         if (i >= embd_inp.size()) {
@@ -1076,7 +1081,7 @@ int main(int argc, char ** argv) {
                     break;
                 }
             }
-            i += embd.size() - 1;
+            i += int(embd.size()) - 1;
         }
 
         // display text
