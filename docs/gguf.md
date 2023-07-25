@@ -28,7 +28,7 @@ Fields, including arrays, are written sequentially without alignment unless othe
 
 ```c
 enum ggml_type {
-    GGML_TYPE_F32  = 0,
+    GGML_TYPE_float32  = 0,
     GGML_TYPE_F16  = 1,
     GGML_TYPE_Q4_0 = 2,
     GGML_TYPE_Q4_1 = 3,
@@ -208,7 +208,7 @@ If a particular community key is widely used, it may be promoted to a standardiz
   - `bloom`
   - `falcon`
   - `rwkv`
-- **`general.quantization_version: u32`**: version of quantization scheme. Not required if the model is not quantized (i.e. no tensors are quantized). If any tensors are quantized, this _must_ be present.
+- **`general.quantization_version: uint32`**: version of quantization scheme. Not required if the model is not quantized (i.e. no tensors are quantized). If any tensors are quantized, this _must_ be present.
 
 #### General metadata
 
@@ -230,10 +230,10 @@ Information about where this model came from. This is useful for tracking the pr
 
 In the following, `[llm]` is used to fill in for the name of a specific LLM architecture. They will be used in each architecture's section.
 
-- `[llm].context_length: u32`: Also known as `n_ctx`. length of the context (in tokens) that the model was trained on. For most architectures, this is the hard limit on the length of the input. Architectures, like RWKV, that are not reliant on transformer-style attention may be able to handle larger inputs, but this is not guaranteed.
-- `[llm].embedding_length: u32`: Also known as `n_embd`. Embedding layer size.
-- `[llm].layer_count: u32`: Also known as `n_layers`. The number of attention+feedforward layers (i.e. the bulk of the LLM). Does not include the input or embedding layers.
-- `[llm].feedforward_length: u32`: Also known as `n_ff`. The length of the feedforward layer.
+- `[llm].context_length: uint32`: Also known as `n_ctx`. length of the context (in tokens) that the model was trained on. For most architectures, this is the hard limit on the length of the input. Architectures, like RWKV, that are not reliant on transformer-style attention may be able to handle larger inputs, but this is not guaranteed.
+- `[llm].embedding_length: uint32`: Also known as `n_embd`. Embedding layer size.
+- `[llm].layer_count: uint32`: Also known as `n_layers`. The number of attention+feedforward layers (i.e. the bulk of the LLM). Does not include the input or embedding layers.
+- `[llm].feedforward_length: uint32`: Also known as `n_ff`. The length of the feedforward layer.
 - `[llm].use_parallel_residual: bool`: Whether or not the parallel residual logic should be used.
 - `[llm].tensor_data_layout: string`: When a model is converted to GGUF, tensors may be rearranged to improve performance. This key describes the layout of the tensor data. This is not required; if not present, it is assumed to be `reference`.
   - `reference`: tensors are laid out in the same order as the original model
@@ -241,15 +241,17 @@ In the following, `[llm]` is used to fill in for the name of a specific LLM arch
 
 #### Attention
 
-- `[llm].attention.head_count: u32`: Also known as `n_head`. Number of attention heads.
-- `[llm].attention.head_count_kv: u32`: The number of heads per group used in Grouped-Query-Attention. If not present, the model does not use GQA.
-- `[llm].attention.max_alibi_bias: f32`: The maximum bias to use for ALiBI.
-- `[llm].attention.clamp_kqv: f32`: Value (`C`) to clamp the values of the `Q`, `K`, and `V` tensors between (`[-C, C]`).
+- `[llm].attention.head_count: uint32`: Also known as `n_head`. Number of attention heads.
+- `[llm].attention.head_count_kv: uint32`: The number of heads per group used in Grouped-Query-Attention. If not present, the model does not use GQA.
+- `[llm].attention.max_alibi_bias: float32`: The maximum bias to use for ALiBI.
+- `[llm].attention.clamp_kqv: float32`: Value (`C`) to clamp the values of the `Q`, `K`, and `V` tensors between (`[-C, C]`).
+- `[llm].attention.layer_norm_epsilon: float32`: Layer normalization epsilon.
+- `[llm].attention.layer_norm_rms_epsilon: float32`: Layer RMS normalization epsilon.
 
 #### RoPE
 
-- `[llm].rope.dimension_count: u32`: The number of rotary dimensions for RoPE.
-- `[llm].rope.scale: f32`: A scale factor for RoPE to adjust the context length.
+- `[llm].rope.dimension_count: uint32`: The number of rotary dimensions for RoPE.
+- `[llm].rope.scale: float32`: A scale factor for RoPE to adjust the context length.
 
 #### Models
 
@@ -263,6 +265,7 @@ The following sections describe the metadata for each model architecture. Each k
 - `llama.feedforward_length`
 - `llama.rope.dimension_count`
 - `llama.attention.head_count`
+- `llama.attention.layer_norm_rms_epsilon`
 
 ###### Optional
 
@@ -285,6 +288,7 @@ The following sections describe the metadata for each model architecture. Each k
 - `mpt.attention.head_count`
 - `mpt.attention.alibi_bias_max`
 - `mpt.attention.clip_kqv`
+- `mpt.attention.layer_norm_epsilon`
 
 ##### GPT-NeoX
 
@@ -294,6 +298,7 @@ The following sections describe the metadata for each model architecture. Each k
 - `gptneox.use_parallel_residual`
 - `gptneox.rope.dimension_count`
 - `gptneox.attention.head_count`
+- `gptneox.attention.layer_norm_epsilon`
 
 ###### Optional
 
@@ -306,6 +311,7 @@ The following sections describe the metadata for each model architecture. Each k
 - `gptj.layer_count`
 - `gptj.rope.dimension_count`
 - `gptj.attention.head_count`
+- `gptj.attention.layer_norm_epsilon`
 
 ###### Optional
 
@@ -317,6 +323,7 @@ The following sections describe the metadata for each model architecture. Each k
 - `gpt2.embedding_length`
 - `gpt2.layer_count`
 - `gpt2.attention.head_count`
+- `gpt2.attention.layer_norm_epsilon`
 
 ##### BLOOM
 
@@ -325,6 +332,7 @@ The following sections describe the metadata for each model architecture. Each k
 - `bloom.layer_count`
 - `bloom.feedforward_length`
 - `bloom.attention.head_count`
+- `bloom.attention.layer_norm_epsilon`
 
 ##### Falcon
 
@@ -334,6 +342,7 @@ The following sections describe the metadata for each model architecture. Each k
 - `falcon.attention.head_count`
 - `falcon.attention.head_count_kv`
 - `falcon.attention.use_norm`
+- `falcon.attention.layer_norm_epsilon`
 
 ###### Optional
 
@@ -365,11 +374,11 @@ The following sections describe the metadata for each model architecture. Each k
 
 The vocabulary size is the same as the number of rows in the `head` matrix.
 
-- `rwkv.architecture_version: u32`: The only allowed value currently is 4. Version 5 is expected to appear some time in the future.
-- `rwkv.context_length: u32`: Length of the context used during training or fine-tuning. RWKV is able to handle larger context than this limit, but the output quality may suffer.
-- `rwkv.layer_count: u32`
-- `rwkv.embedding_length: u32`
-- `rwkv.feedforward_length: u32`
+- `rwkv.architecture_version: uint32`: The only allowed value currently is 4. Version 5 is expected to appear some time in the future.
+- `rwkv.context_length: uint32`: Length of the context used during training or fine-tuning. RWKV is able to handle larger context than this limit, but the output quality may suffer.
+- `rwkv.layer_count: uint32`
+- `rwkv.embedding_length: uint32`
+- `rwkv.feedforward_length: uint32`
 
 ##### Whisper
 
@@ -380,7 +389,7 @@ This is because they are both transformer models.
 - `whisper.encoder.context_length`
 - `whisper.encoder.embedding_length`
 - `whisper.encoder.layer_count`
-- `whisper.encoder.mels_count: u32`
+- `whisper.encoder.mels_count: uint32`
 - `whisper.encoder.attention.head_count`
 
 - `whisper.decoder.context_length`
@@ -417,13 +426,17 @@ It is not guaranteed to be standardized across models, and may change in the fut
   - `gpt2`: GPT-2 / GPT-NeoX style BPE (tokens extracted from HF `tokenizer.json`)
   - `rwkv`: RWKV tokenizer
 - `tokenizer.ggml.tokens: array[string]`: A list of tokens indexed by the token ID used by the model.
-- `tokenizer.ggml.scores: array[f32]`: If present, the score/probability of each token. If not present, all tokens are assumed to have equal probability. Must be the same length as `tokens`.
+- `tokenizer.ggml.scores: array[float32]`: If present, the score/probability of each token. If not present, all tokens are assumed to have equal probability. Must be the same length as `tokens`.
 - `tokenizer.ggml.merges: array[string]`: If present, the merges of the tokenizer. If not present, the tokens are assumed to be atomic.
-- `tokenizer.ggml.bos_token_id: u32`: Beginning of sequence marker
-- `tokenizer.ggml.eos_token_id: u32`: End of sequence marker
-- `tokenizer.ggml.unknown_token_id: u32`: Unknown token
-- `tokenizer.ggml.separator_token_id: u32`: Separator token
-- `tokenizer.ggml.padding_token_id: u32`: Padding token
+- `tokenizer.ggml.added_tokens: array[string]`: If present, tokens that were added after training.
+
+##### Special tokens
+
+- `tokenizer.ggml.bos_token_id: uint32`: Beginning of sequence marker
+- `tokenizer.ggml.eos_token_id: uint32`: End of sequence marker
+- `tokenizer.ggml.unknown_token_id: uint32`: Unknown token
+- `tokenizer.ggml.separator_token_id: uint32`: Separator token
+- `tokenizer.ggml.padding_token_id: uint32`: Padding token
 
 #### Hugging Face
 
@@ -472,7 +485,7 @@ These formats share the same fundamental structure:
   - metadata about the model, such as the number of layers, the number of heads, etc.
   - a `ftype` that describes the type of the majority of the tensors,
     - for GGML files, the quantization version is encoded in the `ftype` divided by 1000
-- an embedded vocabulary, which is a list of strings with length prepended. The GGMF/GGJT formats embed a f32 score next to the strings.
+- an embedded vocabulary, which is a list of strings with length prepended. The GGMF/GGJT formats embed a float32 score next to the strings.
 - finally, a list of tensors with their length-prepended name, type, and (aligned, in the case of GGJT) tensor data
 
 Notably, this structure does not identify what model architecture the model belongs to, nor does it offer any flexibility for changing the structure of the hyperparameters. This means that the only way to add new hyperparameters is to add them to the end of the list, which is a breaking change for existing models.
