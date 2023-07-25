@@ -99,7 +99,9 @@ for k, v in model.items():
     ftype_cur = 1
     if ftype == 0 or n_dims == 1 or \
             name == "image_encoder.pos_embed" or \
-            name.startswith("prompt_encoder"):
+            name.startswith("prompt_encoder") or \
+            name.startswith("mask_decoder.iou_token") or \
+            name.startswith("mask_decoder.mask_tokens"):
         print("  Converting to float32")
         data = data.astype(np.float32)
         ftype_cur = 0

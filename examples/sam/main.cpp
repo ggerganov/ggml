@@ -21,6 +21,7 @@ struct sam_hparams {
     int32_t n_enc_head        = 12;
     int32_t n_enc_out_chans   = 256;
     int32_t n_pt_embd         = 4;
+    int32_t n_dec_heads       = 8;
     int32_t ftype             = 1;
 
     int32_t n_enc_head_dim() const { return n_enc_state / n_enc_head; }
@@ -138,12 +139,12 @@ struct sam_layer_dec_transformer {
     struct ggml_tensor * norm2_b;
 
     // mlp.lin1
-    struct ggml_tensor * mlp_ln1_w;
-    struct ggml_tensor * mlp_ln1_b;
+    struct ggml_tensor * mlp_lin1_w;
+    struct ggml_tensor * mlp_lin1_b;
 
     // mlp.lin2
-    struct ggml_tensor * mlp_ln2_w;
-    struct ggml_tensor * mlp_ln2_b;
+    struct ggml_tensor * mlp_lin2_w;
+    struct ggml_tensor * mlp_lin2_b;
 
     // norm3
     struct ggml_tensor * norm3_w;
@@ -552,10 +553,10 @@ bool sam_model_load(const std::string & fname, sam_model & model) {
                 ctx_size += n_pt_embd*                ggml_type_sizef(GGML_TYPE_F32);
 
                 // iou_token_w
-                ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
+                ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
 
                 // mask_tokens_w
-                ctx_size += n_pt_embd*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
+                ctx_size += n_pt_embd*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
             }
         }
         fprintf(stderr, "%s: ggml ctx size = %6.2f MB\n", __func__, ctx_size/(1024.0*1024.0));
@@ -732,10 +733,10 @@ bool sam_model_load(const std::string & fname, sam_model & model) {
                 l.norm2_w = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
                 l.norm2_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
 
-                l.mlp_ln1_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, 8*n_enc_out_chans);
-                l.mlp_ln1_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 8*n_enc_out_chans);
-                l.mlp_ln2_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, 8*n_enc_out_chans, n_enc_out_chans);
-                l.mlp_ln2_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
+                l.mlp_lin1_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, 8*n_enc_out_chans);
+                l.mlp_lin1_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 8*n_enc_out_chans);
+                l.mlp_lin2_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, 8*n_enc_out_chans, n_enc_out_chans);
+                l.mlp_lin2_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
 
                 l.norm3_w = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
                 l.norm3_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_enc_out_chans);
@@ -777,10 +778,10 @@ bool sam_model_load(const std::string & fname, sam_model & model) {
                 model.tensors[prefix + "norm2.weight"] = l.norm2_w;
                 model.tensors[prefix + "norm2.bias"]   = l.norm2_b;
 
-                model.tensors[prefix + "mlp.lin1.weight"] = l.mlp_ln1_w;
-                model.tensors[prefix + "mlp.lin1.bias"]   = l.mlp_ln1_b;
-                model.tensors[prefix + "mlp.lin2.weight"] = l.mlp_ln2_w;
-                model.tensors[prefix + "mlp.lin2.bias"]   = l.mlp_ln2_b;
+                model.tensors[prefix + "mlp.lin1.weight"] = l.mlp_lin1_w;
+                model.tensors[prefix + "mlp.lin1.bias"]   = l.mlp_lin1_b;
+                model.tensors[prefix + "mlp.lin2.weight"] = l.mlp_lin2_w;
+                model.tensors[prefix + "mlp.lin2.bias"]   = l.mlp_lin2_b;
 
                 model.tensors[prefix + "norm3.weight"] = l.norm3_w;
                 model.tensors[prefix + "norm3.bias"]   = l.norm3_b;
@@ -863,8 +864,8 @@ bool sam_model_load(const std::string & fname, sam_model & model) {
             dec.iou_prediction_head_2_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, n_pt_embd);
             dec.iou_prediction_head_2_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_pt_embd);
 
-            dec.iou_token_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, 1);
-            dec.mask_tokens_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, n_enc_out_chans, n_pt_embd);
+            dec.iou_token_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, n_enc_out_chans, 1);
+            dec.mask_tokens_w = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, n_enc_out_chans, n_pt_embd);
 
             model.tensors["mask_decoder.iou_prediction_head.layers.0.weight"] = dec.iou_prediction_head_0_w;
             model.tensors["mask_decoder.iou_prediction_head.layers.0.bias"]   = dec.iou_prediction_head_0_b;
@@ -1045,22 +1046,6 @@ bool sam_fill_dense_pe(
     ggml_set_name(cur, "check");
     ggml_build_forward_expand(&gf, cur);
     ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
-
-    // auto * t = ggml_get_tensor(ctx0, "check");
-    // auto print_t_f32 = [&](struct ggml_tensor * t) {
-    //     float * data = (float *)t->data;
-    //     printf("dims: %jd %jd %jd %jd f32\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
-    //     for (int i = 0; i < 256; i++) {
-    //         printf("%f ", data[256*64*63 + 63*256 + i]);
-    //     }
-    //     printf("\n");
-    //     double sum = 0.0;
-    //     for (int i = 0; i < ggml_nelements(t); i++) {
-    //         sum += data[i];
-    //     }
-    //     printf("sum:  %f\n", sum);
-    // };
-    // print_t_f32(t);
 
     return true;
 }
@@ -1357,70 +1342,70 @@ bool sam_encode_image(
 
     // print
     {
-        auto print_t_f32 = [&](struct ggml_tensor * t) {
-            float * data = (float *)t->data;
-            printf("dims: %jd %jd %jd %jd f32\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
-            printf("data: ");
-            for (int i = 0; i < std::min((int) t->ne[0], 10); i++) {
-                printf("%f ", data[i]);
-            }
-            printf("\n");
-            //for (int y = 0; y < 64; ++y) {
-            //    for (int x = 0; x < 64; ++x) {
-            //        printf("%5.2f ", data[y*64 + x]);
-            //    }
-            //    printf("\n");
-            //}
-            //printf("\n");
-            for (int y = 0; y < 64; ++y) {
-                for (int x = 0; x < 64; ++x) {
-                    printf("%5.2f ", data[(y*64 + x)*64 + 41]);
-                }
-                printf("\n");
-            }
-            printf("\n");
-            //for (int y = 0; y < 64; ++y) {
-            //    for (int x = 0; x < 64; ++x) {
-            //        printf("%5.2f ", data[(y*64 + x)*768 + 231]);
-            //    }
-            //    printf("\n");
-            //}
-            //printf("\n");
-            double sum = 0.0;
-            for (int i = 0; i < ggml_nelements(t); i++) {
-                sum += data[i];
-            }
-            printf("sum:  %f\n", sum);
-        };
+        // auto print_t_f32 = [&](struct ggml_tensor * t) {
+        //     float * data = (float *)t->data;
+        //     printf("dims: %jd %jd %jd %jd f32\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
+        //     printf("data: ");
+        //     for (int i = 0; i < std::min((int) t->ne[0], 10); i++) {
+        //         printf("%f ", data[i]);
+        //     }
+        //     printf("\n");
+        //     //for (int y = 0; y < 64; ++y) {
+        //     //    for (int x = 0; x < 64; ++x) {
+        //     //        printf("%5.2f ", data[y*64 + x]);
+        //     //    }
+        //     //    printf("\n");
+        //     //}
+        //     //printf("\n");
+        //     for (int y = 0; y < 64; ++y) {
+        //         for (int x = 0; x < 64; ++x) {
+        //             printf("%5.2f ", data[(y*64 + x)*64 + 41]);
+        //         }
+        //         printf("\n");
+        //     }
+        //     printf("\n");
+        //     //for (int y = 0; y < 64; ++y) {
+        //     //    for (int x = 0; x < 64; ++x) {
+        //     //        printf("%5.2f ", data[(y*64 + x)*768 + 231]);
+        //     //    }
+        //     //    printf("\n");
+        //     //}
+        //     //printf("\n");
+        //     double sum = 0.0;
+        //     for (int i = 0; i < ggml_nelements(t); i++) {
+        //         sum += data[i];
+        //     }
+        //     printf("sum:  %f\n", sum);
+        // };
 
-        auto print_t_f16 = [&](struct ggml_tensor * t) {
-            ggml_fp16_t * data = (ggml_fp16_t *)t->data;
-            printf("dims: %jd %jd %jd %jd f16\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
-            printf("data: ");
-            for (int i = 0; i < std::min((int) t->ne[0], 10); i++) {
-                printf("%f ", ggml_fp16_to_fp32(data[i]));
-            }
-            printf("\n");
-            for (int y = 0; y < 14; ++y) {
-                for (int x = 0; x < 14; ++x) {
-                    printf("%7.4f ", ggml_fp16_to_fp32(data[(y*14 + x)*64 + 23]));
-                }
-                printf("\n");
-            }
-            printf("\n");
-            double sum = 0.0;
-            for (int i = 0; i < ggml_nelements(t); i++) {
-                sum += ggml_fp16_to_fp32(data[i]);
-            }
-            printf("sum:  %f\n", sum);
-        };
+        // auto print_t_f16 = [&](struct ggml_tensor * t) {
+        //     ggml_fp16_t * data = (ggml_fp16_t *)t->data;
+        //     printf("dims: %jd %jd %jd %jd f16\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
+        //     printf("data: ");
+        //     for (int i = 0; i < std::min((int) t->ne[0], 10); i++) {
+        //         printf("%f ", ggml_fp16_to_fp32(data[i]));
+        //     }
+        //     printf("\n");
+        //     for (int y = 0; y < 14; ++y) {
+        //         for (int x = 0; x < 14; ++x) {
+        //             printf("%7.4f ", ggml_fp16_to_fp32(data[(y*14 + x)*64 + 23]));
+        //         }
+        //         printf("\n");
+        //     }
+        //     printf("\n");
+        //     double sum = 0.0;
+        //     for (int i = 0; i < ggml_nelements(t); i++) {
+        //         sum += ggml_fp16_to_fp32(data[i]);
+        //     }
+        //     printf("sum:  %f\n", sum);
+        // };
 
-        auto * t = ggml_get_tensor(ctx0, "check");
-        if (t->type == GGML_TYPE_F32) {
-            print_t_f32(t);
-        } else {
-            print_t_f16(t);
-        }
+        // auto * t = ggml_get_tensor(ctx0, "check");
+        // if (t->type == GGML_TYPE_F32) {
+        //     print_t_f32(t);
+        // } else {
+        //     print_t_f16(t);
+        // }
     }
 
     //printf("used_mem = %zu\n", ggml_used_mem(ctx0));
@@ -1528,6 +1513,9 @@ bool sam_encode_prompt(
                     1, 1, enc.no_mask_embd_w->ne[0], enc.no_mask_embd_w->nb[0], enc.no_mask_embd_w->nb[0], 0)),
             state.embd_prompt_dense);
 
+    // TODO: avoid copy
+    cur = ggml_cpy(ctx0, cur, state.embd_prompt_dense);
+
     ggml_build_forward_expand(&gf, cur);
 
     ggml_set_name(cur, "check");
@@ -1537,76 +1525,144 @@ bool sam_encode_prompt(
 
     // print
     {
-        auto print_t_f32 = [&](struct ggml_tensor * t) {
-            float * data = (float *)t->data;
-            printf("dims: %jd %jd %jd %jd f32\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
-            printf("data: ");
-            for (int i = 0; i < std::min((int) t->ne[0], 10); i++) {
-                printf("%f ", data[i]);
-            }
-            printf("\n");
-            //for (int y = 0; y < 64; ++y) {
-            //    for (int x = 0; x < 64; ++x) {
-            //        printf("%5.2f ", data[y*64 + x]);
-            //    }
-            //    printf("\n");
-            //}
-            //printf("\n");
-            for (int y = 0; y < 64; ++y) {
-                for (int x = 0; x < 64; ++x) {
-                    printf("%5.2f ", data[255*64*64 + y*64 + x]);
-                }
-                printf("\n");
-            }
-            printf("\n");
-            //for (int y = 0; y < 64; ++y) {
-            //    for (int x = 0; x < 64; ++x) {
-            //        printf("%5.2f ", data[(y*64 + x)*768 + 231]);
-            //    }
-            //    printf("\n");
-            //}
-            //printf("\n");
-            double sum = 0.0;
-            for (int i = 0; i < ggml_nelements(t); i++) {
-                sum += data[i];
-            }
-            printf("sum:  %f\n", sum);
-        };
+        // auto print_t_f32 = [&](struct ggml_tensor * t) {
+        //     float * data = (float *)t->data;
+        //     printf("dims: %jd %jd %jd %jd f32\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
+        //     printf("data: ");
+        //     for (int i = 0; i < std::min((int) t->ne[0], 256); i++) {
+        //         printf("%f ", data[i]);
+        //     }
+        //     printf("\n");
+        //     //for (int y = 0; y < 64; ++y) {
+        //     //    for (int x = 0; x < 64; ++x) {
+        //     //        printf("%5.2f ", data[y*64 + x]);
+        //     //    }
+        //     //    printf("\n");
+        //     //}
+        //     //printf("\n");
+        //     // for (int y = 0; y < 64; ++y) {
+        //     //     for (int x = 0; x < 64; ++x) {
+        //     //         printf("%5.2f ", data[255*64*64 + y*64 + x]);
+        //     //     }
+        //     //     printf("\n");
+        //     // }
+        //     // printf("\n");
+        //     //for (int y = 0; y < 64; ++y) {
+        //     //    for (int x = 0; x < 64; ++x) {
+        //     //        printf("%5.2f ", data[(y*64 + x)*768 + 231]);
+        //     //    }
+        //     //    printf("\n");
+        //     //}
+        //     //printf("\n");
+        //     double sum = 0.0;
+        //     for (int i = 0; i < ggml_nelements(t); i++) {
+        //         sum += data[i];
+        //     }
+        //     printf("sum:  %f\n", sum);
+        // };
 
-        auto print_t_f16 = [&](struct ggml_tensor * t) {
-            ggml_fp16_t * data = (ggml_fp16_t *)t->data;
-            printf("dims: %jd %jd %jd %jd f16\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
-            printf("data: ");
-            for (int i = 0; i < std::min((int) t->ne[0], 10); i++) {
-                printf("%f ", ggml_fp16_to_fp32(data[i]));
-            }
-            printf("\n");
-            for (int y = 0; y < 14; ++y) {
-                for (int x = 0; x < 14; ++x) {
-                    printf("%7.4f ", ggml_fp16_to_fp32(data[(y*14 + x)*64 + 23]));
-                }
-                printf("\n");
-            }
-            printf("\n");
-            double sum = 0.0;
-            for (int i = 0; i < ggml_nelements(t); i++) {
-                sum += ggml_fp16_to_fp32(data[i]);
-            }
-            printf("sum:  %f\n", sum);
-        };
+        // auto print_t_f16 = [&](struct ggml_tensor * t) {
+        //     ggml_fp16_t * data = (ggml_fp16_t *)t->data;
+        //     printf("dims: %jd %jd %jd %jd f16\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
+        //     printf("data: ");
+        //     for (int i = 0; i < std::min((int) t->ne[0], 256); i++) {
+        //         printf("%f ", ggml_fp16_to_fp32(data[i]));
+        //     }
+        //     printf("\n");
+        //     for (int y = 0; y < 14; ++y) {
+        //         for (int x = 0; x < 14; ++x) {
+        //             printf("%7.4f ", ggml_fp16_to_fp32(data[(y*14 + x)*64 + 23]));
+        //         }
+        //         printf("\n");
+        //     }
+        //     printf("\n");
+        //     double sum = 0.0;
+        //     for (int i = 0; i < ggml_nelements(t); i++) {
+        //         sum += ggml_fp16_to_fp32(data[i]);
+        //     }
+        //     printf("sum:  %f\n", sum);
+        // };
 
-        auto * t = ggml_get_tensor(ctx0, "check");
-        if (t->type == GGML_TYPE_F32) {
-            print_t_f32(t);
-        } else {
-            print_t_f16(t);
-        }
+        // auto * t = ggml_get_tensor(ctx0, "check");
+        // if (t->type == GGML_TYPE_F32) {
+        //     print_t_f32(t);
+        // } else {
+        //     print_t_f16(t);
+        // }
     }
 
     //printf("used_mem = %zu\n", ggml_used_mem(ctx0));
 
     ggml_free(ctx0);
     return true;
+}
+
+struct ggml_tensor* sam_decode_mask_transformer_attn(
+    const sam_layer_dec_transformer_attn & attn,
+                      struct ggml_tensor * queries,
+                      struct ggml_tensor * keys,
+                      struct ggml_tensor * values,
+                     struct ggml_context * ctx0,
+                         const sam_model & model) {
+    const auto & hparams = model.hparams;
+    const int n_head = hparams.n_dec_heads;
+
+    struct ggml_tensor * Qcur = {};
+    struct ggml_tensor * Kcur = {};
+    struct ggml_tensor * Vcur = {};
+
+    Qcur = ggml_mul_mat(ctx0, attn.q_w, queries);
+    Qcur = ggml_add(ctx0,
+            ggml_repeat(ctx0, attn.q_b, Qcur),
+            Qcur);
+
+    Kcur = ggml_mul_mat(ctx0, attn.k_w, keys);
+    Kcur = ggml_add(ctx0,
+            ggml_repeat(ctx0, attn.k_b, Kcur),
+            Kcur);
+
+    Vcur = ggml_mul_mat(ctx0, attn.v_w, values);
+    Vcur = ggml_add(ctx0,
+            ggml_repeat(ctx0, attn.v_b, Vcur),
+            Vcur);
+
+    // TODO: use stratch memory
+    // ggml_set_scratch(ctx0, { 0, scr0_size, scr0, });
+
+    struct ggml_tensor * Q = {};
+    struct ggml_tensor * K = {};
+    struct ggml_tensor * V = {};
+
+    Q = ggml_reshape_4d(ctx0, Qcur, Qcur->ne[0]/n_head, n_head, Qcur->ne[1], Qcur->ne[2]);
+    Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));
+
+    K = ggml_reshape_4d(ctx0, Kcur, Kcur->ne[0]/n_head, n_head, Kcur->ne[1], Kcur->ne[2]);
+    K = ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3));
+
+    V = ggml_reshape_4d(ctx0, Vcur, Vcur->ne[0]/n_head, n_head, Vcur->ne[1], Vcur->ne[2]);
+    V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));
+
+    // Q * K
+    struct ggml_tensor * KQ = ggml_mul_mat(ctx0, K, Q);
+
+    struct ggml_tensor * KQ_scaled =
+        ggml_scale_inplace(ctx0,
+                KQ,
+                ggml_new_f32(ctx0, 1.0f/sqrt(float(Q->ne[0]))));
+
+    struct ggml_tensor * KQ_soft_max = ggml_soft_max_inplace(ctx0, KQ_scaled);
+
+    struct ggml_tensor * KQV = ggml_mul_mat(ctx0, KQ_soft_max, ggml_cont(ctx0, ggml_transpose(ctx0, V)));
+
+    struct ggml_tensor * KQV_merged = ggml_cont(ctx0, ggml_transpose(ctx0, KQV));
+    KQV_merged = ggml_cont(ctx0, ggml_permute(ctx0, KQV_merged, 0, 2, 1, 3));
+    KQV_merged = ggml_cont(ctx0, ggml_reshape_3d(ctx0, KQV_merged, KQV_merged->ne[0]*KQV_merged->ne[1], KQV_merged->ne[2], KQV_merged->ne[3]));
+    KQV_merged = ggml_mul_mat(ctx0, attn.out_w, KQV_merged);
+    KQV_merged = ggml_add(ctx0,
+                ggml_repeat(ctx0, attn.out_b, KQV_merged),
+                KQV_merged);
+
+    return KQV_merged;
 }
 
 bool sam_decode_mask(
@@ -1628,6 +1684,209 @@ bool sam_decode_mask(
 
     struct ggml_context * ctx0 = ggml_init(params);
     struct ggml_cgraph gf = {};
+
+    auto print_t_f32 = [&](const char* title, struct ggml_tensor * t) {
+        printf("%s\n", title);
+        float * data = (float *)t->data;
+        printf("dims: %jd %jd %jd %jd f32\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
+        printf("First 10 elements:\n");
+        for (int i = 0; i < std::min((int) t->ne[0], 10); i++) {
+            printf("%f ", data[i]);
+        }
+        printf("\n");
+        // printf("All elements:\n");
+        // for (int y = 0; y < 7; ++y) {
+        //     printf("[");
+        //     for (int x = 0; x < 256; ++x) {
+        //         printf("%f ", data[y*256 + x]);
+        //     }
+        //     printf("]\n\n");
+        // }
+        double sum = 0.0;
+        for (int i = 0; i < ggml_nelements(t); i++) {
+            sum += data[i];
+        }
+        printf("sum:  %f\n\n", sum);
+    };
+    print_t_f32("embd_img", state.embd_img);
+    print_t_f32("embd_prompt_dense", state.embd_prompt_dense);
+    print_t_f32("embd_prompt_sparse", state.embd_prompt_sparse);
+    print_t_f32("pe_img_dense", state.pe_img_dense);
+
+    struct ggml_tensor * tokens = {};
+    {
+        // Concatenate output tokens
+        // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/mask_decoder.py#L120
+        const auto& sparse = state.embd_prompt_sparse;
+
+        tokens = ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, dec.iou_token_w->ne[0], dec.iou_token_w->ne[1] + dec.mask_tokens_w->ne[1] + sparse->ne[1], sparse->ne[2]);
+
+        const size_t offsets[3] = { 0, dec.iou_token_w->ne[1]*tokens->nb[1], dec.iou_token_w->ne[1]*tokens->nb[1] + dec.mask_tokens_w->ne[1]*tokens->nb[1] };
+        ggml_build_forward_expand(&gf, ggml_cpy(ctx0, dec.iou_token_w,   ggml_view_2d(ctx0, tokens, tokens->ne[0], dec.iou_token_w->ne[1],   tokens->nb[1], offsets[0])));
+        ggml_build_forward_expand(&gf, ggml_cpy(ctx0, dec.mask_tokens_w, ggml_view_2d(ctx0, tokens, tokens->ne[0], dec.mask_tokens_w->ne[1], tokens->nb[1], offsets[1])));
+        ggml_build_forward_expand(&gf, ggml_cpy(ctx0, sparse,            ggml_view_2d(ctx0, tokens, tokens->ne[0], sparse->ne[1],            tokens->nb[1], offsets[2])));
+        // TODO: Sparse prompt embeddings can have more than one point
+    }
+
+    struct ggml_tensor * src = {};
+    struct ggml_tensor * pos_src = {};
+    {
+        // Expand per-image data in the batch direction to be per-mask
+        // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/mask_decoder.py#L125
+        src = ggml_new_tensor_4d(ctx0, GGML_TYPE_F32, state.embd_img->ne[0], state.embd_img->ne[1], state.embd_img->ne[2], tokens->ne[2]);
+        src = ggml_add(ctx0,
+            ggml_repeat(ctx0,
+                state.embd_img,
+                src),
+            state.embd_prompt_dense);
+
+        // flatten & permute
+        // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/transformer.py#L83
+        src = ggml_cont(ctx0, ggml_permute(ctx0,
+            ggml_view_3d(ctx0,
+                src,
+                src->ne[0]*src->ne[1],
+                src->ne[2],
+                src->ne[3],
+                src->nb[2],
+                src->nb[3],
+                0),
+            1, 0, 2, 3));
+        ggml_build_forward_expand(&gf, src);
+
+        pos_src = ggml_new_tensor_4d(ctx0, GGML_TYPE_F32, state.pe_img_dense->ne[0], state.pe_img_dense->ne[1], state.pe_img_dense->ne[2], tokens->ne[2]);
+        pos_src = ggml_repeat(ctx0,
+            state.pe_img_dense,
+            pos_src);
+
+        // flatten & permute
+        // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/transformer.py#L83
+        pos_src = ggml_cont(ctx0, ggml_permute(ctx0,
+            ggml_view_3d(ctx0,
+                pos_src,
+                pos_src->ne[0]*pos_src->ne[1],
+                pos_src->ne[2],
+                pos_src->ne[3],
+                pos_src->nb[2],
+                pos_src->nb[3],
+                0),
+            1, 0, 2, 3));
+        ggml_build_forward_expand(&gf, pos_src);
+    }
+
+    {
+        // Run the transformer
+        // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/transformer.py#L62
+
+        struct ggml_tensor * queries = tokens;
+        struct ggml_tensor * keys = src;
+        for (int i = 0; i < int(model.dec.transformer_layers.size()); ++i) {
+            const auto& tfm_layer = model.dec.transformer_layers[i];
+
+            // Self attention block
+            const bool skip_first_layer_pe = i == 0;
+            if (skip_first_layer_pe) {
+                queries = sam_decode_mask_transformer_attn(tfm_layer.self_attn, queries, queries, queries, ctx0, model);
+            }
+            else {
+                struct ggml_tensor * q_0 = ggml_add(ctx0, queries, tokens);
+
+                struct ggml_tensor * self_attn = sam_decode_mask_transformer_attn(tfm_layer.self_attn, q_0, q_0, queries, ctx0, model);
+                queries = ggml_add(ctx0, queries, self_attn);
+            }
+
+            queries = ggml_norm(ctx0, queries);
+            queries = ggml_add(ctx0,
+                    ggml_mul(ctx0,
+                        ggml_repeat(ctx0, tfm_layer.norm1_w, queries),
+                        queries),
+                    ggml_repeat(ctx0, tfm_layer.norm1_b, queries));
+
+            // Cross attention block, tokens attending to image embedding
+            struct ggml_tensor * q_1 = ggml_add(ctx0, queries, tokens);
+            struct ggml_tensor * k_1 = ggml_add(ctx0, keys, pos_src);
+
+            struct ggml_tensor * cross_attn_token_to_img = sam_decode_mask_transformer_attn(tfm_layer.cross_attn_token_to_img, q_1, k_1, keys, ctx0, model);
+
+            queries = ggml_add(ctx0, queries, cross_attn_token_to_img);
+            queries = ggml_norm(ctx0, queries);
+            queries = ggml_add(ctx0,
+                    ggml_mul(ctx0,
+                        ggml_repeat(ctx0, tfm_layer.norm2_w, queries),
+                        queries),
+                    ggml_repeat(ctx0, tfm_layer.norm2_b, queries));
+
+            // MLP block
+            struct ggml_tensor * mlp_out = ggml_mul_mat(ctx0,
+                tfm_layer.mlp_lin1_w,
+                queries);
+
+            mlp_out = ggml_add(ctx0,
+                    ggml_repeat(ctx0, tfm_layer.mlp_lin1_b, mlp_out),
+                    mlp_out);
+
+            // RELU activation
+            mlp_out = ggml_relu(ctx0, mlp_out);
+            mlp_out = ggml_mul_mat(ctx0,
+                    tfm_layer.mlp_lin2_w,
+                    mlp_out);
+
+            mlp_out = ggml_add(ctx0,
+                    ggml_repeat(ctx0, tfm_layer.mlp_lin2_b, mlp_out),
+                    mlp_out);
+
+            queries = ggml_add(ctx0, queries, mlp_out);
+            queries = ggml_norm(ctx0, queries);
+            queries = ggml_add(ctx0,
+                    ggml_mul(ctx0,
+                        ggml_repeat(ctx0, tfm_layer.norm3_w, queries),
+                        queries),
+                    ggml_repeat(ctx0, tfm_layer.norm3_b, queries));
+
+            // Cross attention block, image embedding attending to tokens
+            struct ggml_tensor * q_2 = ggml_add(ctx0, queries, tokens);
+            struct ggml_tensor * k_2 = ggml_add(ctx0, keys, pos_src);
+
+            struct ggml_tensor * cross_attn_img_to_token = sam_decode_mask_transformer_attn(tfm_layer.cross_attn_img_to_token, k_2, q_2, queries, ctx0, model);
+            keys = ggml_add(ctx0, keys, cross_attn_img_to_token);
+            keys = ggml_norm(ctx0, keys);
+            keys = ggml_add(ctx0,
+                    ggml_mul(ctx0,
+                        ggml_repeat(ctx0, tfm_layer.norm4_w, keys),
+                        keys),
+                    ggml_repeat(ctx0, tfm_layer.norm4_b, keys));
+        }
+
+        // Apply the final attention layer from the points to the image
+        struct ggml_tensor * q = ggml_add(ctx0, queries, tokens);
+        struct ggml_tensor * k = ggml_add(ctx0, keys, pos_src);
+
+        struct ggml_tensor * final_attn_token_to_img = sam_decode_mask_transformer_attn(dec.transformer_final_attn_token_to_img, q, k, keys, ctx0, model);
+
+        queries = ggml_add(ctx0, queries, final_attn_token_to_img);
+        queries = ggml_norm(ctx0, queries);
+        queries = ggml_add(ctx0,
+                ggml_mul(ctx0,
+                    ggml_repeat(ctx0, dec.transformer_norm_final_w, queries),
+                    queries),
+                ggml_repeat(ctx0, dec.transformer_norm_final_b, queries));
+
+        ggml_set_name(queries, "queries");
+        ggml_set_name(keys, "keys");
+
+        ggml_build_forward_expand(&gf, queries);
+        ggml_build_forward_expand(&gf, keys);
+
+        ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
+    }
+
+    // // run the computation
+    // ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
+
+    auto * t = ggml_get_tensor(ctx0, "queries");
+        print_t_f32("queries", t);
+    t = ggml_get_tensor(ctx0, "keys");
+    print_t_f32("keys", t);
 
     return true;
 }
