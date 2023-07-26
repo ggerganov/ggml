@@ -1665,6 +1665,37 @@ struct ggml_tensor* sam_decode_mask_transformer_attn(
     return KQV_merged;
 }
 
+struct ggml_tensor * sam_decode_mask_mlp_relu_3(
+     struct ggml_tensor * in,
+     struct ggml_tensor * w_0,
+     struct ggml_tensor * b_0,
+     struct ggml_tensor * w_1,
+     struct ggml_tensor * b_1,
+     struct ggml_tensor * w_2,
+     struct ggml_tensor * b_2,
+    struct ggml_context * ctx0) {
+
+    struct ggml_tensor * cur = {};
+    cur = ggml_mul_mat(ctx0, w_0, in);
+    cur = ggml_add(ctx0,
+            ggml_repeat(ctx0, b_0, cur),
+            cur);
+    cur = ggml_relu(ctx0, cur);
+
+    cur = ggml_mul_mat(ctx0, w_1, cur);
+    cur = ggml_add(ctx0,
+            ggml_repeat(ctx0, b_1, cur),
+            cur);
+    cur = ggml_relu(ctx0, cur);
+
+    cur = ggml_mul_mat(ctx0, w_2, cur);
+    cur = ggml_add(ctx0,
+            ggml_repeat(ctx0, b_2, cur),
+            cur);
+
+    return cur;
+}
+
 bool sam_decode_mask(
         const sam_model     & model,
                   sam_state & state,
@@ -1672,6 +1703,7 @@ bool sam_decode_mask(
 
     const auto & hparams = model.hparams;
     const auto & dec = model.dec;
+    const int n_img_embd = hparams.n_img_embd();
 
     static size_t buf_size = 256u*1024*1024;
     static void * buf = malloc(buf_size);
@@ -1730,6 +1762,7 @@ bool sam_decode_mask(
 
     struct ggml_tensor * src = {};
     struct ggml_tensor * pos_src = {};
+    int srcNE[4] = { 0, 0, 0, 0 };
     {
         // Expand per-image data in the batch direction to be per-mask
         // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/mask_decoder.py#L125
@@ -1739,6 +1772,11 @@ bool sam_decode_mask(
                 state.embd_img,
                 src),
             state.embd_prompt_dense);
+
+        srcNE[0] = src->ne[0];
+        srcNE[1] = src->ne[1];
+        srcNE[2] = src->ne[2];
+        srcNE[3] = src->ne[3];
 
         // flatten & permute
         // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/transformer.py#L83
@@ -1774,16 +1812,16 @@ bool sam_decode_mask(
         ggml_build_forward_expand(&gf, pos_src);
     }
 
+    struct ggml_tensor * queries = tokens;
+    struct ggml_tensor * keys = src;
     {
         // Run the transformer
         // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/transformer.py#L62
-
-        struct ggml_tensor * queries = tokens;
-        struct ggml_tensor * keys = src;
         for (int i = 0; i < int(model.dec.transformer_layers.size()); ++i) {
             const auto& tfm_layer = model.dec.transformer_layers[i];
 
             // Self attention block
+            // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/transformer.py#L154
             const bool skip_first_layer_pe = i == 0;
             if (skip_first_layer_pe) {
                 queries = sam_decode_mask_transformer_attn(tfm_layer.self_attn, queries, queries, queries, ctx0, model);
@@ -1803,6 +1841,7 @@ bool sam_decode_mask(
                     ggml_repeat(ctx0, tfm_layer.norm1_b, queries));
 
             // Cross attention block, tokens attending to image embedding
+            // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/transformer.py#L163
             struct ggml_tensor * q_1 = ggml_add(ctx0, queries, tokens);
             struct ggml_tensor * k_1 = ggml_add(ctx0, keys, pos_src);
 
@@ -1817,6 +1856,7 @@ bool sam_decode_mask(
                     ggml_repeat(ctx0, tfm_layer.norm2_b, queries));
 
             // MLP block
+            // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/transformer.py#L170
             struct ggml_tensor * mlp_out = ggml_mul_mat(ctx0,
                 tfm_layer.mlp_lin1_w,
                 queries);
@@ -1844,6 +1884,7 @@ bool sam_decode_mask(
                     ggml_repeat(ctx0, tfm_layer.norm3_b, queries));
 
             // Cross attention block, image embedding attending to tokens
+            // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/transformer.py#L175
             struct ggml_tensor * q_2 = ggml_add(ctx0, queries, tokens);
             struct ggml_tensor * k_2 = ggml_add(ctx0, keys, pos_src);
 
@@ -1858,6 +1899,7 @@ bool sam_decode_mask(
         }
 
         // Apply the final attention layer from the points to the image
+        // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/transformer.py#L99
         struct ggml_tensor * q = ggml_add(ctx0, queries, tokens);
         struct ggml_tensor * k = ggml_add(ctx0, keys, pos_src);
 
@@ -1870,24 +1912,53 @@ bool sam_decode_mask(
                     ggml_repeat(ctx0, dec.transformer_norm_final_w, queries),
                     queries),
                 ggml_repeat(ctx0, dec.transformer_norm_final_b, queries));
-
-        ggml_set_name(queries, "queries");
-        ggml_set_name(keys, "keys");
-
-        ggml_build_forward_expand(&gf, queries);
-        ggml_build_forward_expand(&gf, keys);
-
-        ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
     }
 
-    // // run the computation
-    // ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
+    struct ggml_tensor * iou_pred = ggml_view_2d(ctx0, queries, queries->ne[0], queries->ne[2], queries->nb[2], 0);
+    const int num_mask_tokens = 4; // num_multimask_outputs + 1
+    struct ggml_tensor * mask_tokens_out = ggml_view_3d(ctx0, queries, queries->ne[0], num_mask_tokens, queries->ne[2], queries->nb[1], num_mask_tokens*queries->nb[1], queries->nb[1]);
+
+    // Upscale mask embeddings and predict masks using the mask tokens
+    // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/mask_decoder.py#L136
+    keys = ggml_cont(ctx0, ggml_transpose(ctx0, keys));
+    keys = ggml_view_4d(ctx0, keys, srcNE[0], srcNE[1], srcNE[2], srcNE[3], srcNE[0]*keys->nb[0], keys->nb[1], keys->nb[2], 0);
+    // TODO: In order to implement the output_upscaling we need implementation of the
+    // PyTorch nn.ConvTranspose2d(). LayerNorm2d is already done in the image_encoder part
+    struct ggml_tensor * hyper_in = ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_img_embd/2, num_mask_tokens, mask_tokens_out->ne[2]);
+    for (int i = 0; i < num_mask_tokens; ++i) {
+        const auto& mlp = dec.output_hypernet_mlps[i];
+        struct ggml_tensor * in = ggml_view_2d(ctx0, mask_tokens_out, mask_tokens_out->ne[0], mask_tokens_out->ne[2], mask_tokens_out->nb[1], i*mask_tokens_out->nb[1]);
+        struct ggml_tensor * out = sam_decode_mask_mlp_relu_3(in, mlp.w_0, mlp.b_0, mlp.w_1, mlp.b_1, mlp.w_2, mlp.b_2, ctx0);
+        ggml_build_forward_expand(&gf, ggml_cpy(ctx0, out, ggml_view_2d(ctx0, hyper_in, hyper_in->ne[0], hyper_in->ne[2], hyper_in->nb[1], i*hyper_in->nb[1])));
+    }
+
+    // Generate mask quality predictions
+    // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/mask_decoder.py#L146
+    iou_pred = sam_decode_mask_mlp_relu_3(iou_pred, dec.iou_prediction_head_0_w, dec.iou_prediction_head_0_b, dec.iou_prediction_head_1_w, dec.iou_prediction_head_1_b, dec.iou_prediction_head_2_w, dec.iou_prediction_head_2_b, ctx0);
+
+    ggml_set_name(queries, "queries");
+    ggml_set_name(keys, "keys");
+    ggml_set_name(iou_pred, "iou_pred");
+    ggml_set_name(hyper_in, "hyper_in");
+
+    ggml_build_forward_expand(&gf, queries);
+    ggml_build_forward_expand(&gf, keys);
+    ggml_build_forward_expand(&gf, iou_pred);
+    ggml_build_forward_expand(&gf, hyper_in);
+
+    // run the computation
+    ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
     auto * t = ggml_get_tensor(ctx0, "queries");
-        print_t_f32("queries", t);
+    print_t_f32("queries", t);
     t = ggml_get_tensor(ctx0, "keys");
     print_t_f32("keys", t);
+    t = ggml_get_tensor(ctx0, "iou_pred");
+    print_t_f32("iou_pred", t);
+    t = ggml_get_tensor(ctx0, "hyper_in");
+    print_t_f32("hyper_in", t);
 
+    ggml_free(ctx0);
     return true;
 }
 
