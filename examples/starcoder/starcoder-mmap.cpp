@@ -198,9 +198,6 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
     std::vector<char> f_buf(1024*1024);
     fin.rdbuf()->pubsetbuf(f_buf.data(), f_buf.size());
 
-    fin.seekg(0, fin.end);
-    const size_t file_size = fin.tellg();
-    fin.seekg(0);
 
     // verify magic
     {
@@ -303,8 +300,10 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
     {
         const auto & hparams = model.hparams;
 
+        const int n_layer = hparams.n_layer;
 
 
+        /*
         const int n_embd  = hparams.n_embd;
         const int n_layer = hparams.n_layer;
         const int n_ctx   = hparams.n_ctx;
@@ -315,7 +314,6 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
         const int kv_dim   = kv_heads * head_dim;
 
 
-        /*
         ctx_size += n_embd*ggml_type_sizef(GGML_TYPE_F32); // ln_f_g
         ctx_size += n_embd*ggml_type_sizef(GGML_TYPE_F32); // ln_f_b
 
@@ -347,8 +345,7 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
 
         ctx_size += (6 + 12*n_layer)*512; // object overhead
 
-        //printf("%s: ggml ctx size = %6.2f MB\n", __func__, ctx_size/(1024.0*1024.0));
-        printf("%s: ggml ctx size = %6.2f MB\n", __func__, ctx_size/(1024.0));
+        printf("%s: ggml ctx size = %6.2f MB\n", __func__, ctx_size/(1024.0*1024.0));
     }
 
     // create the ggml context
