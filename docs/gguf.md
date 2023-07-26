@@ -165,11 +165,11 @@ struct gguf_file_t {
     // The header of the file.
     gguf_header_t header;
 
-    // Padding to the nearest multiple of `ALIGNMENT`.
-    uint8_t _padding[ALIGNMENT - (sizeof(header) % ALIGNMENT)];
-
     // Tensor infos, which can be used to locate the tensor data.
     gguf_tensor_info_t tensor_infos[header.tensor_count];
+
+    // Padding to the nearest multiple of `ALIGNMENT`.
+    uint8_t _padding[ALIGNMENT - (sizeof(header + tensor_infos) % ALIGNMENT)];
 
     // Tensor data.
     //
