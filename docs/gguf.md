@@ -456,12 +456,6 @@ This is a future extension and still needs to be discussed, and may necessitate 
 
 A sample computation graph of GGML nodes could be included in the model itself, allowing an executor to run the model without providing its own implementation of the architecture. This would allow for a more consistent experience across executors, and would allow for more complex architectures to be supported without requiring the executor to implement them.
 
-## Migration
-
-All existing Python conversion scripts will be consolidated to use one `gguf` library. They will take models from Hugging Face or elsewhere and produce compliant GGUF files with all of the recommended metadata.
-
-Existing models do not have enough information to be directly converted to GGUF. Instead, a migration tool may be built that takes an existing GGML/GGMF/GGJT file and prompts the user for the missing information. This tool will be executor-agnostic, and will be able to produce a GGUF file that can be used by any executor. This tool may hardcode settings for models with known hashes to ease the migration process, such that a user can run `./migrate nous-hermes-13b.ggmlv3.q5_1.bin` and obtain a `nous-hermes-13b.ggmlv3.q5_1.gguf` file that is ready to use and consistent with uploaded models.
-
 ---
 
 ## Current State of Affairs
