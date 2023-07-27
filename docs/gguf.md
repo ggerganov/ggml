@@ -157,6 +157,10 @@ struct gguf_tensor_info_t {
     // The type of the tensor.
     ggml_type type;
     // The offset of the tensor's data in this file in bytes.
+    // This offset is relative to `tensor_data`, not to the start
+    // of the file, to make it easier for writers to write the file.
+    // Readers should consider exposing this offset relative to the
+    // file to make it easier to read the data.
     // Must be a multiple of `ALIGNMENT`.
     uint64_t offset;
 };
