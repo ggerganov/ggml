@@ -28,7 +28,7 @@ Fields, including arrays, are written sequentially without alignment unless othe
 
 ```c
 enum ggml_type {
-    GGML_TYPE_float32  = 0,
+    GGML_TYPE_F32  = 0,
     GGML_TYPE_F16  = 1,
     GGML_TYPE_Q4_0 = 2,
     GGML_TYPE_Q4_1 = 3,
