@@ -342,6 +342,7 @@ extern "C" {
         GGML_OP_REPEAT_BACK,
         GGML_OP_SILU_BACK,
         GGML_OP_NORM, // normalize
+        GGML_OP_GROUP_NORM,
         GGML_OP_RMS_NORM,
         GGML_OP_RMS_NORM_BACK,
 
@@ -899,6 +900,18 @@ extern "C" {
     GGML_API struct ggml_tensor * ggml_norm_inplace(
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
+    
+    // group normalize along ne0*ne1*n_groups
+    // TODO: eps is hardcoded to 1e-6 for now
+    GGML_API struct ggml_tensor * ggml_group_norm(
+        struct ggml_context * ctx,
+        struct ggml_tensor * a,
+        int n_groups);
+
+    GGML_API struct ggml_tensor * ggml_group_norm_inplace(
+        struct ggml_context * ctx,
+        struct ggml_tensor * a,
+        int n_groups);
 
     GGML_API struct ggml_tensor * ggml_rms_norm(
             struct ggml_context * ctx,
