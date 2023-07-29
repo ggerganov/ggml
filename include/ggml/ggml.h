@@ -374,6 +374,8 @@ extern "C" {
         GGML_OP_POOL_1D,
         GGML_OP_POOL_2D,
 
+        GGML_OP_UPSCALE, // nearest interpolate
+
         GGML_OP_FLASH_ATTN,
         GGML_OP_FLASH_FF,
         GGML_OP_FLASH_ATTN_BACK,
@@ -1335,6 +1337,12 @@ extern "C" {
             int                   s1,
             int                   p0,
             int                   p1);
+
+    // nearest interpolate
+    GGML_API struct ggml_tensor * ggml_upscale(
+            struct ggml_context * ctx,
+            struct ggml_tensor * a,
+            int scale_factor);
 
     GGML_API struct ggml_tensor * ggml_flash_attn(
             struct ggml_context * ctx,
