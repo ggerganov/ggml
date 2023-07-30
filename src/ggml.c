@@ -3811,7 +3811,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS_BACK",
 };
 
-static_assert(GGML_OP_COUNT == 59, "GGML_OP_COUNT != 59");
+static_assert(GGML_OP_COUNT == 62, "GGML_OP_COUNT != 62");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -3883,7 +3883,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "cross_entropy_loss_back(x,y)",
 };
 
-static_assert(GGML_OP_COUNT == 59, "GGML_OP_COUNT != 59");
+static_assert(GGML_OP_COUNT == 62, "GGML_OP_COUNT != 62");
 
 static_assert(GGML_OP_POOL_COUNT == 2, "GGML_OP_POOL_COUNT != 2");
 
@@ -4253,7 +4253,7 @@ static inline bool ggml_is_padded_1d(const struct ggml_tensor * tensor) {
         tensor->nb[3] == tensor->nb[2]*tensor->ne[2];
 }
 
-static inline bool ggml_are_same_shape(const struct ggml_tensor * t0, const struct ggml_tensor * t1) {
+bool ggml_are_same_shape(const struct ggml_tensor * t0, const struct ggml_tensor * t1) {
     static_assert(GGML_MAX_DIMS == 4, "GGML_MAX_DIMS is not 4 - update this function");
 
     return
@@ -4630,6 +4630,11 @@ static struct ggml_tensor * ggml_new_tensor_impl(
     ctx->n_objects++;
 
     return result;
+}
+
+static void ggml_get_op_params(const struct ggml_tensor * tensor, void * params, size_t params_size) {
+    assert(params_size <= GGML_MAX_OP_PARAMS);
+    memcpy(params, tensor->op_params, params_size);
 }
 
 static void ggml_set_op_params(struct ggml_tensor * tensor, const void * params, size_t params_size) {
@@ -6871,7 +6876,8 @@ GGML_API struct ggml_tensor * ggml_conv_1d(
         ggml_calc_conv_output_size(b->ne[0], a->ne[0], s0, p0, d0),
         a->ne[2], 1, 1,
     };
-    struct ggml_tensor* result = ggml_new_tensor(ctx, GGML_TYPE_F32, 2, ne);
+
+    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 2, ne);
 
     int32_t params[] = { s0, p0, d0 };
     ggml_set_op_params(result, &params, sizeof(params));
@@ -6886,7 +6892,7 @@ GGML_API struct ggml_tensor * ggml_conv_1d(
 
 // ggml_conv_2d
 
-struct ggml_tensor* ggml_conv_2d(
+struct ggml_tensor * ggml_conv_2d(
     struct ggml_context* ctx,
     struct ggml_tensor * a,
     struct ggml_tensor * b,
@@ -6910,7 +6916,8 @@ struct ggml_tensor* ggml_conv_2d(
         ggml_calc_conv_output_size(b->ne[1], a->ne[1], s1, p1, d1),
         a->ne[3], b->ne[3],
     };
-    struct ggml_tensor* result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
+
+    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
 
     int32_t params[] = { s0, s1, p0, p1, d0, d1 };
     ggml_set_op_params(result, &params, sizeof(params));
@@ -6926,7 +6933,7 @@ struct ggml_tensor* ggml_conv_2d(
 
 // ggml_conv_1d_ph
 
-struct ggml_tensor* ggml_conv_1d_ph(
+struct ggml_tensor * ggml_conv_1d_ph(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * b,
@@ -6944,7 +6951,7 @@ static int64_t ggml_calc_pool_output_size(int64_t ins, int ks, int s, int p) {
 
 // ggml_pool_1d
 
-struct ggml_tensor* ggml_pool_1d(
+struct ggml_tensor * ggml_pool_1d(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         enum ggml_op_pool     op,
@@ -6963,7 +6970,8 @@ struct ggml_tensor* ggml_pool_1d(
         ggml_calc_pool_output_size(a->ne[0], k0, s0, p0),
         a->ne[1],
     };
-    struct ggml_tensor* result = ggml_new_tensor(ctx, GGML_TYPE_F32, 2, ne);
+
+    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 2, ne);
 
     int32_t params[] = { op, k0, s0, p0 };
     ggml_set_op_params(result, &params, sizeof(params));
@@ -6977,7 +6985,7 @@ struct ggml_tensor* ggml_pool_1d(
 
 // ggml_pool_2d
 
-struct ggml_tensor* ggml_pool_2d(
+struct ggml_tensor * ggml_pool_2d(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         enum ggml_op_pool     op,
@@ -7000,7 +7008,8 @@ struct ggml_tensor* ggml_pool_2d(
         ggml_calc_pool_output_size(a->ne[1], k1, s1, p1),
         a->ne[2],
     };
-    struct ggml_tensor* result = ggml_new_tensor(ctx, GGML_TYPE_F32, 3, ne);
+
+    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 3, ne);
 
     int32_t params[] = { op, k0, k1, s0, s1, p0, p1 };
     ggml_set_op_params(result, &params, sizeof(params));
@@ -7330,7 +7339,7 @@ struct ggml_tensor * ggml_map_binary_inplace_f32(
     return ggml_map_binary_impl_f32(ctx, a, b, fun, true);
 }
 
-// ggml_map_custom1
+// ggml_map_custom1_f32
 
 static struct ggml_tensor * ggml_map_custom1_impl_f32(
         struct ggml_context          * ctx,
@@ -7347,7 +7356,7 @@ static struct ggml_tensor * ggml_map_custom1_impl_f32(
 
     ggml_set_op_params(result, (const void *) &fun, sizeof(fun));
 
-    result->op = GGML_OP_MAP_CUSTOM1;
+    result->op = GGML_OP_MAP_CUSTOM1_F32;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
 
@@ -7368,7 +7377,7 @@ struct ggml_tensor * ggml_map_custom1_inplace_f32(
     return ggml_map_custom1_impl_f32(ctx, a, fun, true);
 }
 
-// ggml_map_custom2
+// ggml_map_custom2_f32
 
 static struct ggml_tensor * ggml_map_custom2_impl_f32(
         struct ggml_context          * ctx,
@@ -7386,7 +7395,7 @@ static struct ggml_tensor * ggml_map_custom2_impl_f32(
 
     ggml_set_op_params(result, (const void *) &fun, sizeof(fun));
 
-    result->op = GGML_OP_MAP_CUSTOM2;
+    result->op = GGML_OP_MAP_CUSTOM2_F32;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = b;
@@ -7410,7 +7419,7 @@ struct ggml_tensor * ggml_map_custom2_inplace_f32(
     return ggml_map_custom2_impl_f32(ctx, a, b, fun, true);
 }
 
-// ggml_map_custom3
+// ggml_map_custom3_f32
 
 static struct ggml_tensor * ggml_map_custom3_impl_f32(
         struct ggml_context          * ctx,
@@ -7429,7 +7438,7 @@ static struct ggml_tensor * ggml_map_custom3_impl_f32(
 
     ggml_set_op_params(result, (const void *) &fun, sizeof(fun));
 
-    result->op = GGML_OP_MAP_CUSTOM3;
+    result->op = GGML_OP_MAP_CUSTOM3_F32;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = b;
@@ -7455,6 +7464,190 @@ struct ggml_tensor * ggml_map_custom3_inplace_f32(
         const  ggml_custom3_op_f32_t   fun) {
     return ggml_map_custom3_impl_f32(ctx, a, b, c, fun, true);
 }
+
+// ggml_map_custom1
+struct ggml_map_custom1_op_params {
+    ggml_custom1_op_t fun;
+    int n_tasks;
+    void * userdata;
+};
+
+static struct ggml_tensor * ggml_map_custom1_impl(
+        struct ggml_context          * ctx,
+        struct ggml_tensor           * a,
+        const  ggml_custom1_op_t       fun,
+        int                            n_tasks,
+        void                         * userdata,
+        bool                           inplace) {
+    GGML_ASSERT(n_tasks == GGML_N_TASKS_MAX || n_tasks > 0);
+
+    bool is_node = false;
+
+    if (!inplace && a->grad) {
+        is_node = true;
+    }
+
+    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
+
+    struct ggml_map_custom1_op_params params = {
+        /*.fun      =*/ fun,
+        /*.n_tasks  =*/ n_tasks,
+        /*.userdata =*/ userdata
+    };
+    ggml_set_op_params(result, (const void *) &params, sizeof(params));
+
+    result->op = GGML_OP_MAP_CUSTOM1;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->src[0] = a;
+
+    return result;
+}
+
+struct ggml_tensor * ggml_map_custom1(
+        struct ggml_context          * ctx,
+        struct ggml_tensor           * a,
+        const  ggml_custom1_op_t       fun,
+        int                            n_tasks,
+        void                         * userdata) {
+    return ggml_map_custom1_impl(ctx, a, fun, n_tasks, userdata, false);
+}
+
+struct ggml_tensor * ggml_map_custom1_inplace(
+        struct ggml_context          * ctx,
+        struct ggml_tensor           * a,
+        const  ggml_custom1_op_t       fun,
+        int                            n_tasks,
+        void                         * userdata) {
+    return ggml_map_custom1_impl(ctx, a, fun, n_tasks, userdata, true);
+}
+
+// ggml_map_custom2
+
+struct ggml_map_custom2_op_params {
+    ggml_custom2_op_t fun;
+    int n_tasks;
+    void * userdata;
+};
+
+static struct ggml_tensor * ggml_map_custom2_impl(
+        struct ggml_context          * ctx,
+        struct ggml_tensor           * a,
+        struct ggml_tensor           * b,
+        const  ggml_custom2_op_t       fun,
+        int                            n_tasks,
+        void                         * userdata,
+        bool                           inplace) {
+    GGML_ASSERT(n_tasks == GGML_N_TASKS_MAX || n_tasks > 0);
+
+    bool is_node = false;
+
+    if (!inplace && (a->grad || b->grad)) {
+        is_node = true;
+    }
+
+    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
+
+    struct ggml_map_custom2_op_params params = {
+        /*.fun      =*/ fun,
+        /*.n_tasks  =*/ n_tasks,
+        /*.userdata =*/ userdata
+    };
+    ggml_set_op_params(result, (const void *) &params, sizeof(params));
+
+    result->op = GGML_OP_MAP_CUSTOM2;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->src[0] = a;
+    result->src[1] = b;
+
+    return result;
+}
+
+struct ggml_tensor * ggml_map_custom2(
+        struct ggml_context          * ctx,
+        struct ggml_tensor           * a,
+        struct ggml_tensor           * b,
+        const  ggml_custom2_op_t       fun,
+        int                            n_tasks,
+        void                         * userdata) {
+    return ggml_map_custom2_impl(ctx, a, b, fun, n_tasks, userdata, false);
+}
+
+struct ggml_tensor * ggml_map_custom2_inplace(
+        struct ggml_context          * ctx,
+        struct ggml_tensor           * a,
+        struct ggml_tensor           * b,
+        const  ggml_custom2_op_t       fun,
+        int                            n_tasks,
+        void                         * userdata) {
+    return ggml_map_custom2_impl(ctx, a, b, fun, n_tasks, userdata, true);
+}
+
+// ggml_map_custom3
+
+struct ggml_map_custom3_op_params {
+    ggml_custom3_op_t fun;
+    int n_tasks;
+    void * userdata;
+};
+
+static struct ggml_tensor * ggml_map_custom3_impl(
+        struct ggml_context          * ctx,
+        struct ggml_tensor           * a,
+        struct ggml_tensor           * b,
+        struct ggml_tensor           * c,
+        const  ggml_custom3_op_t       fun,
+        int                            n_tasks,
+        void                         * userdata,
+        bool                           inplace) {
+    GGML_ASSERT(n_tasks == GGML_N_TASKS_MAX || n_tasks > 0);
+
+    bool is_node = false;
+
+    if (!inplace && (a->grad || b->grad || c->grad)) {
+        is_node = true;
+    }
+
+    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
+
+    struct ggml_map_custom3_op_params params = {
+        /*.fun      =*/ fun,
+        /*.n_tasks  =*/ n_tasks,
+        /*.userdata =*/ userdata
+    };
+    ggml_set_op_params(result, (const void *) &params, sizeof(params));
+
+    result->op = GGML_OP_MAP_CUSTOM3;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->src[0] = a;
+    result->src[1] = b;
+    result->src[2] = c;
+
+    return result;
+}
+
+struct ggml_tensor * ggml_map_custom3(
+        struct ggml_context          * ctx,
+        struct ggml_tensor           * a,
+        struct ggml_tensor           * b,
+        struct ggml_tensor           * c,
+        const  ggml_custom3_op_t       fun,
+        int                            n_tasks,
+        void                         * userdata) {
+    return ggml_map_custom3_impl(ctx, a, b, c, fun, n_tasks, userdata, false);
+}
+
+struct ggml_tensor * ggml_map_custom3_inplace(
+        struct ggml_context          * ctx,
+        struct ggml_tensor           * a,
+        struct ggml_tensor           * b,
+        struct ggml_tensor           * c,
+        const  ggml_custom3_op_t       fun,
+        int                            n_tasks,
+        void                         * userdata) {
+    return ggml_map_custom3_impl(ctx, a, b, c, fun, n_tasks, userdata, true);
+}
+
+
 
 // ggml_cross_entropy_loss
 
@@ -14208,24 +14401,6 @@ static void ggml_compute_forward_map_custom1_f32(
     fun(dst, a);
 }
 
-
-static void ggml_compute_forward_map_custom1(
-        const struct ggml_compute_params * params,
-        const struct ggml_tensor * a,
-        struct ggml_tensor * dst,
-        const ggml_custom1_op_f32_t fun) {
-    switch (a->type) {
-        case GGML_TYPE_F32:
-            {
-                ggml_compute_forward_map_custom1_f32(params, a, dst, fun);
-            } break;
-        default:
-            {
-                GGML_ASSERT(false);
-            } break;
-    }
-}
-
 // ggml_compute_forward_map_custom2
 
 static void ggml_compute_forward_map_custom2_f32(
@@ -14243,24 +14418,6 @@ static void ggml_compute_forward_map_custom2_f32(
     fun(dst, a, b);
 }
 
-
-static void ggml_compute_forward_map_custom2(
-        const struct ggml_compute_params * params,
-        const struct ggml_tensor * a,
-        const struct ggml_tensor * b,
-        struct ggml_tensor * dst,
-        const ggml_custom2_op_f32_t fun) {
-    switch (a->type) {
-        case GGML_TYPE_F32:
-            {
-                ggml_compute_forward_map_custom2_f32(params, a, b, dst, fun);
-            } break;
-        default:
-            {
-                GGML_ASSERT(false);
-            } break;
-    }
-}
 
 // ggml_compute_forward_map_custom3
 
@@ -14280,24 +14437,52 @@ static void ggml_compute_forward_map_custom3_f32(
     fun(dst, a, b, c);
 }
 
+// ggml_compute_forward_map_custom1
+
+static void ggml_compute_forward_map_custom1(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * a,
+              struct ggml_tensor * dst) {
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+        return;
+    }
+
+    struct ggml_map_custom1_op_params * p = (struct ggml_map_custom1_op_params *) dst->op_params;
+
+    p->fun(dst, a, params->ith, params->nth, p->userdata);
+}
+
+// ggml_compute_forward_map_custom2
+
+static void ggml_compute_forward_map_custom2(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * a,
+        const struct ggml_tensor * b,
+              struct ggml_tensor * dst) {
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+        return;
+    }
+
+    struct ggml_map_custom2_op_params * p = (struct ggml_map_custom2_op_params *) dst->op_params;
+
+    p->fun(dst, a, b, params->ith, params->nth, p->userdata);
+}
+
+// ggml_compute_forward_map_custom3
 
 static void ggml_compute_forward_map_custom3(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * a,
         const struct ggml_tensor * b,
         const struct ggml_tensor * c,
-        struct ggml_tensor * dst,
-        const ggml_custom3_op_f32_t fun) {
-    switch (a->type) {
-        case GGML_TYPE_F32:
-            {
-                ggml_compute_forward_map_custom3_f32(params, a, b, c, dst, fun);
-            } break;
-        default:
-            {
-                GGML_ASSERT(false);
-            } break;
+              struct ggml_tensor * dst) {
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+        return;
     }
+
+    struct ggml_map_custom3_op_params * p = (struct ggml_map_custom3_op_params *) dst->op_params;
+
+    p->fun(dst, a, b, c, params->ith, params->nth, p->userdata);
 }
 
 // ggml_compute_forward_cross_entropy_loss
@@ -14819,25 +15004,40 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
                 ggml_compute_forward_map_binary(params, tensor->src[0], tensor->src[1], tensor, fun);
             }
             break;
-        case GGML_OP_MAP_CUSTOM1:
+        case GGML_OP_MAP_CUSTOM1_F32:
             {
                 ggml_custom1_op_f32_t fun;
                 memcpy(&fun, tensor->op_params, sizeof(fun));
-                ggml_compute_forward_map_custom1(params, tensor->src[0], tensor, fun);
+                ggml_compute_forward_map_custom1_f32(params, tensor->src[0], tensor, fun);
+            }
+            break;
+        case GGML_OP_MAP_CUSTOM2_F32:
+            {
+                ggml_custom2_op_f32_t fun;
+                memcpy(&fun, tensor->op_params, sizeof(fun));
+                ggml_compute_forward_map_custom2_f32(params, tensor->src[0], tensor->src[1], tensor, fun);
+            }
+            break;
+        case GGML_OP_MAP_CUSTOM3_F32:
+            {
+                ggml_custom3_op_f32_t fun;
+                memcpy(&fun, tensor->op_params, sizeof(fun));
+                ggml_compute_forward_map_custom3_f32(params, tensor->src[0], tensor->src[1], tensor->src[2], tensor, fun);
+            }
+            break;
+        case GGML_OP_MAP_CUSTOM1:
+            {
+                ggml_compute_forward_map_custom1(params, tensor->src[0], tensor);
             }
             break;
         case GGML_OP_MAP_CUSTOM2:
             {
-                ggml_custom2_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
-                ggml_compute_forward_map_custom2(params, tensor->src[0], tensor->src[1], tensor, fun);
+                ggml_compute_forward_map_custom2(params, tensor->src[0], tensor->src[1], tensor);
             }
             break;
         case GGML_OP_MAP_CUSTOM3:
             {
-                ggml_custom3_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
-                ggml_compute_forward_map_custom3(params, tensor->src[0], tensor->src[1], tensor->src[2], tensor, fun);
+                ggml_compute_forward_map_custom3(params, tensor->src[0], tensor->src[1], tensor->src[2], tensor);
             }
             break;
         case GGML_OP_CROSS_ENTROPY_LOSS:
@@ -15645,6 +15845,9 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             } break;
         case GGML_OP_MAP_UNARY:
         case GGML_OP_MAP_BINARY:
+        case GGML_OP_MAP_CUSTOM1_F32:
+        case GGML_OP_MAP_CUSTOM2_F32:
+        case GGML_OP_MAP_CUSTOM3_F32:
         case GGML_OP_MAP_CUSTOM1:
         case GGML_OP_MAP_CUSTOM2:
         case GGML_OP_MAP_CUSTOM3:
@@ -16401,11 +16604,38 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
             case GGML_OP_WIN_UNPART:
             case GGML_OP_MAP_UNARY:
             case GGML_OP_MAP_BINARY:
-            case GGML_OP_MAP_CUSTOM1:
-            case GGML_OP_MAP_CUSTOM2:
-            case GGML_OP_MAP_CUSTOM3:
+            case GGML_OP_MAP_CUSTOM1_F32:
+            case GGML_OP_MAP_CUSTOM2_F32:
+            case GGML_OP_MAP_CUSTOM3_F32:
                 {
                     n_tasks = 1;
+                } break;
+            case GGML_OP_MAP_CUSTOM1:
+                {
+                    struct ggml_map_custom1_op_params * p = (struct ggml_map_custom1_op_params *) node->op_params;
+                    if (p->n_tasks == GGML_N_TASKS_MAX) {
+                        n_tasks = n_threads;
+                    } else {
+                        n_tasks = MIN(p->n_tasks, n_threads);
+                    }
+                } break;
+            case GGML_OP_MAP_CUSTOM2:
+                {
+                    struct ggml_map_custom2_op_params * p = (struct ggml_map_custom2_op_params *) node->op_params;
+                    if (p->n_tasks == GGML_N_TASKS_MAX) {
+                        n_tasks = n_threads;
+                    } else {
+                        n_tasks = MIN(p->n_tasks, n_threads);
+                    }
+                } break;
+            case GGML_OP_MAP_CUSTOM3:
+                {
+                    struct ggml_map_custom3_op_params * p = (struct ggml_map_custom3_op_params *) node->op_params;
+                    if (p->n_tasks == GGML_N_TASKS_MAX) {
+                        n_tasks = n_threads;
+                    } else {
+                        n_tasks = MIN(p->n_tasks, n_threads);
+                    }
                 } break;
             case GGML_OP_CROSS_ENTROPY_LOSS:
                 {
