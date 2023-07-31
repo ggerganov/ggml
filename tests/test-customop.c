@@ -1,17 +1,14 @@
 #include "ggml/ggml.h"
-
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 
 #if defined(_WIN32)
-
 #include <windows.h>
 static LONG atomic_fetch_add(atomic_int * ptr, LONG inc) {
     return InterlockedExchangeAdd(ptr, inc);
 }
-
 #else
 #include <stdatomic.h>
 #endif
@@ -37,7 +34,6 @@ atomic_int g_custom3_count = 0;
 void custom1(struct ggml_tensor * dst , const struct ggml_tensor * a, int ith, int nth, void * userdata) {
     // check that the userdata is correct
     assert(userdata == NULL);
-
     assert(ggml_are_same_shape(dst, a));
 
     atomic_fetch_add(&g_custom1_count, 1);
@@ -45,6 +41,9 @@ void custom1(struct ggml_tensor * dst , const struct ggml_tensor * a, int ith, i
     const float * a_data = ggml_get_data_f32(a);
     float * dst_data = ggml_get_data_f32(dst);
 
+    // this assumes that the tensors are contiguous
+    assert(ggml_is_contiguous(dst));
+    assert(ggml_is_contiguous(a));
 
     // parallelize by elements
     const int ne = ggml_nelements(dst);
@@ -81,6 +80,11 @@ void custom2(struct ggml_tensor * dst , const struct ggml_tensor * a, const stru
     // number of columns
     const int nc = dst->ne[0];
 
+    // this assumes that the tensors are contiguous
+    assert(ggml_is_contiguous(dst));
+    assert(ggml_is_contiguous(a));
+    assert(ggml_is_contiguous(b));
+
     for (int ir = ir0; ir < ir1; ++ir) {
         for (int ic = 0; ic < nc; ++ic) {
             const int i = ir * nc + ic;
@@ -104,11 +108,17 @@ void custom3(struct ggml_tensor * dst , const struct ggml_tensor * a, const stru
     const float * c_data = ggml_get_data_f32(c);
     float * dst_data = ggml_get_data_f32(dst);
 
-
     // dont parallelize
     assert(ith == 0);
 
+    // number of elements
     const int ne = ggml_nelements(dst);
+
+    // this assumes that the tensors are contiguous
+    assert(ggml_is_contiguous(dst));
+    assert(ggml_is_contiguous(a));
+    assert(ggml_is_contiguous(b));
+    assert(ggml_is_contiguous(c));
 
     for (int i = 0; i < ne; ++i) {
         dst_data[i] = a_data[i] + b_data[i] + c_data[i];
@@ -131,6 +141,7 @@ int main(int argc, const char** argv) {
     }
 
     // map_custom1
+    // 2 tasks, no userdata, parallelized by elements
     {
         struct ggml_context * ctx = make_ctx();
         struct ggml_tensor * t = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 10, 2);
@@ -153,6 +164,7 @@ int main(int argc, const char** argv) {
     }
 
     // map_custom2
+    // max tasks (4), userdata, parallelized by rows
     {
         struct ggml_context * ctx = make_ctx();
         struct ggml_tensor * t1 = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 10, 2);
@@ -178,6 +190,7 @@ int main(int argc, const char** argv) {
     }
 
     // map_custom3
+    // 1 task, userdata, not parallelized
     {
         struct ggml_context * ctx = make_ctx();
         struct ggml_tensor * t1 = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 10, 2);
