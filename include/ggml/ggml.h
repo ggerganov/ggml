@@ -1395,60 +1395,61 @@ extern "C" {
                    ggml_custom3_op_f32_t   fun),
         "use ggml_map_custom3_inplace instead");
 
-// custom operators v2
-        typedef void (*ggml_custom1_op_t)(struct ggml_tensor * dst , const struct ggml_tensor * a, int ith, int nth, void * userdata);
-        typedef void (*ggml_custom2_op_t)(struct ggml_tensor * dst , const struct ggml_tensor * a, const struct ggml_tensor * b, int ith, int nth, void * userdata);
-        typedef void (*ggml_custom3_op_t)(struct ggml_tensor * dst , const struct ggml_tensor * a, const struct ggml_tensor * b, const struct ggml_tensor * c, int ith, int nth, void * userdata);
+    // custom operators v2
 
-        #define GGML_N_TASKS_MAX -1
+    typedef void (*ggml_custom1_op_t)(struct ggml_tensor * dst , const struct ggml_tensor * a, int ith, int nth, void * userdata);
+    typedef void (*ggml_custom2_op_t)(struct ggml_tensor * dst , const struct ggml_tensor * a, const struct ggml_tensor * b, int ith, int nth, void * userdata);
+    typedef void (*ggml_custom3_op_t)(struct ggml_tensor * dst , const struct ggml_tensor * a, const struct ggml_tensor * b, const struct ggml_tensor * c, int ith, int nth, void * userdata);
 
-        GGML_API struct ggml_tensor * ggml_map_custom1(
-                struct ggml_context   * ctx,
-                struct ggml_tensor    * a,
-                ggml_custom1_op_t       fun,
-                int                     n_tasks,
-                void                  * userdata);
+    #define GGML_N_TASKS_MAX -1
 
-        GGML_API struct ggml_tensor * ggml_map_custom1_inplace(
-                struct ggml_context   * ctx,
-                struct ggml_tensor    * a,
-                ggml_custom1_op_t       fun,
-                int                     n_tasks,
-                void                  * userdata);
+    GGML_API struct ggml_tensor * ggml_map_custom1(
+            struct ggml_context   * ctx,
+            struct ggml_tensor    * a,
+            ggml_custom1_op_t       fun,
+            int                     n_tasks,
+            void                  * userdata);
 
-        GGML_API struct ggml_tensor * ggml_map_custom2(
-                struct ggml_context   * ctx,
-                struct ggml_tensor    * a,
-                struct ggml_tensor    * b,
-                ggml_custom2_op_t       fun,
-                int                     n_tasks,
-                void                  * userdata);
+    GGML_API struct ggml_tensor * ggml_map_custom1_inplace(
+            struct ggml_context   * ctx,
+            struct ggml_tensor    * a,
+            ggml_custom1_op_t       fun,
+            int                     n_tasks,
+            void                  * userdata);
 
-        GGML_API struct ggml_tensor * ggml_map_custom2_inplace(
-                struct ggml_context   * ctx,
-                struct ggml_tensor    * a,
-                struct ggml_tensor    * b,
-                ggml_custom2_op_t       fun,
-                int                     n_tasks,
-                void                  * userdata);
+    GGML_API struct ggml_tensor * ggml_map_custom2(
+            struct ggml_context   * ctx,
+            struct ggml_tensor    * a,
+            struct ggml_tensor    * b,
+            ggml_custom2_op_t       fun,
+            int                     n_tasks,
+            void                  * userdata);
 
-        GGML_API struct ggml_tensor * ggml_map_custom3(
-                struct ggml_context   * ctx,
-                struct ggml_tensor    * a,
-                struct ggml_tensor    * b,
-                struct ggml_tensor    * c,
-                ggml_custom3_op_t       fun,
-                int                     n_tasks,
-                void                  * userdata);
+    GGML_API struct ggml_tensor * ggml_map_custom2_inplace(
+            struct ggml_context   * ctx,
+            struct ggml_tensor    * a,
+            struct ggml_tensor    * b,
+            ggml_custom2_op_t       fun,
+            int                     n_tasks,
+            void                  * userdata);
 
-        GGML_API struct ggml_tensor * ggml_map_custom3_inplace(
-                struct ggml_context   * ctx,
-                struct ggml_tensor    * a,
-                struct ggml_tensor    * b,
-                struct ggml_tensor    * c,
-                ggml_custom3_op_t       fun,
-                int                     n_tasks,
-                void                  * userdata);
+    GGML_API struct ggml_tensor * ggml_map_custom3(
+            struct ggml_context   * ctx,
+            struct ggml_tensor    * a,
+            struct ggml_tensor    * b,
+            struct ggml_tensor    * c,
+            ggml_custom3_op_t       fun,
+            int                     n_tasks,
+            void                  * userdata);
+
+    GGML_API struct ggml_tensor * ggml_map_custom3_inplace(
+            struct ggml_context   * ctx,
+            struct ggml_tensor    * a,
+            struct ggml_tensor    * b,
+            struct ggml_tensor    * c,
+            ggml_custom3_op_t       fun,
+            int                     n_tasks,
+            void                  * userdata);
 
     // loss function
 
