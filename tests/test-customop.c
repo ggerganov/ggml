@@ -6,6 +6,7 @@
 
 #if defined(_WIN32)
 #include <windows.h>
+typedef volatile LONG atomic_int;
 static LONG atomic_fetch_add(atomic_int * ptr, LONG inc) {
     return InterlockedExchangeAdd(ptr, inc);
 }
@@ -46,7 +47,7 @@ void custom1(struct ggml_tensor * dst , const struct ggml_tensor * a, int ith, i
     assert(ggml_is_contiguous(a));
 
     // parallelize by elements
-    const int ne = ggml_nelements(dst);
+    const int ne = (int)ggml_nelements(dst);
     const int dr = (ne + nth - 1) / nth;
     const int ie0 = dr * ith;
     const int ie1 = MIN(ie0 + dr, ne);
@@ -70,7 +71,7 @@ void custom2(struct ggml_tensor * dst , const struct ggml_tensor * a, const stru
     float * dst_data = ggml_get_data_f32(dst);
 
     // parallelize by rows
-    const int nr = ggml_nrows(dst);
+    const int nr = (int)ggml_nrows(dst);
     // number of rows per thread
     const int dr = (nr + nth - 1) / nth;
     // row range for this thread
@@ -78,7 +79,7 @@ void custom2(struct ggml_tensor * dst , const struct ggml_tensor * a, const stru
     const int ir1 = MIN(ir0 + dr, nr);
 
     // number of columns
-    const int nc = dst->ne[0];
+    const int nc = (int)dst->ne[0];
 
     // this assumes that the tensors are contiguous
     assert(ggml_is_contiguous(dst));
@@ -112,7 +113,7 @@ void custom3(struct ggml_tensor * dst , const struct ggml_tensor * a, const stru
     assert(ith == 0);
 
     // number of elements
-    const int ne = ggml_nelements(dst);
+    const int ne = (int)ggml_nelements(dst);
 
     // this assumes that the tensors are contiguous
     assert(ggml_is_contiguous(dst));
