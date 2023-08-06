@@ -20,11 +20,9 @@ The key difference between GGJT and GGUF is the use of a key-value structure for
 
 ### File Structure
 
-GGUF files are structured as follows. They assume the use of a global `ALIGNMENT` constant, which is the alignment of the model data. This is currently 64 bytes, but may change in the future. [^1] To achieve this, where relevant, the file is padded with `0x00` bytes to the next multiple of `ALIGNMENT`.
+GGUF files are structured as follows. They use a global alignment specified in the `general.alignment` metadata field. Where required, the file is padded with `0x00` bytes to the next multiple of `general.alignment`.
 
 Fields, including arrays, are written sequentially without alignment unless otherwise specified.
-
-[^1]: This may be moved to a per-model key-value pair in the future.
 
 ```c
 enum ggml_type {
@@ -107,10 +105,10 @@ union gguf_metadata_value_t {
 };
 
 struct gguf_metadata_kv_t {
-    // A standard GGUF string, with the following caveats:
+    // The key of the metadata. It is a standard GGUF string, with the following caveats:
     // - It must be a valid ASCII string.
     // - It must be a hierarchical key, where each segment is `lower_snake_case` and separated by a `.`.
-    // - It must be at most 2^16-1 bytes long.
+    // - It must be at most 2^16-1/65535 bytes long.
     // Any keys that do not follow these rules are invalid.
     gguf_string_t key;
 
@@ -145,7 +143,8 @@ struct gguf_header_t {
 };
 
 struct gguf_tensor_info_t {
-    // The name of the tensor.
+    // The name of the tensor. It is a standard GGUF string, with the caveat that
+    // it must be at most 64 bytes long.
     gguf_string_t name;
     // The number of dimensions in the tensor.
     // Currently at most 4, but this may change in the future.
@@ -213,6 +212,7 @@ If a particular community key is widely used, it may be promoted to a standardiz
   - `falcon`
   - `rwkv`
 - **`general.quantization_version: uint32`**: version of quantization scheme. Not required if the model is not quantized (i.e. no tensors are quantized). If any tensors are quantized, this _must_ be present.
+- **`general.alignment: uint32`**: the global alignment to use, as described above. This can vary to allow for different alignment schemes, but it must be a multiple of 8.
 
 #### General metadata
 
