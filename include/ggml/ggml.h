@@ -340,6 +340,7 @@ extern "C" {
         GGML_OP_ARGMAX,
         GGML_OP_REPEAT,
         GGML_OP_REPEAT_BACK,
+        GGML_OP_CONCAT,
         GGML_OP_SILU_BACK,
         GGML_OP_NORM, // normalize
         GGML_OP_GROUP_NORM,
@@ -799,6 +800,12 @@ extern "C" {
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             struct ggml_tensor  * b);
+
+    // concat a and b on dim 2
+    GGML_API struct ggml_tensor* ggml_concat(
+            struct ggml_context* ctx,
+            struct ggml_tensor* a,
+            struct ggml_tensor* b);
 
     GGML_API struct ggml_tensor * ggml_repeat_back(
             struct ggml_context * ctx,

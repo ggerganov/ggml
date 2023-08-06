@@ -3760,6 +3760,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "ARGMAX",
     "REPEAT",
     "REPEAT_BACK",
+    "CONCAT",
     "SILU_BACK",
     "NORM",
     "GROUP_NORM",
@@ -3820,7 +3821,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS_BACK",
 };
 
-static_assert(GGML_OP_COUNT == 67, "GGML_OP_COUNT != 67");
+static_assert(GGML_OP_COUNT == 68, "GGML_OP_COUNT != 68");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -3841,6 +3842,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "argmax(x)",
     "repeat(x)",
     "repeat_back(x)",
+    "concat(x, y)",
     "silu_back(x)",
     "norm(x)",
     "group_norm(x)",
@@ -3901,7 +3903,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "cross_entropy_loss_back(x,y)",
 };
 
-static_assert(GGML_OP_COUNT == 67, "GGML_OP_COUNT != 67");
+static_assert(GGML_OP_COUNT == 68, "GGML_OP_COUNT != 68");
 
 static_assert(GGML_OP_POOL_COUNT == 2, "GGML_OP_POOL_COUNT != 2");
 
@@ -5600,6 +5602,30 @@ struct ggml_tensor * ggml_repeat_back(
     struct ggml_tensor * result = ggml_new_tensor(ctx, a->type, b->n_dims, b->ne);
 
     result->op   = GGML_OP_REPEAT_BACK;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->src[0] = a;
+    result->src[1] = b;
+
+    return result;
+}
+
+// ggml_concat
+
+struct ggml_tensor* ggml_concat(
+    struct ggml_context* ctx,
+    struct ggml_tensor* a,
+    struct ggml_tensor* b) {
+    GGML_ASSERT(a->ne[0] == b->ne[0] && a->ne[1] == b->ne[1] && a->ne[3] == b->ne[3]);
+
+    bool is_node = false;
+
+    if (a->grad || b->grad) {
+        is_node = true;
+    }
+
+    struct ggml_tensor* result = ggml_new_tensor_4d(ctx, a->type, a->ne[0], a->ne[1], a->ne[2] + b->ne[2], a->ne[3]);
+
+    result->op = GGML_OP_CONCAT;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = b;
@@ -9937,6 +9963,73 @@ static void ggml_compute_forward_repeat_back(
             {
                 GGML_ASSERT(false);
             } break;
+    }
+}
+
+// ggml_compute_forward_concat
+
+static void ggml_compute_forward_concat_f32(
+    const struct ggml_compute_params* params,
+    const struct ggml_tensor* src0,
+    const struct ggml_tensor* src1,
+    struct ggml_tensor* dst) {
+
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+        return;
+    }
+
+    GGML_ASSERT(src0->nb[0] == sizeof(float));
+
+    const int ith = params->ith;
+
+    GGML_TENSOR_BINARY_OP_LOCALS;
+
+    // TODO: support for transposed / permuted tensors
+    GGML_ASSERT(nb0 == sizeof(float));
+    GGML_ASSERT(nb00 == sizeof(float));
+    GGML_ASSERT(nb10 == sizeof(float));
+
+    for (int i3 = 0; i3 < ne3; i3++) {
+        for (int i2 = ith; i2 < ne2; i2++) {
+            if (i2 < ne02) { // src0
+                for (int i1 = 0; i1 < ne1; i1++) {
+                    for (int i0 = 0; i0 < ne0; i0++) {
+                        const float* x = (float*)((char*)src0->data + i0 * nb00 + i1 * nb01 + i2 * nb02 + i3 * nb03);
+
+                        float* y = (float*)((char*)dst->data + i0 * nb0 + i1 * nb1 + i2 * nb2 + i3 * nb3);
+                        *y = *x;
+                    }
+                }
+            } // src1
+            else {
+                for (int i1 = 0; i1 < ne1; i1++) {
+                    for (int i0 = 0; i0 < ne0; i0++) {
+                        const float* x = (float*)((char*)src1->data + i0 * nb10 + i1 * nb11 + (i2 - ne02) * nb12 + i3 * nb13);
+
+                        float* y = (float*)((char*)dst->data + i0 * nb0 + i1 * nb1 + i2 * nb2 + i3 * nb3);
+                        *y = *x;
+                    }
+                }
+            }
+            
+        }
+    }
+}
+
+static void ggml_compute_forward_concat(
+    const struct ggml_compute_params* params,
+    const struct ggml_tensor* src0,
+    const struct ggml_tensor* src1,
+    struct ggml_tensor* dst) {
+    switch (src0->type) {
+    case GGML_TYPE_F32:
+    {
+        ggml_compute_forward_concat_f32(params, src0, src1, dst);
+    } break;
+    default:
+    {
+        GGML_ASSERT(false);
+    } break;
     }
 }
 
@@ -15465,6 +15558,10 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_repeat_back(params, tensor->src[0], tensor);
             } break;
+        case GGML_OP_CONCAT:
+            {
+                ggml_compute_forward_concat(params, tensor->src[0], tensor->src[1], tensor);
+            } break;
         case GGML_OP_SILU_BACK:
             {
                 ggml_compute_forward_silu_back(params, tensor->src[0], tensor->src[1], tensor);
@@ -15893,6 +15990,10 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                             ggml_repeat(ctx, tensor->grad, src0->grad),
                             inplace);
                 }
+            } break;
+        case GGML_OP_CONCAT:
+            {
+                GGML_ASSERT(false); // TODO: implement
             } break;
         case GGML_OP_SILU_BACK:
             {
@@ -17078,6 +17179,7 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
                 {
                     n_tasks = n_threads;
                 } break;
+            case GGML_OP_CONCAT:
             case GGML_OP_MUL_MAT:
             case GGML_OP_OUT_PROD:
                 {
