@@ -10,7 +10,7 @@ cp -rpv ../llama.cpp/ggml-metal.m     src/ggml-metal.m
 cp -rpv ../llama.cpp/ggml-metal.metal src/ggml-metal.metal
 cp -rpv ../llama.cpp/ggml.h           include/ggml/ggml.h
 
-cp -rpv ../llama.cpp/tests/test-opt.c             tests/test-opt.c
-cp -rpv ../llama.cpp/tests/test-grad0.c           tests/test-grad0.c
+cp -rpv ../llama.cpp/tests/test-opt.cpp           tests/test-opt.cpp
+cp -rpv ../llama.cpp/tests/test-grad0.cpp         tests/test-grad0.cpp
 cp -rpv ../llama.cpp/tests/test-quantize-fns.cpp  tests/test-quantize-fns.cpp
 cp -rpv ../llama.cpp/tests/test-quantize-perf.cpp tests/test-quantize-perf.cpp
