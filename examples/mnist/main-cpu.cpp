@@ -34,8 +34,7 @@
 int mnist_eval(
         const char * fname_cgraph,
         const int n_threads,
-        std::vector<float> digit
-        ) {
+        std::vector<float> digit) {
     // load the compute graph
     struct ggml_context * ctx_data = NULL;
     struct ggml_context * ctx_eval = NULL;
