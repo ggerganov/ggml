@@ -6711,6 +6711,8 @@ static struct ggml_tensor * ggml_rope_impl(
         int                   n_ctx,
         float                 freq_base,
         float                 freq_scale,
+        float                 xpos_base,
+        bool                  xpos_downscale,
         bool                  inplace) {
     GGML_ASSERT(n_past >= 0);
     bool is_node = false;
@@ -6721,9 +6723,11 @@ static struct ggml_tensor * ggml_rope_impl(
 
     struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
 
-    int32_t params[6] = { n_past, n_dims, mode, n_ctx };
+    int32_t params[8] = { n_past, n_dims, mode, n_ctx };
     memcpy(params + 4, &freq_base,  sizeof(float));
     memcpy(params + 5, &freq_scale, sizeof(float));
+    memcpy(params + 6, &xpos_base, sizeof(float));
+    memcpy(params + 7, &xpos_downscale, sizeof(bool));
     ggml_set_op_params(result, params, sizeof(params));
 
     result->op   = GGML_OP_ROPE;
@@ -6740,7 +6744,7 @@ struct ggml_tensor * ggml_rope(
         int                   n_dims,
         int                   mode,
         int                   n_ctx) {
-    return ggml_rope_impl(ctx, a, n_past, n_dims, mode, n_ctx, 10000.0f, 1.0f, false);
+    return ggml_rope_impl(ctx, a, n_past, n_dims, mode, n_ctx, 10000.0f, 1.0f, 0.0f, false, false);
 }
 
 struct ggml_tensor * ggml_rope_inplace(
@@ -6750,7 +6754,7 @@ struct ggml_tensor * ggml_rope_inplace(
         int                   n_dims,
         int                   mode,
         int                   n_ctx) {
-    return ggml_rope_impl(ctx, a, n_past, n_dims, mode, n_ctx, 10000.0f, 1.0f, true);
+    return ggml_rope_impl(ctx, a, n_past, n_dims, mode, n_ctx, 10000.0f, 1.0f, 0.0f, false, true);
 }
 
 struct ggml_tensor * ggml_rope_custom(
@@ -6762,7 +6766,7 @@ struct ggml_tensor * ggml_rope_custom(
         int                   n_ctx,
         float                 freq_base,
         float                 freq_scale) {
-    return ggml_rope_impl(ctx, a, n_past, n_dims, mode, n_ctx, freq_base, freq_scale, false);
+    return ggml_rope_impl(ctx, a, n_past, n_dims, mode, n_ctx, freq_base, freq_scale, 0.0f, false, false);
 }
 
 struct ggml_tensor * ggml_rope_custom_inplace(
@@ -6774,7 +6778,17 @@ struct ggml_tensor * ggml_rope_custom_inplace(
         int                   n_ctx,
         float                 freq_base,
         float                 freq_scale) {
-    return ggml_rope_impl(ctx, a, n_past, n_dims, mode, n_ctx, freq_base, freq_scale, true);
+    return ggml_rope_impl(ctx, a, n_past, n_dims, mode, n_ctx, freq_base, freq_scale, 0.0f, false, true);
+}
+
+struct ggml_tensor * ggml_rope_xpos_inplace(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        int                   n_past,
+        int                   n_dims,
+        float                 scale_base,
+        bool                  downscale) {
+    return ggml_rope_impl(ctx, a, n_past, n_dims, 0, 0, 10000.0f, 1.0f, scale_base, downscale, true);
 }
 
 // ggml_rope_back
@@ -6785,7 +6799,11 @@ struct ggml_tensor * ggml_rope_back(
         int                   n_past,
         int                   n_dims,
         int                   mode,
-        int                   n_ctx) {
+        int                   n_ctx,
+        float                 freq_base,
+        float                 freq_scale,
+        float                 xpos_base,
+        bool                  xpos_downscale) {
     GGML_ASSERT(n_past >= 0);
     GGML_ASSERT((mode & 4) == 0 && "ggml_rope_back() for ChatGLM not implemented yet");
 
@@ -6797,7 +6815,11 @@ struct ggml_tensor * ggml_rope_back(
 
     struct ggml_tensor * result = ggml_dup_tensor(ctx, a);
 
-    int32_t params[] = { n_past, n_dims, mode, n_ctx };
+    int32_t params[8] = { n_past, n_dims, mode, n_ctx };
+    memcpy(params + 4, &freq_base, sizeof(float));
+    memcpy(params + 5, &freq_scale, sizeof(float));
+    memcpy(params + 6, &xpos_base, sizeof(float));
+    memcpy(params + 7, &xpos_downscale, sizeof(bool));
     ggml_set_op_params(result, params, sizeof(params));
 
     result->op   = GGML_OP_ROPE_BACK;
@@ -11926,7 +11948,6 @@ static void ggml_compute_forward_alibi(
     }
 }
 
-
 // ggml_compute_forward_clamp
 
 static void ggml_compute_forward_clamp_f32(
@@ -12015,12 +12036,18 @@ static void ggml_compute_forward_rope_f32(
     float freq_base;
     float freq_scale;
 
+    // these two only relevant for xPos RoPE:
+    float xpos_base;
+    bool xpos_downscale;
+
     const int n_past = ((int32_t *) dst->op_params)[0];
     const int n_dims = ((int32_t *) dst->op_params)[1];
     const int mode   = ((int32_t *) dst->op_params)[2];
     const int n_ctx  = ((int32_t *) dst->op_params)[3];
     memcpy(&freq_base,  (int32_t *) dst->op_params + 4, sizeof(float));
     memcpy(&freq_scale, (int32_t *) dst->op_params + 5, sizeof(float));
+    memcpy(&xpos_base,  (int32_t *) dst->op_params + 6, sizeof(float));
+    memcpy(&xpos_downscale, (int32_t *) dst->op_params + 7, sizeof(bool));
 
     assert(n_past >= 0);
 
@@ -12092,6 +12119,9 @@ static void ggml_compute_forward_rope_f32(
                     for (int64_t i0 = 0; i0 < ne0; i0 += 2) {
                         const float cos_theta = cosf(theta);
                         const float sin_theta = sinf(theta);
+                        // zeta scaling for xPos only:
+                        float zeta = xpos_base != 0.0f ? powf((i0 + 0.4f * ne0) / (1.4f * ne0), (n_past + i2) / xpos_base) : 1.0f;
+                        if (xpos_downscale) zeta = 1.0f / zeta;
 
                         theta *= theta_scale;
 
@@ -12101,8 +12131,8 @@ static void ggml_compute_forward_rope_f32(
                         const float x0 = src[0];
                         const float x1 = src[1];
 
-                        dst_data[0] = x0*cos_theta - x1*sin_theta;
-                        dst_data[1] = x0*sin_theta + x1*cos_theta;
+                        dst_data[0] = x0*cos_theta*zeta - x1*sin_theta*zeta;
+                        dst_data[1] = x0*sin_theta*zeta + x1*cos_theta*zeta;
                     }
                 } else {
                     // TODO: this is probably wrong, but I can't figure it out ..
@@ -12296,9 +12326,21 @@ static void ggml_compute_forward_rope_back_f32(
     // dx = rope_back(dy, src1)
     // src0 is dy, src1 contains options
 
+    float freq_base;
+    float freq_scale;
+
+    // these two only relevant for xPos RoPE:
+    float xpos_base;
+    bool xpos_downscale;
+
     const int n_past = ((int32_t *) dst->op_params)[0];
     const int n_dims = ((int32_t *) dst->op_params)[1];
     const int mode   = ((int32_t *) dst->op_params)[2];
+    const int n_ctx  = ((int32_t *) dst->op_params)[3];
+    memcpy(&freq_base,  (int32_t *) dst->op_params + 4, sizeof(float));
+    memcpy(&freq_scale, (int32_t *) dst->op_params + 5, sizeof(float));
+    memcpy(&xpos_base,  (int32_t *) dst->op_params + 6, sizeof(float));
+    memcpy(&xpos_downscale, (int32_t *) dst->op_params + 7, sizeof(bool));
 
     assert(n_past >= 0);
 
@@ -12324,7 +12366,7 @@ static void ggml_compute_forward_rope_back_f32(
     // row index used to determine which thread to use
     int ir = 0;
 
-    const float theta_scale = powf(10000.0, -2.0f/n_dims);
+    const float theta_scale = powf(freq_base, -2.0f/n_dims);
 
     const bool is_neox = mode & 2;
 
@@ -12335,12 +12377,15 @@ static void ggml_compute_forward_rope_back_f32(
                 if (ir++ < ir0) continue;
                 if (ir   > ir1) break;
 
-                float theta = (float)p;
+                float theta = freq_scale * (float)p;
 
                 if (!is_neox) {
                     for (int64_t i0 = 0; i0 < ne0; i0 += 2) {
                         const float cos_theta = cosf(theta);
                         const float sin_theta = sinf(theta);
+                        // zeta scaling for xPos only:
+                        float zeta = xpos_base != 0.0f ? powf((i0 + 0.4f * ne0) / (1.4f * ne0), (n_past + i2) / xpos_base) : 1.0f;
+                        if (xpos_downscale) zeta = 1.0f / zeta;
 
                         theta *= theta_scale;
 
@@ -12350,8 +12395,8 @@ static void ggml_compute_forward_rope_back_f32(
                         const float dy0 = dy[0];
                         const float dy1 = dy[1];
 
-                        dx[0] =   dy0*cos_theta + dy1*sin_theta;
-                        dx[1] = - dy0*sin_theta + dy1*cos_theta;
+                        dx[0] =   dy0*cos_theta*zeta + dy1*sin_theta*zeta;
+                        dx[1] = - dy0*sin_theta*zeta + dy1*cos_theta*zeta;
                     }
                 } else {
                     for (int64_t ib = 0; ib < ne0/n_dims; ++ib) {
@@ -15584,6 +15629,13 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                     const int n_dims = ((int32_t *) tensor->op_params)[1];
                     const int mode   = ((int32_t *) tensor->op_params)[2];
                     const int n_ctx  = ((int32_t *) tensor->op_params)[3];
+                    float freq_base, freq_scale, xpos_base;
+                    bool xpos_downscale;
+					memcpy(&freq_base,  (int32_t *) tensor->op_params + 4, sizeof(float));
+					memcpy(&freq_scale, (int32_t *) tensor->op_params + 5, sizeof(float));
+					memcpy(&xpos_base,  (int32_t *) tensor->op_params + 6, sizeof(float));
+					memcpy(&xpos_downscale, (int32_t *) tensor->op_params + 7, sizeof(bool));
+
                     src0->grad = ggml_add_impl(ctx,
                             src0->grad,
                             ggml_rope_back(ctx,
@@ -15591,7 +15643,11 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                                 n_past,
                                 n_dims,
                                 mode,
-                                n_ctx),
+                                n_ctx,
+                                freq_base,
+                                freq_scale,
+                                xpos_base,
+                                xpos_downscale),
                             inplace);
                 }
             } break;
@@ -15602,14 +15658,26 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                     const int n_dims = ((int32_t *) tensor->op_params)[1];
                     const int mode   = ((int32_t *) tensor->op_params)[2];
                     const int n_ctx  = ((int32_t *) tensor->op_params)[3];
+                    float freq_base, freq_scale, xpos_base;
+                    bool xpos_downscale;
+					memcpy(&freq_base,  (int32_t *) tensor->op_params + 4, sizeof(float));
+					memcpy(&freq_scale, (int32_t *) tensor->op_params + 5, sizeof(float));
+					memcpy(&xpos_base,  (int32_t *) tensor->op_params + 6, sizeof(float));
+					memcpy(&xpos_downscale, (int32_t *) tensor->op_params + 7, sizeof(bool));
+
                     src0->grad = ggml_add_impl(ctx,
                             src0->grad,
-                            ggml_rope(ctx,
+                            ggml_rope_impl(ctx,
                                 tensor->grad,
                                 n_past,
                                 n_dims,
                                 mode,
-                                n_ctx),
+                                n_ctx,
+                                freq_base,
+                                freq_scale,
+                                xpos_base,
+                                xpos_downscale,
+                                false),
                             inplace);
                 }
             } break;
