@@ -213,6 +213,51 @@ inline static void * ggml_aligned_malloc(size_t size) {
 #endif
 #endif
 
+
+size_t dynamic_mem_size = 0;
+size_t max_dynamic_mem_size = 0;
+
+size_t curr_max_dynamic_mem_size = 0;
+
+inline static void* ggml_dynamic_malloc(size_t size) {
+    void *ptr = GGML_ALIGNED_MALLOC(GGML_MEM_ALIGN + size);
+    dynamic_mem_size += size;
+    if (dynamic_mem_size > max_dynamic_mem_size) {
+        max_dynamic_mem_size = dynamic_mem_size;
+    }
+    if (dynamic_mem_size > curr_max_dynamic_mem_size) {
+        curr_max_dynamic_mem_size = dynamic_mem_size;
+    }
+    *((size_t*)ptr) = size;
+    return (char*)ptr + GGML_MEM_ALIGN;
+}
+
+inline static void ggml_dynamic_free(void * ptr) {
+    void* realptr = (char*)ptr-GGML_MEM_ALIGN;
+    size_t size = *((size_t*)realptr);
+    dynamic_mem_size -= size;
+    GGML_ALIGNED_FREE(realptr);
+}
+
+size_t  ggml_dynamic_size(void) {
+    return dynamic_mem_size;
+}
+
+size_t  ggml_max_dynamic_size(void) {
+    return max_dynamic_mem_size;
+}
+
+size_t  ggml_curr_max_dynamic_size(void) {
+    return curr_max_dynamic_mem_size;
+}
+
+void  ggml_reset_curr_max_dynamic_size(void) {
+    curr_max_dynamic_mem_size = dynamic_mem_size;
+}
+
+#define GGML_DYNAMIC_MALLOC(size)  ggml_dynamic_malloc(size)
+#define GGML_DYNAMIC_FREE(ptr)     ggml_dynamic_free(ptr)
+
 #define UNUSED GGML_UNUSED
 #define SWAP(x, y, T) do { T SWAP = x; x = y; y = SWAP; } while (0)
 
@@ -4237,6 +4282,9 @@ struct ggml_context {
     bool   no_alloc;
     bool   no_alloc_save; // this is used to save the no_alloc state when using scratch buffers
 
+    bool   dynamic;
+    bool   dynamic_save;
+
     int    n_objects;
 
     struct ggml_object * objects_begin;
@@ -4707,6 +4755,8 @@ struct ggml_context * ggml_init(struct ggml_init_params params) {
         /*.mem_buffer_owned   =*/ params.mem_buffer ? false : true,
         /*.no_alloc           =*/ params.no_alloc,
         /*.no_alloc_save      =*/ params.no_alloc,
+        /*.dynamic            =*/ params.dynamic,
+        /*.dynamic_save       =*/ params.dynamic,
         /*.n_objects          =*/ 0,
         /*.objects_begin      =*/ NULL,
         /*.objects_end        =*/ NULL,
@@ -4728,6 +4778,27 @@ struct ggml_context * ggml_init(struct ggml_init_params params) {
 void ggml_free(struct ggml_context * ctx) {
     // make this function thread safe
     ggml_critical_section_start();
+
+    struct ggml_object* obj = ctx->objects_begin;
+
+    while (obj != NULL) {
+        if (obj->type != GGML_OBJECT_TENSOR) {
+            obj = obj->next;
+            continue;
+        }
+        struct ggml_tensor* tensor = (struct ggml_tensor*)((char*)ctx->mem_buffer + obj->offs);
+        if (tensor->not_own_data) {
+            obj = obj->next;
+            continue;
+        }
+
+        if (tensor->dynamic && tensor->data != NULL) {
+            GGML_DYNAMIC_FREE(tensor->data);
+            tensor->data = NULL;
+        }
+
+        obj = obj->next;
+    }
 
     bool found = false;
 
@@ -4758,6 +4829,28 @@ size_t ggml_used_mem(const struct ggml_context * ctx) {
     return ctx->objects_end == NULL ? 0 : ctx->objects_end->offs + ctx->objects_end->size;
 }
 
+GGML_API size_t ggml_used_mem_of_data(const struct ggml_context* ctx) {
+    size_t mem_size = 0;
+
+    struct ggml_object* obj = ctx->objects_begin;
+
+    while (obj != NULL) {
+        struct ggml_tensor* tensor = (struct ggml_tensor*)((char*)ctx->mem_buffer + obj->offs);
+        if (tensor->not_own_data || tensor->dynamic) {
+            obj = obj->next;
+            continue;
+        }
+
+        const size_t size = ggml_nbytes(tensor);
+
+        mem_size += size;
+
+        obj = obj->next;
+    }
+
+    return mem_size;
+}
+
 size_t ggml_set_scratch(struct ggml_context * ctx, struct ggml_scratch scratch) {
     const size_t result = ctx->scratch.data ? ctx->scratch.offs : 0;
 
@@ -4772,6 +4865,23 @@ bool ggml_get_no_alloc(struct ggml_context * ctx) {
 
 void ggml_set_no_alloc(struct ggml_context * ctx, bool no_alloc) {
     ctx->no_alloc = no_alloc;
+}
+
+void ggml_set_dynamic(struct ggml_context * ctx, bool dynamic) {
+    ctx->dynamic = dynamic;
+}
+
+bool ggml_get_dynamic(struct ggml_context* ctx) {
+    return ctx->dynamic;
+}
+
+void ggml_hold_dynamic_tensor(struct ggml_tensor * tensor) {
+    tensor->dynamic_hold = true;
+}
+
+void ggml_free_dynamic_tensor(struct ggml_tensor * tensor) {
+    GGML_DYNAMIC_FREE(tensor->data);
+    tensor->dynamic_hold = false;
 }
 
 void * ggml_get_mem_buffer(const struct ggml_context * ctx) {
@@ -4815,12 +4925,17 @@ static void ggml_scratch_save(struct ggml_context * ctx) {
     ctx->no_alloc_save = ctx->no_alloc;
     ctx->no_alloc      = false;
 
+    ctx->dynamic_save  = ctx->dynamic;
+    ctx->dynamic       = false;
+
     ctx->scratch_save = ctx->scratch;
     ctx->scratch.data = NULL;
 }
 
 static void ggml_scratch_load(struct ggml_context * ctx) {
     ctx->no_alloc = ctx->no_alloc_save;
+
+    ctx->dynamic  = ctx->dynamic_save;
 
     ctx->scratch = ctx->scratch_save;
 }
@@ -4901,7 +5016,7 @@ static struct ggml_tensor * ggml_new_tensor_impl(
 
     size_t obj_alloc_size = 0;
 
-    if (view_src == NULL && !ctx->no_alloc) {
+    if (view_src == NULL && !ctx->no_alloc && !ctx->dynamic) {
         if (ctx->scratch.data != NULL) {
             // allocate tensor data in the scratch buffer
             if (ctx->scratch.offs + data_size > ctx->scratch.size) {
@@ -4936,6 +5051,11 @@ static struct ggml_tensor * ggml_new_tensor_impl(
         /*.op           =*/ GGML_OP_NONE,
         /*.op_params    =*/ { 0 },
         /*.is_param     =*/ false,
+        /*.not_own_data =*/ false,
+        /*.dynamic      =*/ ctx->dynamic,
+        /*.dinamic_hold =*/ false,
+        /*.n_dst        =*/ 0,
+        /*.n_dst_curr   =*/ 0,
         /*.grad         =*/ NULL,
         /*.src          =*/ { NULL },
         /*.perf_runs    =*/ 0,
@@ -4943,7 +5063,7 @@ static struct ggml_tensor * ggml_new_tensor_impl(
         /*.perf_time_us =*/ 0,
         /*.view_src     =*/ view_src,
         /*.view_offs    =*/ view_offs,
-        /*.data         =*/ obj_alloc_size > 0 ? (void *)(result + 1) : data,
+        /*.data         =*/ (obj_alloc_size > 0 && !ctx->no_alloc && !ctx->dynamic) ? (void *)(result + 1) : data,
         /*.name         =*/ { 0 },
         /*.extra        =*/ NULL,
         /*.padding      =*/ { 0 },
@@ -5492,6 +5612,8 @@ struct ggml_tensor * ggml_view_tensor(
     for (int i = 0; i < GGML_MAX_DIMS; i++) {
         result->nb[i] = src->nb[i];
     }
+
+    result->not_own_data = true;
 
     return result;
 }
@@ -6757,6 +6879,7 @@ struct ggml_tensor * ggml_reshape(
     ggml_format_name(result, "%s (reshaped)", a->name);
 
     result->op   = GGML_OP_RESHAPE;
+    result->not_own_data = true;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
 
@@ -6781,6 +6904,7 @@ struct ggml_tensor * ggml_reshape_1d(
     ggml_format_name(result, "%s (reshaped)", a->name);
 
     result->op   = GGML_OP_RESHAPE;
+    result->not_own_data = true;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
 
@@ -6806,6 +6930,7 @@ struct ggml_tensor * ggml_reshape_2d(
     ggml_format_name(result, "%s (reshaped)", a->name);
 
     result->op   = GGML_OP_RESHAPE;
+    result->not_own_data = true;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
 
@@ -6832,6 +6957,7 @@ struct ggml_tensor * ggml_reshape_3d(
     ggml_format_name(result, "%s (reshaped)", a->name);
 
     result->op   = GGML_OP_RESHAPE;
+    result->not_own_data = true;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
 
@@ -6859,6 +6985,7 @@ struct ggml_tensor * ggml_reshape_4d(
     ggml_format_name(result, "%s (reshaped)", a->name);
 
     result->op   = GGML_OP_RESHAPE;
+    result->not_own_data = true;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
 
@@ -6884,6 +7011,7 @@ static struct ggml_tensor * ggml_view_impl(
     ggml_set_op_params(result, &offset, sizeof(offset));
 
     result->op   = GGML_OP_VIEW;
+    result->not_own_data = true;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
 
@@ -18181,6 +18309,8 @@ static void ggml_visit_parents(struct ggml_cgraph * cgraph, struct ggml_tensor *
         return;
     }
 
+    node->n_dst = 0;
+
     for (int i = 0; i < GGML_MAX_SRC; ++i) {
         const int k =
             (cgraph->order == GGML_CGRAPH_EVAL_ORDER_LEFT_TO_RIGHT) ? i :
@@ -18188,6 +18318,7 @@ static void ggml_visit_parents(struct ggml_cgraph * cgraph, struct ggml_tensor *
             /* unknown order, just fall back to using i*/ i;
         if (node->src[k]) {
             ggml_visit_parents(cgraph, node->src[k]);
+            node->src[k]->n_dst++;
         }
     }
 
@@ -18489,6 +18620,75 @@ static void ggml_graph_compute_perf_stats_node(struct ggml_tensor * node, const 
     node->perf_time_us += time_us_cur;
 }
 
+
+static void on_node_compute_start(struct ggml_tensor* node) {
+    // printf("on_node_compute_start %s dynamic %d not_own_data %d hold %d\n",
+    // GGML_OP_NAME[node->op], node->dynamic, node->not_own_data, node->dynamic_hold);
+    if (node->dynamic) {
+        if (node->not_own_data) {
+            //GGML_ASSERT(node->data == NULL);
+
+            if (node->op == GGML_OP_VIEW) {
+                size_t offset;
+                memcpy(&offset, node->op_params, sizeof(offset));
+                node->data = (void*)((char*)node->src[0]->data + offset);
+            }
+            else {
+                node->data = node->src[0]->data;
+            }
+
+        }
+        else {
+            if (node->data != NULL && node->dynamic_hold) {
+                return;
+            }
+            GGML_ASSERT(node->data == NULL);
+            node->data = GGML_DYNAMIC_MALLOC(ggml_nbytes(node));
+        }
+    }
+    // printf("on_node_compute_start done %s dynamic %d not_own_data %d hold %d\n",
+    // GGML_OP_NAME[node->op], node->dynamic, node->not_own_data, node->dynamic_hold);
+}
+
+static void on_node_all_dst_compute_done(struct ggml_tensor* node) {
+    if (node->not_own_data) {
+        for (int i = 0; i < GGML_MAX_SRC; i++) {
+            struct ggml_tensor* curr = node->src[i];
+            if (curr) {
+                GGML_ASSERT(curr->n_dst_curr > 0);
+                curr->n_dst_curr--;
+                if (curr->n_dst_curr == 0) {
+                    on_node_all_dst_compute_done(curr);
+                }
+            }
+        }
+    }
+    else {
+        if (node->dynamic && !node->dynamic_hold) {
+            GGML_DYNAMIC_FREE(node->data);
+            node->data = NULL;
+        }
+    }
+}
+
+static void on_node_compute_done(struct ggml_tensor* node) {
+    // printf("on_node_compute_done %s dynamic %d not_own_data %d hold %d\n",
+    // GGML_OP_NAME[node->op], node->dynamic, node->not_own_data, node->dynamic_hold);
+    if (node->not_own_data) {
+        return;
+    }
+    for (int i = 0; i < GGML_MAX_SRC; i++) {
+        struct ggml_tensor* curr = node->src[i];
+        if (curr) {
+            GGML_ASSERT(curr->n_dst_curr > 0);
+            curr->n_dst_curr--;
+            if (curr->n_dst_curr == 0) {
+                on_node_all_dst_compute_done(curr);
+            }
+        }
+    }
+}
+
 static thread_ret_t ggml_graph_compute_thread(void * data) {
     struct ggml_compute_state * state = (struct ggml_compute_state *) data;
 
@@ -18526,6 +18726,8 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
                     ggml_compute_forward(&params, node);
                 }
                 ggml_graph_compute_perf_stats_node(node, state->shared);
+
+                on_node_compute_done(node);
             }
 
             // distribute new work or execute it direct if 1T
@@ -18541,6 +18743,7 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
                 params.nth = n_tasks;
 
                 /* INIT */
+                on_node_compute_start(node);
                 if (GGML_OP_HAS_INIT[node->op]) {
                     params.type = GGML_TASK_INIT;
                     ggml_compute_forward(&params, node);
@@ -18558,6 +18761,8 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
                     }
 
                     ggml_graph_compute_perf_stats_node(node, state->shared);
+
+                    on_node_compute_done(node);
                 } else {
                     break;
                 }
@@ -19093,9 +19298,14 @@ int ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {
         }
 
         for (int i = 0; i < cgraph->n_nodes; ++i) {
+            cgraph->nodes[i]->n_dst_curr = cgraph->nodes[i]->n_dst;
             if (cgraph->nodes[i]->op != GGML_OP_NONE) {
                 GGML_ASSERT(cplan->n_tasks[i] > 0);
             }
+        }
+
+        for (int i = 0; i < cgraph->n_leafs; ++i) {
+            cgraph->leafs[i]->n_dst_curr = cgraph->leafs[i]->n_dst;
         }
     }
 
@@ -19454,6 +19664,7 @@ struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** 
                 .mem_size   = fsize + overhead,
                 .mem_buffer = NULL,
                 .no_alloc   = false,
+                .dynamic    = false,
             };
 
             *ctx_data = ggml_init(params);
@@ -19512,6 +19723,7 @@ struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** 
                 .mem_size   = size_eval + overhead,
                 .mem_buffer = NULL,
                 .no_alloc   = true,
+                .dynamic    = false,
             };
 
             *ctx_eval = ggml_init(params);
@@ -20717,6 +20929,7 @@ enum ggml_opt_result ggml_opt(
             .mem_size   = 16*1024*1024,
             .mem_buffer = NULL,
             .no_alloc   = false,
+            .dynamic    = false,
         };
 
         ctx = ggml_init(params_ctx);

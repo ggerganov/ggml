@@ -499,6 +499,11 @@ extern "C" {
         int32_t op_params[GGML_MAX_OP_PARAMS / sizeof(int32_t)];
 
         bool is_param;
+        bool not_own_data;
+        bool dynamic;
+        bool dynamic_hold;
+        int  n_dst;
+        int  n_dst_curr;
 
         struct ggml_tensor * grad;
         struct ggml_tensor * src[GGML_MAX_SRC];
@@ -517,7 +522,7 @@ extern "C" {
 
         void * extra; // extra things e.g. for ggml-cuda.cu
 
-        char padding[12];
+        char padding[4];
     };
 
     static const size_t GGML_TENSOR_SIZE = sizeof(struct ggml_tensor);
@@ -584,6 +589,7 @@ extern "C" {
         size_t mem_size;   // bytes
         void * mem_buffer; // if NULL, memory will be allocated internally
         bool   no_alloc;   // don't allocate memory for the tensor data
+        bool   dynamic;    // allocate memory for the tensor data dynamically
     };
 
 
@@ -658,10 +664,22 @@ extern "C" {
     GGML_API void                  ggml_free(struct ggml_context * ctx);
 
     GGML_API size_t  ggml_used_mem(const struct ggml_context * ctx);
+    GGML_API size_t  ggml_used_mem_of_data(const struct ggml_context* ctx);
 
     GGML_API size_t  ggml_set_scratch (struct ggml_context * ctx, struct ggml_scratch scratch);
     GGML_API bool    ggml_get_no_alloc(struct ggml_context * ctx);
     GGML_API void    ggml_set_no_alloc(struct ggml_context * ctx, bool no_alloc);
+
+    GGML_API void    ggml_set_dynamic(struct ggml_context * ctx, bool dynamic);
+    GGML_API bool    ggml_get_dynamic(struct ggml_context* ctx);
+
+    GGML_API void    ggml_hold_dynamic_tensor(struct ggml_tensor * tensor);
+    GGML_API void    ggml_free_dynamic_tensor(struct ggml_tensor * tensor);
+    GGML_API size_t  ggml_dynamic_size(void);
+    GGML_API size_t  ggml_max_dynamic_size(void);
+    GGML_API size_t  ggml_curr_max_dynamic_size(void);
+    GGML_API void    ggml_reset_curr_max_dynamic_size(void);
+
 
     GGML_API void *  ggml_get_mem_buffer     (const struct ggml_context * ctx);
     GGML_API size_t  ggml_get_mem_size       (const struct ggml_context * ctx);
