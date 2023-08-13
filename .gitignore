@@ -31,3 +31,5 @@ zig-cache/
 *.dot
 
 *.sw?
+
+__pycache__/
