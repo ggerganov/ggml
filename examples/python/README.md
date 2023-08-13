@@ -2,7 +2,7 @@
 
 This folder contains:
 
-- Scripts to generate full Python bindings from ggml headers.
+- Scripts to generate full Python bindings from ggml headers (+ stubs for autocompletion in IDEs)
 - Some barebones utils (see [ggml/utils.py](./ggml/utils.py)):
   - `ggml.utils.init` builds a context that's freed automatically when the pointer gets GC'd
   - `ggml.utils.copy` **copies between same-shaped tensors (numpy or ggml), w/ automatic (de/re)quantization**
@@ -70,9 +70,9 @@ export GGML_LIBRARY=$PWD/llama_build/libggml_shared.so
 # Alternatively, you can just copy it to your system's lib dir, e.g /usr/local/lib
 ```
 
-#### (Optional) Regenerate the bindings (`ggml/cffi.py`)
+#### (Optional) Regenerate the bindings and stubs
 
-If you added or changed any signatures of the C API, you'll want to regenerate the bindings.
+If you added or changed any signatures of the C API, you'll want to regenerate the bindings ([ggml/cffi.py](./ggml/cffi.py)) and stubs ([ggml/__init__.pyi](./ggml/__init__.pyi)).
 
 Luckily it's a one-liner using [regenerate.py](./regenerate.py):
 

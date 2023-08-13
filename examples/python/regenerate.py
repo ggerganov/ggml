@@ -4,6 +4,7 @@
 # so we help it a bit (e.g. replace sizeof expressions with their value, remove exotic syntax found in Darwin headers).
 import os, sys, re, subprocess
 import cffi
+from stubs import generate_stubs
 
 API = os.environ.get('API', 'api.h')
 CC = os.environ.get('CC') or 'gcc'
@@ -36,3 +37,6 @@ ffibuilder = cffi.FFI()
 ffibuilder.cdef(header)
 ffibuilder.set_source(f'ggml.cffi', None) # we're not compiling a native extension, as this quickly gets hairy
 ffibuilder.compile(verbose=True)
+
+with open("ggml/__init__.pyi", "wt") as f:
+    f.write(generate_stubs(header))
