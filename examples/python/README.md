@@ -96,6 +96,14 @@ In fact, if you wanted to only generate bindings for the current version of the 
 API=../../include/ggml/ggml.h python regenerate.py
 ```
 
+## Develop
+
+Run tests:
+
+```bash
+pytest
+```
+
 ### Alternatives
 
 This example's goal is to showcase [cffi](https://cffi.readthedocs.io/)-generated bindings that are trivial to use and update, but there are already alternatives in the wild:

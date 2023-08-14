@@ -88,7 +88,8 @@ def numpy(tensor: ffi.CData, allow_copy: Union[bool, np.ndarray] = False, allow_
             raise NotImplementedError(f'Cannot convert {__describe(tensor)} to numpy')
 
         assert __is_contiguous(tensor), f"Cannot convert {__describe(tensor)} to numpy (support contiguous tensors only)"
-        array = np.frombuffer(ffi.buffer(lib.ggml_get_data(tensor), lib.ggml_nbytes(tensor)), dtype=dtype)
+        nbytes = lib.ggml_nelements(tensor) * lib.ggml_type_size(tensor.type)
+        array = np.frombuffer(ffi.buffer(lib.ggml_get_data(tensor), nbytes), dtype=dtype)
         array.shape = shape
         return array
 
@@ -122,7 +123,7 @@ def __dtype_to_type(dtype: np.dtype):
     elif dtype == np.int8: return lib.GGML_TYPE_I8
     else: raise ValueError(f"Unsupported dtype: {dtype}")
 
-def __describe(tensor: ffi.CType): return f'Tensor[{__type_name(tensor.type)}, {__get_shape(tensor)}]'
+def __describe(tensor: ffi.CType): return f'Tensor[{__type_name(__get_type(tensor))}, {__get_shape(tensor)}]'
 def __get_type(tensor: TensorLike): return __dtype_to_type(tensor.dtype) if isinstance(tensor, np.ndarray) else tensor.type
 def __get_shape(x: TensorLike): return x.shape if isinstance(x, np.ndarray) else tuple([x.ne[i] for i in range(x.n_dims)])
 def __get_strides(x: TensorLike): return x.strides if isinstance(x, np.ndarray) else tuple([x.nb[i] for i in range(x.n_dims)])
@@ -139,7 +140,7 @@ def __get_floats(tensor: TensorLike) -> ffi.CData:
       nelements = __get_nelements(tensor)
       floats = ffi.new('float[]', nelements)
       if type == lib.GGML_TYPE_F16:
-          lib.ggml_fp16_to_fp32_row(data, floats, nelements)
+          lib.ggml_fp16_to_fp32_row(ffi.cast('uint16_t*', data), floats, nelements)
       elif lib.ggml_is_quantized(type):
           qtype = lib.ggml_internal_get_type_traits(type)
           assert qtype.to_float, f"Type {__type_name(type)} is not supported by ggml"
@@ -155,7 +156,7 @@ def __set_floats(tensor: TensorLike, f32_data: ffi.CData) -> None:
     else:
       nelements = __get_nelements(tensor)
       if type == lib.GGML_TYPE_F16:
-          lib.ggml_fp32_to_fp16_row(f32_data, data, nelements)
+          lib.ggml_fp32_to_fp16_row(f32_data, ffi.cast('uint16_t*', data), nelements)
       elif lib.ggml_is_quantized(type):
           qtype = lib.ggml_internal_get_type_traits(type)
           assert qtype.from_float, f"Type {__type_name(type)} is not supported by ggml"
