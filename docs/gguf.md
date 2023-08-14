@@ -4,7 +4,7 @@ GGUF is a file format for storing models for inference with GGML and executors b
 
 It is a successor file format to GGML, GGMF and GGJT, and is designed to be unambiguous by containing all the information needed to load a model. It is also designed to be extensible, so that new features can be added to GGML without breaking compatibility with older models.
 
-For more information about the motivation behind GGUF, see [Current State of Affairs](#current-state-of-affairs).
+For more information about the motivation behind GGUF, see [Historical State of Affairs](#historical-state-of-affairs).
 
 ## Specification
 
@@ -211,7 +211,7 @@ If a particular community key is widely used, it may be promoted to a standardiz
   - `bloom`
   - `falcon`
   - `rwkv`
-- **`general.quantization_version: uint32`**: version of quantization scheme. Not required if the model is not quantized (i.e. no tensors are quantized). If any tensors are quantized, this _must_ be present.
+- **`general.quantization_version: uint32`**: The version of the quantization format. Not required if the model is not quantized (i.e. no tensors are quantized). If any tensors are quantized, this _must_ be present. This is separate to the quantization scheme described in `general.file_type` because the quantization version may change without changing the file type (e.g. the quantization scheme is Q5_K, and the quantization version is 4).
 - **`general.alignment: uint32`**: the global alignment to use, as described above. This can vary to allow for different alignment schemes, but it must be a multiple of 8.
 
 #### General metadata
@@ -236,7 +236,7 @@ In the following, `[llm]` is used to fill in for the name of a specific LLM arch
 
 - `[llm].context_length: uint32`: Also known as `n_ctx`. length of the context (in tokens) that the model was trained on. For most architectures, this is the hard limit on the length of the input. Architectures, like RWKV, that are not reliant on transformer-style attention may be able to handle larger inputs, but this is not guaranteed.
 - `[llm].embedding_length: uint32`: Also known as `n_embd`. Embedding layer size.
-- `[llm].layer_count: uint32`: Also known as `n_layers`. The number of attention+feedforward layers (i.e. the bulk of the LLM). Does not include the input or embedding layers.
+- `[llm].block_count: uint32`: The number of blocks of attention+feedforward layers (i.e. the bulk of the LLM). Does not include the input or embedding layers.
 - `[llm].feedforward_length: uint32`: Also known as `n_ff`. The length of the feedforward layer.
 - `[llm].use_parallel_residual: bool`: Whether or not the parallel residual logic should be used.
 - `[llm].tensor_data_layout: string`: When a model is converted to GGUF, tensors may be rearranged to improve performance. This key describes the layout of the tensor data. This is not required; if not present, it is assumed to be `reference`.
@@ -430,7 +430,8 @@ It is not guaranteed to be standardized across models, and may change in the fut
   - `gpt2`: GPT-2 / GPT-NeoX style BPE (tokens extracted from HF `tokenizer.json`)
   - `rwkv`: RWKV tokenizer
 - `tokenizer.ggml.tokens: array[string]`: A list of tokens indexed by the token ID used by the model.
-- `tokenizer.ggml.scores: array[float32]`: If present, the score/probability of each token. If not present, all tokens are assumed to have equal probability. Must be the same length as `tokens`.
+- `tokenizer.ggml.scores: array[float32]`: If present, the score/probability of each token. If not present, all tokens are assumed to have equal probability. If present, it must have the same length and index as `tokens`.
+- `tokenizer.ggml.token_type: array[uint32]`: The token type (1=normal, 2=unknown, 3=control, 4=user defined, 5=unused, 6=byte). If present, it must have the same length and index as `tokens`.
 - `tokenizer.ggml.merges: array[string]`: If present, the merges of the tokenizer. If not present, the tokens are assumed to be atomic.
 - `tokenizer.ggml.added_tokens: array[string]`: If present, tokens that were added after training.
 
@@ -460,9 +461,43 @@ This is a future extension and still needs to be discussed, and may necessitate 
 
 A sample computation graph of GGML nodes could be included in the model itself, allowing an executor to run the model without providing its own implementation of the architecture. This would allow for a more consistent experience across executors, and would allow for more complex architectures to be supported without requiring the executor to implement them.
 
+## Standardized tensor names
+
+To minimize complexity and maximize compatibility, it is recommended that models using the transformer architecture use the following naming convention for their tensors:
+
+### Base layers
+
+`AA.weight` `AA.bias`
+
+where `AA` can be:
+
+- `token_embd`: Token embedding layer
+- `pos_embd`: Position embedding layer
+- `output_norm`: Output normalization layer
+- `output`: Output layer
+
+### Attention and feed-forward layer blocks
+
+`blk.N.BB.weight` `blk.N.BB.bias`
+
+where N signifies the block number a layer belongs to, and where `BB` could be:
+
+- `attn_norm`: Attention normalization layer
+- `attn_norm_2`: Attention normalization layer
+- `attn_qkv`: Attention query-key-value layer
+- `attn_q`: Attention query layer
+- `attn_k`: Attention key layer
+- `attn_v`: Attention value layer
+- `attn_output`: Attention output layer
+
+- `ffn_norm`: Feed-forward network normalization layer
+- `ffn_up`: Feed-forward network "up" layer
+- `ffn_gate`: Feed-forward network "gate" layer
+- `ffn_down`: Feed-forward network "down" layer
+
 ---
 
-## Current State of Affairs
+## Historical State of Affairs
 
 The following information is provided for context, but is not necessary to understand the rest of this document.
 
