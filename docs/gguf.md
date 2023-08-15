@@ -352,7 +352,7 @@ The following sections describe the metadata for each model architecture. Each k
 
 - `falcon.tensor_data_layout`:
 
-  - `llama.cpp` (this name may be inaccurate depending on where the Falcon implementation ends up):
+  - `jploski` (author of the original GGML implementation of Falcon; this may change in the future):
 
     ```python
     # The original query_key_value tensor contains n_head_kv "kv groups",
@@ -420,7 +420,7 @@ The following keys are used to describe the tokenizer of the model. It is recomm
 
 #### GGML
 
-GGML supports an embedded vocabulary that may be lossily compressed from a more complete tokenizer. It is simplistic and specific to GGML. This should enable inferencing of the model, but it may not fully capture the nuances of tokenization. When a more accurate tokenizer is available and supported, it should be used instead.
+GGML supports an embedded vocabulary that enables inference of the model, but implementations of tokenization using this vocabulary (i.e. `llama.cpp`'s tokenizer) may have lower accuracy than the original tokenizer used for the model. When a more accurate tokenizer is available and supported, it should be used instead.
 
 It is not guaranteed to be standardized across models, and may change in the future. It is recommended that model authors use a more standardized tokenizer if possible.
 
