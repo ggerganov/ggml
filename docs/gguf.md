@@ -221,7 +221,7 @@ If a particular community key is widely used, it may be promoted to a standardiz
 - `general.url`: URL to the model's homepage. This can be a GitHub repo, a paper, etc.
 - `general.description: string`: free-form description of the model including anything that isn't covered by the other fields
 - `general.file_type: string`: type of the majority of the tensors in the file. This shouldn't have any semantic meaning and should be purely informational, hence the use of `string`.
-- `general.license: string`: SPDX license of the model
+- `general.license: string`: License of the model, expressed as a [SPDX license expression](https://spdx.github.io/spdx-spec/v2-draft/SPDX-license-expressions/) (e.g. `"MIT OR Apache-2.0`). Do not include any other information, such as the license text or the URL to the license.
 
 #### Source metadata
 
