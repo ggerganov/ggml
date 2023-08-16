@@ -256,7 +256,9 @@ endif()
 
 add_library(${TARGET}
     ggml.c
+    ggml-alloc.c
     ../include/ggml/ggml.h
+    ../include/ggml/ggml-alloc.h
     ${GGML_CUDA_SOURCES}
     ${GGML_OPENCL_SOURCES}
     ${GGML_METAL_SOURCES}
@@ -314,7 +316,9 @@ if (GGML_CUDA_SOURCES)
     endif()
 endif()
 
-set (GGML_PUBLIC_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml.h)
+set (GGML_PUBLIC_HEADERS
+     ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml.h
+     ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml-alloc.h)
 set_target_properties(${TARGET} PROPERTIES
                       PUBLIC_HEADER "${GGML_PUBLIC_HEADERS}")
 
