@@ -221,6 +221,9 @@ struct sam_state {
     struct ggml_tensor * embd_prompt_dense;
     struct ggml_tensor * pe_img_dense;
 
+    struct ggml_tensor * low_res_masks;
+    struct ggml_tensor * iou_predictions;
+
     struct ggml_context * ctx;
 
     std::vector<uint8_t> buf;
@@ -1705,7 +1708,7 @@ bool sam_decode_mask(
     const auto & dec = model.dec;
     const int n_img_embd = hparams.n_img_embd();
 
-    static size_t buf_size = 256u*1024*1024;
+    static size_t buf_size = 384u*1024*1024;
     static void * buf = malloc(buf_size);
 
     struct ggml_init_params params = {
@@ -1922,8 +1925,41 @@ bool sam_decode_mask(
     // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/mask_decoder.py#L136
     keys = ggml_cont(ctx0, ggml_transpose(ctx0, keys));
     keys = ggml_view_4d(ctx0, keys, srcNE[0], srcNE[1], srcNE[2], srcNE[3], srcNE[0]*keys->nb[0], keys->nb[1], keys->nb[2], 0);
-    // TODO: In order to implement the output_upscaling we need implementation of the
-    // PyTorch nn.ConvTranspose2d(). LayerNorm2d is already done in the image_encoder part
+
+    struct ggml_tensor * upscaled_embedding = {};
+    {
+        // ConvTranspose2d
+        keys = ggml_conv_transpose_2d_p0(ctx0, dec.output_upscaling_0_w, keys, 2);
+        keys = ggml_add(ctx0, ggml_repeat(ctx0, dec.output_upscaling_0_b, keys), keys);
+
+        // LayerNorm2d
+        {
+            // normalize along channel dimmension
+            // TODO: better implementation
+            keys = ggml_cont(ctx0, ggml_permute(ctx0,
+                        ggml_norm(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, keys, 1, 2, 0, 3))),
+                        2, 0, 1, 3));
+
+            keys = ggml_add(ctx0,
+                    ggml_mul(ctx0,
+                        ggml_repeat(ctx0, ggml_reshape_3d(ctx0, dec.output_upscaling_1_w, 1, 1, n_img_embd), keys),
+                        keys),
+                    ggml_repeat(ctx0, ggml_reshape_3d(ctx0, dec.output_upscaling_1_b, 1, 1, n_img_embd), keys));
+        }
+
+        // GELU activation
+        keys = ggml_gelu(ctx0, keys);
+
+        // ConvTranspose2d
+        keys = ggml_conv_transpose_2d_p0(ctx0, dec.output_upscaling_3_w, keys, 2);
+        keys = ggml_add(ctx0, ggml_repeat(ctx0, dec.output_upscaling_3_b, keys), keys);
+
+        // GELU activation
+        keys = ggml_gelu(ctx0, keys);
+        upscaled_embedding = ggml_reshape_3d(ctx0, keys, keys->ne[0]*keys->ne[1], keys->ne[2], keys->ne[3]);
+        upscaled_embedding = ggml_cont(ctx0, ggml_transpose(ctx0, upscaled_embedding)); // TODO: Shouldn't be needed
+    }
+
     struct ggml_tensor * hyper_in = ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_img_embd/2, num_mask_tokens, mask_tokens_out->ne[2]);
     for (int i = 0; i < num_mask_tokens; ++i) {
         const auto& mlp = dec.output_hypernet_mlps[i];
@@ -1932,29 +1968,38 @@ bool sam_decode_mask(
         ggml_build_forward_expand(&gf, ggml_cpy(ctx0, out, ggml_view_2d(ctx0, hyper_in, hyper_in->ne[0], hyper_in->ne[2], hyper_in->nb[1], i*hyper_in->nb[1])));
     }
 
+    struct ggml_tensor * masks = ggml_mul_mat(ctx0, hyper_in, upscaled_embedding);
+    masks = ggml_cont(ctx0, ggml_transpose(ctx0, masks)); // TODO: Shouldn't be needed
+    masks = ggml_cont(ctx0, ggml_reshape_4d(ctx0, masks, keys->ne[0], keys->ne[1], masks->ne[1], keys->ne[3]));
+
     // Generate mask quality predictions
     // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/mask_decoder.py#L146
-    iou_pred = sam_decode_mask_mlp_relu_3(iou_pred, dec.iou_prediction_head_0_w, dec.iou_prediction_head_0_b, dec.iou_prediction_head_1_w, dec.iou_prediction_head_1_b, dec.iou_prediction_head_2_w, dec.iou_prediction_head_2_b, ctx0);
+    state.iou_predictions = sam_decode_mask_mlp_relu_3(iou_pred, dec.iou_prediction_head_0_w, dec.iou_prediction_head_0_b, dec.iou_prediction_head_1_w, dec.iou_prediction_head_1_b, dec.iou_prediction_head_2_w, dec.iou_prediction_head_2_b, ctx0);
+    state.iou_predictions = ggml_view_1d(ctx0, state.iou_predictions, state.iou_predictions->ne[0] - 1, state.iou_predictions->nb[0]);
 
+    state.low_res_masks = ggml_view_4d(ctx0, masks, masks->ne[0], masks->ne[1], masks->ne[2] - 1, masks->ne[3],
+                                                    masks->nb[0], masks->nb[1], masks->nb[2],
+                                                    masks->nb[2] /* offset*/);
     ggml_set_name(queries, "queries");
-    ggml_set_name(keys, "keys");
-    ggml_set_name(iou_pred, "iou_pred");
+    ggml_set_name(upscaled_embedding, "upscaled_embedding");
+    ggml_set_name(state.low_res_masks, "low_res_masks");
+    ggml_set_name(state.iou_predictions, "iou_predictions");
     ggml_set_name(hyper_in, "hyper_in");
 
-    ggml_build_forward_expand(&gf, queries);
-    ggml_build_forward_expand(&gf, keys);
-    ggml_build_forward_expand(&gf, iou_pred);
-    ggml_build_forward_expand(&gf, hyper_in);
+    ggml_build_forward_expand(&gf, state.iou_predictions);
+    ggml_build_forward_expand(&gf, state.low_res_masks);
 
     // run the computation
     ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
     auto * t = ggml_get_tensor(ctx0, "queries");
     print_t_f32("queries", t);
-    t = ggml_get_tensor(ctx0, "keys");
-    print_t_f32("keys", t);
-    t = ggml_get_tensor(ctx0, "iou_pred");
-    print_t_f32("iou_pred", t);
+    t = ggml_get_tensor(ctx0, "upscaled_embedding");
+    print_t_f32("upscaled_embedding", t);
+    t = ggml_get_tensor(ctx0, "low_res_masks");
+    print_t_f32("low_res_masks", t);
+    t = ggml_get_tensor(ctx0, "iou_predictions");
+    print_t_f32("iou_predictions", t);
     t = ggml_get_tensor(ctx0, "hyper_in");
     print_t_f32("hyper_in", t);
 
