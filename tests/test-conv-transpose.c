@@ -12,35 +12,35 @@ struct ggml_context* make_ctx(void) {
     return ggml_init(params);
 }
 
-[[maybe_unused]] void printf_tensor(struct ggml_tensor * t) {
-    if (t->type == GGML_TYPE_F32) {
-        const float * t_d = ggml_get_data_f32(t);
-        for (int i = 0; i < t->ne[2]; ++i) {
-            for (int j = 0; j < t->ne[1]; ++j) {
-                for (int k = 0; k < t->ne[0]; ++k) {
-                    printf("%.1f ", t_d[i * t->ne[1] * t->ne[0] + j * t->ne[0] + k]);
-                }
-                printf("\n");
-            }
-            printf("---\n");
-        }
-    }
-    else if (t->type == GGML_TYPE_F16) {
-        const ggml_fp16_t * t_d = ggml_get_data(t);
-        for (int i = 0; i < t->ne[2]; ++i) {
-            for (int j = 0; j < t->ne[1]; ++j) {
-                for (int k = 0; k < t->ne[0]; ++k) {
-                    printf("%.1f ", ggml_fp16_to_fp32(t_d[i * t->ne[1] * t->ne[0] + j * t->ne[0] + k]));
-                }
-                printf("\n");
-            }
-            printf("---\n");
-        }
-    }
-    else {
-        printf("unknown type\n");
-    }
-}
+// void printf_tensor(struct ggml_tensor * t) {
+//     if (t->type == GGML_TYPE_F32) {
+//         const float * t_d = ggml_get_data_f32(t);
+//         for (int i = 0; i < t->ne[2]; ++i) {
+//             for (int j = 0; j < t->ne[1]; ++j) {
+//                 for (int k = 0; k < t->ne[0]; ++k) {
+//                     printf("%.1f ", t_d[i * t->ne[1] * t->ne[0] + j * t->ne[0] + k]);
+//                 }
+//                 printf("\n");
+//             }
+//             printf("---\n");
+//         }
+//     }
+//     else if (t->type == GGML_TYPE_F16) {
+//         const ggml_fp16_t * t_d = ggml_get_data(t);
+//         for (int i = 0; i < t->ne[2]; ++i) {
+//             for (int j = 0; j < t->ne[1]; ++j) {
+//                 for (int k = 0; k < t->ne[0]; ++k) {
+//                     printf("%.1f ", ggml_fp16_to_fp32(t_d[i * t->ne[1] * t->ne[0] + j * t->ne[0] + k]));
+//                 }
+//                 printf("\n");
+//             }
+//             printf("---\n");
+//         }
+//     }
+//     else {
+//         printf("unknown type\n");
+//     }
+// }
 
 void check_tensor(struct ggml_tensor * t, float * expected_t_d, int ne0, int ne1, int ne2) {
     GGML_ASSERT(t->type == GGML_TYPE_F32);
