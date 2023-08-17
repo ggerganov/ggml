@@ -71,11 +71,6 @@ for k, v in model.items():
     name = k
     shape = v.shape
 
-    # TODO: export only the Encoder -- after it works we will export the other stuff
-    if name[:13] != "image_encoder" and \
-       name[:14] != "prompt_encoder":
-        continue
-
     if name[:19] == "prompt_encoder.mask":
         continue
 
@@ -104,7 +99,9 @@ for k, v in model.items():
     ftype_cur = 1
     if ftype == 0 or n_dims == 1 or \
             name == "image_encoder.pos_embed" or \
-            name.startswith("prompt_encoder"):
+            name.startswith("prompt_encoder") or \
+            name.startswith("mask_decoder.iou_token") or \
+            name.startswith("mask_decoder.mask_tokens"):
         print("  Converting to float32")
         data = data.astype(np.float32)
         ftype_cur = 0
