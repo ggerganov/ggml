@@ -3789,7 +3789,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CLAMP",
     "CONV_1D",
     "CONV_2D",
-    "CONV_TRANSPOSE_2D"
+    "CONV_TRANSPOSE_2D",
     "POOL_1D",
     "POOL_2D",
 
@@ -3805,6 +3805,10 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
 
     "MAP_UNARY",
     "MAP_BINARY",
+
+    "MAP_CUSTOM1_F32",
+    "MAP_CUSTOM2_F32",
+    "MAP_CUSTOM3_F32",
 
     "MAP_CUSTOM1",
     "MAP_CUSTOM2",
@@ -3864,7 +3868,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "clamp(x)",
     "conv_1d(x)",
     "conv_2d(x)",
-    "conv_transpose_2d(x)"
+    "conv_transpose_2d(x)",
     "pool_1d(x)",
     "pool_2d(x)",
 
@@ -3880,6 +3884,10 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
 
     "f(x)",
     "f(x,y)",
+
+    "custom_f32(x)",
+    "custom_f32(x,y)",
+    "custom_f32(x,y,z)",
 
     "custom(x)",
     "custom(x,y)",
