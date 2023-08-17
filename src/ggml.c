@@ -3787,6 +3787,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CLAMP",
     "CONV_1D",
     "CONV_2D",
+    "CONV_TRANSPOSE_2D"
     "POOL_1D",
     "POOL_2D",
 
@@ -3809,7 +3810,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS_BACK",
 };
 
-static_assert(GGML_OP_COUNT == 71, "GGML_OP_COUNT != 70");
+static_assert(GGML_OP_COUNT == 71, "GGML_OP_COUNT != 71");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -3869,6 +3870,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "clamp(x)",
     "conv_1d(x)",
     "conv_2d(x)",
+    "conv_transpose_2d(x)"
     "pool_1d(x)",
     "pool_2d(x)",
 
