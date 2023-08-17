@@ -2126,7 +2126,8 @@ bool sam_write_masks(const sam_hparams& hparams, int nx, int ny, const sam_state
 
         std::string filename = "mask_out_" + std::to_string(i) + ".png";
         if (!stbi_write_png(filename.c_str(), res.nx, res.ny, 1, res.data.data(), res.nx)) {
-            fprintf(stderr, "%s: failed to write mask to 'mask_out_1.png'\n", __func__);
+            printf("%s: failed to write mask %s\n", __func__, filename.c_str());
+            return false;
         }
     }
 

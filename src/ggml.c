@@ -3922,6 +3922,7 @@ static void ggml_setup_op_has_task_pass(void) {
         p[GGML_OP_CONV_TRANSPOSE_2D      ] = true;
         p[GGML_OP_FLASH_ATTN_BACK        ] = true;
         p[GGML_OP_CROSS_ENTROPY_LOSS     ] = true;
+        p[GGML_OP_ADD_REL_POS            ] = true;
     }
 
     {   // FINALIZE
@@ -13214,20 +13215,6 @@ static void ggml_compute_forward_conv_transpose_2d(
                     }
                 }
             }
-
-            //    printf("kernel\n");
-            //    for (int z = 0; z < ne02; z++) {
-            //         for (int y = 0; y < ne01; y++) {
-            //              for (int x = 0; x < ne00; x++) {
-            //                   for (int x0 = 0; x0 < ne03; x0++) {
-            //                        printf("%f ", GGML_FP16_TO_FP32(wdata[z*ne01*ne00*ne03 + y*ne00*ne03 + x*ne03 + x0]));
-            //                   }
-            //                 printf("\n");
-            //              }
-            //              printf("---\n");
-            //         }
-            //         printf("===\n");
-            //    }
         }
 
         // permute source data (src1) from (Sw x Sh x Cin) to (Cin x Sw x Sh)
@@ -13242,18 +13229,6 @@ static void ggml_compute_forward_conv_transpose_2d(
                     }
                 }
             }
-
-
-            // printf("src\n");
-            // for (int y = 0; y < ne11; y++) {
-            //     for (int x = 0; x < ne10; x++) {
-            //         for (int x0 = 0; x0 < ne12; x0++) {
-            //             printf("%f ", GGML_FP16_TO_FP32(wdata[y*ne10*ne12 + x*ne12 + x0]));
-            //         }
-            //         printf("\n");
-            //     }
-            //     printf("===\n");
-            // }
         }
 
         return;
@@ -14633,18 +14608,13 @@ static void ggml_compute_forward_add_rel_pos_f32(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
-        const struct ggml_tensor * opt0,
+        const struct ggml_tensor * src2,
         struct ggml_tensor * dst) {
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_FINALIZE) {
         return;
     }
 
     // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/modeling/image_encoder.py#L357-L359
-
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
-    const int64_t ne12 = src1->ne[2];
-    const int64_t ne13 = src1->ne[3];
 
     const int64_t ne0 = dst->ne[0];
     const int64_t ne1 = dst->ne[1];
@@ -14652,12 +14622,33 @@ static void ggml_compute_forward_add_rel_pos_f32(
 
     float * src0_data = (float *) src0->data;
     float * src1_data = (float *) src1->data;
-    float * opt0_data = (float *) opt0->data;
+    float * src2_data = (float *) src2->data;
     float * dst_data  = (float *) dst->data;
 
-    memcpy(dst_data, src0_data, ne0*ne1*ne2*sizeof(float));
+    if (params->type == GGML_TASK_INIT) {
+        memcpy(dst_data, src0_data, ne0*ne1*ne2*sizeof(float));
+        return;
+    }
 
-    for (int64_t i13 = 0; i13 < ne13; ++i13) {
+    const int64_t ne10 = src1->ne[0];
+    const int64_t ne11 = src1->ne[1];
+    const int64_t ne12 = src1->ne[2];
+    const int64_t ne13 = src1->ne[3];
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    // total patches in dst
+    const int np = ne13;
+
+    // patches per thread
+    const int dp = (np + nth - 1)/nth;
+
+    // patch range for this thread
+    const int ip0 = dp*ith;
+    const int ip1 = MIN(ip0 + dp, np);
+
+    for (int64_t i13 = ip0; i13 < ip1; ++i13) {
         for (int64_t i12 = 0; i12 < ne12; ++i12) {
             for (int64_t i11 = 0; i11 < ne11; ++i11) {
                 for (int64_t i10 = 0; i10 < ne10; ++i10) {
@@ -14668,12 +14659,12 @@ static void ggml_compute_forward_add_rel_pos_f32(
 
                     const int64_t jp  = i13*ne12*ne11*ne10 + i12*ne11*ne10 + i11*ne10 + i10;
 
-                    const int64_t jdw = i4*ne1*ne0 + (i3*ne11 + i2)*ne0 + i10;
-                    const int64_t jdh = i4*ne1*ne0 + (i3*ne11 + i2)*ne0 + i10*ne10;
+                    const int64_t jdw = i4*ne1*ne0 + i3*ne11*ne0 + i2*ne0 + i10;
+                    const int64_t jdh = i4*ne1*ne0 + i3*ne11*ne0 + i2*ne0 + i10*ne10;
 
                     for (int64_t j = 0; j < ne10; ++j) {
                         dst_data[jdw + j*ne10] += src1_data[jp];
-                        dst_data[jdh + j     ] += opt0_data[jp];
+                        dst_data[jdh + j     ] += src2_data[jp];
                     }
                 }
             }
@@ -14685,12 +14676,12 @@ static void ggml_compute_forward_add_rel_pos(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
-        const struct ggml_tensor * opt0,
+        const struct ggml_tensor * src2,
         struct ggml_tensor * dst) {
     switch (src0->type) {
         case GGML_TYPE_F32:
             {
-                ggml_compute_forward_add_rel_pos_f32(params, src0, src1, opt0, dst);
+                ggml_compute_forward_add_rel_pos_f32(params, src0, src1, src2, dst);
             } break;
         default:
             {
@@ -16914,6 +16905,7 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
             case GGML_OP_SOFT_MAX_BACK:
             case GGML_OP_ROPE:
             case GGML_OP_ROPE_BACK:
+            case GGML_OP_ADD_REL_POS:
                 {
                     n_tasks = n_threads;
                 } break;
@@ -17076,7 +17068,6 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
             case GGML_OP_WIN_PART:
             case GGML_OP_WIN_UNPART:
             case GGML_OP_GET_REL_POS:
-            case GGML_OP_ADD_REL_POS:
             case GGML_OP_MAP_UNARY:
             case GGML_OP_MAP_BINARY:
             case GGML_OP_MAP_CUSTOM1_F32:
