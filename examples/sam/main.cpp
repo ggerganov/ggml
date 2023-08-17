@@ -4,6 +4,8 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 #include <cassert>
 #include <cmath>
@@ -23,6 +25,7 @@ struct sam_hparams {
     int32_t n_pt_embd         = 4;
     int32_t n_dec_heads       = 8;
     int32_t ftype             = 1;
+    float   iou_threshold     = 0.88f;
 
     int32_t n_enc_head_dim() const { return n_enc_state / n_enc_head; }
     int32_t n_img_size()     const { return 1024; }
@@ -1729,14 +1732,6 @@ bool sam_decode_mask(
             printf("%f ", data[i]);
         }
         printf("\n");
-        // printf("All elements:\n");
-        // for (int y = 0; y < 7; ++y) {
-        //     printf("[");
-        //     for (int x = 0; x < 256; ++x) {
-        //         printf("%f ", data[y*256 + x]);
-        //     }
-        //     printf("]\n\n");
-        // }
         double sum = 0.0;
         for (int i = 0; i < ggml_nelements(t); i++) {
             sum += data[i];
@@ -1975,6 +1970,9 @@ bool sam_decode_mask(
     // Generate mask quality predictions
     // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/mask_decoder.py#L146
     state.iou_predictions = sam_decode_mask_mlp_relu_3(iou_pred, dec.iou_prediction_head_0_w, dec.iou_prediction_head_0_b, dec.iou_prediction_head_1_w, dec.iou_prediction_head_1_b, dec.iou_prediction_head_2_w, dec.iou_prediction_head_2_b, ctx0);
+
+    // Select the correct mask or masks for output
+    // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/mask_decoder.py#L101
     state.iou_predictions = ggml_view_1d(ctx0, state.iou_predictions, state.iou_predictions->ne[0] - 1, state.iou_predictions->nb[0]);
 
     state.low_res_masks = ggml_view_4d(ctx0, masks, masks->ne[0], masks->ne[1], masks->ne[2] - 1, masks->ne[3],
@@ -2004,6 +2002,135 @@ bool sam_decode_mask(
     print_t_f32("hyper_in", t);
 
     ggml_free(ctx0);
+    return true;
+}
+
+bool sam_write_masks(const sam_hparams& hparams, int nx, int ny, const sam_state & state) {
+    if (state.low_res_masks->ne[2] == 0) return true;
+    if (state.low_res_masks->ne[2] != state.iou_predictions->ne[0]) {
+        printf("Error: number of masks (%jd) does not match number of iou predictions (%jd)\n", state.low_res_masks->ne[2], state.iou_predictions->ne[0]);
+        return false;
+    }
+
+    const int n_img_size = hparams.n_img_size();
+    const float iou_threshold = hparams.iou_threshold;
+
+    const int ne0 = state.low_res_masks->ne[0];
+    const int ne1 = state.low_res_masks->ne[1];
+    const int ne2 = state.low_res_masks->ne[2];
+
+    // TODO: Calculate and filter based on stability score and crop boxes
+
+    // Remove padding and upscale masks to the original image size.
+    // ref: https://github.com/facebookresearch/segment-anything/blob/efeab7296ab579d4a261e554eca80faf6b33924a/segment_anything/modeling/sam.py#L140
+
+    const float preprocess_scale = std::max(nx, ny) / float(n_img_size);
+    const int cropped_nx = int(nx / preprocess_scale + 0.5f);
+    const int cropped_ny = int(ny / preprocess_scale + 0.5f);
+
+    const float scale_x_1 = (float)ne0 / (float)n_img_size;
+    const float scale_y_1 = (float)ne1 / (float)n_img_size;
+
+    const float scale_x_2 = float(cropped_nx) / float(nx);
+    const float scale_y_2 = float(cropped_ny) / float(ny);
+
+    const auto iou_data = (float*)state.iou_predictions->data;
+
+    for (int i = 0; i < ne2; ++i) {
+        if (iou_threshold > 0.f && iou_data[i] < iou_threshold) {
+            continue; // Filtering masks with iou below the threshold
+        }
+
+        std::vector<float> mask_data(n_img_size*n_img_size);
+        {
+            const float* data = (float *) state.low_res_masks->data + i*ne0*ne1;
+
+            for (int iy = 0; iy < n_img_size; ++iy) {
+                for (int ix = 0; ix < n_img_size; ++ix) {
+                    const float sx = std::max(scale_x_1*(ix + 0.5f) - 0.5f, 0.0f);
+                    const float sy = std::max(scale_y_1*(iy + 0.5f) - 0.5f, 0.0f);
+
+                    const int x0 = std::max(0, (int)sx);
+                    const int y0 = std::max(0, (int)sy);
+
+                    const int x1 = std::min(x0 + 1, ne0 - 1);
+                    const int y1 = std::min(y0 + 1, ne1 - 1);
+
+                    const float dx = sx - x0;
+                    const float dy = sy - y0;
+
+                    const int j00 = y0*ne0 + x0;
+                    const int j01 = y0*ne0 + x1;
+                    const int j10 = y1*ne0 + x0;
+                    const int j11 = y1*ne0 + x1;
+
+                    const float v00 = data[j00];
+                    const float v01 = data[j01];
+                    const float v10 = data[j10];
+                    const float v11 = data[j11];
+
+                    const float v0 = (1-dx)*v00 + dx*v01;
+                    const float v1 = (1-dx)*v10 + dx*v11;
+
+                    const float v = (1-dy)*v0 + dy*v1;
+
+                    mask_data[iy*n_img_size + ix] = v;
+                }
+            }
+        }
+
+        sam_image_u8 res;
+        {
+            const float* data = mask_data.data();
+
+            res.nx = nx;
+            res.ny = ny;
+            res.data.resize(nx*ny);
+
+            for (int iy = 0; iy < ny; ++iy) {
+                for (int ix = 0; ix < nx; ++ix) {
+                    const float sx = std::max(scale_x_2*(ix + 0.5f) - 0.5f, 0.0f);
+                    const float sy = std::max(scale_y_2*(iy + 0.5f) - 0.5f, 0.0f);
+
+                    const int x0 = std::max(0, (int)sx);
+                    const int y0 = std::max(0, (int)sy);
+
+                    const int x1 = std::min(x0 + 1, cropped_nx - 1);
+                    const int y1 = std::min(y0 + 1, cropped_ny - 1);
+
+                    const float dx = sx - x0;
+                    const float dy = sy - y0;
+
+                    const int j00 = y0*n_img_size + x0;
+                    const int j01 = y0*n_img_size + x1;
+                    const int j10 = y1*n_img_size + x0;
+                    const int j11 = y1*n_img_size + x1;
+
+                    const float v00 = data[j00];
+                    const float v01 = data[j01];
+                    const float v10 = data[j10];
+                    const float v11 = data[j11];
+
+                    const float v0 = (1-dx)*v00 + dx*v01;
+                    const float v1 = (1-dx)*v10 + dx*v11;
+
+                    const float v = (1-dy)*v0 + dy*v1;
+
+                    if (v > 0) {
+                        const uint8_t v2 = std::min(std::max((int)std::round(v*255.f), 0), 255);
+                        res.data[iy*nx + ix] = v2;
+                    }
+                }
+            }
+        }
+
+        std::string filename = "mask_out_" + std::to_string(i) + ".png";
+        if (!stbi_write_png(filename.c_str(), res.nx, res.ny, 1, res.data.data(), res.nx)) {
+            fprintf(stderr, "%s: failed to write mask to 'mask_out_1.png'\n", __func__);
+        }
+    }
+
+
     return true;
 }
 
@@ -2113,6 +2240,11 @@ int main(int argc, char ** argv) {
 
     if (!sam_decode_mask(model, state, params.n_threads)) {
         fprintf(stderr, "%s: failed to decode mask\n", __func__);
+        return 1;
+    }
+
+    if (!sam_write_masks(model.hparams, img0.nx, img0.ny, state)) {
+        fprintf(stderr, "%s: failed to write masks\n", __func__);
         return 1;
     }
 
