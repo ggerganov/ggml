@@ -18,14 +18,17 @@
 
 // default hparams (ViT-B SAM)
 struct sam_hparams {
-    int32_t n_enc_state       = 768;
-    int32_t n_enc_layer       = 12;
-    int32_t n_enc_head        = 12;
-    int32_t n_enc_out_chans   = 256;
-    int32_t n_pt_embd         = 4;
-    int32_t n_dec_heads       = 8;
-    int32_t ftype             = 1;
-    float   iou_threshold     = 0.88f;
+    int32_t n_enc_state               = 768;
+    int32_t n_enc_layer               = 12;
+    int32_t n_enc_head                = 12;
+    int32_t n_enc_out_chans           = 256;
+    int32_t n_pt_embd                 = 4;
+    int32_t n_dec_heads               = 8;
+    int32_t ftype                     = 1;
+    float   mask_threshold            = 0.f;
+    float   iou_threshold             = 0.88f;
+    float   stability_score_threshold = 0.95f;
+    float   stability_score_offset    = 1.0f;
 
     int32_t n_enc_head_dim() const { return n_enc_state / n_enc_head; }
     int32_t n_img_size()     const { return 1024; }
@@ -1943,13 +1946,15 @@ bool sam_write_masks(const sam_hparams& hparams, int nx, int ny, const sam_state
     }
 
     const int n_img_size = hparams.n_img_size();
+    const float mask_threshold = hparams.mask_threshold;
     const float iou_threshold = hparams.iou_threshold;
+    const float stability_score_threshold = hparams.stability_score_threshold;
+    const float intersection_threshold = mask_threshold + hparams.stability_score_offset;
+    const float union_threshold = mask_threshold - hparams.stability_score_offset;
 
     const int ne0 = state.low_res_masks->ne[0];
     const int ne1 = state.low_res_masks->ne[1];
     const int ne2 = state.low_res_masks->ne[2];
-
-    // TODO: Calculate and filter based on stability score and crop boxes
 
     // Remove padding and upscale masks to the original image size.
     // ref: https://github.com/facebookresearch/segment-anything/blob/efeab7296ab579d4a261e554eca80faf6b33924a/segment_anything/modeling/sam.py#L140
@@ -2009,7 +2014,13 @@ bool sam_write_masks(const sam_hparams& hparams, int nx, int ny, const sam_state
             }
         }
 
+        int intersections = 0;
+        int unions = 0;
         sam_image_u8 res;
+        int min_iy = ny;
+        int max_iy = 0;
+        int min_ix = nx;
+        int max_ix = 0;
         {
             const float* data = mask_data.data();
 
@@ -2046,13 +2057,31 @@ bool sam_write_masks(const sam_hparams& hparams, int nx, int ny, const sam_state
 
                     const float v = (1-dy)*v0 + dy*v1;
 
-                    if (v > 0) {
-                        const uint8_t v2 = std::min(std::max((int)std::round(v*255.f), 0), 255);
-                        res.data[iy*nx + ix] = v2;
+                    if (v > intersection_threshold) {
+                        intersections++;
+                    }
+                    if (v > union_threshold) {
+                        unions++;
+                    }
+                    if (v > mask_threshold) {
+                        min_iy = std::min(min_iy, iy);
+                        max_iy = std::max(max_iy, iy);
+                        min_ix = std::min(min_ix, ix);
+                        max_ix = std::max(max_ix, ix);
+
+                        res.data[iy*nx + ix] = 255;
                     }
                 }
             }
         }
+
+        const float stability_score = float(intersections) / float(unions);
+        if (stability_score_threshold > 0.f && stability_score < stability_score_threshold) {
+            continue; // Filtering masks with stability score below the threshold
+        }
+
+        printf("Mask %d: iou = %f, stability_score = %f, bbox (%d, %d), (%d, %d)\n",
+                i, iou_data[i], stability_score, min_ix, max_ix, min_iy, max_iy);
 
         std::string filename = "mask_out_" + std::to_string(i) + ".png";
         if (!stbi_write_png(filename.c_str(), res.nx, res.ny, 1, res.data.data(), res.nx)) {
