@@ -12,7 +12,7 @@ The example currently supports only the [ViT-B SAM model checkpoint](https://hug
 - [ ] Remove redundant graph nodes
 - [ ] Make inference faster
 - [ ] Fix the difference in output masks compared to the PyTorch implementation
-- [ ] Filter masks based on stability score and based on boxes, which touch crop boundaries
+- [X] Filter masks based on stability score
 - [ ] Add support for user input
 - [ ] Support F16 for heavy F32 ops
 - [ ] Test quantization
