@@ -1346,76 +1346,6 @@ bool sam_encode_image(
     ggml_build_forward_expand(&gf, cur);
     ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
-    // print
-    {
-        // auto print_t_f32 = [&](struct ggml_tensor * t) {
-        //     float * data = (float *)t->data;
-        //     printf("dims: %jd %jd %jd %jd f32\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
-        //     printf("data: ");
-        //     for (int i = 0; i < std::min((int) t->ne[0], 10); i++) {
-        //         printf("%f ", data[i]);
-        //     }
-        //     printf("\n");
-        //     //for (int y = 0; y < 64; ++y) {
-        //     //    for (int x = 0; x < 64; ++x) {
-        //     //        printf("%5.2f ", data[y*64 + x]);
-        //     //    }
-        //     //    printf("\n");
-        //     //}
-        //     //printf("\n");
-        //     for (int y = 0; y < 64; ++y) {
-        //         for (int x = 0; x < 64; ++x) {
-        //             printf("%5.2f ", data[(y*64 + x)*64 + 41]);
-        //         }
-        //         printf("\n");
-        //     }
-        //     printf("\n");
-        //     //for (int y = 0; y < 64; ++y) {
-        //     //    for (int x = 0; x < 64; ++x) {
-        //     //        printf("%5.2f ", data[(y*64 + x)*768 + 231]);
-        //     //    }
-        //     //    printf("\n");
-        //     //}
-        //     //printf("\n");
-        //     double sum = 0.0;
-        //     for (int i = 0; i < ggml_nelements(t); i++) {
-        //         sum += data[i];
-        //     }
-        //     printf("sum:  %f\n", sum);
-        // };
-
-        // auto print_t_f16 = [&](struct ggml_tensor * t) {
-        //     ggml_fp16_t * data = (ggml_fp16_t *)t->data;
-        //     printf("dims: %jd %jd %jd %jd f16\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
-        //     printf("data: ");
-        //     for (int i = 0; i < std::min((int) t->ne[0], 10); i++) {
-        //         printf("%f ", ggml_fp16_to_fp32(data[i]));
-        //     }
-        //     printf("\n");
-        //     for (int y = 0; y < 14; ++y) {
-        //         for (int x = 0; x < 14; ++x) {
-        //             printf("%7.4f ", ggml_fp16_to_fp32(data[(y*14 + x)*64 + 23]));
-        //         }
-        //         printf("\n");
-        //     }
-        //     printf("\n");
-        //     double sum = 0.0;
-        //     for (int i = 0; i < ggml_nelements(t); i++) {
-        //         sum += ggml_fp16_to_fp32(data[i]);
-        //     }
-        //     printf("sum:  %f\n", sum);
-        // };
-
-        // auto * t = ggml_get_tensor(ctx0, "check");
-        // if (t->type == GGML_TYPE_F32) {
-        //     print_t_f32(t);
-        // } else {
-        //     print_t_f16(t);
-        // }
-    }
-
-    //printf("used_mem = %zu\n", ggml_used_mem(ctx0));
-
     ggml_free(ctx0);
     return true;
 }
@@ -1723,25 +1653,25 @@ bool sam_decode_mask(
     struct ggml_context * ctx0 = ggml_init(params);
     struct ggml_cgraph gf = {};
 
-    auto print_t_f32 = [&](const char* title, struct ggml_tensor * t) {
-        printf("%s\n", title);
-        float * data = (float *)t->data;
-        printf("dims: %jd %jd %jd %jd f32\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
-        printf("First 10 elements:\n");
-        for (int i = 0; i < std::min((int) t->ne[0], 10); i++) {
-            printf("%f ", data[i]);
-        }
-        printf("\n");
-        double sum = 0.0;
-        for (int i = 0; i < ggml_nelements(t); i++) {
-            sum += data[i];
-        }
-        printf("sum:  %f\n\n", sum);
-    };
-    print_t_f32("embd_img", state.embd_img);
-    print_t_f32("embd_prompt_dense", state.embd_prompt_dense);
-    print_t_f32("embd_prompt_sparse", state.embd_prompt_sparse);
-    print_t_f32("pe_img_dense", state.pe_img_dense);
+    // auto print_t_f32 = [&](const char* title, struct ggml_tensor * t) {
+    //     printf("%s\n", title);
+    //     float * data = (float *)t->data;
+    //     printf("dims: %jd %jd %jd %jd f32\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
+    //     printf("First 10 elements:\n");
+    //     for (int i = 0; i < std::min((int) t->ne[0], 10); i++) {
+    //         printf("%f ", data[i]);
+    //     }
+    //     printf("\n");
+    //     double sum = 0.0;
+    //     for (int i = 0; i < ggml_nelements(t); i++) {
+    //         sum += data[i];
+    //     }
+    //     printf("sum:  %f\n\n", sum);
+    // };
+    // print_t_f32("embd_img", state.embd_img);
+    // print_t_f32("embd_prompt_dense", state.embd_prompt_dense);
+    // print_t_f32("embd_prompt_sparse", state.embd_prompt_sparse);
+    // print_t_f32("pe_img_dense", state.pe_img_dense);
 
     struct ggml_tensor * tokens = {};
     {
@@ -1978,11 +1908,11 @@ bool sam_decode_mask(
     state.low_res_masks = ggml_view_4d(ctx0, masks, masks->ne[0], masks->ne[1], masks->ne[2] - 1, masks->ne[3],
                                                     masks->nb[0], masks->nb[1], masks->nb[2],
                                                     masks->nb[2] /* offset*/);
-    ggml_set_name(queries, "queries");
-    ggml_set_name(upscaled_embedding, "upscaled_embedding");
-    ggml_set_name(state.low_res_masks, "low_res_masks");
-    ggml_set_name(state.iou_predictions, "iou_predictions");
-    ggml_set_name(hyper_in, "hyper_in");
+    // ggml_set_name(queries, "queries");
+    // ggml_set_name(upscaled_embedding, "upscaled_embedding");
+    // ggml_set_name(state.low_res_masks, "low_res_masks");
+    // ggml_set_name(state.iou_predictions, "iou_predictions");
+    // ggml_set_name(hyper_in, "hyper_in");
 
     ggml_build_forward_expand(&gf, state.iou_predictions);
     ggml_build_forward_expand(&gf, state.low_res_masks);
@@ -1990,16 +1920,16 @@ bool sam_decode_mask(
     // run the computation
     ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
-    auto * t = ggml_get_tensor(ctx0, "queries");
-    print_t_f32("queries", t);
-    t = ggml_get_tensor(ctx0, "upscaled_embedding");
-    print_t_f32("upscaled_embedding", t);
-    t = ggml_get_tensor(ctx0, "low_res_masks");
-    print_t_f32("low_res_masks", t);
-    t = ggml_get_tensor(ctx0, "iou_predictions");
-    print_t_f32("iou_predictions", t);
-    t = ggml_get_tensor(ctx0, "hyper_in");
-    print_t_f32("hyper_in", t);
+    // auto * t = ggml_get_tensor(ctx0, "queries");
+    // print_t_f32("queries", t);
+    // t = ggml_get_tensor(ctx0, "upscaled_embedding");
+    // print_t_f32("upscaled_embedding", t);
+    // t = ggml_get_tensor(ctx0, "low_res_masks");
+    // print_t_f32("low_res_masks", t);
+    // t = ggml_get_tensor(ctx0, "iou_predictions");
+    // print_t_f32("iou_predictions", t);
+    // t = ggml_get_tensor(ctx0, "hyper_in");
+    // print_t_f32("hyper_in", t);
 
     ggml_free(ctx0);
     return true;
@@ -2169,7 +2099,7 @@ int main(int argc, char ** argv) {
 
     fprintf(stderr, "%s: preprocessed image (%d x %d)\n", __func__, img1.nx, img1.ny);
 
-#if 1
+#if 0
     {
         const int n = 128;
         fprintf(stderr, "%s: first %d diagonal pixels:\n", __func__, n);
