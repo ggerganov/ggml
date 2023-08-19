@@ -31,3 +31,7 @@ zig-cache/
 *.dot
 
 *.sw?
+
+build-lin/
+
+build-win/

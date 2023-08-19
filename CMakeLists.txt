@@ -58,9 +58,14 @@ option(GGML_AVX512                  "ggml: enable AVX512"                       
 option(GGML_AVX512_VBMI             "ggml: enable AVX512-VBMI"                             OFF)
 option(GGML_AVX512_VNNI             "ggml: enable AVX512-VNNI"                             OFF)
 option(GGML_FMA                     "ggml: enable FMA"                                     ON)
+option(GGML_FPIC                     "ggml: enable FPIC"                                     OFF)
 # in MSVC F16C is implied with AVX2/AVX512
 if (NOT MSVC)
     option(GGML_F16C                "ggml: enable F16C"                                    ON)
+endif()
+
+if (GGML_FPIC)
+	set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
 
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffast-math")
