@@ -13410,23 +13410,36 @@ static void ggml_compute_forward_conv_2d_f16_f32(
         memset(params->wdata, 0, params->wsize);
 
         // prepare source data (src1)
+        // src1: image [N, IC, IH, IW]
+        // src0: kernel [OC, IC, KH, KW]
+        // dst:  result [N, OC, OH, OW]
+        // ne12: IC
+        // ne0: OW
+        // ne1: OH
+        // nk0: KW
+        // nk1: KH
+        // ne13: N
+        // ew0: IC*KH*KW
+        // im2col: [N, IC, IH, IW] => [N*OH*OW, IC*KH*KW]
         {
             ggml_fp16_t * const wdata = (ggml_fp16_t *) params->wdata + 0;
 
-            for (int i12 = 0; i12 < ne12; i12++) {
-                const float * const src = (float *)((char *) src1->data + i12*nb12);
-                ggml_fp16_t * dst_data = wdata;
+            for (int i13 = 0; i13 < ne3; i13++) {
+                for (int i12 = 0; i12 < ne12; i12++) {
+                    const float * const src = (float *)((char *) src1->data + i13*nb13 + i12*nb12);
+                    ggml_fp16_t * dst_data = wdata;
 
-                for (int i1 = 0; i1 < ne1; i1++) {
-                    for (int i0 = 0; i0 < ne0; i0++) {
-                        for (int ik1 = 0; ik1 < nk1; ik1++) {
-                            for (int ik0 = 0; ik0 < nk0; ik0++) {
-                                const int idx0 = i0*s0 + ik0*d0 - p0;
-                                const int idx1 = i1*s1 + ik1*d1 - p1;
+                    for (int i1 = 0; i1 < ne1; i1++) {
+                        for (int i0 = 0; i0 < ne0; i0++) {
+                            for (int ik1 = 0; ik1 < nk1; ik1++) {
+                                for (int ik0 = 0; ik0 < nk0; ik0++) {
+                                    const int idx0 = i0*s0 + ik0*d0 - p0;
+                                    const int idx1 = i1*s1 + ik1*d1 - p1;
 
-                                if (!(idx1 < 0 || idx1 >= ne11 || idx0 < 0 || idx0 >= ne10)) {
-                                    dst_data[(i1*ne0 + i0)*ew0 + i12*(nk0*nk1) + ik1*nk0 + ik0] =
-                                        GGML_FP32_TO_FP16(src[idx1*ne10 + idx0]);
+                                    if (!(idx1 < 0 || idx1 >= ne11 || idx0 < 0 || idx0 >= ne10)) {
+                                        dst_data[(i13*ne1*ne0 + i1*ne0 + i0)*ew0 + i12*(nk0*nk1) + ik1*nk0 + ik0] =
+                                            GGML_FP32_TO_FP16(src[idx1*ne10 + idx0]);
+                                    }
                                 }
                             }
                         }
@@ -13453,16 +13466,26 @@ static void ggml_compute_forward_conv_2d_f16_f32(
     const int ip1 = MIN(ip0 + dp, np);
 
     ggml_fp16_t * const wdata = (ggml_fp16_t *) params->wdata + 0;
-
+    // wdata: [N*OH*OW, IC*KH*KW]
+    // dst: result [N, OC, OH, OW]
+    // src0: kernel [OC, IC, KH, KW]
+    // ne3: N
+    // ip1: subset of OC
+    // ne1: OH
+    // ne0: OW
+    // nb3: OC*OH*OW*nb0
     for (int i3 = 0; i3 < ne3; i3++) {
         for (int i2 = ip0; i2 < ip1; i2++) {
             float * dst_data = (float *)((char *) dst->data + i3*nb3 + i2*nb2);
+            // dst_data: [OH, OW]
+            // src0->data + i2*nb03: [IC * KH * KW]
+            //  wdata + (i3*ne1*ne0 + i1*ne0 + i0)*ew0: [IC * KH * KW]
 
             for (int i1 = 0; i1 < ne1; ++i1) {
                 for (int i0 = 0; i0 < ne0; ++i0) {
                     ggml_vec_dot_f16(ew0, dst_data + i1*ne0 + i0,
                             (ggml_fp16_t *) ((char *) src0->data + i2*nb03),
-                            (ggml_fp16_t *)                wdata + i3*nb3 + (i1*ne0 + i0)*ew0);
+                            (ggml_fp16_t *)                wdata + (i3*ne1*ne0 + i1*ne0 + i0)*ew0);
                 }
             }
         }
@@ -17386,6 +17409,7 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
                     const int64_t ne0 = node->ne[0];
                     const int64_t ne1 = node->ne[1];
                     const int64_t ne2 = node->ne[2];
+                    const int64_t ne3 = node->ne[3];
                     const int64_t nk = ne00*ne01;
                     const int64_t ew0 = nk * ne02;
 
@@ -17396,7 +17420,8 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
 
                     if (node->src[0]->type == GGML_TYPE_F16 &&
                         node->src[1]->type == GGML_TYPE_F32) {
-                        cur = sizeof(ggml_fp16_t)*(ne0*ne1*ew0);
+                        // im2col: [N*OH*OW, IC*KH*KW]
+                        cur = sizeof(ggml_fp16_t)*(ne3*ne0*ne1*ew0);
                     } else if (node->src[0]->type == GGML_TYPE_F32 &&
                                node->src[1]->type == GGML_TYPE_F32) {
                         cur = sizeof(float)*      (ne10*ne11*ne12);
