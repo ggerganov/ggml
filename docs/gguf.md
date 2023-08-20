@@ -152,8 +152,6 @@ struct gguf_tensor_info_t {
     uint32_t n_dimensions;
     // The dimensions of the tensor.
     uint32_t dimensions[n_dimensions];
-    // The number of elements in the tensor.
-    uint32_t n_elements;
     // The type of the tensor.
     ggml_type type;
     // The offset of the tensor's data in this file in bytes.
