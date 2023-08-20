@@ -95,10 +95,10 @@ union gguf_metadata_value_t {
     bool bool_;
     gguf_string_t string;
     struct {
-        // Number of elements, not bytes
-        uint32_t len;
         // Any value type is valid, including arrays.
         gguf_metadata_value_type type;
+        // Number of elements, not bytes
+        uint32_t len;
         // The array of values.
         gguf_metadata_value_t array[len];
     } array;
@@ -112,8 +112,6 @@ struct gguf_metadata_kv_t {
     // Any keys that do not follow these rules are invalid.
     gguf_string_t key;
 
-    // The length of the value, in bytes
-    uint32_t value_len;
     // The type of the value.
     // Must be one of the `gguf_metadata_value_type` values.
     gguf_metadata_value_type value_type;
