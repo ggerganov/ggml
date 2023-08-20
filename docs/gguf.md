@@ -123,7 +123,8 @@ struct gguf_metadata_kv_t {
 
 struct gguf_header_t {
     // Magic number to announce that this is a GGUF file.
-    // Must be `'GGUF'`/`0x47475546`.
+    // Must be `GGUF` as a 32-bit little-endian integer:
+    // `0x46` `0x55` `0x47` `0x47` (i.e. 'F' 'U' 'G' 'G' at the byte level).
     uint32_t magic;
     // The version of the format implemented.
     // Must be `1` for version described in this spec.
@@ -211,7 +212,7 @@ If a particular community key is widely used, it may be promoted to a standardiz
   - `bloom`
   - `falcon`
   - `rwkv`
-- **`general.quantization_version: uint32`**: The version of the quantization format. Not required if the model is not quantized (i.e. no tensors are quantized). If any tensors are quantized, this _must_ be present. This is separate to the quantization scheme described in `general.file_type` because the quantization version may change without changing the file type (e.g. the quantization scheme is Q5_K, and the quantization version is 4).
+- **`general.quantization_version: uint32`**: The version of the quantization format. Not required if the model is not quantized (i.e. no tensors are quantized). If any tensors are quantized, this _must_ be present. This is separate to the quantization scheme of the tensors itself; the quantization version may change without changing the scheme's name (e.g. the quantization scheme is Q5_K, and the quantization version is 4).
 - **`general.alignment: uint32`**: the global alignment to use, as described above. This can vary to allow for different alignment schemes, but it must be a multiple of 8.
 
 #### General metadata
@@ -220,7 +221,6 @@ If a particular community key is widely used, it may be promoted to a standardiz
 - `general.author`: The author of the model.
 - `general.url`: URL to the model's homepage. This can be a GitHub repo, a paper, etc.
 - `general.description: string`: free-form description of the model including anything that isn't covered by the other fields
-- `general.file_type: string`: type of the majority of the tensors in the file. This shouldn't have any semantic meaning and should be purely informational, hence the use of `string`.
 - `general.license: string`: License of the model, expressed as a [SPDX license expression](https://spdx.github.io/spdx-spec/v2-draft/SPDX-license-expressions/) (e.g. `"MIT OR Apache-2.0`). Do not include any other information, such as the license text or the URL to the license.
 
 #### Source metadata
@@ -246,7 +246,7 @@ In the following, `[llm]` is used to fill in for the name of a specific LLM arch
 #### Attention
 
 - `[llm].attention.head_count: uint32`: Also known as `n_head`. Number of attention heads.
-- `[llm].attention.head_count_kv: uint32`: The number of heads per group used in Grouped-Query-Attention. If not present, the model does not use GQA.
+- `[llm].attention.head_count_kv: uint32`: The number of heads per group used in Grouped-Query-Attention. If not present or if present and equal to `[llm].attention.head_count`, the model does not use GQA.
 - `[llm].attention.max_alibi_bias: float32`: The maximum bias to use for ALiBI.
 - `[llm].attention.clamp_kqv: float32`: Value (`C`) to clamp the values of the `Q`, `K`, and `V` tensors between (`[-C, C]`).
 - `[llm].attention.layer_norm_epsilon: float32`: Layer normalization epsilon.
@@ -276,7 +276,7 @@ The following sections describe the metadata for each model architecture. Each k
 - `llama.rope.scale`
 - `llama.attention.head_count_kv`
 - `llama.tensor_data_layout`:
-  - `llama.cpp`:
+  - `Meta AI original pth`:
     ```python
     def permute(weights: NDArray, n_head: int) -> NDArray:
         return (weights.reshape(n_head, 2, weights.shape[0] // n_head // 2, *weights.shape[1:])
