@@ -123,8 +123,10 @@ struct gguf_metadata_kv_t {
 
 struct gguf_header_t {
     // Magic number to announce that this is a GGUF file.
-    // Must be `GGUF` as a 32-bit little-endian integer:
-    // `0x46` `0x55` `0x47` `0x47` (i.e. 'F' 'U' 'G' 'G' at the byte level).
+    // Must be `GGUF` at the byte level: `0x47` `0x47` `0x55` `0x46`.
+    // Your executor might do little-endian byte order, so it might be
+    // check for 0x46554747 and letting the endianness cancel out.
+    // Consider being *very* explicit about the byte order here.
     uint32_t magic;
     // The version of the format implemented.
     // Must be `1` for version described in this spec.
