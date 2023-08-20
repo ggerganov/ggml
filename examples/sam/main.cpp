@@ -1228,7 +1228,7 @@ bool sam_encode_image(
                         0, 2, 1, 3));
             struct ggml_tensor * rel_h = ggml_mul_mat(ctx0, rh, q_r);
 
-            struct ggml_tensor * attn = ggml_add_rel_pos(ctx0, KQ_scaled, rel_w, rel_h);
+            struct ggml_tensor * attn = ggml_add_rel_pos_inplace(ctx0, KQ_scaled, rel_w, rel_h);
 
             struct ggml_tensor * KQ_soft_max = ggml_soft_max_inplace(ctx0, attn);
 

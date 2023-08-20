@@ -3930,7 +3930,6 @@ static void ggml_setup_op_has_task_pass(void) {
         p[GGML_OP_CONV_TRANSPOSE_2D      ] = true;
         p[GGML_OP_FLASH_ATTN_BACK        ] = true;
         p[GGML_OP_CROSS_ENTROPY_LOSS     ] = true;
-        p[GGML_OP_ADD_REL_POS            ] = true;
     }
 
     {   // FINALIZE
@@ -7329,7 +7328,7 @@ struct ggml_tensor * ggml_get_rel_pos(
 
 // ggml_add_rel_pos
 
-struct ggml_tensor * ggml_add_rel_pos(
+struct ggml_tensor * ggml_add_rel_pos_inplace(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * pw,
@@ -7347,18 +7346,9 @@ struct ggml_tensor * ggml_add_rel_pos(
     GGML_ASSERT(pw->type == GGML_TYPE_F32);
     GGML_ASSERT(ph->type == GGML_TYPE_F32);
 
-    bool is_node = false;
-
-    if (a->grad) {
-        GGML_ASSERT(false); // TODO: implement backward
-        is_node = true;
-    }
-
-    const int64_t ne[4] = { a->ne[0], a->ne[1], a->ne[2], 1, };
-    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 3, ne);
-
+    struct ggml_tensor * result = ggml_view_tensor(ctx, a);
     result->op   = GGML_OP_ADD_REL_POS;
-    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->grad = NULL;
     result->src[0] = a;
     result->src[1] = pw;
     result->src[2] = ph;
@@ -14586,7 +14576,6 @@ static void ggml_compute_forward_get_rel_pos_f16(
     for (int64_t i2 = 0; i2 < ne2; ++i2) {
         for (int64_t i1 = 0; i1 < ne1; ++i1) {
             const int64_t pos = (w - i1 - 1) + i2;
-
             for (int64_t i0 = 0; i0 < ne0; ++i0) {
                 dst_data[i2*ne1*ne0 + i1*ne0 + i0] = src0_data[pos*ne00 + i0];
             }
@@ -14618,25 +14607,19 @@ static void ggml_compute_forward_add_rel_pos_f32(
         const struct ggml_tensor * src1,
         const struct ggml_tensor * src2,
         struct ggml_tensor * dst) {
-    if (params->type == GGML_TASK_FINALIZE) {
+    UNUSED(src0);
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
         return;
     }
+
+    int64_t t0 = ggml_perf_time_us();
+    UNUSED(t0);
 
     // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/modeling/image_encoder.py#L357-L359
 
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
-    const int64_t ne2 = dst->ne[2];
-
-    float * src0_data = (float *) src0->data;
     float * src1_data = (float *) src1->data;
     float * src2_data = (float *) src2->data;
     float * dst_data  = (float *) dst->data;
-
-    if (params->type == GGML_TASK_INIT) {
-        memcpy(dst_data, src0_data, ne0*ne1*ne2*sizeof(float));
-        return;
-    }
 
     const int64_t ne10 = src1->ne[0];
     const int64_t ne11 = src1->ne[1];
@@ -14656,23 +14639,22 @@ static void ggml_compute_forward_add_rel_pos_f32(
     const int ip0 = dp*ith;
     const int ip1 = MIN(ip0 + dp, np);
 
+
     for (int64_t i13 = ip0; i13 < ip1; ++i13) {
         for (int64_t i12 = 0; i12 < ne12; ++i12) {
             for (int64_t i11 = 0; i11 < ne11; ++i11) {
+                const int64_t jp1 = i13*ne12*ne11*ne10 + i12*ne11*ne10 + i11*ne10;
                 for (int64_t i10 = 0; i10 < ne10; ++i10) {
-                    // add rel pos W (src1) to src0
-                    const int64_t i2 = i11;
-                    const int64_t i3 = i12;
-                    const int64_t i4 = i13;
+                    const int64_t jp0  = jp1 + i10;
+                    const float src1_e = src1_data[jp0];
+                    const float src2_e = src2_data[jp0];
 
-                    const int64_t jp  = i13*ne12*ne11*ne10 + i12*ne11*ne10 + i11*ne10 + i10;
-
-                    const int64_t jdw = i4*ne1*ne0 + i3*ne11*ne0 + i2*ne0 + i10;
-                    const int64_t jdh = i4*ne1*ne0 + i3*ne11*ne0 + i2*ne0 + i10*ne10;
+                    const int64_t jdh = jp0 * ne10;
+                    const int64_t jdw = jdh - (ne10 - 1) * i10;
 
                     for (int64_t j = 0; j < ne10; ++j) {
-                        dst_data[jdw + j*ne10] += src1_data[jp];
-                        dst_data[jdh + j     ] += src2_data[jp];
+                        dst_data[jdh + j     ] += src2_e;
+                        dst_data[jdw + j*ne10] += src1_e;
                     }
                 }
             }
