@@ -1364,6 +1364,8 @@ bool sam_encode_image(
     ggml_build_forward_expand(&gf, cur);
     ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
+    //ggml_graph_print(&gf);
+
     ggml_free(ctx0);
     return true;
 }
