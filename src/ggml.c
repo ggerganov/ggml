@@ -7329,33 +7329,30 @@ struct ggml_tensor * ggml_get_rel_pos(
 
 // ggml_add_rel_pos
 
-struct ggml_tensor * ggml_add_rel_pos(
+static struct ggml_tensor * ggml_add_rel_pos_impl(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * pw,
-        struct ggml_tensor  * ph) {
-    GGML_ASSERT(pw->ne[0] == ph->ne[0]);
-    GGML_ASSERT(pw->ne[1] == ph->ne[1]);
-    GGML_ASSERT(pw->ne[2] == ph->ne[2]);
-    GGML_ASSERT(pw->ne[3] == ph->ne[3]);
-    GGML_ASSERT(pw->ne[3] == a->ne[2]);
-    GGML_ASSERT(pw->ne[0]*ph->ne[0] == a->ne[0]);
-    GGML_ASSERT(pw->ne[1]*pw->ne[2] == a->ne[1]);
+        struct ggml_tensor  * ph,
+        bool                  inplace) {
+    GGML_ASSERT(ggml_are_same_shape(pw, ph));
     GGML_ASSERT(ggml_is_contiguous(a));
     GGML_ASSERT(ggml_is_contiguous(pw));
     GGML_ASSERT(ggml_is_contiguous(ph));
-    GGML_ASSERT(pw->type == GGML_TYPE_F32);
     GGML_ASSERT(ph->type == GGML_TYPE_F32);
+    GGML_ASSERT(pw->type == GGML_TYPE_F32);
+    GGML_ASSERT(pw->ne[3] == a->ne[2]);
+    GGML_ASSERT(pw->ne[0]*pw->ne[0] == a->ne[0]);
+    GGML_ASSERT(pw->ne[1]*pw->ne[2] == a->ne[1]);
 
     bool is_node = false;
 
-    if (a->grad) {
-        GGML_ASSERT(false); // TODO: implement backward
+    if (!inplace && (a->grad || pw->grad || ph->grad)) {
         is_node = true;
     }
 
-    const int64_t ne[4] = { a->ne[0], a->ne[1], a->ne[2], 1, };
-    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 3, ne);
+    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
+    ggml_set_op_params_i32(result, 0, inplace ? 1 : 0);
 
     result->op   = GGML_OP_ADD_REL_POS;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
@@ -7364,6 +7361,23 @@ struct ggml_tensor * ggml_add_rel_pos(
     result->src[2] = ph;
 
     return result;
+}
+
+
+struct ggml_tensor * ggml_add_rel_pos(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        struct ggml_tensor  * pw,
+        struct ggml_tensor  * ph) {
+    return ggml_add_rel_pos_impl(ctx, a, pw, ph, false);
+}
+
+struct ggml_tensor * ggml_add_rel_pos_inplace(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        struct ggml_tensor  * pw,
+        struct ggml_tensor  * ph) {
+    return ggml_add_rel_pos_impl(ctx, a, pw, ph, true);
 }
 
 // gmml_unary
@@ -10774,6 +10788,10 @@ static void ggml_compute_forward_mul_mat(
     GGML_ASSERT(nb1 <= nb2);
     GGML_ASSERT(nb2 <= nb3);
 
+    // broadcast factors
+    const int64_t r2 = ne12/ne02;
+    const int64_t r3 = ne13/ne03;
+
     // nb01 >= nb00 - src0 is not transposed
     //   compute by src0 rows
 
@@ -10793,11 +10811,6 @@ static void ggml_compute_forward_mul_mat(
 
 #if defined(GGML_USE_ACCELERATE) || defined(GGML_USE_OPENBLAS)
     if (ggml_compute_forward_mul_mat_use_blas(src0, src1, dst)) {
-        // TODO: handle case when src0 is broadcast-able into src1 across 2nd,3rd dimension
-        //       ref: https://github.com/ggerganov/ggml/pull/224
-        GGML_ASSERT(ne02 == ne12);
-        GGML_ASSERT(ne03 == ne13);
-
         if (params->ith != 0) {
             return;
         }
@@ -10810,12 +10823,16 @@ static void ggml_compute_forward_mul_mat(
             return;
         }
 
-        for (int64_t i03 = 0; i03 < ne03; i03++) {
-            for (int64_t i02 = 0; i02 < ne02; i02++) {
-                const void * x = (char *) src0->data + i03*nb03 + i02*nb02;
-                const float * y = (float *) ((char *) src1->data + i02*nb12 + i03*nb13);
+        for (int64_t i13 = 0; i13 < ne13; i13++) {
+            for (int64_t i12 = 0; i12 < ne12; i12++) {
+                // broadcast src0 into src1 across 2nd,3rd dimension
+                const int64_t i03 = i13/r3;
+                const int64_t i02 = i12/r2;
 
-                float * d = (float *) ((char *) dst->data + i02*nb2 + i03*nb3);
+                const void  * x = (char *)            src0->data + i02*nb02 + i03*nb03;
+                const float * y = (float *) ((char *) src1->data + i12*nb12 + i13*nb13);
+
+                float * d = (float *) ((char *) dst->data + i12*nb2 + i13*nb3);
 
                 if (type != GGML_TYPE_F32) {
                             float * const wdata    = params->wdata;
@@ -10823,7 +10840,7 @@ static void ggml_compute_forward_mul_mat(
 
                     size_t id = 0;
                     for (int64_t i01 = 0; i01 < ne01; ++i01) {
-                        to_float((char *) src0->data + i03*nb03 + i02*nb02 + i01*nb01, wdata + id, ne00);
+                        to_float((const char *) x + i01*nb01, wdata + id, ne00);
                         id += ne00;
                     }
 
@@ -10902,10 +10919,6 @@ static void ggml_compute_forward_mul_mat(
 
     assert(ne12 % ne02 == 0);
     assert(ne13 % ne03 == 0);
-
-    // broadcast factors
-    const int64_t r2 = ne12/ne02;
-    const int64_t r3 = ne13/ne03;
 
     // block-tiling attempt
     const int64_t blck_0 = 16;
@@ -14586,7 +14599,6 @@ static void ggml_compute_forward_get_rel_pos_f16(
     for (int64_t i2 = 0; i2 < ne2; ++i2) {
         for (int64_t i1 = 0; i1 < ne1; ++i1) {
             const int64_t pos = (w - i1 - 1) + i2;
-
             for (int64_t i0 = 0; i0 < ne0; ++i0) {
                 dst_data[i2*ne1*ne0 + i1*ne0 + i0] = src0_data[pos*ne00 + i0];
             }
@@ -14618,25 +14630,24 @@ static void ggml_compute_forward_add_rel_pos_f32(
         const struct ggml_tensor * src1,
         const struct ggml_tensor * src2,
         struct ggml_tensor * dst) {
-    if (params->type == GGML_TASK_FINALIZE) {
+
+    const bool inplace = (bool) ((int32_t *) dst->op_params)[0];
+    if (!inplace && params->type == GGML_TASK_INIT) {
+        memcpy((char *) dst->data, (char *) src0->data, ggml_nbytes(dst));
         return;
     }
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+        return;
+    }
+
+    int64_t t0 = ggml_perf_time_us();
+    UNUSED(t0);
 
     // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/modeling/image_encoder.py#L357-L359
 
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
-    const int64_t ne2 = dst->ne[2];
-
-    float * src0_data = (float *) src0->data;
     float * src1_data = (float *) src1->data;
     float * src2_data = (float *) src2->data;
     float * dst_data  = (float *) dst->data;
-
-    if (params->type == GGML_TASK_INIT) {
-        memcpy(dst_data, src0_data, ne0*ne1*ne2*sizeof(float));
-        return;
-    }
 
     const int64_t ne10 = src1->ne[0];
     const int64_t ne11 = src1->ne[1];
@@ -14656,23 +14667,22 @@ static void ggml_compute_forward_add_rel_pos_f32(
     const int ip0 = dp*ith;
     const int ip1 = MIN(ip0 + dp, np);
 
+
     for (int64_t i13 = ip0; i13 < ip1; ++i13) {
         for (int64_t i12 = 0; i12 < ne12; ++i12) {
             for (int64_t i11 = 0; i11 < ne11; ++i11) {
+                const int64_t jp1 = i13*ne12*ne11*ne10 + i12*ne11*ne10 + i11*ne10;
                 for (int64_t i10 = 0; i10 < ne10; ++i10) {
-                    // add rel pos W (src1) to src0
-                    const int64_t i2 = i11;
-                    const int64_t i3 = i12;
-                    const int64_t i4 = i13;
+                    const int64_t jp0  = jp1 + i10;
+                    const float src1_e = src1_data[jp0];
+                    const float src2_e = src2_data[jp0];
 
-                    const int64_t jp  = i13*ne12*ne11*ne10 + i12*ne11*ne10 + i11*ne10 + i10;
-
-                    const int64_t jdw = i4*ne1*ne0 + i3*ne11*ne0 + i2*ne0 + i10;
-                    const int64_t jdh = i4*ne1*ne0 + i3*ne11*ne0 + i2*ne0 + i10*ne10;
+                    const int64_t jdh = jp0 * ne10;
+                    const int64_t jdw = jdh - (ne10 - 1) * i10;
 
                     for (int64_t j = 0; j < ne10; ++j) {
-                        dst_data[jdw + j*ne10] += src1_data[jp];
-                        dst_data[jdh + j     ] += src2_data[jp];
+                        dst_data[jdh + j     ] += src2_e;
+                        dst_data[jdw + j*ne10] += src1_e;
                     }
                 }
             }
