@@ -59,21 +59,29 @@ int main(int argc, const char** argv) {
         struct ggml_tensor * rw_f32 = ggml_cpy(ctx, rw, ggml_new_tensor_3d(ctx, GGML_TYPE_F32, 3, 2, 2));
         struct ggml_tensor * rh_f32 = ggml_cpy(ctx, rh, ggml_new_tensor_3d(ctx, GGML_TYPE_F32, 3, 2, 2));
 
-        struct ggml_tensor * out = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 9, 4);
-        float* out_d = (float*)out->data;
-        for (int i = 0; i < ggml_nelements(out); ++i) {
-            out_d[i] = 1.f;
+        struct ggml_tensor * in = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 9, 4);
+        struct ggml_tensor * out_inplace = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 9, 4);
+        float * in_d          = (float*)in->data;
+        float * out_inplace_d = (float*)out_inplace->data;
+        for (int i = 0; i < ggml_nelements(in); ++i) {
+            in_d[i]          = 1.f;
+            out_inplace_d[i] = 1.f;
         }
 
-        out = ggml_add_rel_pos_inplace(ctx, out, rw_f32, rh_f32);
-
+        struct ggml_tensor * out = ggml_add_rel_pos(ctx, in, rw_f32, rh_f32);
         struct ggml_cgraph gf = ggml_build_forward(out);
         ggml_build_forward_expand(&gf, rw_f32);
         ggml_build_forward_expand(&gf, rh_f32);
-
         ggml_graph_compute_with_ctx(ctx, &gf, 1);
 
+        out_inplace = ggml_add_rel_pos_inplace(ctx, out_inplace, rw_f32, rh_f32);
+        struct ggml_cgraph gf_2 = ggml_build_forward(out_inplace);
+        ggml_build_forward_expand(&gf_2, rw_f32);
+        ggml_build_forward_expand(&gf_2, rh_f32);
+        ggml_graph_compute_with_ctx(ctx, &gf_2, 1);
+
         check_tensor(out, (float*)expected_out, 9, 4, 1);
+        check_tensor(out_inplace, (float*)expected_out, 9, 4, 1);
     }
 
     return 0;

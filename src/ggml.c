@@ -3930,6 +3930,7 @@ static void ggml_setup_op_has_task_pass(void) {
         p[GGML_OP_CONV_TRANSPOSE_2D      ] = true;
         p[GGML_OP_FLASH_ATTN_BACK        ] = true;
         p[GGML_OP_CROSS_ENTROPY_LOSS     ] = true;
+        p[GGML_OP_ADD_REL_POS            ] = true;
     }
 
     {   // FINALIZE
@@ -7328,32 +7329,55 @@ struct ggml_tensor * ggml_get_rel_pos(
 
 // ggml_add_rel_pos
 
-struct ggml_tensor * ggml_add_rel_pos_inplace(
+static struct ggml_tensor * ggml_add_rel_pos_impl(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * pw,
-        struct ggml_tensor  * ph) {
-    GGML_ASSERT(pw->ne[0] == ph->ne[0]);
-    GGML_ASSERT(pw->ne[1] == ph->ne[1]);
-    GGML_ASSERT(pw->ne[2] == ph->ne[2]);
-    GGML_ASSERT(pw->ne[3] == ph->ne[3]);
-    GGML_ASSERT(pw->ne[3] == a->ne[2]);
-    GGML_ASSERT(pw->ne[0]*ph->ne[0] == a->ne[0]);
-    GGML_ASSERT(pw->ne[1]*pw->ne[2] == a->ne[1]);
+        struct ggml_tensor  * ph,
+        bool                  inplace) {
+    GGML_ASSERT(ggml_are_same_shape(pw, ph));
     GGML_ASSERT(ggml_is_contiguous(a));
     GGML_ASSERT(ggml_is_contiguous(pw));
     GGML_ASSERT(ggml_is_contiguous(ph));
-    GGML_ASSERT(pw->type == GGML_TYPE_F32);
     GGML_ASSERT(ph->type == GGML_TYPE_F32);
+    GGML_ASSERT(pw->type == GGML_TYPE_F32);
+    GGML_ASSERT(pw->ne[3] == a->ne[2]);
+    GGML_ASSERT(pw->ne[0]*pw->ne[0] == a->ne[0]);
+    GGML_ASSERT(pw->ne[1]*pw->ne[2] == a->ne[1]);
 
-    struct ggml_tensor * result = ggml_view_tensor(ctx, a);
+    bool is_node = false;
+
+    if (!inplace && (a->grad || pw->grad || ph->grad)) {
+        is_node = true;
+    }
+
+    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
+    ggml_set_op_params_i32(result, 0, inplace ? 1 : 0);
+
     result->op   = GGML_OP_ADD_REL_POS;
-    result->grad = NULL;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = pw;
     result->src[2] = ph;
 
     return result;
+}
+
+
+struct ggml_tensor * ggml_add_rel_pos(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        struct ggml_tensor  * pw,
+        struct ggml_tensor  * ph) {
+    return ggml_add_rel_pos_impl(ctx, a, pw, ph, false);
+}
+
+struct ggml_tensor * ggml_add_rel_pos_inplace(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        struct ggml_tensor  * pw,
+        struct ggml_tensor  * ph) {
+    return ggml_add_rel_pos_impl(ctx, a, pw, ph, true);
 }
 
 // gmml_unary
@@ -14607,7 +14631,12 @@ static void ggml_compute_forward_add_rel_pos_f32(
         const struct ggml_tensor * src1,
         const struct ggml_tensor * src2,
         struct ggml_tensor * dst) {
-    UNUSED(src0);
+
+    const bool inplace = (bool) ((int32_t *) dst->op_params)[0];
+    if (!inplace && params->type == GGML_TASK_INIT) {
+        memcpy((char *) dst->data, (char *) src0->data, ggml_nbytes(dst));
+        return;
+    }
     if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
         return;
     }
