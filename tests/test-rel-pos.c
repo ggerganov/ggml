@@ -70,14 +70,10 @@ int main(int argc, const char** argv) {
 
         struct ggml_tensor * out = ggml_add_rel_pos(ctx, in, rw_f32, rh_f32);
         struct ggml_cgraph gf = ggml_build_forward(out);
-        ggml_build_forward_expand(&gf, rw_f32);
-        ggml_build_forward_expand(&gf, rh_f32);
         ggml_graph_compute_with_ctx(ctx, &gf, 1);
 
         out_inplace = ggml_add_rel_pos_inplace(ctx, out_inplace, rw_f32, rh_f32);
         struct ggml_cgraph gf_2 = ggml_build_forward(out_inplace);
-        ggml_build_forward_expand(&gf_2, rw_f32);
-        ggml_build_forward_expand(&gf_2, rh_f32);
         ggml_graph_compute_with_ctx(ctx, &gf_2, 1);
 
         check_tensor(out, (float*)expected_out, 9, 4, 1);
