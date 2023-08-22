@@ -349,9 +349,9 @@ extern "C" {
         GGML_OP_CONCAT,
         GGML_OP_SILU_BACK,
         GGML_OP_NORM, // normalize
-        GGML_OP_GROUP_NORM,
         GGML_OP_RMS_NORM,
         GGML_OP_RMS_NORM_BACK,
+        GGML_OP_GROUP_NORM,
 
         GGML_OP_MUL_MAT,
         GGML_OP_OUT_PROD,
@@ -808,13 +808,14 @@ extern "C" {
             struct ggml_tensor  * a,
             struct ggml_tensor  * b);
 
-    // concat a and b on dim 2
-    GGML_API struct ggml_tensor* ggml_concat(
-            struct ggml_context* ctx,
-            struct ggml_tensor* a,
-            struct ggml_tensor* b);
-
     GGML_API struct ggml_tensor * ggml_repeat_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
+
+    // concat a and b on dim 2
+    // used in stable-diffusion
+    GGML_API struct ggml_tensor * ggml_concat(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             struct ggml_tensor  * b);
@@ -916,18 +917,6 @@ extern "C" {
     GGML_API struct ggml_tensor * ggml_norm_inplace(
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
-    
-    // group normalize along ne0*ne1*n_groups
-    // TODO: eps is hardcoded to 1e-6 for now
-    GGML_API struct ggml_tensor * ggml_group_norm(
-        struct ggml_context * ctx,
-        struct ggml_tensor * a,
-        int n_groups);
-
-    GGML_API struct ggml_tensor * ggml_group_norm_inplace(
-        struct ggml_context * ctx,
-        struct ggml_tensor * a,
-        int n_groups);
 
     GGML_API struct ggml_tensor * ggml_rms_norm(
             struct ggml_context * ctx,
@@ -938,6 +927,19 @@ extern "C" {
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             float                 eps);
+
+    // group normalize along ne0*ne1*n_groups
+    // used in stable-diffusion
+    // TODO: eps is hardcoded to 1e-6 for now
+    GGML_API struct ggml_tensor * ggml_group_norm(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            int                   n_groups);
+
+    GGML_API struct ggml_tensor * ggml_group_norm_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            int                   n_groups);
 
     // a - x
     // b - dy
@@ -1366,10 +1368,11 @@ extern "C" {
             int                   p1);
 
     // nearest interpolate
+    // used in stable-diffusion
     GGML_API struct ggml_tensor * ggml_upscale(
             struct ggml_context * ctx,
-            struct ggml_tensor * a,
-            int scale_factor);
+            struct ggml_tensor  * a,
+            int                   scale_factor);
 
     GGML_API struct ggml_tensor * ggml_flash_attn(
             struct ggml_context * ctx,
