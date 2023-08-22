@@ -1,3 +1,4 @@
+# auto-generated file
 import ggml.ffi as ffi
 import numpy as np
 class lib:
@@ -267,6 +268,28 @@ class lib:
   def GGML_UNARY_OP_STEP(self) -> int: ...
   @property
   def GGML_UNARY_OP_TANH(self) -> int: ...
+  @property
+  def GGUF_TYPE_ARRAY(self) -> int: ...
+  @property
+  def GGUF_TYPE_BOOL(self) -> int: ...
+  @property
+  def GGUF_TYPE_COUNT(self) -> int: ...
+  @property
+  def GGUF_TYPE_FLOAT32(self) -> int: ...
+  @property
+  def GGUF_TYPE_INT16(self) -> int: ...
+  @property
+  def GGUF_TYPE_INT32(self) -> int: ...
+  @property
+  def GGUF_TYPE_INT8(self) -> int: ...
+  @property
+  def GGUF_TYPE_STRING(self) -> int: ...
+  @property
+  def GGUF_TYPE_UINT16(self) -> int: ...
+  @property
+  def GGUF_TYPE_UINT32(self) -> int: ...
+  @property
+  def GGUF_TYPE_UINT8(self) -> int: ...
   def abort_callback(data: ffi.CData) -> bool:
     """
     abort ggml_graph_compute when true
@@ -399,6 +422,14 @@ class lib:
     ...
   def ggml_allocr_reset(alloc: ffi.CData) -> None:
     """GGML_API void   ggml_allocr_reset(struct ggml_allocr * alloc);"""
+    ...
+  def ggml_allocr_set_parse_seq(alloc: ffi.CData, list: ffi.CData, n: int) -> None:
+    """
+    tell the allocator to parse nodes following the order described in the list
+    you should call this if your graph are optimized to execute out-of-order
+
+    GGML_API void   ggml_allocr_set_parse_seq(struct ggml_allocr * alloc, int * list, int n);
+    """
     ...
   def ggml_are_same_shape(t0: ffi.CData, t1: ffi.CData) -> bool:
     """    GGML_API bool ggml_are_same_shape(const struct ggml_tensor * t0, const struct ggml_tensor * t1);"""
@@ -611,59 +642,52 @@ class lib:
     """
     ...
   def ggml_cuda_assign_buffers(tensor: ffi.CData) -> None:
-    """void   ggml_cuda_assign_buffers(struct ggml_tensor * tensor);"""
+    """GGML_API void   ggml_cuda_assign_buffers(struct ggml_tensor * tensor);"""
     ...
   def ggml_cuda_assign_buffers_force_inplace(tensor: ffi.CData) -> None:
-    """void   ggml_cuda_assign_buffers_force_inplace(struct ggml_tensor * tensor);"""
+    """GGML_API void   ggml_cuda_assign_buffers_force_inplace(struct ggml_tensor * tensor);"""
     ...
   def ggml_cuda_assign_buffers_no_scratch(tensor: ffi.CData) -> None:
-    """void   ggml_cuda_assign_buffers_no_scratch(struct ggml_tensor * tensor);"""
+    """GGML_API void   ggml_cuda_assign_buffers_no_scratch(struct ggml_tensor * tensor);"""
     ...
   def ggml_cuda_can_mul_mat(src0: ffi.CData, src1: ffi.CData, dst: ffi.CData) -> bool:
-    """bool   ggml_cuda_can_mul_mat(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst);"""
+    """GGML_API bool   ggml_cuda_can_mul_mat(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst);"""
     ...
   def ggml_cuda_compute_forward(params: ffi.CData, tensor: ffi.CData) -> bool:
-    """bool   ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_tensor * tensor);"""
+    """GGML_API bool   ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_tensor * tensor);"""
     ...
   def ggml_cuda_free_data(tensor: ffi.CData) -> None:
-    """void   ggml_cuda_free_data(struct ggml_tensor * tensor);"""
+    """GGML_API void   ggml_cuda_free_data(struct ggml_tensor * tensor);"""
     ...
   def ggml_cuda_free_scratch() -> None:
-    """void   ggml_cuda_free_scratch(void);"""
+    """GGML_API void   ggml_cuda_free_scratch(void);"""
+    ...
+  def ggml_cuda_get_device_count() -> int:
+    """GGML_API int    ggml_cuda_get_device_count(void);"""
+    ...
+  def ggml_cuda_get_device_description(device: int, description: ffi.CData, description_size: int) -> None:
+    """GGML_API void   ggml_cuda_get_device_description(int device, char * description, size_t description_size);"""
     ...
   def ggml_cuda_host_free(ptr: ffi.CData) -> None:
-    """void   ggml_cuda_host_free(void * ptr);"""
+    """GGML_API void   ggml_cuda_host_free(void * ptr);"""
     ...
   def ggml_cuda_host_malloc(size: int) -> ffi.CData:
-    """
-    TODO: export these with GGML_API
-
-    void * ggml_cuda_host_malloc(size_t size);
-    """
-    ...
-  def ggml_cuda_mul(src0: ffi.CData, src1: ffi.CData, dst: ffi.CData) -> None:
-    """void   ggml_cuda_mul(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst);"""
-    ...
-  def ggml_cuda_mul_mat(src0: ffi.CData, src1: ffi.CData, dst: ffi.CData, wdata: ffi.CData, wsize: int) -> None:
-    """void   ggml_cuda_mul_mat(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst, void * wdata, size_t wsize);"""
-    ...
-  def ggml_cuda_mul_mat_get_wsize(src0: ffi.CData, src1: ffi.CData, dst: ffi.CData) -> int:
-    """size_t ggml_cuda_mul_mat_get_wsize(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst);"""
+    """GGML_API void * ggml_cuda_host_malloc(size_t size);"""
     ...
   def ggml_cuda_set_main_device(main_device: int) -> None:
-    """void   ggml_cuda_set_main_device(int main_device);"""
+    """GGML_API void   ggml_cuda_set_main_device(int main_device);"""
     ...
   def ggml_cuda_set_mul_mat_q(mul_mat_q: bool) -> None:
-    """void   ggml_cuda_set_mul_mat_q(bool mul_mat_q);"""
+    """GGML_API void   ggml_cuda_set_mul_mat_q(bool mul_mat_q);"""
     ...
   def ggml_cuda_set_scratch_size(scratch_size: int) -> None:
-    """void   ggml_cuda_set_scratch_size(size_t scratch_size);"""
+    """GGML_API void   ggml_cuda_set_scratch_size(size_t scratch_size);"""
     ...
   def ggml_cuda_set_tensor_split(tensor_split: ffi.CData) -> None:
-    """void   ggml_cuda_set_tensor_split(const float * tensor_split);"""
+    """GGML_API void   ggml_cuda_set_tensor_split(const float * tensor_split);"""
     ...
   def ggml_cuda_transform_tensor(data: ffi.CData, tensor: ffi.CData) -> None:
-    """void   ggml_cuda_transform_tensor(void * data, struct ggml_tensor * tensor);"""
+    """GGML_API void   ggml_cuda_transform_tensor(void * data, struct ggml_tensor * tensor);"""
     ...
   def ggml_cycles() -> int:
     """    GGML_API int64_t ggml_cycles(void);"""
@@ -963,10 +987,10 @@ class lib:
     """    GGML_API struct ggml_context * ggml_init(struct ggml_init_params params);"""
     ...
   def ggml_init_cublas() -> None:
-    """void   ggml_init_cublas(void);"""
+    """GGML_API void   ggml_init_cublas(void);"""
     ...
-  def ggml_internal_get_type_traits(i: int) -> ffi.CData:
-    """    ggml_type_traits_t ggml_internal_get_type_traits(enum ggml_type i);"""
+  def ggml_internal_get_type_traits(type: int) -> ffi.CData:
+    """    ggml_type_traits_t ggml_internal_get_type_traits(enum ggml_type type);"""
     ...
   def ggml_is_contiguous(tensor: ffi.CData) -> bool:
     """    GGML_API bool ggml_is_contiguous(const struct ggml_tensor * tensor);"""
@@ -1191,6 +1215,13 @@ class lib:
   def ggml_metal_free(ctx: ffi.CData) -> None:
     """void ggml_metal_free(struct ggml_metal_context * ctx);"""
     ...
+  def ggml_metal_get_concur_list(ctx: ffi.CData) -> ffi.CData:
+    """
+    output the concur_list for ggml_alloc
+
+    int * ggml_metal_get_concur_list(struct ggml_metal_context * ctx);
+    """
+    ...
   def ggml_metal_get_tensor(ctx: ffi.CData, t: ffi.CData) -> None:
     """
     get data from the device into host memory
@@ -1206,19 +1237,25 @@ class lib:
     void ggml_metal_graph_compute(struct ggml_metal_context * ctx, struct ggml_cgraph * gf);
     """
     ...
-  def ggml_metal_graph_find_concurrency(ctx: ffi.CData, gf: ffi.CData) -> None:
+  def ggml_metal_graph_find_concurrency(ctx: ffi.CData, gf: ffi.CData, check_mem: bool) -> None:
     """
     try to find operations that can be run concurrently in the graph
     you should run it again if the topology of your graph changes
 
-    void ggml_metal_graph_find_concurrency(struct ggml_metal_context * ctx, struct ggml_cgraph * gf);
+    void ggml_metal_graph_find_concurrency(struct ggml_metal_context * ctx, struct ggml_cgraph * gf, bool check_mem);
     """
     ...
-  def ggml_metal_if_optimized(ctx: ffi.CData) -> bool:
+  def ggml_metal_host_free(data: ffi.CData) -> None:
+    """void   ggml_metal_host_free  (void * data);"""
+    ...
+  def ggml_metal_host_malloc(n: int) -> ffi.CData:
+    """void * ggml_metal_host_malloc(size_t n);"""
+    ...
+  def ggml_metal_if_optimized(ctx: ffi.CData) -> int:
     """
-    if the graph has been optimized for concurrently dispatch
+    if the graph has been optimized for concurrently dispatch, return length of the concur_list if optimized
 
-    bool ggml_metal_if_optimized(struct ggml_metal_context * ctx);
+    int ggml_metal_if_optimized(struct ggml_metal_context * ctx);
     """
     ...
   def ggml_metal_init(n_cb: int) -> ffi.CData:
@@ -1312,6 +1349,9 @@ class lib:
     ...
   def ggml_nbytes(tensor: ffi.CData) -> int:
     """    GGML_API size_t  ggml_nbytes      (const struct ggml_tensor * tensor);"""
+    ...
+  def ggml_nbytes_pad(tensor: ffi.CData) -> int:
+    """    GGML_API size_t  ggml_nbytes_pad  (const struct ggml_tensor * tensor); // same as ggml_nbytes() but padded to GGML_MEM_ALIGN"""
     ...
   def ggml_nbytes_split(tensor: ffi.CData, nrows_split: int) -> int:
     """    GGML_API size_t  ggml_nbytes_split(const struct ggml_tensor * tensor, int nrows_split);"""
@@ -2182,6 +2222,171 @@ class lib:
                 int                   w0,
                 int                   h0,
                 int                   w);
+    """
+    ...
+  def gguf_add_tensor(ctx: ffi.CData, tensor: ffi.CData) -> None:
+    """
+    manage tensor info
+
+        GGML_API void gguf_add_tensor(struct gguf_context * ctx, const struct ggml_tensor * tensor);
+    """
+    ...
+  def gguf_find_key(ctx: ffi.CData, key: ffi.CData) -> int:
+    """    GGML_API int          gguf_find_key(struct gguf_context * ctx, const char * key);"""
+    ...
+  def gguf_find_tensor(ctx: ffi.CData, name: ffi.CData) -> int:
+    """    GGML_API int    gguf_find_tensor      (struct gguf_context * ctx, const char * name);"""
+    ...
+  def gguf_free(ctx: ffi.CData) -> None:
+    """    GGML_API void gguf_free(struct gguf_context * ctx);"""
+    ...
+  def gguf_get_alignment(ctx: ffi.CData) -> int:
+    """    GGML_API size_t gguf_get_alignment  (struct gguf_context * ctx);"""
+    ...
+  def gguf_get_arr_data(ctx: ffi.CData, i: int) -> ffi.CData:
+    """    GGML_API const void * gguf_get_arr_data(struct gguf_context * ctx, int i);"""
+    ...
+  def gguf_get_arr_n(ctx: ffi.CData, i: int) -> int:
+    """    GGML_API int          gguf_get_arr_n   (struct gguf_context * ctx, int i);"""
+    ...
+  def gguf_get_arr_str(ctx: ffi.CData, key_id: int, i: int) -> ffi.CData:
+    """    GGML_API const char * gguf_get_arr_str (struct gguf_context * ctx, int key_id, int i);"""
+    ...
+  def gguf_get_arr_type(ctx: ffi.CData, i: int) -> int:
+    """    GGML_API enum gguf_type gguf_get_arr_type(struct gguf_context * ctx, int i);"""
+    ...
+  def gguf_get_data(ctx: ffi.CData) -> ffi.CData:
+    """    GGML_API void * gguf_get_data       (struct gguf_context * ctx);"""
+    ...
+  def gguf_get_data_offset(ctx: ffi.CData) -> int:
+    """    GGML_API size_t gguf_get_data_offset(struct gguf_context * ctx);"""
+    ...
+  def gguf_get_key(ctx: ffi.CData, i: int) -> ffi.CData:
+    """    GGML_API const char * gguf_get_key (struct gguf_context * ctx, int i);"""
+    ...
+  def gguf_get_kv_type(ctx: ffi.CData, i: int) -> int:
+    """    GGML_API enum gguf_type gguf_get_kv_type (struct gguf_context * ctx, int i);"""
+    ...
+  def gguf_get_meta_data(ctx: ffi.CData, data: ffi.CData) -> None:
+    """    GGML_API void   gguf_get_meta_data(struct gguf_context * ctx, void * data);"""
+    ...
+  def gguf_get_meta_size(ctx: ffi.CData) -> int:
+    """
+    get the size in bytes of the meta data (header, kv pairs, tensor info) including padding
+
+        GGML_API size_t gguf_get_meta_size(struct gguf_context * ctx);
+    """
+    ...
+  def gguf_get_n_kv(ctx: ffi.CData) -> int:
+    """    GGML_API int          gguf_get_n_kv(struct gguf_context * ctx);"""
+    ...
+  def gguf_get_n_tensors(ctx: ffi.CData) -> int:
+    """    GGML_API int    gguf_get_n_tensors    (struct gguf_context * ctx);"""
+    ...
+  def gguf_get_tensor_name(ctx: ffi.CData, i: int) -> ffi.CData:
+    """    GGML_API char * gguf_get_tensor_name  (struct gguf_context * ctx, int i);"""
+    ...
+  def gguf_get_tensor_offset(ctx: ffi.CData, i: int) -> int:
+    """    GGML_API size_t gguf_get_tensor_offset(struct gguf_context * ctx, int i);"""
+    ...
+  def gguf_get_val_bool(ctx: ffi.CData, i: int) -> bool:
+    """    GGML_API bool         gguf_get_val_bool(struct gguf_context * ctx, int i);"""
+    ...
+  def gguf_get_val_f32(ctx: ffi.CData, i: int) -> float:
+    """    GGML_API float        gguf_get_val_f32 (struct gguf_context * ctx, int i);"""
+    ...
+  def gguf_get_val_i16(ctx: ffi.CData, i: int) -> int:
+    """    GGML_API int16_t      gguf_get_val_i16 (struct gguf_context * ctx, int i);"""
+    ...
+  def gguf_get_val_i32(ctx: ffi.CData, i: int) -> int:
+    """    GGML_API int32_t      gguf_get_val_i32 (struct gguf_context * ctx, int i);"""
+    ...
+  def gguf_get_val_i8(ctx: ffi.CData, i: int) -> int:
+    """    GGML_API int8_t       gguf_get_val_i8  (struct gguf_context * ctx, int i);"""
+    ...
+  def gguf_get_val_str(ctx: ffi.CData, i: int) -> ffi.CData:
+    """    GGML_API const char * gguf_get_val_str (struct gguf_context * ctx, int i);"""
+    ...
+  def gguf_get_val_u16(ctx: ffi.CData, i: int) -> int:
+    """    GGML_API uint16_t     gguf_get_val_u16 (struct gguf_context * ctx, int i);"""
+    ...
+  def gguf_get_val_u32(ctx: ffi.CData, i: int) -> int:
+    """    GGML_API uint32_t     gguf_get_val_u32 (struct gguf_context * ctx, int i);"""
+    ...
+  def gguf_get_val_u8(ctx: ffi.CData, i: int) -> int:
+    """
+    results are undefined if the wrong type is used for the key
+
+        GGML_API uint8_t      gguf_get_val_u8  (struct gguf_context * ctx, int i);
+    """
+    ...
+  def gguf_get_version(ctx: ffi.CData) -> int:
+    """    GGML_API int    gguf_get_version    (struct gguf_context * ctx);"""
+    ...
+  def gguf_init_empty() -> ffi.CData:
+    """    GGML_API struct gguf_context * gguf_init_empty(void);"""
+    ...
+  def gguf_init_from_file(fname: ffi.CData, params: ffi.CData) -> ffi.CData:
+    """    GGML_API struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_params params);"""
+    ...
+  def gguf_set_arr_data(ctx: ffi.CData, key: ffi.CData, type: int, data: ffi.CData, n: int) -> None:
+    """    GGML_API void gguf_set_arr_data(struct gguf_context * ctx, const char * key, enum gguf_type type, const void * data, int n);"""
+    ...
+  def gguf_set_arr_str(ctx: ffi.CData, key: ffi.CData, data: ffi.CData, n: int) -> None:
+    """    GGML_API void gguf_set_arr_str (struct gguf_context * ctx, const char * key, const char ** data, int n);"""
+    ...
+  def gguf_set_kv(ctx: ffi.CData, src: ffi.CData) -> None:
+    """
+    set or add KV pairs from another context
+
+        GGML_API void gguf_set_kv(struct gguf_context * ctx, struct gguf_context * src);
+    """
+    ...
+  def gguf_set_tensor_data(ctx: ffi.CData, name: ffi.CData, data: ffi.CData, size: int) -> None:
+    """    GGML_API void gguf_set_tensor_data(struct gguf_context * ctx, const char * name, const void * data, size_t size);"""
+    ...
+  def gguf_set_tensor_type(ctx: ffi.CData, name: ffi.CData, type: int) -> None:
+    """    GGML_API void gguf_set_tensor_type(struct gguf_context * ctx, const char * name, enum ggml_type type);"""
+    ...
+  def gguf_set_val_bool(ctx: ffi.CData, key: ffi.CData, val: bool) -> None:
+    """    GGML_API void gguf_set_val_bool(struct gguf_context * ctx, const char * key, bool     val);"""
+    ...
+  def gguf_set_val_f32(ctx: ffi.CData, key: ffi.CData, val: float) -> None:
+    """    GGML_API void gguf_set_val_f32 (struct gguf_context * ctx, const char * key, float    val);"""
+    ...
+  def gguf_set_val_i16(ctx: ffi.CData, key: ffi.CData, val: int) -> None:
+    """    GGML_API void gguf_set_val_i16 (struct gguf_context * ctx, const char * key, int16_t  val);"""
+    ...
+  def gguf_set_val_i32(ctx: ffi.CData, key: ffi.CData, val: int) -> None:
+    """    GGML_API void gguf_set_val_i32 (struct gguf_context * ctx, const char * key, int32_t  val);"""
+    ...
+  def gguf_set_val_i8(ctx: ffi.CData, key: ffi.CData, val: int) -> None:
+    """    GGML_API void gguf_set_val_i8  (struct gguf_context * ctx, const char * key, int8_t   val);"""
+    ...
+  def gguf_set_val_str(ctx: ffi.CData, key: ffi.CData, val: ffi.CData) -> None:
+    """    GGML_API void gguf_set_val_str (struct gguf_context * ctx, const char * key, const char * val);"""
+    ...
+  def gguf_set_val_u16(ctx: ffi.CData, key: ffi.CData, val: int) -> None:
+    """    GGML_API void gguf_set_val_u16 (struct gguf_context * ctx, const char * key, uint16_t val);"""
+    ...
+  def gguf_set_val_u32(ctx: ffi.CData, key: ffi.CData, val: int) -> None:
+    """    GGML_API void gguf_set_val_u32 (struct gguf_context * ctx, const char * key, uint32_t val);"""
+    ...
+  def gguf_set_val_u8(ctx: ffi.CData, key: ffi.CData, val: int) -> None:
+    """
+    overrides existing values or adds a new one
+
+        GGML_API void gguf_set_val_u8  (struct gguf_context * ctx, const char * key, uint8_t  val);
+    """
+    ...
+  def gguf_type_name(type: int) -> ffi.CData:
+    """    GGML_API const char * gguf_type_name(enum gguf_type type);"""
+    ...
+  def gguf_write_to_file(ctx: ffi.CData, fname: ffi.CData, only_meta: bool) -> None:
+    """
+    write the entire context to a binary file
+
+        GGML_API void gguf_write_to_file(struct gguf_context * ctx, const char * fname, bool only_meta);
     """
     ...
   def quantize_row_q2_K(x: ffi.CData, y: ffi.CData, k: int) -> None:

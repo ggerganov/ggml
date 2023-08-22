@@ -14,7 +14,7 @@ def init(mem_size: int, mem_buffer: ffi.CData = ffi.NULL, no_alloc: bool = False
     params.mem_buffer = mem_buffer
     params.no_alloc = no_alloc
     return ffi.gc(lib.ggml_init(params[0]), lib.ggml_free)
-    
+ 
 TensorLike = Union[ffi.CData, np.ndarray]
 
 def copy(from_tensor: TensorLike, to_tensor: TensorLike, allow_requantize: bool = True):
@@ -34,7 +34,7 @@ def copy(from_tensor: TensorLike, to_tensor: TensorLike, allow_requantize: bool 
     """
     if id(from_tensor) == id(to_tensor):
         return
-    
+ 
     __expect_same_layout("source", from_tensor, "destination", to_tensor)
     __check_shape_consistent_with_type(from_tensor)
     __check_shape_consistent_with_type(to_tensor)
@@ -47,14 +47,14 @@ def copy(from_tensor: TensorLike, to_tensor: TensorLike, allow_requantize: bool 
     else:
         assert allow_requantize or not lib.ggml_is_quantized(from_type) or not lib.ggml_is_quantized(to_type), \
             f"Requantizing from {__type_name(from_type)} to {__type_name(to_type)} is disabled. Force with allow_requantize=True"
-        
+ 
         __set_floats(to_tensor, __get_floats(from_tensor))
 
 def numpy(tensor: ffi.CData, allow_copy: Union[bool, np.ndarray] = False, allow_requantize=False) -> np.ndarray:
     """
       Convert a ggml tensor to a numpy array.
       If the tensor isn't quantized, the returned numpy array will be a view over its data.
-      
+ 
       If it is quantized (and allow_copy is True), the copy will involve dequantization and the returned array will
       be a copy of the original tensor (any changes to the numpy array won't then be reflected back to the tensor).
 
