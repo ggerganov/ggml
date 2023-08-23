@@ -27,6 +27,7 @@ struct gpt_neox_hparams {
     int32_t n_rot   = 32; // rotary_pct * (n_embd / n_head)
     int32_t par_res = 1; // 1 = true, 0 = false
     int32_t ftype   = 1;
+    float   eps     = 1e-5;
 };
 
 struct gpt_neox_layer {
@@ -384,10 +385,11 @@ bool gpt_neox_model_load(const std::string & fname, gpt_neox_model & model, gpt_
 
 // feed-forward network
 ggml_tensor * gpt_neox_ff(
-        const gpt_neox_layer &layer,
-        ggml_context * ctx0,
-        ggml_tensor * inp) {
-    ggml_tensor * cur = ggml_norm(ctx0, inp);
+        const gpt_neox_layer & layer,
+        ggml_context         * ctx0,
+        ggml_tensor          * inp,
+        float                  eps) {
+    ggml_tensor * cur = ggml_norm(ctx0, inp, eps);
 
     cur = ggml_add(ctx0,
         ggml_mul(ctx0,
@@ -491,7 +493,7 @@ bool gpt_neox_eval(
         // self-attention
         {
             {
-                cur = ggml_norm(ctx0, inpL);
+                cur = ggml_norm(ctx0, inpL, hparams.eps);
 
                 cur = ggml_add(ctx0,
                         ggml_mul(ctx0,
@@ -596,7 +598,7 @@ bool gpt_neox_eval(
         if (hparams.par_res == 0) {
             struct ggml_tensor * inpFF = ggml_add(ctx0, cur, inpL);
 
-            cur = gpt_neox_ff(model.layers[il], ctx0, inpFF);
+            cur = gpt_neox_ff(model.layers[il], ctx0, inpFF, hparams.eps);
 
             // input for next layer
             inpL = ggml_add(ctx0, cur, inpFF);
@@ -605,7 +607,7 @@ bool gpt_neox_eval(
 
             // this is independent of the self-attention result, so it could be done in parallel to the self-attention
             // note here we pass inpL instead of cur
-            cur = gpt_neox_ff(model.layers[il], ctx0, inpL);
+            cur = gpt_neox_ff(model.layers[il], ctx0, inpL, hparams.eps);
 
             // layer input + FF
             cur  = ggml_add(ctx0, cur, inpFF);
@@ -619,7 +621,7 @@ bool gpt_neox_eval(
 
     // norm
     {
-        inpL = ggml_norm(ctx0, inpL);
+        inpL = ggml_norm(ctx0, inpL, hparams.eps);
 
         // inpL = ln_f_g*inpL + ln_f_b
         inpL = ggml_add(ctx0,
