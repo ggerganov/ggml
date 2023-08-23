@@ -13574,7 +13574,7 @@ static void ggml_compute_forward_conv_transpose_2d(
     const int ip1 = MIN(ip0 + dp, np);
 
     ggml_fp16_t * const wdata = (ggml_fp16_t *) params->wdata + 0;
-    ggml_fp16_t * const wdata_src = (ggml_fp16_t *) params->wdata + nk;
+    ggml_fp16_t * const wdata_src = wdata + nk;
 
     for (int i2 = ip0; i2 < ip1; i2++) { // Cout
         float * dst_data = (float *)((char *) dst->data + i2*nb2);
@@ -13586,9 +13586,8 @@ static void ggml_compute_forward_conv_transpose_2d(
                     for (int i00 = 0; i00 < ne00; i00++) {
                         float v = 0;
                         ggml_vec_dot_f16(ne03, &v,
-                                (ggml_fp16_t *) wdata_src + i1n,
-                                (ggml_fp16_t *) wdata_kernel + i01*ne00*ne03 + i00*ne03);
-
+                                wdata_src + i1n,
+                                wdata_kernel + i01*ne00*ne03 + i00*ne03);
                         dst_data[(i11*stride + i01)*ne0 + i10*stride + i00] += v;
                     }
                 }

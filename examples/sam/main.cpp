@@ -16,6 +16,32 @@
 #include <string>
 #include <vector>
 
+// void print_t_f32(const char* title, struct ggml_tensor * t, int n = 10) {
+//     printf("%s\n", title);
+//     float * data = (float *)t->data;
+//     printf("dims: %jd %jd %jd %jd f32\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
+//     printf("First & Last %d elements:\n", n);
+//     for (int i = 0; i < std::min((int) (t->ne[0]*t->ne[1]), n); i++) {
+//         printf("%.5f ", data[i]);
+//         if (i != 0 && i % t->ne[0] == 0) {
+//             printf("\n");
+//         }
+//     }
+//     printf("\n");
+//     for (int i = 0; i < std::min((int) (t->ne[0]*t->ne[1]), n); i++) {
+//         printf("%.5f ", data[ggml_nelements(t) - n + i]);
+//         if ((ggml_nelements(t) - n + i) % t->ne[0] == 0) {
+//             printf("\n");
+//         }
+//     }
+//     printf("\n");
+//     double sum = 0.0;
+//     for (int i = 0; i < ggml_nelements(t); i++) {
+//         sum += data[i];
+//     }
+//     printf("sum:  %f\n\n", sum);
+// }
+
 // default hparams (ViT-B SAM)
 struct sam_hparams {
     int32_t n_enc_state               = 768;
@@ -1608,21 +1634,6 @@ bool sam_decode_mask(
     struct ggml_context * ctx0 = ggml_init(params);
     struct ggml_cgraph gf = {};
 
-    // auto print_t_f32 = [&](const char* title, struct ggml_tensor * t) {
-    //     printf("%s\n", title);
-    //     float * data = (float *)t->data;
-    //     printf("dims: %jd %jd %jd %jd f32\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
-    //     printf("First 10 elements:\n");
-    //     for (int i = 0; i < std::min((int) t->ne[0], 10); i++) {
-    //         printf("%f ", data[i]);
-    //     }
-    //     printf("\n");
-    //     double sum = 0.0;
-    //     for (int i = 0; i < ggml_nelements(t); i++) {
-    //         sum += data[i];
-    //     }
-    //     printf("sum:  %f\n\n", sum);
-    // };
     // print_t_f32("embd_img", state.embd_img);
     // print_t_f32("embd_prompt_dense", state.embd_prompt_dense);
     // print_t_f32("embd_prompt_sparse", state.embd_prompt_sparse);
@@ -1810,7 +1821,10 @@ bool sam_decode_mask(
     {
         // ConvTranspose2d
         keys = ggml_conv_transpose_2d_p0(ctx0, dec.output_upscaling_0_w, keys, 2);
-        keys = ggml_add(ctx0, ggml_repeat(ctx0, dec.output_upscaling_0_b, keys), keys);
+        keys = ggml_add(ctx0, keys, ggml_repeat(ctx0,
+                                     ggml_reshape_3d(ctx0, dec.output_upscaling_0_b, 1, 1, dec.output_upscaling_0_b->ne[0]),
+                                     keys));
+
         keys = sam_layer_norm_2d(ctx0, keys, n_img_embd, dec.output_upscaling_1_w, dec.output_upscaling_1_b, hparams.eps);
 
         // GELU activation
@@ -1818,8 +1832,9 @@ bool sam_decode_mask(
 
         // ConvTranspose2d
         keys = ggml_conv_transpose_2d_p0(ctx0, dec.output_upscaling_3_w, keys, 2);
-        keys = ggml_add(ctx0, ggml_repeat(ctx0, dec.output_upscaling_3_b, keys), keys);
-
+        keys = ggml_add(ctx0, ggml_repeat(ctx0,
+                                ggml_reshape_3d(ctx0, dec.output_upscaling_3_b, 1, 1, dec.output_upscaling_3_b->ne[0]),
+                                keys), keys);
         // GELU activation
         keys = ggml_gelu(ctx0, keys);
         upscaled_embedding = ggml_reshape_3d(ctx0, keys, keys->ne[0]*keys->ne[1], keys->ne[2], keys->ne[3]);
