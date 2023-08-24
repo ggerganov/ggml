@@ -13474,18 +13474,44 @@ static void ggml_compute_forward_conv_2d_f16_f32(
     // ne1: OH
     // ne0: OW
     // nb3: OC*OH*OW*nb0
-    for (int i3 = 0; i3 < ne3; i3++) {
-        for (int i2 = ip0; i2 < ip1; i2++) {
-            float * dst_data = (float *)((char *) dst->data + i3*nb3 + i2*nb2);
-            // dst_data: [OH, OW]
-            // src0->data + i2*nb03: [IC * KH * KW]
-            //  wdata + (i3*ne1*ne0 + i1*ne0 + i0)*ew0: [IC * KH * KW]
 
-            for (int i1 = 0; i1 < ne1; ++i1) {
-                for (int i0 = 0; i0 < ne0; ++i0) {
-                    ggml_vec_dot_f16(ew0, dst_data + i1*ne0 + i0,
-                            (ggml_fp16_t *) ((char *) src0->data + i2*nb03),
-                            (ggml_fp16_t *)                wdata + (i3*ne1*ne0 + i1*ne0 + i0)*ew0);
+    int64_t M = ne2; // OC
+    int64_t N = ne1 * ne0; // OH*OW
+    int64_t K = ew0; // IC * KH * KW
+
+    // block-tiling attempt
+    int64_t blck_0 = 16;
+    int64_t blck_1 = 16;
+
+    // int64_t CACHE_SIZE = 2 * 1024 * 1024; // 2MB
+    // int64_t blck_size = CACHE_SIZE / (sizeof(float) + 2 * sizeof(ggml_fp16_t) * K);
+    // if (blck_size > 0) {
+    //     blck_0 = 4;
+    //     blck_1 = blck_size / blck_0;
+    //     if (blck_1 < 0) {
+    //         blck_1 = 1;
+    //     }
+    //     // blck_0 = (int64_t)sqrt(blck_size);
+    //     // blck_1 = blck_0;
+    // }
+    // // printf("%zd %zd %zd %zd\n", blck_size, K, blck_0, blck_1);
+
+    // [N, OC, OH, OW] = [N*OH*OW, IC * KH * KW] x [OC, IC * KH * KW]
+    for (int i3 = 0; i3 < ne3; i3++) {
+        ggml_fp16_t * a = (ggml_fp16_t *)src0->data; // [M, K]
+        ggml_fp16_t * b = (ggml_fp16_t *)wdata + i3 * M * K; // [N, K]
+        float * c = (float *)dst->data + i3 * M * N; // [M * N]
+
+        for (int j = 0; j < N; j+=blck_0) {
+            for (int i = ip0; i < ip1; i+=blck_1) {
+                // printf("i j k => %d %d %d\n", i, j, K);
+                for (int ii = i; ii < i + blck_1 && ii < ip1; ii++) {
+                    for (int jj = j; jj < j + blck_0 && jj < N; jj++) {
+                        ggml_vec_dot_f16(K,
+                                        c + ii*N + jj,
+                                        a + ii * K,
+                                        b + jj * K);
+                    }
                 }
             }
         }
