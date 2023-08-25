@@ -13373,6 +13373,74 @@ static void ggml_compute_forward_conv_1d(
 
 // ggml_compute_forward_conv_2d
 
+static void gemm_f16_out_f32(int64_t m, int64_t n, int64_t k,
+                             ggml_fp16_t * A,
+                             ggml_fp16_t * B,
+                             float * C,
+                             const int ith, const int nth) {
+    // does not seem to make a difference
+    int64_t m0, m1, n0, n1;
+    // patches per thread
+    if (m > n) {
+        n0 = 0;
+        n1 = n;
+
+        // total patches in dst
+        const int np = m;
+
+        // patches per thread
+        const int dp = (np + nth - 1)/nth;
+
+        // patch range for this thread
+        m0 = dp*ith;
+        m1 = MIN(m0 + dp, np);
+    } else {
+        m0 = 0;
+        m1 = m;
+
+        // total patches in dst
+        const int np = n;
+
+        // patches per thread
+        const int dp = (np + nth - 1)/nth;
+
+        // patch range for this thread
+        n0 = dp*ith;
+        n1 = MIN(n0 + dp, np);
+    }
+
+    // block-tiling attempt
+    int64_t blck_n = 16;
+    int64_t blck_m = 16;
+
+    // int64_t CACHE_SIZE = 2 * 1024 * 1024; // 2MB
+    // int64_t blck_size = CACHE_SIZE / (sizeof(float) + 2 * sizeof(ggml_fp16_t) * K);
+    // if (blck_size > 0) {
+    //     blck_0 = 4;
+    //     blck_1 = blck_size / blck_0;
+    //     if (blck_1 < 0) {
+    //         blck_1 = 1;
+    //     }
+    //     // blck_0 = (int64_t)sqrt(blck_size);
+    //     // blck_1 = blck_0;
+    // }
+    // // printf("%zd %zd %zd %zd\n", blck_size, K, blck_0, blck_1);
+
+    for (int j = n0; j < n1; j+=blck_n) {
+        for (int i = m0; i < m1; i+=blck_m) {
+            // printf("i j k => %d %d %d\n", i, j, K);
+            for (int ii = i; ii < i + blck_m && ii < m1; ii++) {
+                for (int jj = j; jj < j + blck_n && jj < n1; jj++) {
+                    ggml_vec_dot_f16(k,
+                                    C + ii*n + jj,
+                                    A + ii * k,
+                                    B + jj * k);
+                }
+            }
+        }
+    }
+}
+
 static void ggml_compute_forward_conv_2d_f16_f32(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
@@ -13387,14 +13455,38 @@ static void ggml_compute_forward_conv_2d_f16_f32(
 
     GGML_TENSOR_BINARY_OP_LOCALS;
 
+    // src1: image [N, IC, IH, IW]
+    // src0: kernel [OC, IC, KH, KW]
+    // dst:  result [N, OC, OH, OW]
+    // ne12: IC
+    // ne0: OW
+    // ne1: OH
+    // nk0: KW
+    // nk1: KH
+    // ne13: N
+
+    const int N = ne13;
+    const int IC = ne12;
+    const int IH = ne11;
+    const int IW = ne10;
+
+    const int OC = ne03;
+    // const int IC = ne02;
+    const int KH = ne01;
+    const int KW = ne00;
+
+    const int OH = ne1;
+    const int OW = ne0;
+
     const int ith = params->ith;
     const int nth = params->nth;
 
-    const int nk0 = ne00;
-    const int nk1 = ne01;
+    // const int nk0 = ne00;
+    // const int nk1 = ne01;
 
     // size of the convolution row - the kernel size unrolled across all channels
-    const int ew0 = nk0*nk1*ne02;
+    // const int ew0 = nk0*nk1*ne02;
+    // ew0: IC*KH*KW
 
     const int32_t s0 = ((const int32_t*)(dst->op_params))[0];
     const int32_t s1 = ((const int32_t*)(dst->op_params))[1];
@@ -13410,35 +13502,27 @@ static void ggml_compute_forward_conv_2d_f16_f32(
         memset(params->wdata, 0, params->wsize);
 
         // prepare source data (src1)
-        // src1: image [N, IC, IH, IW]
-        // src0: kernel [OC, IC, KH, KW]
-        // dst:  result [N, OC, OH, OW]
-        // ne12: IC
-        // ne0: OW
-        // ne1: OH
-        // nk0: KW
-        // nk1: KH
-        // ne13: N
-        // ew0: IC*KH*KW
         // im2col: [N, IC, IH, IW] => [N*OH*OW, IC*KH*KW]
+
         {
             ggml_fp16_t * const wdata = (ggml_fp16_t *) params->wdata + 0;
 
-            for (int i13 = 0; i13 < ne3; i13++) {
-                for (int i12 = 0; i12 < ne12; i12++) {
-                    const float * const src = (float *)((char *) src1->data + i13*nb13 + i12*nb12);
-                    ggml_fp16_t * dst_data = wdata;
+            for (int in = 0; in < N; in++) {
+                for (int iic = 0; iic < IC; iic++) {
+                    for (int ioh = 0; ioh < OH; ioh++) {
+                        for (int iow = 0; iow < OW; iow++) {
 
-                    for (int i1 = 0; i1 < ne1; i1++) {
-                        for (int i0 = 0; i0 < ne0; i0++) {
-                            for (int ik1 = 0; ik1 < nk1; ik1++) {
-                                for (int ik0 = 0; ik0 < nk0; ik0++) {
-                                    const int idx0 = i0*s0 + ik0*d0 - p0;
-                                    const int idx1 = i1*s1 + ik1*d1 - p1;
+                            // micro kernel
+                            ggml_fp16_t * dst_data = wdata + (in*OH*OW + ioh*OW + iow)*(IC*KH*KW); // [IC, KH, KW]
+                            const float * const src_data = (float *)((char *) src1->data + in*nb13 + iic*nb12); // [IH, IW]
 
-                                    if (!(idx1 < 0 || idx1 >= ne11 || idx0 < 0 || idx0 >= ne10)) {
-                                        dst_data[(i13*ne1*ne0 + i1*ne0 + i0)*ew0 + i12*(nk0*nk1) + ik1*nk0 + ik0] =
-                                            GGML_FP32_TO_FP16(src[idx1*ne10 + idx0]);
+                            for (int ikh = 0; ikh < KH; ikh++) {
+                                for (int ikw = 0; ikw < KW; ikw++) {
+                                    const int iiw = iow*s0 + ikw*d0 - p0;
+                                    const int iih = ioh*s1 + ikh*d1 - p1;
+
+                                    if (!(iih < 0 || iih >= IH || iiw < 0 || iiw >= IW)) {
+                                        dst_data[iic*(KH*KW) + ikh*KW + ikw] = GGML_FP32_TO_FP16(src_data[iih*IW + iiw]);
                                     }
                                 }
                             }
@@ -13455,66 +13539,22 @@ static void ggml_compute_forward_conv_2d_f16_f32(
         return;
     }
 
-    // total patches in dst
-    const int np = ne2;
-
-    // patches per thread
-    const int dp = (np + nth - 1)/nth;
-
-    // patch range for this thread
-    const int ip0 = dp*ith;
-    const int ip1 = MIN(ip0 + dp, np);
-
     ggml_fp16_t * const wdata = (ggml_fp16_t *) params->wdata + 0;
     // wdata: [N*OH*OW, IC*KH*KW]
     // dst: result [N, OC, OH, OW]
     // src0: kernel [OC, IC, KH, KW]
-    // ne3: N
-    // ip1: subset of OC
-    // ne1: OH
-    // ne0: OW
-    // nb3: OC*OH*OW*nb0
 
-    int64_t M = ne2; // OC
-    int64_t N = ne1 * ne0; // OH*OW
-    int64_t K = ew0; // IC * KH * KW
+    int64_t m = OC;
+    int64_t n = OH * OW;
+    int64_t k = IC * KH * KW;
 
-    // block-tiling attempt
-    int64_t blck_0 = 16;
-    int64_t blck_1 = 16;
+    // [N, OC, OH, OW] = [OC, IC * KH * KW] x [N*OH*OW, IC * KH * KW]
+    for (int i = 0; i < N; i++) {
+        ggml_fp16_t * A = (ggml_fp16_t *)src0->data; // [m, k]
+        ggml_fp16_t * B = (ggml_fp16_t *)wdata + i * m * k; // [n, k]
+        float * C = (float *)dst->data + i * m * n; // [m * k]
 
-    // int64_t CACHE_SIZE = 2 * 1024 * 1024; // 2MB
-    // int64_t blck_size = CACHE_SIZE / (sizeof(float) + 2 * sizeof(ggml_fp16_t) * K);
-    // if (blck_size > 0) {
-    //     blck_0 = 4;
-    //     blck_1 = blck_size / blck_0;
-    //     if (blck_1 < 0) {
-    //         blck_1 = 1;
-    //     }
-    //     // blck_0 = (int64_t)sqrt(blck_size);
-    //     // blck_1 = blck_0;
-    // }
-    // // printf("%zd %zd %zd %zd\n", blck_size, K, blck_0, blck_1);
-
-    // [N, OC, OH, OW] = [N*OH*OW, IC * KH * KW] x [OC, IC * KH * KW]
-    for (int i3 = 0; i3 < ne3; i3++) {
-        ggml_fp16_t * a = (ggml_fp16_t *)src0->data; // [M, K]
-        ggml_fp16_t * b = (ggml_fp16_t *)wdata + i3 * M * K; // [N, K]
-        float * c = (float *)dst->data + i3 * M * N; // [M * N]
-
-        for (int j = 0; j < N; j+=blck_0) {
-            for (int i = ip0; i < ip1; i+=blck_1) {
-                // printf("i j k => %d %d %d\n", i, j, K);
-                for (int ii = i; ii < i + blck_1 && ii < ip1; ii++) {
-                    for (int jj = j; jj < j + blck_0 && jj < N; jj++) {
-                        ggml_vec_dot_f16(K,
-                                        c + ii*N + jj,
-                                        a + ii * K,
-                                        b + jj * K);
-                    }
-                }
-            }
-        }
+        gemm_f16_out_f32(m, n, k, A, B, C, ith, nth);
     }
 }
 
