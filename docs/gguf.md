@@ -74,12 +74,18 @@ enum gguf_metadata_value_type: uint32_t {
     ///
     // Arrays can be nested, and the length of the array is the number of elements in the array, not the number of bytes.
     GGUF_METADATA_VALUE_TYPE_ARRAY = 9,
+    // The value is a 64-bit unsigned little-endian integer.
+    GGUF_METADATA_VALUE_TYPE_UINT64 = 10,
+    // The value is a 64-bit signed little-endian integer.
+    GGUF_METADATA_VALUE_TYPE_INT64 = 11,
+    // The value is a 64-bit IEEE754 floating point number.
+    GGUF_METADATA_VALUE_TYPE_FLOAT64 = 12,
 }
 
 // A string in GGUF.
 struct gguf_string_t {
     // The length of the string, in bytes.
-    uint32_t len;
+    uint64_t len;
     // The string as a UTF-8 non-null-terminated string.
     char string[len];
 }
@@ -92,13 +98,16 @@ union gguf_metadata_value_t {
     uint32_t uint32;
     int32_t int32;
     float float32;
+    uint64_t uint64;
+    int64_t int64;
+    double float64;
     bool bool_;
     gguf_string_t string;
     struct {
         // Any value type is valid, including arrays.
         gguf_metadata_value_type type;
         // Number of elements, not bytes
-        uint32_t len;
+        uint64_t len;
         // The array of values.
         gguf_metadata_value_t array[len];
     } array;
@@ -127,7 +136,7 @@ struct gguf_header_t {
     // Consider being *very* explicit about the byte order here.
     uint32_t magic;
     // The version of the format implemented.
-    // Must be `1` for version described in this spec.
+    // Must be `2` for version described in this spec.
     //
     // This version should only be increased for structural changes to the format.
     // Changes that do not affect the structure of the file should instead update the metadata
@@ -136,9 +145,9 @@ struct gguf_header_t {
     // The number of tensors in the file.
     // This is explicit, instead of being included in the metadata, to ensure it is always present
     // for loading the tensors.
-    uint32_t tensor_count;
+    uint64_t tensor_count;
     // The number of metadata key-value pairs.
-    uint32_t metadata_kv_count;
+    uint64_t metadata_kv_count;
     // The metadata key-value pairs.
     gguf_metadata_kv_t metadata_kv[metadata_kv_count];
 };
@@ -151,7 +160,7 @@ struct gguf_tensor_info_t {
     // Currently at most 4, but this may change in the future.
     uint32_t n_dimensions;
     // The dimensions of the tensor.
-    uint32_t dimensions[n_dimensions];
+    uint64_t dimensions[n_dimensions];
     // The type of the tensor.
     ggml_type type;
     // The offset of the tensor's data in this file in bytes.
@@ -197,6 +206,8 @@ The community can develop their own key-value pairs to carry additional data. Ho
 
 If a particular community key is widely used, it may be promoted to a standardized key.
 
+By convention, most counts/lengths/etc are `uint64` unless otherwise specified. This is to allow for larger models to be supported in the future. Some models may use `uint32` for their values; it is recommended that readers support both.
+
 ### General
 
 #### Required
@@ -220,7 +231,7 @@ If a particular community key is widely used, it may be promoted to a standardiz
 - `general.url`: URL to the model's homepage. This can be a GitHub repo, a paper, etc.
 - `general.description: string`: free-form description of the model including anything that isn't covered by the other fields
 - `general.license: string`: License of the model, expressed as a [SPDX license expression](https://spdx.github.io/spdx-spec/v2-draft/SPDX-license-expressions/) (e.g. `"MIT OR Apache-2.0`). Do not include any other information, such as the license text or the URL to the license.
-- `general.file_type: u32`: An enumerated value describing the type of the majority of the tensors in the file. Optional; can be inferred from the tensor types.
+- `general.file_type: uint32`: An enumerated value describing the type of the majority of the tensors in the file. Optional; can be inferred from the tensor types.
   - `ALL_F32 = 0`
   - `MOSTLY_F16 = 1`
   - `MOSTLY_Q4_0 = 2`
@@ -252,10 +263,10 @@ Information about where this model came from. This is useful for tracking the pr
 
 In the following, `[llm]` is used to fill in for the name of a specific LLM architecture. They will be used in each architecture's section.
 
-- `[llm].context_length: uint32`: Also known as `n_ctx`. length of the context (in tokens) that the model was trained on. For most architectures, this is the hard limit on the length of the input. Architectures, like RWKV, that are not reliant on transformer-style attention may be able to handle larger inputs, but this is not guaranteed.
-- `[llm].embedding_length: uint32`: Also known as `n_embd`. Embedding layer size.
-- `[llm].block_count: uint32`: The number of blocks of attention+feedforward layers (i.e. the bulk of the LLM). Does not include the input or embedding layers.
-- `[llm].feedforward_length: uint32`: Also known as `n_ff`. The length of the feedforward layer.
+- `[llm].context_length: uint64`: Also known as `n_ctx`. length of the context (in tokens) that the model was trained on. For most architectures, this is the hard limit on the length of the input. Architectures, like RWKV, that are not reliant on transformer-style attention may be able to handle larger inputs, but this is not guaranteed.
+- `[llm].embedding_length: uint64`: Also known as `n_embd`. Embedding layer size.
+- `[llm].block_count: uint64`: The number of blocks of attention+feedforward layers (i.e. the bulk of the LLM). Does not include the input or embedding layers.
+- `[llm].feedforward_length: uint64`: Also known as `n_ff`. The length of the feedforward layer.
 - `[llm].use_parallel_residual: bool`: Whether or not the parallel residual logic should be used.
 - `[llm].tensor_data_layout: string`: When a model is converted to GGUF, tensors may be rearranged to improve performance. This key describes the layout of the tensor data. This is not required; if not present, it is assumed to be `reference`.
   - `reference`: tensors are laid out in the same order as the original model
@@ -263,8 +274,8 @@ In the following, `[llm]` is used to fill in for the name of a specific LLM arch
 
 #### Attention
 
-- `[llm].attention.head_count: uint32`: Also known as `n_head`. Number of attention heads.
-- `[llm].attention.head_count_kv: uint32`: The number of heads per group used in Grouped-Query-Attention. If not present or if present and equal to `[llm].attention.head_count`, the model does not use GQA.
+- `[llm].attention.head_count: uint64`: Also known as `n_head`. Number of attention heads.
+- `[llm].attention.head_count_kv: uint64`: The number of heads per group used in Grouped-Query-Attention. If not present or if present and equal to `[llm].attention.head_count`, the model does not use GQA.
 - `[llm].attention.max_alibi_bias: float32`: The maximum bias to use for ALiBI.
 - `[llm].attention.clamp_kqv: float32`: Value (`C`) to clamp the values of the `Q`, `K`, and `V` tensors between (`[-C, C]`).
 - `[llm].attention.layer_norm_epsilon: float32`: Layer normalization epsilon.
@@ -272,7 +283,7 @@ In the following, `[llm]` is used to fill in for the name of a specific LLM arch
 
 #### RoPE
 
-- `[llm].rope.dimension_count: uint32`: The number of rotary dimensions for RoPE.
+- `[llm].rope.dimension_count: uint64`: The number of rotary dimensions for RoPE.
 - `[llm].rope.freq_base: float32`: The base frequency for RoPE.
 - `[llm].rope.scale_linear: float32`: A linear scale factor for RoPE to adjust the context length.
 
@@ -398,10 +409,10 @@ The following sections describe the metadata for each model architecture. Each k
 The vocabulary size is the same as the number of rows in the `head` matrix.
 
 - `rwkv.architecture_version: uint32`: The only allowed value currently is 4. Version 5 is expected to appear some time in the future.
-- `rwkv.context_length: uint32`: Length of the context used during training or fine-tuning. RWKV is able to handle larger context than this limit, but the output quality may suffer.
-- `rwkv.layer_count: uint32`
-- `rwkv.embedding_length: uint32`
-- `rwkv.feedforward_length: uint32`
+- `rwkv.context_length: uint64`: Length of the context used during training or fine-tuning. RWKV is able to handle larger context than this limit, but the output quality may suffer.
+- `rwkv.layer_count: uint64`
+- `rwkv.embedding_length: uint64`
+- `rwkv.feedforward_length: uint64`
 
 ##### Whisper
 
@@ -412,7 +423,7 @@ This is because they are both transformer models.
 - `whisper.encoder.context_length`
 - `whisper.encoder.embedding_length`
 - `whisper.encoder.layer_count`
-- `whisper.encoder.mels_count: uint32`
+- `whisper.encoder.mels_count: uint64`
 - `whisper.encoder.attention.head_count`
 
 - `whisper.decoder.context_length`
