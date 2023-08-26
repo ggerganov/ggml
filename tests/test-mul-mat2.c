@@ -662,9 +662,6 @@ void mul_mat_gq_2(
     int m, int n, int k) {
     assert(k % QK == 0);
 
-    const int nb = quantize_2_blocks_per_row(k);
-    const int nq = quantize_2_quants_per_block();
-
     for (int ir0 = 0; ir0 < m; ir0++) {
         for (int ir1 = 0; ir1 < n; ir1++) {
             vec_dot_gq_2(k, dst + ir1, src0, src1);
@@ -2354,8 +2351,6 @@ void mul_mat_gq_6(
          float * dst,
     int m, int n, int k) {
     assert(k % 32 == 0);
-
-    const int nb = quantize_6_blocks_per_row(k);
 
     for (int ir0 = 0; ir0 < m; ir0++) {
         for (int ir1 = 0; ir1 < n; ir1++) {
