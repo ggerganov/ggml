@@ -6,7 +6,6 @@ if (GGML_ALL_WARNINGS)
             -Wpedantic                      \
             -Wshadow                        \
             -Wcast-qual                     \
-            -Wstrict-prototypes             \
             -Wpointer-arith                 \
             -Wdouble-promotion              \
             -Wno-unused-function            \

@@ -13,7 +13,7 @@
 
 #define MAX_NARGS 2
 
-float frand() {
+float frand(void) {
     return (float)rand()/(float)RAND_MAX;
 }
 

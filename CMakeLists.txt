@@ -71,10 +71,16 @@ endif()
 
 if (GGML_ALL_WARNINGS)
     if (NOT MSVC)
-        add_compile_options(-Wall -Wno-unused)
+        set(c_flags   -Wall -Wno-unused -Wstrict-prototypes)
+        set(cxx_flags -Wall)
     else()
         # todo : windows
     endif()
+
+    add_compile_options(
+        "$<$<COMPILE_LANGUAGE:C>:${c_flags}>"
+        "$<$<COMPILE_LANGUAGE:CXX>:${cxx_flags}>"
+    )
 endif()
 
 if (NOT MSVC)
