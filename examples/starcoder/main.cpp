@@ -145,7 +145,7 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
         }
 
         // Add StarChat special tokens.
-        for (const std::string & token : {
+        for (std::string token : {
                 "<|system|>",
                 "<|user|>",
                 "<|assistant|>",

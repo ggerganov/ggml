@@ -71,7 +71,7 @@ endif()
 
 if (GGML_ALL_WARNINGS)
     if (NOT MSVC)
-        add_compile_options(-Wuninitialized -Wsign-compare)
+        add_compile_options(-Wall -Wno-unused)
     else()
         # todo : windows
     endif()
