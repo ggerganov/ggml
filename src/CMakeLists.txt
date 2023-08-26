@@ -3,10 +3,8 @@ if (GGML_ALL_WARNINGS)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} \
             -Wunused                        \
             -Wextra                         \
-            -Wpedantic                      \
             -Wshadow                        \
             -Wcast-qual                     \
-            -Wpointer-arith                 \
             -Wdouble-promotion              \
             -Wno-unused-function            \
             -Wmissing-prototypes            \

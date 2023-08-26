@@ -71,8 +71,8 @@ endif()
 
 if (GGML_ALL_WARNINGS)
     if (NOT MSVC)
-        set(c_flags   -Wall -Wno-unused -Wstrict-prototypes)
-        set(cxx_flags -Wall)
+        set(c_flags   -Wall -Wpedantic -Wformat=2 -Wno-unused -Wstrict-prototypes)
+        set(cxx_flags -Wall -Wpedantic -Wformat=2)
     else()
         # todo : windows
     endif()
