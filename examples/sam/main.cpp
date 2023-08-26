@@ -1,3 +1,5 @@
+#define _USE_MATH_DEFINES // for M_PI
+
 #include "ggml.h"
 
 #include "common.h"
