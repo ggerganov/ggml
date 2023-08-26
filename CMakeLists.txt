@@ -69,6 +69,14 @@ endif()
 
 # warning flags
 
+if (GGML_ALL_WARNINGS)
+    if (NOT MSVC)
+        add_compile_options(-Wuninitialized)
+    else()
+        # todo : windows
+    endif()
+endif()
+
 if (NOT MSVC)
     add_compile_options(-Werror=vla)
 endif()

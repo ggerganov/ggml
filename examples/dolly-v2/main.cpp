@@ -873,7 +873,7 @@ int main(int argc, char ** argv) {
     }
 
 #if defined(DOLLY_INTERACTIVE_PORT)
-    int sockfd;
+    int sockfd = -1;
     if (params.interactive_port != -1) {
         sockfd = setup_port(params.interactive_port);
         if (sockfd == -1) {
@@ -888,7 +888,7 @@ int main(int argc, char ** argv) {
         while (true) {
             std::string prompt_input;
 #if defined(DOLLY_INTERACTIVE_PORT)
-            int clientfd;
+            int clientfd = -1;
             if (params.interactive_port != -1) {
                 sockaddr_in clientaddr;
                 socklen_t clientaddrlen = sizeof(clientaddr);
