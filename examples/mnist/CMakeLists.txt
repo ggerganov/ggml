@@ -6,6 +6,13 @@ add_executable(${TEST_TARGET} main.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml common)
 
 #
+# mnist-cnn
+
+set(TEST_TARGET mnist-cnn)
+add_executable(${TEST_TARGET} main-cnn.cpp)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml common)
+
+#
 # mnist-cpu
 
 set(TEST_TARGET mnist-cpu)
