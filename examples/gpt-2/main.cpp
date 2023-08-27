@@ -381,15 +381,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
     return true;
 }
 
-// evaluate the transformer
-//
-//   - model:     the model
-//   - n_threads: number of threads to use
-//   - n_past:    the context size so far
-//   - embd_inp:  the embeddings of the tokens in the context
-//   - embd_w:    the predicted logits for the next token
-//
-
+// build the computation graph
 struct ggml_cgraph * gpt2_graph(
         const gpt2_model & model,
         struct ggml_allocr * allocr,
@@ -679,6 +671,15 @@ struct ggml_cgraph * gpt2_graph(
     return gf;
 }
 
+// evaluate the transformer
+//
+//   - model:     the model
+//   - allocr:    ggml_allocr to use to allocate the compute buffer
+//   - n_threads: number of threads to use
+//   - n_past:    the context size so far
+//   - embd_inp:  the embeddings of the tokens in the context
+//   - embd_w:    the predicted logits for the next token
+//
 bool gpt2_eval(
         const gpt2_model & model,
         struct ggml_allocr * allocr,
