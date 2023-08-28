@@ -1062,7 +1062,7 @@ void quantize_4_row(const float * restrict src, void * restrict dst, int k) {
 #if defined(__AVX2__)
         {
             assert(QK == 64);
-            const int QK8 = QK/8;
+            enum { QK8 = QK/8 };
 
             __m256 srcv[QK8];
             __m256 minv[QK8];
@@ -1647,7 +1647,7 @@ void quantize_5_row(const float * restrict src, void * restrict dst, int k) {
 #if defined(__AVX2__)
         {
             assert(QK == 64);
-            const int QK8 = QK/8;
+            enum { QK8 = QK/8 };
 
             __m256 srcv [QK8];
             __m256 asrcv[QK8];
@@ -1658,7 +1658,7 @@ void quantize_5_row(const float * restrict src, void * restrict dst, int k) {
             }
 
             for (int l = 0; l < QK8; l++) {
-                asrcv[l] = _mm256_and_ps(srcv[l], (__m256) _mm256_set1_epi32(0x7fffffff));
+                asrcv[l] = _mm256_and_ps(srcv[l], _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff)));
             }
 
 
@@ -2035,7 +2035,7 @@ void quantize_6_row(const float * restrict src, void * restrict dst, int k) {
 
 #if defined(__AVX2__)
         {
-            const int QK8 = 4;
+            enum { QK8 = 4 };
 
             __m256 srcv [QK8];
             __m256 asrcv[QK8];
@@ -2046,7 +2046,7 @@ void quantize_6_row(const float * restrict src, void * restrict dst, int k) {
             }
 
             for (int l = 0; l < QK8; l++) {
-                asrcv[l] = _mm256_and_ps(srcv[l], (__m256) _mm256_set1_epi32(0x7fffffff));
+                asrcv[l] = _mm256_and_ps(srcv[l], _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff)));
             }
 
             for (int l = 0; l < QK8/2; l++) {

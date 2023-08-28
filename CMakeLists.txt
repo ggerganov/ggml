@@ -67,6 +67,12 @@ endif()
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=native")
 
+# warning flags
+
+if (NOT MSVC)
+    add_compile_options(-Werror=vla)
+endif()
+
 # dependencies
 
 set(CMAKE_C_STANDARD   11)
