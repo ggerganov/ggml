@@ -768,7 +768,9 @@ int main(int argc, char ** argv) {
         test_gpt_tokenizer(vocab, params.token_test);
     }
 
+    // keep this buffer alive while evaluating the model
     std::vector<uint8_t> compute_buffer;
+
     struct ggml_allocr * allocr = NULL;
     // allocate the compute buffer
     {
