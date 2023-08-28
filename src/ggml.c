@@ -4102,16 +4102,13 @@ int64_t ggml_nrows(const struct ggml_tensor * tensor) {
 }
 
 size_t ggml_nbytes(const struct ggml_tensor * tensor) {
-    static_assert(GGML_MAX_DIMS == 4, "GGML_MAX_DIMS is not 4 - update this function");
+    size_t nbytes = tensor->ne[0]*tensor->nb[0]/ggml_blck_size(tensor->type);
 
-    // this should handle cases where the tensor is not contiguous in memory
-    // probaby just:
-    //
-    //     return tensor->ne[3]*tensor->nb[3]
-    //
-    // is enough, but just in case, adding the second part
+    for (int i = 1; i < GGML_MAX_DIMS; ++i) {
+        nbytes += (tensor->ne[i] - 1)*tensor->nb[i];
+    }
 
-    return MAX(tensor->ne[3]*tensor->nb[3], (ggml_nelements(tensor)*ggml_type_size(tensor->type))/ggml_blck_size(tensor->type));
+    return nbytes;
 }
 
 size_t ggml_nbytes_pad(const struct ggml_tensor * tensor) {
@@ -6346,6 +6343,8 @@ struct ggml_tensor * ggml_view_1d(
 
     struct ggml_tensor * result = ggml_view_tensor_offset(ctx, a, 1, &ne0, offset);
 
+    GGML_ASSERT(ggml_nbytes(result) + offset <= ggml_nbytes(a));
+
     result->op   = GGML_OP_VIEW;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
@@ -6376,6 +6375,8 @@ struct ggml_tensor * ggml_view_2d(
     result->nb[1] = nb1;
     result->nb[2] = result->nb[1]*ne1;
     result->nb[3] = result->nb[2];
+
+    GGML_ASSERT(ggml_nbytes(result) + offset <= ggml_nbytes(a));
 
     result->op   = GGML_OP_VIEW;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
@@ -6409,6 +6410,8 @@ struct ggml_tensor * ggml_view_3d(
     result->nb[1] = nb1;
     result->nb[2] = nb2;
     result->nb[3] = result->nb[2]*ne2;
+
+    GGML_ASSERT(ggml_nbytes(result) + offset <= ggml_nbytes(a));
 
     result->op   = GGML_OP_VIEW;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
@@ -6444,6 +6447,8 @@ struct ggml_tensor * ggml_view_4d(
     result->nb[1] = nb1;
     result->nb[2] = nb2;
     result->nb[3] = nb3;
+
+    GGML_ASSERT(ggml_nbytes(result) + offset <= ggml_nbytes(a));
 
     result->op   = GGML_OP_VIEW;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
