@@ -7467,8 +7467,6 @@ static struct ggml_tensor * ggml_add_rel_pos_impl(
     }
 
     struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
-    ggml_set_op_params_i32(result, 0, inplace ? 1 : 0);
-
     result->op   = GGML_OP_ADD_REL_POS;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
@@ -14981,8 +14979,11 @@ static void ggml_compute_forward_add_rel_pos_f32(
         const struct ggml_tensor * src1,
         const struct ggml_tensor * src2,
         struct ggml_tensor * dst) {
+    GGML_ASSERT(ggml_are_same_shape(src0, dst));
+    GGML_ASSERT(src0->nb[0] == dst->nb[0] && src0->nb[1] == dst->nb[1]
+             && src0->nb[2] == dst->nb[2] && src0->nb[3] == dst->nb[3]);
 
-    const bool inplace = (bool) ((int32_t *) dst->op_params)[0];
+    const bool inplace = dst->data == src0->data;
     if (!inplace && params->type == GGML_TASK_INIT) {
         memcpy((char *) dst->data, (char *) src0->data, ggml_nbytes(dst));
         return;
