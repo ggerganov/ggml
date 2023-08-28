@@ -440,6 +440,7 @@ struct whisper_hparams {
     int32_t n_text_layer  = 4;
     int32_t n_mels        = 80;
     int32_t ftype         = 1;
+    float   eps           = 1e-5;
 };
 
 // audio encoding layer
@@ -1555,7 +1556,7 @@ static bool whisper_encode_internal(
             {
                 wstate.use_buf(ctx0, 0);
 
-                cur = ggml_norm(ctx0, inpL);
+                cur = ggml_norm(ctx0, inpL, hparams.eps);
 
                 // cur = ln_0_w*cur + ln_0_b
                 cur = ggml_add(ctx0,
@@ -1702,7 +1703,7 @@ static bool whisper_encode_internal(
                 {
                     wstate.use_buf(ctx0, 0);
 
-                    cur = ggml_norm(ctx0, inpFF);
+                    cur = ggml_norm(ctx0, inpFF, hparams.eps);
 
                     wstate.use_buf(ctx0, 1);
 
@@ -1765,7 +1766,7 @@ static bool whisper_encode_internal(
         {
             wstate.use_buf(ctx0, 0);
 
-            cur = ggml_norm(ctx0, cur);
+            cur = ggml_norm(ctx0, cur, hparams.eps);
 
             wstate.use_buf(ctx0, 1);
 
@@ -1966,7 +1967,7 @@ static bool whisper_decode_internal(
         {
             wstate.use_buf(ctx0, 0);
 
-            cur = ggml_norm(ctx0, inpL);
+            cur = ggml_norm(ctx0, inpL, hparams.eps);
 
             // cur = ln_0_w*cur + ln_0_b
             cur = ggml_add(ctx0,
@@ -2093,7 +2094,7 @@ static bool whisper_decode_internal(
         {
             wstate.use_buf(ctx0, 0);
 
-            cur = ggml_norm(ctx0, inpCA); // note: we use inpCA here
+            cur = ggml_norm(ctx0, inpCA, hparams.eps); // note: we use inpCA here
 
             // cur = ln_0_w*cur + ln_0_b
             cur = ggml_add(ctx0,
@@ -2203,7 +2204,7 @@ static bool whisper_decode_internal(
             {
                 wstate.use_buf(ctx0, 0);
 
-                cur = ggml_norm(ctx0, inpFF);
+                cur = ggml_norm(ctx0, inpFF, hparams.eps);
 
                 wstate.use_buf(ctx0, 1);
 
@@ -2258,7 +2259,7 @@ static bool whisper_decode_internal(
     {
         wstate.use_buf(ctx0, 0);
 
-        cur = ggml_norm(ctx0, cur);
+        cur = ggml_norm(ctx0, cur, hparams.eps);
 
         wstate.use_buf(ctx0, 1);
 

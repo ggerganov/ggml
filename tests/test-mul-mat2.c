@@ -1655,7 +1655,7 @@ void quantize_5_row(const float * restrict src, void * restrict dst, int k) {
             }
 
             for (int l = 0; l < QK8; l++) {
-                asrcv[l] = _mm256_and_ps(srcv[l], (__m256) _mm256_set1_epi32(0x7fffffff));
+                asrcv[l] = _mm256_and_ps(srcv[l], _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff)));
             }
 
 
@@ -2043,7 +2043,7 @@ void quantize_6_row(const float * restrict src, void * restrict dst, int k) {
             }
 
             for (int l = 0; l < QK8; l++) {
-                asrcv[l] = _mm256_and_ps(srcv[l], (__m256) _mm256_set1_epi32(0x7fffffff));
+                asrcv[l] = _mm256_and_ps(srcv[l], _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff)));
             }
 
             for (int l = 0; l < QK8/2; l++) {

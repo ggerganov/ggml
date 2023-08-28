@@ -1,3 +1,5 @@
+#define _USE_MATH_DEFINES // for M_PI
+
 #include "common.h"
 
 // third-party utilities
@@ -12,10 +14,6 @@
 #include <locale>
 #include <codecvt>
 #include <sstream>
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
 
 #if defined(_MSC_VER)
 #pragma warning(disable: 4244 4267) // possible loss of data

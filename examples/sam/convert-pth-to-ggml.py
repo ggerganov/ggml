@@ -36,17 +36,32 @@ if ftype < 0 or ftype > 1:
 
 fname_out = fname_out.replace(".bin", "-" + ftype_str[ftype] + ".bin")
 
+# Default params are set to sam_vit_b checkpoint
+n_enc_state = 768
+n_enc_layers = 12
+n_enc_heads = 12
+n_enc_out_chans = 256
+n_pt_embd = 4
+
 model = torch.load(fname_model, map_location="cpu")
+for k, v in model.items():
+    print(k, v.shape)
+    if k == "image_encoder.blocks.0.norm1.weight":
+        n_enc_state = v.shape[0]
 
-# TODO: determine based on model data
-# TODO: add decoder / prompt encoder if needed
+if n_enc_state == 1024: # sam_vit_l
+    n_enc_layers = 24
+    n_enc_heads  = 16
+elif n_enc_state == 1280: # sam_vit_h
+    n_enc_layers = 32
+    n_enc_heads  = 16
+
 hparams = {
-    "n_enc_state":      768,
-    "n_enc_layers":      12,
-    "n_enc_heads":       12,
-    "n_enc_out_chans":  256,
-
-    "n_pt_embd": 4,
+    "n_enc_state":      n_enc_state,
+    "n_enc_layers":     n_enc_layers,
+    "n_enc_heads":      n_enc_heads,
+    "n_enc_out_chans":  n_enc_out_chans,
+    "n_pt_embd":        n_pt_embd,
 }
 
 print(hparams)
@@ -79,7 +94,7 @@ for k, v in model.items():
     #data = tf.train.load_variable(dir_model, name).squeeze()
     #data = v.numpy().squeeze()
     data = v.numpy()
-    n_dims = len(data.shape);
+    n_dims = len(data.shape)
 
     # for efficiency - transpose some matrices
     # "model/h.*/attn/c_attn/w"
@@ -113,7 +128,7 @@ for k, v in model.items():
     # keep it in F32 since the data is small
     if name == "image_encoder.patch_embed.proj.bias":
         data = data.reshape(1, data.shape[0], 1, 1)
-        n_dims = len(data.shape);
+        n_dims = len(data.shape)
         dshape = data.shape
 
     print("  New shape: ", dshape)
@@ -123,7 +138,7 @@ for k, v in model.items():
     fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
     for i in range(n_dims):
         fout.write(struct.pack("i", dshape[n_dims - 1 - i]))
-    fout.write(str);
+    fout.write(str)
 
     # data
     data.tofile(fout)
