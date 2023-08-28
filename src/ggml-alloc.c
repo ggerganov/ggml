@@ -378,6 +378,7 @@ static bool ggml_op_can_inplace(enum ggml_op op) {
         case GGML_OP_SET:
         case GGML_OP_SOFT_MAX:
         case GGML_OP_CONT:
+        case GGML_OP_ADD_REL_POS:
             return true;
 
         default:
