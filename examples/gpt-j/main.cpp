@@ -26,6 +26,7 @@ struct gptj_hparams {
     int32_t n_layer = 28;
     int32_t n_rot   = 64;
     int32_t ftype   = 1;
+    float   eps     = 1e-5;
 };
 
 struct gptj_layer {
@@ -437,7 +438,7 @@ bool gptj_eval(
 
         // norm
         {
-            cur = ggml_norm(ctx0, inpL);
+            cur = ggml_norm(ctx0, inpL, hparams.eps);
 
             // cur = ln_1_g*cur + ln_1_b
             cur = ggml_add(ctx0,
@@ -559,7 +560,7 @@ bool gptj_eval(
 
     // norm
     {
-        inpL = ggml_norm(ctx0, inpL);
+        inpL = ggml_norm(ctx0, inpL, hparams.eps);
 
         // inpL = ln_f_g*inpL + ln_f_b
         inpL = ggml_add(ctx0,

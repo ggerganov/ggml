@@ -25,6 +25,7 @@ struct gpt2_hparams {
     int32_t n_head  = 12;
     int32_t n_layer = 12;
     int32_t ftype   = 1;
+    float   eps     = 1e-5;
 };
 
 struct gpt2_layer {
@@ -444,7 +445,7 @@ struct ggml_cgraph * gpt2_graph(
         // norm
         {
             // [ 768, N]
-            cur = ggml_norm(ctx0, inpL);
+            cur = ggml_norm(ctx0, inpL, hparams.eps);
 
             // cur = ln_1_g*cur + ln_1_b
             // [ 768, N]
@@ -590,7 +591,7 @@ struct ggml_cgraph * gpt2_graph(
         {
             // norm
             {
-                cur = ggml_norm(ctx0, inpFF);
+                cur = ggml_norm(ctx0, inpFF, hparams.eps);
 
                 // cur = ln_2_g*cur + ln_2_b
                 // [ 768, N]
@@ -645,7 +646,7 @@ struct ggml_cgraph * gpt2_graph(
     // norm
     {
         // [ 768, N]
-        inpL = ggml_norm(ctx0, inpL);
+        inpL = ggml_norm(ctx0, inpL, hparams.eps);
 
         // inpL = ln_f_g*inpL + ln_f_b
         // [ 768, N]

@@ -16,6 +16,32 @@
 #include <string>
 #include <vector>
 
+// void print_t_f32(const char* title, struct ggml_tensor * t, int n = 10) {
+//     printf("%s\n", title);
+//     float * data = (float *)t->data;
+//     printf("dims: %jd %jd %jd %jd f32\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
+//     printf("First & Last %d elements:\n", n);
+//     for (int i = 0; i < std::min((int) (t->ne[0]*t->ne[1]), n); i++) {
+//         printf("%.5f ", data[i]);
+//         if (i != 0 && i % t->ne[0] == 0) {
+//             printf("\n");
+//         }
+//     }
+//     printf("\n");
+//     for (int i = 0; i < std::min((int) (t->ne[0]*t->ne[1]), n); i++) {
+//         printf("%.5f ", data[ggml_nelements(t) - n + i]);
+//         if ((ggml_nelements(t) - n + i) % t->ne[0] == 0) {
+//             printf("\n");
+//         }
+//     }
+//     printf("\n");
+//     double sum = 0.0;
+//     for (int i = 0; i < ggml_nelements(t); i++) {
+//         sum += data[i];
+//     }
+//     printf("sum:  %f\n\n", sum);
+// }
+
 // default hparams (ViT-B SAM)
 struct sam_hparams {
     int32_t n_enc_state               = 768;
@@ -29,6 +55,8 @@ struct sam_hparams {
     float   iou_threshold             = 0.88f;
     float   stability_score_threshold = 0.95f;
     float   stability_score_offset    = 1.0f;
+    float   eps                       = 1e-6f;
+    float   eps_decoder_transformer   = 1e-5f;
 
     int32_t n_enc_head_dim() const { return n_enc_state / n_enc_head; }
     int32_t n_img_size()     const { return 1024; }
@@ -1083,12 +1111,13 @@ struct ggml_tensor* sam_layer_norm_2d(
                     struct ggml_tensor  * layer,
                     int                   n_channels,
                     struct ggml_tensor  * w,
-                    struct ggml_tensor  * b) {
+                    struct ggml_tensor  * b,
+                    float                 eps) {
     // LayerNorm2d
     // normalize along channel dimmension
     // TODO: better implementation
     layer = ggml_permute(ctx0,
-                ggml_norm(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, layer, 1, 2, 0, 3))),
+                ggml_norm(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, layer, 1, 2, 0, 3)), eps),
                 2, 0, 1, 3);
 
     layer = ggml_add(ctx0,
@@ -1188,7 +1217,7 @@ bool sam_encode_image(
         // norm
         // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/modeling/image_encoder.py#L168
         {
-            cur = ggml_norm(ctx0, inpL);
+            cur = ggml_norm(ctx0, inpL, hparams.eps);
 
             // cur = ln_0_w*cur + ln_0_b
             cur = ggml_add(ctx0,
@@ -1306,7 +1335,7 @@ bool sam_encode_image(
         {
             // norm
             {
-                cur = ggml_norm(ctx0, inpFF);
+                cur = ggml_norm(ctx0, inpFF, hparams.eps);
 
                 // cur = mlp_ln_w*cur + mlp_ln_b
                 cur = ggml_add(ctx0,
@@ -1347,11 +1376,11 @@ bool sam_encode_image(
 
     cur = ggml_conv_2d_sk_p0(ctx0, enc.neck_conv_0, cur);
 
-    cur = sam_layer_norm_2d(ctx0, cur, n_enc_out_chans, enc.neck_norm_0_w, enc.neck_norm_0_b);
+    cur = sam_layer_norm_2d(ctx0, cur, n_enc_out_chans, enc.neck_norm_0_w, enc.neck_norm_0_b, hparams.eps);
 
     cur = ggml_conv_2d_s1_ph(ctx0, enc.neck_conv_1, cur);
 
-    cur = sam_layer_norm_2d(ctx0, cur, n_enc_out_chans, enc.neck_norm_1_w, enc.neck_norm_1_b);
+    cur = sam_layer_norm_2d(ctx0, cur, n_enc_out_chans, enc.neck_norm_1_w, enc.neck_norm_1_b, hparams.eps);
 
     // TODO: avoid copy
     cur = ggml_cpy(ctx0, cur, state.embd_img);
@@ -1605,21 +1634,6 @@ bool sam_decode_mask(
     struct ggml_context * ctx0 = ggml_init(params);
     struct ggml_cgraph gf = {};
 
-    // auto print_t_f32 = [&](const char* title, struct ggml_tensor * t) {
-    //     printf("%s\n", title);
-    //     float * data = (float *)t->data;
-    //     printf("dims: %jd %jd %jd %jd f32\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
-    //     printf("First 10 elements:\n");
-    //     for (int i = 0; i < std::min((int) t->ne[0], 10); i++) {
-    //         printf("%f ", data[i]);
-    //     }
-    //     printf("\n");
-    //     double sum = 0.0;
-    //     for (int i = 0; i < ggml_nelements(t); i++) {
-    //         sum += data[i];
-    //     }
-    //     printf("sum:  %f\n\n", sum);
-    // };
     // print_t_f32("embd_img", state.embd_img);
     // print_t_f32("embd_prompt_dense", state.embd_prompt_dense);
     // print_t_f32("embd_prompt_sparse", state.embd_prompt_sparse);
@@ -1713,7 +1727,7 @@ bool sam_decode_mask(
                 queries = ggml_add(ctx0, queries, self_attn);
             }
 
-            queries = ggml_norm(ctx0, queries);
+            queries = ggml_norm(ctx0, queries, hparams.eps_decoder_transformer);
             queries = ggml_add(ctx0,
                     ggml_mul(ctx0,
                         ggml_repeat(ctx0, tfm_layer.norm1_w, queries),
@@ -1728,7 +1742,7 @@ bool sam_decode_mask(
             struct ggml_tensor * cross_attn_token_to_img = sam_decode_mask_transformer_attn(tfm_layer.cross_attn_token_to_img, q_1, k_1, keys, ctx0, model);
 
             queries = ggml_add(ctx0, queries, cross_attn_token_to_img);
-            queries = ggml_norm(ctx0, queries);
+            queries = ggml_norm(ctx0, queries, hparams.eps_decoder_transformer);
             queries = ggml_add(ctx0,
                     ggml_mul(ctx0,
                         ggml_repeat(ctx0, tfm_layer.norm2_w, queries),
@@ -1756,7 +1770,7 @@ bool sam_decode_mask(
                     mlp_out);
 
             queries = ggml_add(ctx0, queries, mlp_out);
-            queries = ggml_norm(ctx0, queries);
+            queries = ggml_norm(ctx0, queries, hparams.eps_decoder_transformer);
             queries = ggml_add(ctx0,
                     ggml_mul(ctx0,
                         ggml_repeat(ctx0, tfm_layer.norm3_w, queries),
@@ -1770,7 +1784,7 @@ bool sam_decode_mask(
 
             struct ggml_tensor * cross_attn_img_to_token = sam_decode_mask_transformer_attn(tfm_layer.cross_attn_img_to_token, k_2, q_2, queries, ctx0, model);
             keys = ggml_add(ctx0, keys, cross_attn_img_to_token);
-            keys = ggml_norm(ctx0, keys);
+            keys = ggml_norm(ctx0, keys, hparams.eps_decoder_transformer);
             keys = ggml_add(ctx0,
                     ggml_mul(ctx0,
                         ggml_repeat(ctx0, tfm_layer.norm4_w, keys),
@@ -1786,7 +1800,7 @@ bool sam_decode_mask(
         struct ggml_tensor * final_attn_token_to_img = sam_decode_mask_transformer_attn(dec.transformer_final_attn_token_to_img, q, k, keys, ctx0, model);
 
         queries = ggml_add(ctx0, queries, final_attn_token_to_img);
-        queries = ggml_norm(ctx0, queries);
+        queries = ggml_norm(ctx0, queries, hparams.eps_decoder_transformer);
         queries = ggml_add(ctx0,
                 ggml_mul(ctx0,
                     ggml_repeat(ctx0, dec.transformer_norm_final_w, queries),
@@ -1807,16 +1821,20 @@ bool sam_decode_mask(
     {
         // ConvTranspose2d
         keys = ggml_conv_transpose_2d_p0(ctx0, dec.output_upscaling_0_w, keys, 2);
-        keys = ggml_add(ctx0, ggml_repeat(ctx0, dec.output_upscaling_0_b, keys), keys);
-        keys = sam_layer_norm_2d(ctx0, keys, n_img_embd, dec.output_upscaling_1_w, dec.output_upscaling_1_b);
+        keys = ggml_add(ctx0, keys, ggml_repeat(ctx0,
+                                     ggml_reshape_3d(ctx0, dec.output_upscaling_0_b, 1, 1, dec.output_upscaling_0_b->ne[0]),
+                                     keys));
+
+        keys = sam_layer_norm_2d(ctx0, keys, n_img_embd, dec.output_upscaling_1_w, dec.output_upscaling_1_b, hparams.eps);
 
         // GELU activation
         keys = ggml_gelu(ctx0, keys);
 
         // ConvTranspose2d
         keys = ggml_conv_transpose_2d_p0(ctx0, dec.output_upscaling_3_w, keys, 2);
-        keys = ggml_add(ctx0, ggml_repeat(ctx0, dec.output_upscaling_3_b, keys), keys);
-
+        keys = ggml_add(ctx0, ggml_repeat(ctx0,
+                                ggml_reshape_3d(ctx0, dec.output_upscaling_3_b, 1, 1, dec.output_upscaling_3_b->ne[0]),
+                                keys), keys);
         // GELU activation
         keys = ggml_gelu(ctx0, keys);
         upscaled_embedding = ggml_reshape_3d(ctx0, keys, keys->ne[0]*keys->ne[1], keys->ne[2], keys->ne[3]);

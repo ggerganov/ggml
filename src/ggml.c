@@ -5783,6 +5783,7 @@ struct ggml_tensor * ggml_silu_back(
 static struct ggml_tensor * ggml_norm_impl(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
+        float eps,
         bool inplace) {
     bool is_node = false;
 
@@ -5793,7 +5794,7 @@ static struct ggml_tensor * ggml_norm_impl(
 
     struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
 
-    // TODO: maybe store epsilon here?
+    ggml_set_op_params(result, &eps, sizeof(eps));
 
     result->op   = GGML_OP_NORM;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
@@ -5804,14 +5805,16 @@ static struct ggml_tensor * ggml_norm_impl(
 
 struct ggml_tensor * ggml_norm(
         struct ggml_context * ctx,
-        struct ggml_tensor  * a) {
-    return ggml_norm_impl(ctx, a, false);
+        struct ggml_tensor  * a,
+        float eps) {
+    return ggml_norm_impl(ctx, a, eps, false);
 }
 
 struct ggml_tensor * ggml_norm_inplace(
         struct ggml_context * ctx,
-        struct ggml_tensor  * a) {
-    return ggml_norm_impl(ctx, a, true);
+        struct ggml_tensor  * a,
+        float eps) {
+    return ggml_norm_impl(ctx, a, eps, true);
 }
 
 // ggml_rms_norm
@@ -7092,11 +7095,13 @@ struct ggml_tensor * ggml_conv_transpose_2d_p0(
     };
 
     struct ggml_tensor* result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
+
+    ggml_set_op_params_i32(result, 0, stride);
+
     result->op = GGML_OP_CONV_TRANSPOSE_2D;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = b;
-    result->src[2] = ggml_new_i32(ctx, stride);
 
     return result;
 }
@@ -10613,7 +10618,8 @@ static void ggml_compute_forward_norm_f32(
 
     GGML_TENSOR_UNARY_OP_LOCALS;
 
-    const float eps = 1e-5f; // TODO: make this a parameter
+    float eps;
+    memcpy(&eps, dst->op_params, sizeof(float));
 
     // TODO: optimize
     for (int64_t i03 = 0; i03 < ne03; i03++) {
@@ -13491,7 +13497,6 @@ static void ggml_compute_forward_conv_transpose_2d(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
-        const struct ggml_tensor * opt0,
               struct ggml_tensor * dst) {
     GGML_ASSERT(src0->type == GGML_TYPE_F16);
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
@@ -13551,7 +13556,7 @@ static void ggml_compute_forward_conv_transpose_2d(
         return;
     }
 
-    const int32_t stride = ((const int32_t*)(opt0->data))[0];
+    const int32_t stride = ggml_get_op_params_i32(dst, 0);
 
     // total patches in dst
     const int np = ne2;
@@ -13564,7 +13569,7 @@ static void ggml_compute_forward_conv_transpose_2d(
     const int ip1 = MIN(ip0 + dp, np);
 
     ggml_fp16_t * const wdata = (ggml_fp16_t *) params->wdata + 0;
-    ggml_fp16_t * const wdata_src = (ggml_fp16_t *) params->wdata + nk;
+    ggml_fp16_t * const wdata_src = wdata + nk;
 
     for (int i2 = ip0; i2 < ip1; i2++) { // Cout
         float * dst_data = (float *)((char *) dst->data + i2*nb2);
@@ -13576,9 +13581,8 @@ static void ggml_compute_forward_conv_transpose_2d(
                     for (int i00 = 0; i00 < ne00; i00++) {
                         float v = 0;
                         ggml_vec_dot_f16(ne03, &v,
-                                (ggml_fp16_t *) wdata_src + i1n,
-                                (ggml_fp16_t *) wdata_kernel + i01*ne00*ne03 + i00*ne03);
-
+                                wdata_src + i1n,
+                                wdata_kernel + i01*ne00*ne03 + i00*ne03);
                         dst_data[(i11*stride + i01)*ne0 + i10*stride + i00] += v;
                     }
                 }
@@ -15725,7 +15729,7 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             } break;
         case GGML_OP_CONV_TRANSPOSE_2D:
             {
-                ggml_compute_forward_conv_transpose_2d(params, tensor->src[0], tensor->src[1], tensor->src[2], tensor);
+                ggml_compute_forward_conv_transpose_2d(params, tensor->src[0], tensor->src[1], tensor);
             } break;
         case GGML_OP_POOL_1D:
             {
