@@ -147,6 +147,9 @@ if (GGML_OPENBLAS)
     endif()
 endif()
 
+# undefine NDEBUG so asserts don't get disabled in tests
+add_definitions(-UNDEBUG)
+
 #
 # test-vec0
 
