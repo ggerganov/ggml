@@ -214,6 +214,11 @@
 #define GGML_MAX_OP_PARAMS     32
 #define GGML_DEFAULT_N_THREADS 4
 
+#if UINTPTR_MAX == 0xFFFFFFFF
+    #define GGML_MEM_ALIGN 4
+#else
+    #define GGML_MEM_ALIGN 16
+#endif
 
 #define GGML_EXIT_SUCCESS 0
 #define GGML_EXIT_ABORTED 1
