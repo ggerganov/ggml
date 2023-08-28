@@ -11,6 +11,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -1027,7 +1028,7 @@ bool sam_model_load(const std::string & fname, sam_model & model) {
             }
         }
 
-        if (n_tensors != model.tensors.size()) {
+        if (n_tensors != ptrdiff_t(model.tensors.size())) {
             fprintf(stderr, "%s: model file has %d tensors, but %d tensors were expected\n", __func__, n_tensors, (int) model.tensors.size());
             return false;
         }

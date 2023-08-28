@@ -69,6 +69,20 @@ endif()
 
 # warning flags
 
+if (GGML_ALL_WARNINGS)
+    if (NOT MSVC)
+        set(c_flags   -Wall -Wpedantic -Wformat=2 -Wno-unused -Wstrict-prototypes)
+        set(cxx_flags -Wall -Wpedantic -Wformat=2)
+    else()
+        # todo : windows
+    endif()
+
+    add_compile_options(
+        "$<$<COMPILE_LANGUAGE:C>:${c_flags}>"
+        "$<$<COMPILE_LANGUAGE:CXX>:${cxx_flags}>"
+    )
+endif()
+
 if (NOT MSVC)
     add_compile_options(-Werror=vla)
 endif()

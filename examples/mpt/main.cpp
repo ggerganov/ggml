@@ -243,7 +243,7 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
             // Convert token from utf-8
             std::wstring word_multibytes = convert_to_wstring(word);
             word.resize(word_multibytes.size());
-            for (int w = 0; w < word_multibytes.size(); w++) {
+            for (size_t w = 0; w < word_multibytes.size(); w++) {
                 word[w] = uint8_t(word_multibytes[w]);
             }
 
