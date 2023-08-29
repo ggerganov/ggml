@@ -1292,6 +1292,7 @@ static void quantize_row_q8_0(const float * restrict x, void * restrict vy, int 
 #endif
     }
 #else
+    (void)nb;
     // scalar
     quantize_row_q8_0_reference(x, y, k);
 #endif
@@ -1510,6 +1511,7 @@ static void quantize_row_q8_1(const float * restrict x, void * restrict vy, int 
 #endif
     }
 #else
+    (void)nb;
     // scalar
     quantize_row_q8_1_reference(x, y, k);
 #endif

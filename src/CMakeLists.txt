@@ -1,14 +1,7 @@
 if (GGML_ALL_WARNINGS)
     if (NOT MSVC)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} \
-            -Wunused                        \
-            -Wextra                         \
-            -Wshadow                        \
-            -Wcast-qual                     \
-            -Wdouble-promotion              \
-            -Wno-unused-function            \
-            -Wmissing-prototypes            \
-        ")
+        add_compile_options(-Wunused -Wextra -Wcast-qual -Wdouble-promotion)
+        add_compile_options("$<$<COMPILE_LANGUAGE:C>:-Wshadow;-Wno-unused-function;-Wmissing-prototypes>")
     else()
         # todo : windows
     endif()

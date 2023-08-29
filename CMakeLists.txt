@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.0)
+cmake_minimum_required (VERSION 3.3)
 project(ggml VERSION 0.1.0)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS "on")
@@ -84,7 +84,11 @@ if (GGML_ALL_WARNINGS)
 endif()
 
 if (NOT MSVC)
-    add_compile_options(-Werror=vla)
+    add_compile_options(
+        "$<$<COMPILE_LANGUAGE:C>:-Werror=vla>"
+        "$<$<COMPILE_LANGUAGE:CXX>:-Werror=vla>"
+        "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler;-Werror=vla>"
+    )
 endif()
 
 # dependencies
