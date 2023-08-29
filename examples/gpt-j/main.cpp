@@ -26,7 +26,7 @@ struct gptj_hparams {
     int32_t n_layer = 28;
     int32_t n_rot   = 64;
     int32_t ftype   = 1;
-    float   eps     = 1e-5;
+    float   eps     = 1e-5f;
 };
 
 struct gptj_layer {

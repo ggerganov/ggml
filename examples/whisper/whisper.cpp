@@ -440,7 +440,7 @@ struct whisper_hparams {
     int32_t n_text_layer  = 4;
     int32_t n_mels        = 80;
     int32_t ftype         = 1;
-    float   eps           = 1e-5;
+    float   eps           = 1e-5f;
 };
 
 // audio encoding layer

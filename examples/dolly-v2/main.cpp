@@ -39,7 +39,7 @@ struct dollyv2_hparams {
     int32_t n_rot   = 20;    // rotary_pct[25%] * (n_embd / n_head)
     int32_t par_res = 1; // 1 = true, 0 = false
     int32_t ftype   = GGML_FTYPE_MOSTLY_F16;
-    float   eps     = 1e-5;
+    float   eps     = 1e-5f;
 };
 
 const std::string INSTRUCTION_KEY = "### Instruction:";

@@ -47,6 +47,10 @@
 // disable "possible loss of data" to avoid hundreds of casts
 // we should just be careful :)
 #pragma warning(disable: 4244 4267)
+
+// disable POSIX deprecation warnigns
+// these functions are never going away, anyway
+#pragma warning(disable: 4996)
 #endif
 
 #if defined(_WIN32)

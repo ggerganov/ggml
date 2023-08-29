@@ -25,7 +25,7 @@ struct gpt2_hparams {
     int32_t n_head  = 12;
     int32_t n_layer = 12;
     int32_t ftype   = 1;
-    float   eps     = 1e-5;
+    float   eps     = 1e-5f;
 };
 
 struct gpt2_layer {
