@@ -1,4 +1,5 @@
 #define _USE_MATH_DEFINES // for M_PI
+#define _CRT_SECURE_NO_DEPRECATE // Disables ridiculous "unsafe" warnigns on Windows
 
 #include "ggml.h"
 #include "ggml-alloc.h"
@@ -17,6 +18,10 @@
 #include <string>
 #include <vector>
 #include <thread>
+
+#if defined(_MSC_VER)
+#pragma warning(disable: 4244 4267) // possible loss of data
+#endif
 
 // default hparams (ViT-B SAM)
 struct sam_hparams {
@@ -1106,7 +1111,7 @@ struct ggml_tensor * sam_fill_dense_pe(
 
     struct ggml_tensor * cur = ggml_mul_mat(ctx0, ggml_cont(ctx0, ggml_transpose(ctx0, enc.pe)), xy_embed_stacked);
 
-    cur = ggml_scale(ctx0, cur, ggml_new_f32(ctx0, 2.0f*M_PI));
+    cur = ggml_scale(ctx0, cur, ggml_new_f32(ctx0, float(2.0*M_PI)));
 
     // concat
     // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/modeling/prompt_encoder.py#L192
@@ -1450,7 +1455,7 @@ prompt_encoder_result sam_encode_prompt(
 
     struct ggml_tensor * cur = ggml_mul_mat(ctx0, ggml_cont(ctx0, ggml_transpose(ctx0, enc.pe)), inp);
 
-    cur = ggml_scale(ctx0, cur, ggml_new_f32(ctx0, 2.0f*M_PI));
+    cur = ggml_scale(ctx0, cur, ggml_new_f32(ctx0, float(2.0*M_PI)));
 
     // concat
     // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/modeling/prompt_encoder.py#L192

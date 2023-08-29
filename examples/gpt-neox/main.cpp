@@ -27,7 +27,7 @@ struct gpt_neox_hparams {
     int32_t n_rot   = 32; // rotary_pct * (n_embd / n_head)
     int32_t par_res = 1; // 1 = true, 0 = false
     int32_t ftype   = 1;
-    float   eps     = 1e-5;
+    float   eps     = 1e-5f;
 };
 
 struct gpt_neox_layer {

@@ -465,7 +465,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
     const int n_head  = hparams.n_heads;
     const int n_vocab = hparams.n_vocab;
     const int n_ctx   = hparams.n_ctx;
-    const float eps   = 1e-5;
+    const float eps   = 1e-5f;
 
     static size_t buf_size = 256u * 1024 * 1024;
     static void * buf = malloc(buf_size);

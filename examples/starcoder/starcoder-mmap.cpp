@@ -40,7 +40,7 @@ struct starcoder_hparams {
     int32_t n_head  = 16;
     int32_t n_layer = 24;
     int32_t ftype   = 1;
-    float   eps     = 1e-5;
+    float   eps     = 1e-5f;
 };
 
 struct starcoder_layer {
