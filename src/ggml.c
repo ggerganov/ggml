@@ -18713,7 +18713,6 @@ static enum ggml_opt_result linesearch_backtracking(
                     // strong Wolfe condition (GGML_LINESEARCH_BACKTRACKING_STRONG_WOLFE)
                     return count;
                 }
-                return count;
             }
         }
 
