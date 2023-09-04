@@ -13526,18 +13526,18 @@ static void ggml_compute_forward_conv_2d_stage_0_f32(
 
     GGML_TENSOR_BINARY_OP_LOCALS;
 
-    const int N = ne13;
-    const int IC = ne12;
-    const int IH = ne11;
-    const int IW = ne10;
+    const int64_t N = ne13;
+    const int64_t IC = ne12;
+    const int64_t IH = ne11;
+    const int64_t IW = ne10;
 
-    // const int OC = ne03;
-    // const int IC = ne02;
-    const int KH = ne01;
-    const int KW = ne00;
+    // const int64_t OC = ne03;
+    // const int64_t IC = ne02;
+    const int64_t KH = ne01;
+    const int64_t KW = ne00;
 
-    const int OH = ne2;
-    const int OW = ne1;
+    const int64_t OH = ne2;
+    const int64_t OW = ne1;
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -13565,19 +13565,19 @@ static void ggml_compute_forward_conv_2d_stage_0_f32(
     {
         ggml_fp16_t * const wdata = (ggml_fp16_t *) dst->data;
 
-        for (int in = 0; in < N; in++) {
-            for (int ioh = 0; ioh < OH; ioh++) {
-                for (int iow = 0; iow < OW; iow++) {
-                    for (int iic = ith; iic < IC; iic+=nth) {
+        for (int64_t in = 0; in < N; in++) {
+            for (int64_t ioh = 0; ioh < OH; ioh++) {
+                for (int64_t iow = 0; iow < OW; iow++) {
+                    for (int64_t iic = ith; iic < IC; iic+=nth) {
 
                         // micro kernel
                         ggml_fp16_t * dst_data = wdata + (in*OH*OW + ioh*OW + iow)*(IC*KH*KW); // [IC, KH, KW]
                         const float * const src_data = (float *)((char *) src1->data + in*nb13 + iic*nb12); // [IH, IW]
 
-                        for (int ikh = 0; ikh < KH; ikh++) {
-                            for (int ikw = 0; ikw < KW; ikw++) {
-                                const int iiw = iow*s0 + ikw*d0 - p0;
-                                const int iih = ioh*s1 + ikh*d1 - p1;
+                        for (int64_t ikh = 0; ikh < KH; ikh++) {
+                            for (int64_t ikw = 0; ikw < KW; ikw++) {
+                                const int64_t iiw = iow*s0 + ikw*d0 - p0;
+                                const int64_t iih = ioh*s1 + ikh*d1 - p1;
 
                                 if (!(iih < 0 || iih >= IH || iiw < 0 || iiw >= IW)) {
                                     dst_data[iic*(KH*KW) + ikh*KW + ikw] = GGML_FP32_TO_FP16(src_data[iih*IW + iiw]);
