@@ -1,23 +1,21 @@
 # Convert a SAM model checkpoint to a ggml compatible file
 #
 
-import os
 import sys
-import code
-import json
 import torch
 import struct
 import numpy as np
 
 if len(sys.argv) < 3:
-    print("Usage: convert-pth-to-ggml.py file-model ftype\n")
+    print("Usage: convert-pth-to-ggml.py file-model dir-output [ftype]\n")
     print("  ftype == 0 -> float32")
     print("  ftype == 1 -> float16")
     sys.exit(1)
 
 # output in the same directory as the model
 fname_model = sys.argv[1]
-fname_out   = os.path.dirname(fname_model) + "/ggml-model.bin"
+dir_out     = sys.argv[2]
+fname_out   = dir_out + "/ggml-model.bin"
 
 # possible data types
 #   ftype == 0 -> float32
@@ -27,8 +25,8 @@ fname_out   = os.path.dirname(fname_model) + "/ggml-model.bin"
 ftype_str = ["f32", "f16"]
 
 ftype = 1
-if len(sys.argv) > 2:
-    ftype = int(sys.argv[2])
+if len(sys.argv) > 3:
+    ftype = int(sys.argv[3])
 
 if ftype < 0 or ftype > 1:
     print("Invalid ftype: " + str(ftype))
