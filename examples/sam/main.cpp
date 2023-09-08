@@ -1653,7 +1653,7 @@ bool sam_decode_mask(
                 struct ggml_tensor * q_0 = ggml_add(ctx0, queries, tokens);
 
                 struct ggml_tensor * self_attn = sam_decode_mask_transformer_attn(tfm_layer.self_attn, q_0, q_0, queries, ctx0, model);
-                queries = ggml_add_inplace(ctx0, queries, self_attn);
+                queries = ggml_add(ctx0, queries, self_attn);
             }
 
             queries = ggml_norm(ctx0, queries, hparams.eps_decoder_transformer);
@@ -1730,6 +1730,7 @@ bool sam_decode_mask(
     // ref: https://github.com/facebookresearch/segment-anything/blob/6fdee8f2727f4506cfbbe553e23b895e27956588/segment_anything/modeling/mask_decoder.py#L136
     keys = ggml_cont(ctx0, ggml_transpose(ctx0, keys));
     keys = ggml_view_4d(ctx0, keys, srcNE[0], srcNE[1], srcNE[2], srcNE[3], srcNE[0]*keys->nb[0], keys->nb[1], keys->nb[2], 0);
+    // ggml_build_forward_expand(gf, keys);
     struct ggml_tensor * upscaled_embedding = {};
     {
         // ConvTranspose2d
