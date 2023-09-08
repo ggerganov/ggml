@@ -72,9 +72,9 @@ jobs:
     - name: Test Coverage
       working-directory: ./build
       run: |
-        llvm-profdata merge -sparse tests/*.profraw -o ggml.profdata
-        llvm-cov      report ./bin/test-grad0 -instr-profile=ggml.profdata
-        llvm-cov      report ./bin/test-opt   -instr-profile=ggml.profdata
+        xcrun llvm-profdata merge -sparse tests/*.profraw -o ggml.profdata
+        xcrun llvm-cov      report ./bin/test-grad0 -instr-profile=ggml.profdata
+        xcrun llvm-cov      report ./bin/test-opt   -instr-profile=ggml.profdata
 
   build:
 
