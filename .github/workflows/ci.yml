@@ -7,7 +7,7 @@ on:
     branches: [ master ]
 
 jobs:
-  test-opencl:
+  test-ubuntu-opencl:
     runs-on: ubuntu-latest
     env:
       GGML_NLOOP: 3
