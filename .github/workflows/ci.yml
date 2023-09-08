@@ -12,6 +12,7 @@ jobs:
     env:
       GGML_NLOOP: 3
       GGML_NITER: 1
+      GGML_N_THREADS: 2
 
     steps:
     - uses: actions/checkout@v2
@@ -22,10 +23,6 @@ jobs:
         echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list  
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends llvm intel-oneapi-runtime-opencl intel-oneapi-runtime-compilers libclblast-dev
-
-    - name: Set GGML_N_THREADS
-      run: echo "GGML_N_THREADS=2" >> $GITHUB_ENV
-
     - name: Create Build Environment
       run: mkdir build
 
