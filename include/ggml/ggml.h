@@ -195,6 +195,14 @@
 #    define GGML_DEPRECATED(func, hint) func
 #endif
 
+#ifndef __GNUC__
+#    define GGML_ATTRIBUTE_FORMAT(...)
+#elif defined(__MINGW32__)
+#    define GGML_ATTRIBUTE_FORMAT(...) __attribute__((format(gnu_printf, __VA_ARGS__)))
+#else
+#    define GGML_ATTRIBUTE_FORMAT(...) __attribute__((format(printf, __VA_ARGS__)))
+#endif
+
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -685,6 +693,7 @@ extern "C" {
 
     GGML_API const char *         ggml_get_name   (const struct ggml_tensor * tensor);
     GGML_API struct ggml_tensor * ggml_set_name   (      struct ggml_tensor * tensor, const char * name);
+    GGML_ATTRIBUTE_FORMAT(2, 3)
     GGML_API struct ggml_tensor * ggml_format_name(      struct ggml_tensor * tensor, const char * fmt, ...);
 
     //
