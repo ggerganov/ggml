@@ -44,6 +44,41 @@ jobs:
         llvm-profdata merge -sparse tests/*.profraw -o ggml.profdata
         llvm-cov      report ./bin/test-grad0 -instr-profile=ggml.profdata
         llvm-cov      report ./bin/test-opt   -instr-profile=ggml.profdata
+  test-macos-metal:
+    runs-on: macos-13
+    env:
+      GGML_NLOOP: 3
+      GGML_NITER: 1
+      GGML_N_THREADS: 2
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends llvm
+    - name: Create Build Environment
+      run: mkdir build
+
+    - name: Configure CMake
+      working-directory: ./build
+      run: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DGGML_TEST_COVERAGE=ON -DGGML_METAL=ON ..
+
+    - name: Build
+      working-directory: ./build
+      run: make
+
+    - name: Test
+      working-directory: ./build
+      run: ctest --verbose --timeout 900
+
+    - name: Test Coverage
+      working-directory: ./build
+      run: |
+        llvm-profdata merge -sparse tests/*.profraw -o ggml.profdata
+        llvm-cov      report ./bin/test-grad0 -instr-profile=ggml.profdata
+        llvm-cov      report ./bin/test-opt   -instr-profile=ggml.profdata
 
   build:
 
