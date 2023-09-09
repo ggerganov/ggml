@@ -261,12 +261,12 @@ Information about where this model came from. This is useful for tracking the pr
 
 ### LLM
 
-In the following, `[llm]` is used to fill in for the name of a specific LLM architecture. They will be used in each architecture's section.
+In the following, `[llm]` is used to fill in for the name of a specific LLM architecture. For example, `llama` for LLaMA, `mpt` for MPT, etc. If mentioned in an architecture's section, it is required for that architecture, but not all keys are required for all architectures. Consult the relevant section for more information.
 
 - `[llm].context_length: uint64`: Also known as `n_ctx`. length of the context (in tokens) that the model was trained on. For most architectures, this is the hard limit on the length of the input. Architectures, like RWKV, that are not reliant on transformer-style attention may be able to handle larger inputs, but this is not guaranteed.
 - `[llm].embedding_length: uint64`: Also known as `n_embd`. Embedding layer size.
-- `[llm].block_count: uint64`: The number of blocks of attention+feedforward layers (i.e. the bulk of the LLM). Does not include the input or embedding layers.
-- `[llm].feedforward_length: uint64`: Also known as `n_ff`. The length of the feedforward layer.
+- `[llm].block_count: uint64`: The number of blocks of attention+feed-forward layers (i.e. the bulk of the LLM). Does not include the input or embedding layers.
+- `[llm].feed_forward_length: uint64`: Also known as `n_ff`. The length of the feed-forward layer.
 - `[llm].use_parallel_residual: bool`: Whether or not the parallel residual logic should be used.
 - `[llm].tensor_data_layout: string`: When a model is converted to GGUF, tensors may be rearranged to improve performance. This key describes the layout of the tensor data. This is not required; if not present, it is assumed to be `reference`.
   - `reference`: tensors are laid out in the same order as the original model
@@ -295,8 +295,8 @@ The following sections describe the metadata for each model architecture. Each k
 
 - `llama.context_length`
 - `llama.embedding_length`
-- `llama.layer_count`
-- `llama.feedforward_length`
+- `llama.block_count`
+- `llama.feed_forward_length`
 - `llama.rope.dimension_count`
 - `llama.attention.head_count`
 - `llama.attention.layer_norm_rms_epsilon`
@@ -318,7 +318,7 @@ The following sections describe the metadata for each model architecture. Each k
 
 - `mpt.context_length`
 - `mpt.embedding_length`
-- `mpt.layer_count`
+- `mpt.block_count`
 - `mpt.attention.head_count`
 - `mpt.attention.alibi_bias_max`
 - `mpt.attention.clip_kqv`
@@ -328,7 +328,7 @@ The following sections describe the metadata for each model architecture. Each k
 
 - `gptneox.context_length`
 - `gptneox.embedding_length`
-- `gptneox.layer_count`
+- `gptneox.block_count`
 - `gptneox.use_parallel_residual`
 - `gptneox.rope.dimension_count`
 - `gptneox.attention.head_count`
@@ -342,7 +342,7 @@ The following sections describe the metadata for each model architecture. Each k
 
 - `gptj.context_length`
 - `gptj.embedding_length`
-- `gptj.layer_count`
+- `gptj.block_count`
 - `gptj.rope.dimension_count`
 - `gptj.attention.head_count`
 - `gptj.attention.layer_norm_epsilon`
@@ -355,7 +355,7 @@ The following sections describe the metadata for each model architecture. Each k
 
 - `gpt2.context_length`
 - `gpt2.embedding_length`
-- `gpt2.layer_count`
+- `gpt2.block_count`
 - `gpt2.attention.head_count`
 - `gpt2.attention.layer_norm_epsilon`
 
@@ -363,8 +363,8 @@ The following sections describe the metadata for each model architecture. Each k
 
 - `bloom.context_length`
 - `bloom.embedding_length`
-- `bloom.layer_count`
-- `bloom.feedforward_length`
+- `bloom.block_count`
+- `bloom.feed_forward_length`
 - `bloom.attention.head_count`
 - `bloom.attention.layer_norm_epsilon`
 
@@ -372,7 +372,7 @@ The following sections describe the metadata for each model architecture. Each k
 
 - `falcon.context_length`
 - `falcon.embedding_length`
-- `falcon.layer_count`
+- `falcon.block_count`
 - `falcon.attention.head_count`
 - `falcon.attention.head_count_kv`
 - `falcon.attention.use_norm`
@@ -410,9 +410,9 @@ The vocabulary size is the same as the number of rows in the `head` matrix.
 
 - `rwkv.architecture_version: uint32`: The only allowed value currently is 4. Version 5 is expected to appear some time in the future.
 - `rwkv.context_length: uint64`: Length of the context used during training or fine-tuning. RWKV is able to handle larger context than this limit, but the output quality may suffer.
-- `rwkv.layer_count: uint64`
+- `rwkv.block_count: uint64`
 - `rwkv.embedding_length: uint64`
-- `rwkv.feedforward_length: uint64`
+- `rwkv.feed_forward_length: uint64`
 
 ##### Whisper
 
@@ -422,13 +422,13 @@ This is because they are both transformer models.
 
 - `whisper.encoder.context_length`
 - `whisper.encoder.embedding_length`
-- `whisper.encoder.layer_count`
+- `whisper.encoder.block_count`
 - `whisper.encoder.mels_count: uint64`
 - `whisper.encoder.attention.head_count`
 
 - `whisper.decoder.context_length`
 - `whisper.decoder.embedding_length`
-- `whisper.decoder.layer_count`
+- `whisper.decoder.block_count`
 - `whisper.decoder.attention.head_count`
 
 #### Prompting
