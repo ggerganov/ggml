@@ -79,6 +79,8 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
             }
         } else if (arg == "-tt" || arg == "--token_test") {
             params.token_test = get_next_arg(i, argc, argv, arg, params);
+        } else if (arg == "--perplexity") {
+            params.perplexity = true;
         }
         else {
             fprintf(stderr, "error: unknown argument: %s\n", arg.c_str());
@@ -112,6 +114,7 @@ void gpt_print_usage(int /*argc*/, char ** argv, const gpt_params & params) {
     fprintf(stderr, "  --repeat-penalty N    penalize repeat sequence of tokens (default: %.2f, 1.0 = disabled)\n", (double)params.repeat_penalty);
     fprintf(stderr, "  -b N, --batch_size N  batch size for prompt processing (default: %d)\n", params.n_batch);
     fprintf(stderr, "  -m FNAME, --model FNAME\n");
+    fprintf(stderr, "  --perplexity          compute perplexity over the prompt\n");
     fprintf(stderr, "                        model path (default: %s)\n", params.model.c_str());
     fprintf(stderr, "\n");
 }

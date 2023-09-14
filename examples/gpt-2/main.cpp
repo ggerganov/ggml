@@ -727,6 +727,22 @@ bool gpt2_eval(
     return true;
 }
 
+std::vector<float> softmax(const std::vector<float> & logits) {
+    std::vector<float> probs(logits.size());
+    float max_logit = logits[0];
+    for (float v : logits) max_logit = std::max(max_logit, v);
+    double sum_exp = 0.0;
+    for (size_t i = 0; i < logits.size(); i++) {
+        // Subtract the maximum logit value from the current logit value for numerical stability
+        const float logit = logits[i] - max_logit;
+        const float exp_logit = expf(logit);
+        sum_exp += exp_logit;
+        probs[i] = exp_logit;
+    }
+    for (size_t i = 0; i < probs.size(); i++) probs[i] /= sum_exp;
+    return probs;
+}
+
 int main(int argc, char ** argv) {
     ggml_time_init();
 
@@ -803,7 +819,14 @@ int main(int argc, char ** argv) {
     // tokenize the prompt
     std::vector<gpt_vocab::id> embd_inp = ::gpt_tokenize(vocab, params.prompt);
 
-    params.n_predict = std::min(params.n_predict, model.hparams.n_ctx - (int) embd_inp.size());
+    if (params.perplexity) {
+        // NOTE(xcsong): We only calculate perplexity on prompt (n_predict = 0).
+        //  To get logits, we need to process prompt token-by-token (n_batch = 1).
+        params.n_predict = 0;
+        params.n_batch = 1;
+    } else {
+        params.n_predict = std::min(params.n_predict, model.hparams.n_ctx - (int) embd_inp.size());
+    }
 
     printf("%s: prompt: '%s'\n", __func__, params.prompt.c_str());
     printf("%s: number of tokens in prompt = %zu, first 8 tokens: ", __func__, embd_inp.size());
@@ -816,6 +839,7 @@ int main(int argc, char ** argv) {
     // this reduces the memory usage during inference, at the cost of a bit of speed at the beginning
     std::vector<gpt_vocab::id> embd;
 
+    double nll = 0.0;  // for perplexity
     for (size_t i = embd.size(); i < embd_inp.size() + params.n_predict; i++) {
         // predict
         if (embd.size() > 0) {
@@ -827,6 +851,11 @@ int main(int argc, char ** argv) {
             }
 
             t_predict_us += ggml_time_us() - t_start_us;
+
+            if (params.perplexity) {
+                const float prob = softmax(logits)[embd_inp[i]];
+                nll += -std::log(prob);
+            }
         }
 
         n_past += embd.size();
@@ -873,6 +902,11 @@ int main(int argc, char ** argv) {
         if (embd.back() == 50256) {
             break;
         }
+    }
+
+    if (params.perplexity) {
+        // perplexity is e^(average negative log-likelihood)
+        printf("\n\nperplexity:%.8lf\n", std::exp(nll / (embd_inp.size() - 1)));
     }
 
     // report timing
