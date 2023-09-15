@@ -13295,7 +13295,7 @@ static void ggml_compute_forward_conv_1d(
     switch(src0->type) {
         case GGML_TYPE_F16:
             {
-                ggml_compute_forward_conv_1d_f16(params, src0, src1, dst);
+                ggml_compute_forward_conv_1d_f16_f32(params, src0, src1, dst);
             } break;
         case GGML_TYPE_F32:
             {
