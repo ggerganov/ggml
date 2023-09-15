@@ -7194,7 +7194,7 @@ struct ggml_tensor* ggml_conv_1d_ph(
 
 // ggml_conv_transpose_1d
 
-static int64_t ggml_calc_conv_transpose_output_size(int64_t ins, int64_t ks, int s, int p, int d) {
+static int64_t ggml_calc_conv_transpose_1d_output_size(int64_t ins, int64_t ks, int s, int p, int d) {
     return (ins - 1) * s - 2 * p + d * (ks - 1) + 1;
 }
 
@@ -7220,7 +7220,7 @@ GGML_API struct ggml_tensor * ggml_conv_transpose_1d(
     }
 
     const int64_t ne[4] = {
-        ggml_calc_conv_transpose_output_size(b->ne[0], a->ne[0], s0, 0 /*p0*/, 1 /*d0*/),
+        ggml_calc_conv_transpose_1d_output_size(b->ne[0], a->ne[0], s0, 0 /*p0*/, 1 /*d0*/),
         a->ne[1], 1, 1,
     };
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
