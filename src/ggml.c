@@ -13157,6 +13157,7 @@ static void ggml_compute_forward_conv_1d_f16_f32(
 
     const int nk = ne00;
 
+    // size of the convolution row - the kernel size unrolled across all input channels
     const int ew0 = nk*ne01;
 
     const int32_t s0 = ((const int32_t*)(dst->op_params))[0];
@@ -13175,7 +13176,7 @@ static void ggml_compute_forward_conv_1d_f16_f32(
             const float * const src = (float *)((char *) src1->data + i11*nb11);
             ggml_fp16_t * dst_data = wdata;
 
-            for (int64_t i0 = 0; i0 < ne0; i0++) {  // Lout
+            for (int64_t i0 = 0; i0 < ne0; i0++) {
                 for (int64_t ik = 0; ik < nk; ik++) {
                     const int idx0 = i0*s0 + ik*d0 - p0;
 
@@ -13205,13 +13206,15 @@ static void ggml_compute_forward_conv_1d_f16_f32(
 
     ggml_fp16_t * const wdata = (ggml_fp16_t *) params->wdata + 0;
 
-    for (int i1 = ir0; i1 < ir1; i1++) {
-        float * dst_data = (float *)((char *) dst->data + i1*nb1);
+    for (int i2 = 0; i2 < ne2; i2++) {
+        for (int i1 = ir0; i1 < ir1; i1++) {
+            float * dst_data = (float *)((char *) dst->data + i2*nb2 + i1*nb1);
 
-        for (int i0 = 0; i0 < ne0; i0++) {
-            ggml_vec_dot_f16(ew0, dst_data + i0,
-                    (ggml_fp16_t *) ((char *) src0->data + i1*nb02),
-                    (ggml_fp16_t *)                wdata + i0*ew0);
+            for (int i0 = 0; i0 < ne0; i0++) {
+                ggml_vec_dot_f16(ew0, dst_data + i0,
+                        (ggml_fp16_t *) ((char *) src0->data + i1*nb02),
+                        (ggml_fp16_t *)                wdata + i2*nb2 + i0*ew0);
+            }
         }
     }
 }
@@ -13253,7 +13256,7 @@ static void ggml_compute_forward_conv_1d_f32(
             const float * const src = (float *)((char *) src1->data + i11*nb11);
             float * dst_data = wdata;
 
-            for (int64_t i0 = 0; i0 < ne0; i0++) {  // Lout
+            for (int64_t i0 = 0; i0 < ne0; i0++) {
                 for (int64_t ik = 0; ik < nk; ik++) {
                     const int idx0 = i0*s0 + ik*d0 - p0;
 
@@ -13283,16 +13286,14 @@ static void ggml_compute_forward_conv_1d_f32(
 
     float * const wdata = (float *) params->wdata + 0;
 
-    for (int i3 = 0; i3 < ne3; i3++) {
-        for (int i2 = 0; i2 < ne2; i2++) {
-            for (int i1 = ir0; i1 < ir1; i1++) {
-                float * dst_data = (float *)((char *) dst->data + i3*nb3 + i2*nb2 + i1*nb1);
+    for (int i2 = 0; i2 < ne2; i2++) {
+        for (int i1 = ir0; i1 < ir1; i1++) {
+            float * dst_data = (float *)((char *) dst->data + i2*nb2 + i1*nb1);
 
-                for (int i0 = 0; i0 < ne0; i0++) {
-                    ggml_vec_dot_f32(ew0, dst_data + i0,
-                            (float *) ((char *) src0->data + i1*nb02),
-                            (float *)                wdata + i3*nb3 + i0*ew0);
-                }
+            for (int i0 = 0; i0 < ne0; i0++) {
+                ggml_vec_dot_f32(ew0, dst_data + i0,
+                        (float *) ((char *) src0->data + i1*nb02),
+                        (float *)                wdata + i2*nb2 + i0*ew0);
             }
         }
     }
