@@ -4113,6 +4113,7 @@ static void ggml_setup_op_has_task_pass(void) {
         p[GGML_OP_DIAG_MASK_ZERO         ] = true;
         p[GGML_OP_CONV_1D                ] = true;
         p[GGML_OP_CONV_2D                ] = true;
+        p[GGML_OP_CONV_TRANSPOSE_1D      ] = true;
         p[GGML_OP_CONV_TRANSPOSE_2D      ] = true;
         p[GGML_OP_FLASH_ATTN_BACK        ] = true;
         p[GGML_OP_CROSS_ENTROPY_LOSS     ] = true;
@@ -16568,6 +16569,10 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                 GGML_ASSERT(false); // TODO: not implemented
             } break;
         case GGML_OP_CONV_2D:
+            {
+                GGML_ASSERT(false); // TODO: not implemented
+            } break;
+        case GGML_OP_CONV_TRANSPOSE_1D:
             {
                 GGML_ASSERT(false); // TODO: not implemented
             } break;

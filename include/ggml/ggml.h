@@ -393,6 +393,7 @@ extern "C" {
         GGML_OP_CLAMP,
         GGML_OP_CONV_1D,
         GGML_OP_CONV_2D,
+        GGML_OP_CONV_TRANSPOSE_1D,
         GGML_OP_CONV_TRANSPOSE_2D,
         GGML_OP_POOL_1D,
         GGML_OP_POOL_2D,
