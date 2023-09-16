@@ -160,6 +160,9 @@ bool vad_simple(
 // compute similarity between two strings using Levenshtein distance
 float similarity(const std::string & s0, const std::string & s1);
 
+// softmax for ppl
+std::vector<float> softmax(const std::vector<float> & logits);
+
 //
 // SAM argument parsing
 //

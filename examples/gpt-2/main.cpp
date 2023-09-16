@@ -727,22 +727,6 @@ bool gpt2_eval(
     return true;
 }
 
-std::vector<float> softmax(const std::vector<float> & logits) {
-    std::vector<float> probs(logits.size());
-    float max_logit = logits[0];
-    for (float v : logits) max_logit = std::max(max_logit, v);
-    double sum_exp = 0.0;
-    for (size_t i = 0; i < logits.size(); i++) {
-        // Subtract the maximum logit value from the current logit value for numerical stability
-        const float logit = logits[i] - max_logit;
-        const float exp_logit = expf(logit);
-        sum_exp += exp_logit;
-        probs[i] = exp_logit;
-    }
-    for (size_t i = 0; i < probs.size(); i++) probs[i] /= sum_exp;
-    return probs;
-}
-
 int main(int argc, char ** argv) {
     ggml_time_init();
 
