@@ -397,6 +397,9 @@ extern "C" {
         GGML_OP_POOL_1D,
         GGML_OP_POOL_2D,
 
+        GGML_OP_CONV_1D_STAGE_0,  // internal
+        GGML_OP_CONV_1D_STAGE_1,  // internal
+
         GGML_OP_UPSCALE, // nearest interpolate
 
         GGML_OP_FLASH_ATTN,
