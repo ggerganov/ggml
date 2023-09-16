@@ -7164,6 +7164,10 @@ static int64_t ggml_calc_conv_output_size(int64_t ins, int64_t ks, int s, int p,
     return (ins + 2 * p - d * (ks - 1) - 1) / s + 1;
 }
 
+// im2col: [N, IC, IL] => [N, OL, IC*K]
+// a: [OC，IC, K]
+// b: [N, IC, IL]
+// result: [N, OL, IC*K]
 static struct ggml_tensor * ggml_conv_1d_stage_0(
     struct ggml_context * ctx,
     struct ggml_tensor  * a,
@@ -7182,7 +7186,7 @@ static struct ggml_tensor * ggml_conv_1d_stage_0(
     const int64_t OL = ggml_calc_conv_output_size(b->ne[0], a->ne[0], s0, p0, d0);
 
     const int64_t ne[4] = {
-        a->ne[2] * a->ne[1] * a->ne[0],
+        a->ne[1] * a->ne[0],
         OL,
         b->ne[2],
         1,
@@ -13476,7 +13480,7 @@ static void ggml_compute_forward_conv_1d_stage_0_f32(
 
     GGML_TENSOR_BINARY_OP_LOCALS;
 
-    const int64_t N = ne12;
+    const int64_t N  = ne12;
     const int64_t IC = ne11;
     const int64_t IL = ne10;
 
@@ -13488,8 +13492,8 @@ static void ggml_compute_forward_conv_1d_stage_0_f32(
     const int nth = params->nth;
 
     const int32_t s0 = ((const int32_t*)(dst->op_params))[0];
-    const int32_t p0 = ((const int32_t*)(dst->op_params))[2];
-    const int32_t d0 = ((const int32_t*)(dst->op_params))[4];
+    const int32_t p0 = ((const int32_t*)(dst->op_params))[1];
+    const int32_t d0 = ((const int32_t*)(dst->op_params))[2];
 
     GGML_ASSERT(nb00 == sizeof(ggml_fp16_t));
     GGML_ASSERT(nb10 == sizeof(float));
@@ -17638,6 +17642,9 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
                     work_size = MAX(work_size, cur);
                 } break;
             case GGML_OP_CONV_1D_STAGE_0:
+                {
+                    n_tasks = n_threads;
+                } break;
             case GGML_OP_CONV_1D_STAGE_1:
                 {
                     n_tasks = n_threads;
