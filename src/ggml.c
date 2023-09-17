@@ -7221,7 +7221,7 @@ GGML_API struct ggml_tensor * ggml_conv_transpose_1d(
 
     const int64_t ne[4] = {
         ggml_calc_conv_transpose_1d_output_size(b->ne[0], a->ne[0], s0, 0 /*p0*/, 1 /*d0*/),
-        a->ne[1], 1, 1,
+        a->ne[1], b->ne[2], 1,
     };
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
 
@@ -13637,7 +13637,7 @@ static void ggml_compute_forward_conv_transpose_1d_f16_f32(
                     const ggml_fp16_t * const src = (ggml_fp16_t *)((char *) src0->data + i02*nb02 + i01*nb01);
                     ggml_fp16_t * dst_data = wdata + i01*ne00*ne02;
                     for (int64_t i00 = 0; i00 < ne00; i00++) {
-                        dst_data[i01*ne00*ne02 + i00*ne02 + i02] = src[i00];
+                        dst_data[i00*ne02 + i02] = src[i00];
                     }
                 }
             }
@@ -13686,8 +13686,8 @@ static void ggml_compute_forward_conv_transpose_1d_f16_f32(
             for (int i00 = 0; i00 < ne00; i00++) {
                 float v = 0;
                 ggml_vec_dot_f16(ne02, &v,
-                        wdata_src + i1n,
-                        wdata_kernel + i00*ne02);
+                        (ggml_fp16_t *)    wdata_src + i1n,
+                        (ggml_fp16_t *) wdata_kernel + i00*ne02);
                 dst_data[i10*s0 + i00] += v;
             }
         }
