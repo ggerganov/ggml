@@ -169,7 +169,6 @@ typedef void * thread_ret_t;
 //#define GGML_SOFT_MAX_ACCELERATE
 #endif
 
-
 #if defined(_MSC_VER) || defined(__MINGW32__)
 #define GGML_ALIGNED_MALLOC(size) _aligned_malloc(size, GGML_MEM_ALIGN)
 #define GGML_ALIGNED_FREE(ptr)    _aligned_free(ptr)
