@@ -49,6 +49,7 @@ def bytes_to_unicode():
     return dict(zip(bs, cs))
 
 
+# Download model from https://huggingface.co/Langboat/bloom-1b4-zh
 if len(sys.argv) < 3:
     print("Usage: convert-h5-to-ggml.py dir-model dir-output [use-f32]\n")
     sys.exit(1)
@@ -135,9 +136,32 @@ for name in list_vars.keys():
         i = re.findall("\d+", name)[0]
         name = f"model/h{i}/ln_1/b"
     elif re.match(r"h\.\d+\.self_attention\.query_key_value\.weight", name):
+        # Map bloom-style qkv_linear to gpt-style qkv_linear
+        # bloom: https://github.com/huggingface/transformers/blob/main/src/transformers/models/bloom/modeling_bloom.py#L238-L252  # noqa
+        # gpt-2: https://github.com/huggingface/transformers/blob/main/src/transformers/models/gpt2/modeling_gpt2.py#L312  # noqa
+        qkv_weights = data.reshape(
+            (hparams["n_head"], 3, hparams["hidden_size"] // hparams["n_head"],
+             hparams["hidden_size"])
+        )
+        data = np.concatenate(
+            (qkv_weights[:, 0, :, :].reshape((-1, hparams["hidden_size"])),
+             qkv_weights[:, 1, :, :].reshape((-1, hparams["hidden_size"])),
+             qkv_weights[:, 2, :, :].reshape((-1, hparams["hidden_size"]))),
+            axis=0
+        )
         i = re.findall("\d+", name)[0]
         name = f"model/h{i}/attn/c_attn/w"
     elif re.match(r"h\.\d+\.self_attention\.query_key_value\.bias", name):
+        qkv_bias = data.reshape(
+            (hparams["n_head"], 3,
+             hparams["hidden_size"] // hparams["n_head"])
+        )
+        data = np.concatenate(
+            (qkv_bias[:, 0, :].reshape((hparams["hidden_size"],)),
+             qkv_bias[:, 1, :].reshape((hparams["hidden_size"],)),
+             qkv_bias[:, 2, :].reshape((hparams["hidden_size"],))),
+            axis=0
+        )
         i = re.findall("\d+", name)[0]
         name = f"model/h{i}/attn/c_attn/b"
     elif re.match(r"h\.\d+\.self_attention\.dense\.weight", name):

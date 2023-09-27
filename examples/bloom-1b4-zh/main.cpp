@@ -432,13 +432,19 @@ struct ggml_cgraph * bloom1b4zh_graph(
     // wte
     struct ggml_tensor * inpL = ggml_get_rows(ctx0, model.wte, embd);
 
-    // inpL = ln_wte_g*inpL + ln_wte_b
-    // [2048, N]
-    inpL = ggml_add(ctx0,
-            ggml_mul(ctx0,
-                ggml_repeat(ctx0, model.ln_wte_g, inpL),
-                inpL),
-            ggml_repeat(ctx0, model.ln_wte_b, inpL));
+    // norm
+    {
+        // [2048, N]
+        inpL = ggml_norm(ctx0, inpL, hparams.eps);
+
+        // inpL = ln_wte_g*inpL + ln_wte_b
+        // [2048, N]
+        inpL = ggml_add(ctx0,
+                ggml_mul(ctx0,
+                    ggml_repeat(ctx0, model.ln_wte_g, inpL),
+                    inpL),
+                ggml_repeat(ctx0, model.ln_wte_b, inpL));
+    }
 
     for (int il = 0; il < n_layer; ++il) {
         struct ggml_tensor * cur;
@@ -531,9 +537,8 @@ struct ggml_cgraph * bloom1b4zh_graph(
                         KQ,
                         KQ_scale);
 
-            // FIXME(xcsong): correct alibi
             struct ggml_tensor * KQ_scaled_alibi =
-                ggml_alibi(ctx0, KQ_scaled, n_past, n_head, 8);
+                ggml_alibi(ctx0, KQ_scaled, n_past, n_head, 8.0);
 
             // KQ_masked = mask_past(KQ_scaled_alibi)
             // [n_past + N, N, 16]
