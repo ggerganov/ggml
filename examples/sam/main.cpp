@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 #include <thread>
+#include <cinttypes>
 
 #if defined(_MSC_VER)
 #pragma warning(disable: 4244 4267) // possible loss of data
@@ -298,7 +299,7 @@ struct sam_image_f32 {
 void print_t_f32(const char* title, struct ggml_tensor * t, int n = 10) {
     printf("%s\n", title);
     float * data = (float *)t->data;
-    printf("dims: %jd %jd %jd %jd f32\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
+    printf("dims: % " PRId64 " % " PRId64 " % " PRId64 " % " PRId64 " f32\n", t->ne[0], t->ne[1], t->ne[2], t->ne[3]);
     printf("First & Last %d elements:\n", n);
     for (int i = 0; i < std::min((int) (t->ne[0]*t->ne[1]), n); i++) {
         printf("%.5f ", data[i]);

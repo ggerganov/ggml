@@ -125,15 +125,15 @@ struct ggml_mtl_context * mnist_mtl_init(
 
         ctx->function_add = [ctx->library newFunctionWithName:@"kernel_add"];
         ctx->pipeline_add = [ctx->device newComputePipelineStateWithFunction:ctx->function_add error:nil];
-        fprintf(stderr, "%s: loaded kernel_add: %p\n", __func__, ctx->pipeline_add);
+        fprintf(stderr, "%s: loaded kernel_add: %p\n", __func__, (void *) ctx->pipeline_add);
 
         ctx->function_relu = [ctx->library newFunctionWithName:@"kernel_relu"];
         ctx->pipeline_relu = [ctx->device newComputePipelineStateWithFunction:ctx->function_relu error:nil];
-        fprintf(stderr, "%s: loaded kernel_relu: %p\n", __func__, ctx->pipeline_relu);
+        fprintf(stderr, "%s: loaded kernel_relu: %p\n", __func__, (void *) ctx->pipeline_relu);
 
         ctx->function_soft_max = [ctx->library newFunctionWithName:@"kernel_soft_max" constantValues:constants error:nil];
         ctx->pipeline_soft_max = [ctx->device newComputePipelineStateWithFunction:ctx->function_soft_max error:nil];
-        fprintf(stderr, "%s: loaded kernel_soft_max: %p\n", __func__, ctx->pipeline_soft_max);
+        fprintf(stderr, "%s: loaded kernel_soft_max: %p\n", __func__, (void *) ctx->pipeline_soft_max);
     }
 
 #ifdef GGML_MTL_HEAP
@@ -314,7 +314,7 @@ int mnist_mtl_eval(
 
         id<MTLBuffer> id_dst = mnist_mtl_get_buffer(ctx, inp, &offs_src0);
 
-        memcpy(id_dst.contents + offs_src0, inp->data, ggml_nbytes(inp));
+        memcpy((char *) id_dst.contents + offs_src0, inp->data, ggml_nbytes(inp));
     }
 
     for (int i = 0; i < gf->n_nodes; ++i) {
