@@ -880,7 +880,7 @@ int main(int argc, char ** argv) {
         fflush(stdout);
 
         // end of text token
-        if (embd.back() == 50256) {
+        if (embd.back() == 2) {
             break;
         }
     }
