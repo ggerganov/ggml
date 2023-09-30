@@ -397,6 +397,7 @@ extern "C" {
         GGML_OP_CONV_TRANSPOSE_2D,
         GGML_OP_POOL_1D,
         GGML_OP_POOL_2D,
+        GGML_OP_PAD_REFLEC_1D,
 
         GGML_OP_CONV_1D_STAGE_0,  // internal
         GGML_OP_CONV_1D_STAGE_1,  // internal
@@ -1331,6 +1332,12 @@ extern "C" {
             int                   p0,
             int                   d0);
 
+    GGML_API struct ggml_tensor * ggml_pad_reflec_1d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            int                   p0,
+            int                   p1);
+
     GGML_API struct ggml_tensor * ggml_conv_2d(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
@@ -1341,7 +1348,6 @@ extern "C" {
             int                   p1,
             int                   d0,
             int                   d1);
-
 
     // kernel size is a->ne[0] x a->ne[1]
     // stride is equal to kernel size
