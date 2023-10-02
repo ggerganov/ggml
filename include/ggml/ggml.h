@@ -401,13 +401,9 @@ extern "C" {
         GGML_OP_CLAMP,
         GGML_OP_CONV_1D,
         GGML_OP_CONV_2D,
-        GGML_OP_CONV_TRANSPOSE_1D,
         GGML_OP_CONV_TRANSPOSE_2D,
         GGML_OP_POOL_1D,
         GGML_OP_POOL_2D,
-
-        GGML_OP_CONV_1D_STAGE_0,  // internal
-        GGML_OP_CONV_1D_STAGE_1,  // internal
 
         GGML_OP_UPSCALE, // nearest interpolate
 
@@ -481,6 +477,7 @@ extern "C" {
     struct ggml_tensor {
         enum ggml_type    type;
         enum ggml_backend backend;
+        struct ggml_backend_buffer * buffer;
 
         int     n_dims;
         int64_t ne[GGML_MAX_DIMS]; // number of elements
@@ -514,7 +511,7 @@ extern "C" {
 
         void * extra; // extra things e.g. for ggml-cuda.cu
 
-        char padding[4];
+        char padding[12];
     };
 
     static const size_t GGML_TENSOR_SIZE = sizeof(struct ggml_tensor);
@@ -1389,14 +1386,6 @@ extern "C" {
             struct ggml_tensor  * b,
             int                   s,
             int                   d);
-
-    GGML_API struct ggml_tensor * ggml_conv_transpose_1d(
-            struct ggml_context * ctx,
-            struct ggml_tensor  * a,
-            struct ggml_tensor  * b,
-            int                   s0,
-            int                   p0,
-            int                   d0);
 
     GGML_API struct ggml_tensor * ggml_conv_2d(
             struct ggml_context * ctx,

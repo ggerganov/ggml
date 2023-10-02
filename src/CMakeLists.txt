@@ -212,6 +212,9 @@ if (GGML_CUBLAS)
             set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} CUDA::cudart CUDA::cublas CUDA::cublasLt)
         endif()
 
+        if (CMAKE_BUILD_TYPE MATCHES Debug)
+            set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -lineinfo")
+        endif()
     else()
         message(WARNING "cuBLAS not found")
     endif()
@@ -249,8 +252,10 @@ endif()
 add_library(${TARGET}
     ggml.c
     ggml-alloc.c
+    ggml-backend.c
     ../include/ggml/ggml.h
     ../include/ggml/ggml-alloc.h
+    ../include/ggml/ggml-backend.h
     ${GGML_CUDA_SOURCES}
     ${GGML_OPENCL_SOURCES}
     ${GGML_METAL_SOURCES}
