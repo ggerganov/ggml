@@ -7572,11 +7572,6 @@ static void ggml_backend_cuda_buffer_free_buffer(ggml_backend_buffer_t buffer) {
     delete ctx;
 }
 
-static size_t ggml_backend_cuda_buffer_get_alignment(ggml_backend_buffer_t buffer) {
-    return 128;
-    UNUSED(buffer);
-}
-
 static void * ggml_backend_cuda_buffer_get_base(ggml_backend_buffer_t buffer) {
     ggml_cuda_buffer_context * ctx = (ggml_cuda_buffer_context *)buffer->context;
     return ctx->device;
@@ -7614,7 +7609,6 @@ static void ggml_backend_cuda_buffer_init_tensor(ggml_backend_buffer_t buffer, g
 
 static struct ggml_backend_buffer_interface cuda_backend_buffer_interface = {
     /* .free_buffer    = */ ggml_backend_cuda_buffer_free_buffer,
-    /* .get_alignment  = */ ggml_backend_cuda_buffer_get_alignment,
     /* .get_base       = */ ggml_backend_cuda_buffer_get_base,
     /* .get_alloc_size = */ ggml_backend_cuda_buffer_get_alloc_size,
     /* .init_tensor    = */ ggml_backend_cuda_buffer_init_tensor,
@@ -7625,6 +7619,11 @@ static ggml_backend_buffer_t ggml_backend_cuda_alloc_buffer(ggml_backend_t backe
     ggml_cuda_buffer_context * ctx = new ggml_cuda_buffer_context;
     CUDA_CHECK(cudaMalloc(&ctx->device, size));
     return ggml_backend_buffer_init(cuda_backend_buffer_interface, backend, ctx, size);
+}
+
+static size_t ggml_backend_cuda_get_alignment(ggml_backend_t backend) {
+    return 128;
+    UNUSED(backend);
 }
 
 static void ggml_backend_cuda_set_tensor_async(ggml_backend_t backend, ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
@@ -7733,6 +7732,7 @@ static ggml_backend_interface cuda_backend_interface = {
     /* .get_name            = */ ggml_backend_cuda_name,
     /* .free                = */ ggml_backend_cuda_free,
     /* .alloc_buffer        = */ ggml_backend_cuda_alloc_buffer,
+    /* .get_alignment       = */ ggml_backend_cuda_get_alignment,
     /* .set_tensor_async    = */ ggml_backend_cuda_set_tensor_async,
     /* .get_tensor_async    = */ ggml_backend_cuda_get_tensor_async,
     /* .synchronize         = */ ggml_backend_cuda_synchronize,

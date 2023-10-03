@@ -14,7 +14,6 @@ extern "C" {
 
     struct ggml_backend_buffer_interface {
         void   (*free_buffer)   (ggml_backend_buffer_t buffer);
-        size_t (*get_alignment) (ggml_backend_buffer_t buffer);
         void * (*get_base)      (ggml_backend_buffer_t buffer); // get base pointer
         size_t (*get_alloc_size)(ggml_backend_buffer_t buffer, struct ggml_tensor * tensor); // pre-allocation callback
         void   (*init_tensor)   (ggml_backend_buffer_t buffer, struct ggml_tensor * tensor); // post-allocation callback
@@ -49,6 +48,7 @@ extern "C" {
 
         // buffer allocation
         ggml_backend_buffer_t (*alloc_buffer)(ggml_backend_t backend, size_t size);
+        size_t                (*get_alignment)(ggml_backend_t backend);
 
         // tensor data access
         // these functions can be asynchronous, helper functions are provided for synchronous access that automatically call synchronize
@@ -82,6 +82,7 @@ extern "C" {
     static inline const char * ggml_backend_name(ggml_backend_t backend) { return backend->interface.get_name(backend); }
     static inline void ggml_backend_free(ggml_backend_t backend) { backend->interface.free(backend); }
     static inline ggml_backend_buffer_t ggml_backend_alloc_buffer(ggml_backend_t backend, size_t size) { return backend->interface.alloc_buffer(backend, size); }
+    static inline size_t ggml_backend_get_alignment(ggml_backend_t backend) { return backend->interface.get_alignment(backend); }
     static inline void ggml_backend_tensor_set_async(struct ggml_tensor * tensor, const void * data, size_t offset, size_t size) { get_backend(tensor)->interface.set_tensor_async(get_backend(tensor), tensor, data, offset, size); }
     static inline void ggml_backend_tensor_get_async(const struct ggml_tensor * tensor, void * data, size_t offset, size_t size) { get_backend(tensor)->interface.get_tensor_async(get_backend(tensor), tensor, data, offset, size); }
     static inline void ggml_backend_tensor_set(struct ggml_tensor * tensor, const void * data, size_t offset, size_t size) { get_backend(tensor)->interface.set_tensor_async(get_backend(tensor), tensor, data, offset, size); get_backend(tensor)->interface.synchronize(get_backend(tensor)); }

@@ -34,10 +34,7 @@ void ggml_backend_buffer_free(struct ggml_backend_buffer * buffer) {
 }
 
 size_t ggml_backend_buffer_get_alignment(ggml_backend_buffer_t buffer) {
-    if (buffer->interface.get_alignment) {
-        return buffer->interface.get_alignment(buffer);
-    }
-    return 64;
+    return ggml_backend_get_alignment(buffer->backend);
 }
 
 void * ggml_backend_buffer_get_base(ggml_backend_buffer_t buffer) {
@@ -131,13 +128,6 @@ static void ggml_backend_cpu_free(ggml_backend_t backend) {
     free(backend);
 }
 
-static const size_t TENSOR_ALIGNMENT = 64; // should be enough for AVX 512
-
-static size_t ggml_backend_cpu_buffer_get_alignment(ggml_backend_buffer_t buffer) {
-    return TENSOR_ALIGNMENT;
-    UNUSED(buffer);
-}
-
 static void * ggml_backend_cpu_buffer_get_base(ggml_backend_buffer_t buffer) {
     return (void *)buffer->context;
 }
@@ -149,27 +139,31 @@ static void ggml_backend_cpu_buffer_free_buffer(ggml_backend_buffer_t buffer) {
 
 static struct ggml_backend_buffer_interface cpu_backend_buffer_interface = {
     /* .free_buffer    = */ ggml_backend_cpu_buffer_free_buffer,
-    /* .get_alignment  = */ ggml_backend_cpu_buffer_get_alignment,
     /* .get_base       = */ ggml_backend_cpu_buffer_get_base,
     /* .get_alloc_size = */ NULL, // defaults to ggml_nbytes
-    /* .init_tensor    = */ NULL,
-    /* .free_tensor    = */ NULL,
+    /* .init_tensor    = */ NULL, // no initialization required
+    /* .free_tensor    = */ NULL, // no cleanup required
 };
 
 // for buffers from ptr, free is not called
 static struct ggml_backend_buffer_interface cpu_backend_buffer_interface_from_ptr = {
-    /* .free_buffer    = */ NULL,
-    /* .get_alignment  = */ ggml_backend_cpu_buffer_get_alignment,
+    /* .free_buffer    = */ NULL, // ptr is not owned by the buffer, so it does not need to be freed
     /* .get_base       = */ ggml_backend_cpu_buffer_get_base,
     /* .get_alloc_size = */ NULL, // defaults to ggml_nbytes
     /* .init_tensor    = */ NULL,
     /* .free_tensor    = */ NULL,
 };
 
+static const size_t TENSOR_ALIGNMENT = 64; // should be enough for AVX 512
 
 static struct ggml_backend_buffer * ggml_backend_cpu_alloc_buffer(ggml_backend_t backend, size_t size) {
-    void * data = malloc(size + TENSOR_ALIGNMENT);
+    void * data = malloc(size + TENSOR_ALIGNMENT); // malloc may return an address that is not aligned
     return ggml_backend_buffer_init(cpu_backend_buffer_interface, backend, data, size);
+}
+
+static size_t ggml_backend_cpu_get_alignment(ggml_backend_t backend) {
+    return TENSOR_ALIGNMENT;
+    UNUSED(backend);
 }
 
 static void ggml_backend_cpu_set_tensor_async(ggml_backend_t backend, struct ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
@@ -270,6 +264,7 @@ static struct ggml_backend_interface cpu_backend_interface = {
     /* .get_name            = */ ggml_backend_cpu_name,
     /* .free                = */ ggml_backend_cpu_free,
     /* .alloc_buffer        = */ ggml_backend_cpu_alloc_buffer,
+    /* .get_alignment       = */ ggml_backend_cpu_get_alignment,
     /* .set_tensor_async    = */ ggml_backend_cpu_set_tensor_async,
     /* .get_tensor_async    = */ ggml_backend_cpu_get_tensor_async,
     /* .synchronize         = */ ggml_backend_cpu_synchronize,

@@ -833,7 +833,9 @@ int main(int argc, char ** argv) {
     struct ggml_allocr * allocr = NULL;
     // allocate the compute buffer
     {
-        allocr = ggml_allocr_new_measure(GGML_MEM_ALIGN);
+         // alignment required by the backend
+        size_t align = ggml_backend_get_alignment(model.backend);
+        allocr = ggml_allocr_new_measure(align);
 
         // create the worst case graph for memory usage estimation
         int n_tokens = std::min(model.hparams.n_ctx, params.n_batch);
@@ -841,7 +843,7 @@ int main(int argc, char ** argv) {
         struct ggml_cgraph * gf = gpt2_graph(model, allocr, n_past, std::vector<gpt_vocab::id>(n_tokens, 0));
 
         // compute the required memory
-        size_t mem_size = ggml_allocr_alloc_graph(allocr, gf) + GGML_MEM_ALIGN;
+        size_t mem_size = ggml_allocr_alloc_graph(allocr, gf);
 
         // recreate the allocator with the required memory
         ggml_allocr_free(allocr);
