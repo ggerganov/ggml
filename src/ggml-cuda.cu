@@ -62,6 +62,7 @@
 #define cudaMemcpyHostToDevice hipMemcpyHostToDevice
 #define cudaMemcpyKind hipMemcpyKind
 #define cudaMemset hipMemset
+#define cudaMemsetAsync hipMemsetAsync
 #define cudaOccupancyMaxPotentialBlockSize hipOccupancyMaxPotentialBlockSize
 #define cudaSetDevice hipSetDevice
 #define cudaStreamCreateWithFlags hipStreamCreateWithFlags
@@ -1576,7 +1577,7 @@ static __global__ void quantize_q8_1(const float * __restrict__ x, void * __rest
 }
 
 template<int qk, int qr, dequantize_kernel_t dequantize_kernel, typename dst_t>
-static __global__ void k_get_rows(const void * x, const int * y, dst_t * dst, const int ncols) {
+static __global__ void k_get_rows(const void * x, const int32_t * y, dst_t * dst, const int ncols) {
     const int col = (blockIdx.x*blockDim.x + threadIdx.x)*2;
     const int row = blockDim.y*blockIdx.y + threadIdx.y;
 
@@ -4586,7 +4587,7 @@ static __global__ void scale_f32(const float * x, float * dst, const float scale
 
 
 template<int qk, int qr, dequantize_kernel_t dq>
-static void get_rows_cuda(const void * x, const int * y, float * dst, const int nrows, const int ncols, cudaStream_t stream) {
+static void get_rows_cuda(const void * x, const int32_t * y, float * dst, const int nrows, const int ncols, cudaStream_t stream) {
     const dim3 block_dims(CUDA_GET_ROWS_BLOCK_SIZE, 1, 1);
     const int block_num_x = (ncols + 2*CUDA_GET_ROWS_BLOCK_SIZE - 1) / (2*CUDA_GET_ROWS_BLOCK_SIZE);
     const dim3 block_nums(block_num_x, nrows, 1);
@@ -5810,7 +5811,7 @@ static void ggml_cuda_op_repeat(
     GGML_ASSERT(nb0  == sizeof(float));
     GGML_ASSERT(nb00 == sizeof(float));
 
-    // TODO: very inefficient, implement in a kernel
+    // TODO: very inefficient, implement in a kernel, or fewer cudaMemcpyAsync calls for contiguous tensors
     for                         (int i3 = 0; i3 < nr3;  i3++) {
         for                     (int k3 = 0; k3 < ne03; k3++) {
             for                 (int i2 = 0; i2 < nr2;  i2++) {
@@ -5847,7 +5848,7 @@ static void ggml_cuda_op_get_rows(
     const int ncols = src0->ne[0];
     const int nrows = ggml_nelements(src1);
 
-    const int * src1_i32 = (const int *) src1_d;
+    const int32_t * src1_i32 = (const int32_t *) src1_d;
 
     switch (src0->type) {
         case GGML_TYPE_F16:

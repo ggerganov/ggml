@@ -760,11 +760,9 @@ bool gpt2_eval(
     ggml_allocr_alloc_graph(allocr, gf);
 
     // run the computation
-#ifndef GGML_USE_CUBLAS
-    // FIXME: the backend may be CPU even if CUDA is enabled
-    // if (model.backend.id == GGML_BACKEND_ID_CPU)
-    ggml_backend_cpu_set_n_threads(model.backend, n_threads);
-#endif
+    if (strcmp(ggml_backend_name(model.backend), "CPU") == 0) {
+        ggml_backend_cpu_set_n_threads(model.backend, n_threads);
+    }
     ggml_backend_graph_compute(model.backend, gf);
 
     //if (n_past%100 == 0) {
