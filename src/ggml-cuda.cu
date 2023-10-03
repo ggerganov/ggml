@@ -7,8 +7,6 @@
 #include <atomic>
 #include <assert.h>
 
-#define GGML_CUDA_FORCE_DMMV // FIXME: ggml_cuda_op_mul_mat_vec_q produces wrong results with GPT-2
-
 #if defined(GGML_USE_HIPBLAS)
 #include <hip/hip_runtime.h>
 #include <hipblas/hipblas.h>
@@ -6733,7 +6731,8 @@ static void ggml_cuda_op_mul_mat(
         if (convert_src1_to_q8_1) {
             src1_ddq[id] = (char *) ggml_cuda_pool_malloc(nrows1*src1_padded_col_size*q8_1_ts/q8_1_bs, &src1_asq[id]);
 
-            if (split && src1_on_device && src1_is_contiguous) {
+            // FIXME: why split only? src1 never gets quantized, breaks ggml-backend/GPT-2
+            if (/*split &&*/ src1_on_device && src1_is_contiguous) {
                 quantize_row_q8_1_cuda(src1_ddf[id], src1_ddq[id], ne10, nrows1, src1_padded_col_size, stream);
                 CUDA_CHECK(cudaGetLastError());
             }
@@ -7582,7 +7581,16 @@ static size_t ggml_backend_cuda_buffer_get_alloc_size(ggml_backend_buffer_t buff
     int64_t row_high = ggml_nrows(tensor);
     int64_t nrows_split = row_high - row_low;
 
-    return ggml_nbytes_split(tensor, nrows_split);
+    size_t size = ggml_nbytes_split(tensor, nrows_split);
+
+    int64_t ne0 = tensor->ne[0];
+
+    if (ne0 % MATRIX_ROW_PADDING != 0) {
+        size += (MATRIX_ROW_PADDING - ne0 % MATRIX_ROW_PADDING)
+            * ggml_type_size(tensor->type)/ggml_blck_size(tensor->type);
+    }
+
+    return size;
 
     UNUSED(buffer);
 }
@@ -7601,7 +7609,7 @@ static void ggml_backend_cuda_buffer_init_tensor(ggml_backend_buffer_t buffer, g
     size_t size = ggml_backend_cuda_buffer_get_alloc_size(buffer, tensor);
 
     if (size > original_size && tensor->view_src == nullptr) {
-        CUDA_CHECK(cudaMemset((char *) tensor->data + original_size, 0, size - original_size));
+        CUDA_CHECK(cudaMemsetAsync((char *)tensor->data + original_size, 0, size - original_size, g_cudaStreams[g_main_device][0]));
     }
 
     UNUSED(buffer);
@@ -7629,7 +7637,7 @@ static size_t ggml_backend_cuda_get_alignment(ggml_backend_t backend) {
 static void ggml_backend_cuda_set_tensor_async(ggml_backend_t backend, ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
     GGML_ASSERT(offset + size <= ggml_nbytes(tensor) && "tensor write out of bounds");
     GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
-    //GGML_ASSERT(tensor->backend == GGML_BACKEND_GPU);
+    GGML_ASSERT(tensor->backend == GGML_BACKEND_GPU);
 
     CUDA_CHECK(cudaMemcpyAsync((char *)tensor->data + offset, data, size, cudaMemcpyHostToDevice, g_cudaStreams[g_main_device][0]));
 
@@ -7675,7 +7683,6 @@ static void ggml_backend_cuda_graph_plan_compute(ggml_backend_t backend, ggml_gr
     UNUSED(plan);
 }
 
-#include <vector>
 static void ggml_backend_cuda_graph_compute(ggml_backend_t backend, ggml_cgraph * cgraph) {
     ggml_compute_params params = {};
     params.type = GGML_TASK_COMPUTE;
@@ -7708,17 +7715,19 @@ static void ggml_backend_cuda_graph_compute(ggml_backend_t backend, ggml_cgraph 
             cudaDeviceSynchronize();
             std::vector<float> tmp(ggml_nelements(node), 0.0f);
             cudaMemcpy(tmp.data(), node->data, ggml_nelements(node)*sizeof(float), cudaMemcpyDeviceToHost);
-            printf("\n%s (%s) (%s %s): ", node->name, ggml_op_name(node->op),
+            printf("\n%s (%s) (%s %s) (%s %s): ", node->name, ggml_op_name(node->op),
                 ggml_type_name(node->src[0]->type),
-                node->src[1] ? ggml_type_name(node->src[1]->type) : "none");
+                node->src[1] ? ggml_type_name(node->src[1]->type) : "none",
+                node->src[0]->name,
+                node->src[1] ? node->src[1]->name : "none");
             double sum = 0.0;
             double sq_sum = 0.0;
             for (int i = 0; i < ggml_nelements(node); i++) {
-                //printf("%f ", tmp[i]);
+                printf("%f ", tmp[i]);
                 sum += tmp[i];
                 sq_sum += tmp[i]*tmp[i];
             }
-            //printf("\n");
+            printf("\n");
             printf("sum: %f, ", sum);
             printf("sq_sum: %f\n", sq_sum);
         }
