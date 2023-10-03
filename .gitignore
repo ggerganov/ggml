@@ -15,6 +15,7 @@ compile_commands.json
 CMakeSettings.json
 .vs/
 .vscode/
+.clangd
 
 .exrc
 .cache
