@@ -9,6 +9,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(GGML_STANDALONE ON)
     include(cmake/GitVars.cmake)
     include(cmake/BuildTypes.cmake)
+    include(cmake/GGMLExtraDependencies.cmake)
 else()
     set(GGML_STANDALONE OFF)
 endif()
@@ -159,7 +160,7 @@ endif()
 set(CMAKE_C_STANDARD   11)
 set(CMAKE_CXX_STANDARD 11)
 
-find_package(Threads REQUIRED)
+ggml_find_package(Threads REQUIRED)
 
 # main
 
@@ -179,6 +180,8 @@ if (GGML_BUILD_TESTS)
     endif()
 endif()
 
+include(GNUInstallDirs)
+
 add_subdirectory(src)
 
 if (GGML_BUILD_TESTS)
@@ -194,4 +197,29 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/ggml.pc.in
                ${CMAKE_CURRENT_BINARY_DIR}/ggml.pc
                @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ggml.pc
-        DESTINATION share/pkgconfig)
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/pkgconfig)
+
+export(EXPORT GGMLTargets
+       FILE "${CMAKE_CURRENT_BINARY_DIR}/GGMLTargets.cmake"
+       NAMESPACE ggml::)
+
+install(EXPORT GGMLTargets
+        FILE GGMLTargets.cmake
+        NAMESPACE ggml::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GGML)
+
+include(CMakePackageConfigHelpers)
+ggml_get_extra_dependencies()
+configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/GGMLConfig.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/GGMLConfig.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GGML)
+
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/GGMLConfigVersion.cmake"
+    VERSION "${PROJECT_VERSION}"
+    COMPATIBILITY AnyNewerVersion)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/GGMLConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/GGMLConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GGML)

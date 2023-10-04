@@ -1,3 +1,11 @@
+# ggml
+
+add_library(ggml ggml.c ggml-alloc.c)
+
+set_property(TARGET ggml PROPERTY PUBLIC_HEADER
+     ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml.h
+     ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml-alloc.h)
+
 if (GGML_ALL_WARNINGS)
     if (NOT MSVC)
         add_compile_options(-Wunused -Wextra -Wcast-qual -Wdouble-promotion)
@@ -126,17 +134,13 @@ else()
     endif()
 endif()
 
-# ggml
-
-set(TARGET ggml)
-
 # on APPLE - include Accelerate framework
 if (APPLE AND NOT GGML_NO_ACCELERATE)
-    find_library(ACCELERATE_FRAMEWORK Accelerate)
+    ggml_wrap_library(accelerate::accelerate ACCELERATE_FRAMEWORK Accelerate)
     if (ACCELERATE_FRAMEWORK)
         message(STATUS "Accelerate framework found")
 
-        set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${ACCELERATE_FRAMEWORK})
+        set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  accelerate::accelerate)
         set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_ACCELERATE)
     else()
         message(WARNING "Accelerate framework not found")
@@ -156,12 +160,12 @@ if (GGML_OPENBLAS)
         $ENV{OpenBLAS_HOME}/include
         )
     find_path(OPENBLAS_INC NAMES cblas.h PATHS ${OPENBLAS_INCLUDE_SEARCH_PATHS})
-    find_library(OPENBLAS_LIB NAMES openblas libopenblas)
+    ggml_wrap_library(openblas::openblas OPENBLAS_LIB NAMES openblas libopenblas)
     if (OPENBLAS_LIB)
         message(STATUS "OpenBLAS found")
 
-        set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${OPENBLAS_LIB})
-        set(GGML_EXTRA_INCS  ${GGML_EXTRA_INCS}  ${OPENBLAS_INC})
+        set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS} openblas::openblas)
+        set_target_properties(openblas::openblas PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${OPENBLAS_INC})
 	set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_OPENBLAS)
     else()
         message(WARNING "OpenBLAS not found")
@@ -176,18 +180,17 @@ if (GGML_CLBLAST)
 	    $ENV{CLBLAST_HOME}/include
         )
 	find_path(CLBLAST_INC NAMES clblast.h PATHS ${CLBLAST_INCLUDE_SEARCH_PATHS})
-	find_library(CLBLAST_LIB NAMES clblast)
-	find_library(OPENCL_LIB NAMES OpenCL)
+	ggml_wrap_library(opencl::opencl OPENCL_LIB NAMES OpenCL)
+	ggml_wrap_library(clblast::clblast CLBLAST_LIB NAMES clblast)
 	if (CLBLAST_LIB AND OPENCL_LIB AND CLBLAST_INC)
 		message(STATUS "clBLAST found")
 
-		set(GGML_EXTRA_INCS  ${GGML_EXTRA_INCS}  ${CLBLAST_INC})
-		set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${CLBLAST_LIB}  ${OPENCL_LIB})
+        set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS} clblast::clblast opencl::opencl)
+        set_target_properties(clblast::clblast PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${CLBLAST_INC})
 		set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CLBLAST)
 
-		set(GGML_OPENCL_SOURCES ggml-opencl.cpp ggml-opencl.h)
-
-		link_libraries("-Wl,--copy-dt-needed-entries")
+        target_sources(ggml PRIVATE ggml-opencl.cpp)
+        set_property(TARGET ggml APPEND PROPERTY PUBLIC_HEADER ggml-opencl.h)
     else()
         message(WARNING "clBLAST not found")
     endif()
@@ -196,13 +199,14 @@ endif()
 if (GGML_CUBLAS)
     cmake_minimum_required(VERSION 3.17)
 
-    find_package(CUDAToolkit)
+    ggml_find_package(CUDAToolkit)
     if (CUDAToolkit_FOUND)
         message(STATUS "cuBLAS found")
 
         enable_language(CUDA)
 
-        set(GGML_CUDA_SOURCES ggml-cuda.cu ggml-cuda.h)
+        target_sources(ggml PRIVATE ggml-cuda.cu)
+        set_property(TARGET ggml APPEND PROPERTY PUBLIC_HEADER ggml-cuda.h)
 
         add_compile_definitions(GGML_USE_CUBLAS)
 
@@ -211,19 +215,19 @@ if (GGML_CUBLAS)
         else()
             set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} CUDA::cudart CUDA::cublas CUDA::cublasLt)
         endif()
-
     else()
         message(WARNING "cuBLAS not found")
     endif()
 endif()
 
 if (GGML_METAL)
-    find_library(FOUNDATION_LIBRARY         Foundation              REQUIRED)
-    find_library(METAL_FRAMEWORK            Metal                   REQUIRED)
-    find_library(METALKIT_FRAMEWORK         MetalKit                REQUIRED)
-    find_library(METALPERFORMANCE_FRAMEWORK MetalPerformanceShaders REQUIRED)
+    ggml_wrap_library(foundation::foundation            FOUNDATION_LIBRARY         Foundation              REQUIRED)
+    ggml_wrap_library(metal::metal                      METAL_FRAMEWORK            Metal                   REQUIRED)
+    ggml_wrap_library(metalkit::metalkit                METALKIT_FRAMEWORK         MetalKit                REQUIRED)
+    ggml_wrap_library(metalperformace::metalperformance METALPERFORMANCE_FRAMEWORK MetalPerformanceShaders REQUIRED)
 
-    set(GGML_METAL_SOURCES ggml-metal.m ggml-metal.h)
+    target_sources(ggml PRIVATE ggml-metal.m)
+    set_property(TARGET ggml APPEND PROPERTY PUBLIC_HEADER ggml-metal.h)
 
     add_compile_definitions(GGML_USE_METAL)
     add_compile_definitions(GGML_METAL_NDEBUG)
@@ -235,10 +239,10 @@ if (GGML_METAL)
     configure_file(ggml-metal.metal ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ggml-metal.metal COPYONLY)
 
     set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS}
-        ${FOUNDATION_LIBRARY}
-        ${METAL_FRAMEWORK}
-        ${METALKIT_FRAMEWORK}
-        ${METALPERFORMANCE_FRAMEWORK}
+        foundation::foundation
+        metal::metal
+        metalkit::metalkit
+        metalperformace::metalperformance
         )
 endif()
 
@@ -246,76 +250,72 @@ if (GGML_PERF)
     set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_PERF)
 endif()
 
-add_library(${TARGET}
-    ggml.c
-    ggml-alloc.c
-    ../include/ggml/ggml.h
-    ../include/ggml/ggml-alloc.h
-    ${GGML_CUDA_SOURCES}
-    ${GGML_OPENCL_SOURCES}
-    ${GGML_METAL_SOURCES}
+
+set_target_properties(ggml PROPERTIES
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
+    INTERFACE_GGML_MAJOR_VERSION ${PROJECT_VERSION_MAJOR}
     )
 
-target_include_directories(${TARGET} PUBLIC
-    .
-    ../include
-    ../include/ggml
+set_property(TARGET ggml APPEND PROPERTY
+    COMPATIBLE_INTERFACE_STRING GGML_MAJOR_VERSION
+    )
+
+target_include_directories(ggml PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
     ${GGML_EXTRA_INCS}
     )
 
 if (MSVC)
-    target_link_libraries(${TARGET} PUBLIC ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
+    target_link_libraries(ggml PUBLIC ${GGML_EXTRA_LIBS} Threads::Threads)
 else()
-    target_link_libraries(${TARGET} PUBLIC m ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
+    target_link_libraries(ggml PUBLIC m ${GGML_EXTRA_LIBS} Threads::Threads)
 endif()
 
 if (BUILD_SHARED_LIBS)
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
-    target_link_libraries(${TARGET} PUBLIC
+    target_link_libraries(ggml PUBLIC
         ${CMAKE_DL_LIBS}
         )
 
-    target_compile_definitions(${TARGET} PUBLIC
+    target_compile_definitions(ggml PUBLIC
         GGML_SHARED
         )
 
-    target_compile_definitions(${TARGET} PRIVATE
+    target_compile_definitions(ggml PRIVATE
         GGML_BUILD
         )
 
     if (GGML_METAL)
-        set_target_properties(${TARGET} PROPERTIES RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/ggml-metal.metal")
+        set_target_properties(ggml PROPERTIES RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/ggml-metal.metal")
     endif()
 endif()
 
-target_compile_definitions(${TARGET} PUBLIC
+target_compile_definitions(ggml PUBLIC
     ${GGML_EXTRA_FLAGS}
     )
 
 if (MINGW)
-    target_link_libraries(${TARGET} PUBLIC
-        stdc++
-        )
+    target_link_libraries(ggml PUBLIC stdc++)
 endif()
 
 if (GGML_CUDA_SOURCES)
     message(STATUS "GGML CUDA sources found, configuring CUDA architecture")
-    set_property(TARGET ggml  PROPERTY CUDA_ARCHITECTURES "52;61")
-    set_property(TARGET ggml  PROPERTY CUDA_SELECT_NVCC_ARCH_FLAGS "Auto")
+    set_property(TARGET ggml PROPERTY CUDA_ARCHITECTURES "52;61")
+    set_property(TARGET ggml PROPERTY CUDA_SELECT_NVCC_ARCH_FLAGS "Auto")
     if (NOT MSVC)
         target_link_libraries(ggml PUBLIC stdc++)
     endif()
 endif()
 
-set (GGML_PUBLIC_HEADERS
-     ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml.h
-     ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml-alloc.h)
-set_target_properties(${TARGET} PROPERTIES
-                      PUBLIC_HEADER "${GGML_PUBLIC_HEADERS}")
-
-install(TARGETS ${TARGET}
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib/static
-    PUBLIC_HEADER DESTINATION include/ggml
+install(TARGETS ggml
+    EXPORT GGMLTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/static
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ggml
     )
