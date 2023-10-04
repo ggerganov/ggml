@@ -19762,7 +19762,7 @@ static enum ggml_opt_result ggml_opt_adam(
         if (callback) {
             callback(callback_data, accum_step, &sched, &cancel);
             if (cancel) {
-                break;
+                return GGML_OPT_CANCEL;
             }
         }
         // ggml_graph_reset  (gf);
@@ -19770,9 +19770,6 @@ static enum ggml_opt_result ggml_opt_adam(
         ggml_graph_compute(gb, &cplan);
         ggml_opt_acc_grad(np, ps, g, accum_norm);
         fx += ggml_get_f32_1d(f, 0);
-    }
-    if (cancel) {
-        return GGML_OPT_DID_NOT_CONVERGE;
     }
     fx *= accum_norm;
 
@@ -19799,9 +19796,6 @@ static enum ggml_opt_result ggml_opt_adam(
 
     // run the optimizer
     for (int t = 0; t < params.adam.n_iter; ++t) {
-        if (cancel) {
-            break;
-        }
         opt->iter = iter0 + t + 1;
         GGML_PRINT_DEBUG  ("=== iter %d ===\n", t);
 
@@ -19859,7 +19853,7 @@ static enum ggml_opt_result ggml_opt_adam(
             if (callback) {
                 callback(callback_data, accum_step, &sched, &cancel);
                 if (cancel) {
-                    break;
+                    return GGML_OPT_CANCEL;;
                 }
             }
             // ggml_graph_reset  (gf);
@@ -19867,9 +19861,6 @@ static enum ggml_opt_result ggml_opt_adam(
             ggml_graph_compute(gb, &cplan);
             ggml_opt_acc_grad(np, ps, g, accum_norm);
             fx += ggml_get_f32_1d(f, 0);
-        }
-        if (cancel) {
-            break;
         }
         fx *= accum_norm;
 
@@ -19989,7 +19980,7 @@ static enum ggml_opt_result linesearch_backtracking(
     finit = *fx;
     dgtest = params->lbfgs.ftol*dginit;
 
-    while (!*cancel) {
+    while (true) {
         ggml_vec_cpy_f32(nx, x, xp);
         ggml_vec_mad_f32(nx, x, d, *step);
 
@@ -20005,7 +19996,7 @@ static enum ggml_opt_result linesearch_backtracking(
                     float sched = 0;
                     callback(callback_data, accum_step, &sched, cancel);
                     if (*cancel) {
-                        break;
+                        return GGML_OPT_CANCEL;
                     }
                 }
                 // ggml_graph_reset  (gf);
@@ -20013,9 +20004,6 @@ static enum ggml_opt_result linesearch_backtracking(
                 ggml_graph_compute(gb, cplan);
                 ggml_opt_acc_grad(np, ps, g, accum_norm);
                 *fx += ggml_get_f32_1d(f, 0);
-            }
-            if (*cancel) {
-                break;
             }
             *fx *= accum_norm;
 
@@ -20149,7 +20137,7 @@ static enum ggml_opt_result ggml_opt_lbfgs(
                 float sched = 0;
                 callback(callback_data, accum_step, &sched, &cancel);
                 if (cancel) {
-                    break;
+                    return GGML_OPT_CANCEL;
                 }
             }
             // ggml_graph_reset  (gf);
@@ -20157,9 +20145,6 @@ static enum ggml_opt_result ggml_opt_lbfgs(
             ggml_graph_compute(gb, &cplan);
             ggml_opt_acc_grad(np, ps, g, accum_norm);
             fx += ggml_get_f32_1d(f, 0);
-        }
-        if (cancel) {
-            return GGML_OPT_DID_NOT_CONVERGE;
         }
         fx *= accum_norm;
 
@@ -20220,8 +20205,8 @@ static enum ggml_opt_result ggml_opt_lbfgs(
         ggml_vec_cpy_f32(nx, gp, g);
 
         ls = linesearch_backtracking(&params, nx, x, &fx, g, d, step, xp, f, gb, &cplan, np, ps, &cancel, callback, callback_data);
-        if (!cancel) {
-            break;
+        if (cancel) {
+            return GGML_OPT_CANCEL;
         }
 
         if (ls < 0) {
