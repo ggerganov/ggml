@@ -585,7 +585,3 @@ size_t ggml_allocr_alloc_graph(struct ggml_allocr * alloc, struct ggml_cgraph * 
 size_t ggml_allocr_max_size(struct ggml_allocr * alloc) {
     return alloc->max_size;
 }
-
-size_t ggml_allocr_max_size(struct ggml_allocr * alloc) {
-    return alloc->max_size;
-}
