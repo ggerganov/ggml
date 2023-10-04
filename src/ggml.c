@@ -20204,6 +20204,10 @@ static enum ggml_opt_result ggml_opt_lbfgs(
         ggml_vec_cpy_f32(nx, xp, x);
         ggml_vec_cpy_f32(nx, gp, g);
 
+        // TODO: instead of passing &cancel here, use the return code of the linesearch
+        //       to determine if the optimization should be cancelled
+        //       this is a simple change, but not doing this atm, since I don't have a nice
+        //       way to test and don't want to break something with so many changes lined up
         ls = linesearch_backtracking(&params, nx, x, &fx, g, d, step, xp, f, gb, &cplan, np, ps, &cancel, callback, callback_data);
         if (cancel) {
             return GGML_OPT_CANCEL;
