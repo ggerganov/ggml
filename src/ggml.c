@@ -6490,8 +6490,8 @@ struct ggml_tensor * ggml_out_prod(
     }
 
     // a is broadcastable to b for ne[2] and ne[3] -> use b->ne[2] and b->ne[3]
-    const int64_t ne[4] = { a->ne[0], b->ne[0], a->ne[2], b->ne[3] };
-    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, MIN(a->n_dims, b->n_dims), ne);
+    const int64_t ne[4] = { a->ne[0], b->ne[0], b->ne[2], b->ne[3] };
+    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, MAX(a->n_dims, b->n_dims), ne);
 
     result->op   = GGML_OP_OUT_PROD;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
@@ -7974,26 +7974,29 @@ struct ggml_tensor * ggml_flash_attn_back(
 
     // d shape [D,N,ne2,ne3]
     // q shape [D,N,ne2,ne3]
-    // k shape [D,M,ne2,ne3]
-    // v shape [M,D,ne2,ne3]
+    // k shape [D,M,kvne2,ne3]
+    // v shape [M,D,kvne2,ne3]
 
-    const int64_t   D = q->ne[0];
-    const int64_t   N = q->ne[1];
-    const int64_t   M = k->ne[1];
-    const int64_t ne2 = q->ne[2];
-    const int64_t ne3 = q->ne[3];
+    const int64_t     D = q->ne[0];
+    const int64_t     N = q->ne[1];
+    const int64_t     M = k->ne[1];
+    const int64_t   ne2 = q->ne[2];
+    const int64_t   ne3 = q->ne[3];
+    const int64_t kvne2 = k->ne[2];
 
     GGML_ASSERT(k->ne[0] == D);
     GGML_ASSERT(v->ne[0] == M);
     GGML_ASSERT(v->ne[1] == D);
     GGML_ASSERT(d->ne[0] == D);
     GGML_ASSERT(d->ne[1] == N);
-    GGML_ASSERT(k->ne[2] == ne2);
+    GGML_ASSERT(k->ne[2] == kvne2);
     GGML_ASSERT(k->ne[3] == ne3);
-    GGML_ASSERT(v->ne[2] == ne2);
+    GGML_ASSERT(v->ne[2] == kvne2);
     GGML_ASSERT(v->ne[3] == ne3);
     GGML_ASSERT(d->ne[2] == ne2);
     GGML_ASSERT(d->ne[3] == ne3);
+
+    GGML_ASSERT(ne2 % kvne2 == 0);
 
     bool is_node = false;
 
@@ -8004,14 +8007,23 @@ struct ggml_tensor * ggml_flash_attn_back(
     }
 
     // store gradients of q, k and v as continuous tensors concatenated in result.
-    // q shape[D,N,ne2,ne3] ; k shape [D,M,ne2,ne3] ; v shape [M,D,ne2,ne3]
-    // gradq->data = result->data
-    // gradk->data = result->data + nb0*D*N*ne2*ne3
-    // gradv->data = result->data + nb0*D*N*ne2*ne3 + nb0*D*M*ne2*ne3
     // note: v and gradv are actually transposed, i.e. v->ne[0] != D.
-    int64_t ne[4] = {D,M+N+M,ne2,ne3};
+    const int64_t elem_q = ggml_nelements(q);
+    const int64_t elem_k = ggml_nelements(k);
+    const int64_t elem_v = ggml_nelements(v);
 
-    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
+    enum ggml_type result_type = GGML_TYPE_F32;
+    GGML_ASSERT(ggml_blck_size(result_type) == 1);
+    const size_t tsize = ggml_type_size(result_type);
+
+    const size_t offs_q = 0;
+    const size_t offs_k = offs_q + GGML_PAD(elem_q * tsize, GGML_MEM_ALIGN);
+    const size_t offs_v = offs_k + GGML_PAD(elem_k * tsize, GGML_MEM_ALIGN);
+    const size_t end    = offs_v + GGML_PAD(elem_v * tsize, GGML_MEM_ALIGN);
+
+    const size_t nelements = (end + tsize - 1)/tsize;
+
+    struct ggml_tensor * result = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, nelements);
 
     int32_t masked_i = masked ? 1 : 0;
     ggml_set_op_params(result, &masked_i, sizeof(masked_i));
@@ -19659,7 +19671,7 @@ static void ggml_opt_get_params(int np, struct ggml_tensor * const ps[], float *
 }
 
 static void ggml_opt_get_grad(int np, struct ggml_tensor * const ps[], float * g) {
-    int i = 0;
+    int64_t i = 0;
     for (int p = 0; p < np; ++p) {
         const int64_t ne = ggml_nelements(ps[p]) ;
         // TODO: add function to get all elements at once
