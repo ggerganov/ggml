@@ -334,13 +334,21 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
         printf("%s: memory size = %8.2f MB, n_mem = %d\n", __func__, memory_size/1024.0/1024.0, n_mem);
 
-        // allocate buffer and tensors
+        // create a backend buffer (can be in host or device memory)
         model.buffer_kv = ggml_backend_alloc_buffer(model.backend, memory_size + 256);
 
-        ggml_allocr * alloc = ggml_allocr_new_from_buffer(model.buffer_kv);
-        ggml_allocr_alloc(alloc, model.memory_k);
-        ggml_allocr_alloc(alloc, model.memory_v);
-        ggml_allocr_free(alloc);
+        // allocate the tensors into the backend buffer
+        // TODO: better API for this
+        {
+            ggml_allocr * alloc = ggml_allocr_new_from_buffer(model.buffer_kv);
+
+            // this updates the pointers in the tensors to point to the correct location in the buffer
+            // this is necessary since the ggml_context is .no_alloc == true
+            ggml_allocr_alloc(alloc, model.memory_k);
+            ggml_allocr_alloc(alloc, model.memory_v);
+
+            ggml_allocr_free(alloc);
+        }
     }
 
     // load weights
