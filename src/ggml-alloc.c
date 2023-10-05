@@ -379,7 +379,6 @@ static bool ggml_op_can_inplace(enum ggml_op op) {
         case GGML_OP_ROPE:
         case GGML_OP_RMS_NORM:
         case GGML_OP_SOFT_MAX:
-        case GGML_OP_CONT:
             return true;
 
         default:
@@ -387,14 +386,23 @@ static bool ggml_op_can_inplace(enum ggml_op op) {
     }
 }
 
+static void init_view(struct ggml_allocr * alloc, struct ggml_tensor * view) {
+    assert(view->view_src != NULL && view->view_src->data != NULL);
+    view->backend = view->view_src->backend;
+    view->buffer  = view->view_src->buffer;
+    view->data    = (char *)view->view_src->data + view->view_offs;
+
+    // FIXME: the view should be initialized by the owning buffer, but currently this breaks the CUDA backend
+    // due to the ggml_tensor_extra_gpu ring buffer overwriting the with the KV cache extras
+    assert(ggml_allocr_is_measure(alloc) || view->buffer->backend == alloc->buffer->backend);
+    ggml_backend_buffer_init_tensor(alloc->buffer, view);
+}
+
 static void allocate_node(struct ggml_allocr * alloc, struct ggml_tensor * node) {
     struct hash_node * ht = alloc->hash_table;
     if (node->data == NULL) {
         if (ggml_is_view(node)) {
-            assert(node->view_src->data != NULL);
-            node->data = (char *)node->view_src->data + node->view_offs;
-            node->buffer = node->view_src->buffer;
-            ggml_backend_buffer_init_tensor(alloc->buffer, node); // TODO: change to init_view
+            init_view(alloc, node);
         } else {
             // see if we can reuse a parent's buffer (inplace)
             if (ggml_op_can_inplace(node->op)) {
@@ -422,17 +430,15 @@ static void allocate_node(struct ggml_allocr * alloc, struct ggml_tensor * node)
                                 // adding a view_src pointer to the tensor would solve this and simplify the code dealing with views
                                 // for now, we only reuse the parent's data if the offset is zero (view_src->data == parent->data)
                                 AT_PRINTF("reusing view parent %s (%s) for %s\n", parent->name, view_src->name, node->name);
-                                node->data = parent->data;
-                                node->buffer = parent->buffer;
-                                ggml_backend_buffer_init_tensor(alloc->buffer, node); // TODO: change to init_view
+                                node->view_src = parent;
+                                init_view(alloc, node);
                                 return;
                             }
                         }
                         else {
                             AT_PRINTF("reusing parent %s for %s\n", parent->name, node->name);
-                            node->data = parent->data;
-                            node->buffer = parent->buffer;
-                            ggml_backend_buffer_init_tensor(alloc->buffer, node); // TODO: change to init_view
+                            node->view_src = parent;
+                            init_view(alloc, node);
                             return;
                         }
                     }
@@ -461,6 +467,10 @@ size_t ggml_allocr_alloc_graph_n(
             if (ggml_is_view(node)) {
                 struct ggml_tensor * view_src = node->view_src;
                 hash_get(ht, view_src)->n_views += 1;
+                if (node->buffer == NULL && node->data != NULL) {
+                    // view of a pre-allocated tensor, didn't call init_view() yet
+                    init_view(alloc, node);
+                }
             }
 
             for (int j = 0; j < GGML_MAX_SRC; j++) {
@@ -469,6 +479,9 @@ size_t ggml_allocr_alloc_graph_n(
                     break;
                 }
                 hash_get(ht, parent)->n_children += 1;
+                if (ggml_is_view(parent) && parent->buffer == NULL && parent->data != NULL) {
+                    init_view(alloc, parent);
+                }
             }
         }
     }
