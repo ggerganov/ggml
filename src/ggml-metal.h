@@ -20,6 +20,7 @@
 #pragma once
 
 #include "ggml.h"
+#include "ggml-backend.h"
 
 #include <stddef.h>
 #include <stdbool.h>
@@ -35,19 +36,19 @@ struct ggml_cgraph;
 extern "C" {
 #endif
 
-void ggml_metal_log_set_callback(ggml_log_callback log_callback, void * user_data);
+GGML_API void ggml_metal_log_set_callback(ggml_log_callback log_callback, void * user_data);
 
 struct ggml_metal_context;
 
 // number of command buffers to use
-struct ggml_metal_context * ggml_metal_init(int n_cb);
-void ggml_metal_free(struct ggml_metal_context * ctx);
+GGML_API struct ggml_metal_context * ggml_metal_init(int n_cb);
+GGML_API void ggml_metal_free(struct ggml_metal_context * ctx);
 
-void * ggml_metal_host_malloc(size_t n);
-void   ggml_metal_host_free  (void * data);
+GGML_API void * ggml_metal_host_malloc(size_t n);
+GGML_API void   ggml_metal_host_free  (void * data);
 
 // set the number of command buffers to use
-void ggml_metal_set_n_cb(struct ggml_metal_context * ctx, int n_cb);
+GGML_API void ggml_metal_set_n_cb(struct ggml_metal_context * ctx, int n_cb);
 
 // creates a mapping between a host memory buffer and a device memory buffer
 // - make sure to map all buffers used in the graph before calling ggml_metal_graph_compute
@@ -56,7 +57,7 @@ void ggml_metal_set_n_cb(struct ggml_metal_context * ctx, int n_cb);
 // - max_size specifies the maximum size of a tensor and is used to create shared views such
 //   that it is guaranteed that the tensor will fit in at least one of the views
 //
-bool ggml_metal_add_buffer(
+GGML_API bool ggml_metal_add_buffer(
         struct ggml_metal_context * ctx,
                        const char * name,
                              void * data,
@@ -64,24 +65,28 @@ bool ggml_metal_add_buffer(
                            size_t   max_size);
 
 // set data from host memory into the device
-void ggml_metal_set_tensor(struct ggml_metal_context * ctx, struct ggml_tensor * t);
+GGML_API void ggml_metal_set_tensor(struct ggml_metal_context * ctx, struct ggml_tensor * t);
 
 // get data from the device into host memory
-void ggml_metal_get_tensor(struct ggml_metal_context * ctx, struct ggml_tensor * t);
+GGML_API void ggml_metal_get_tensor(struct ggml_metal_context * ctx, struct ggml_tensor * t);
 
 // try to find operations that can be run concurrently in the graph
 // you should run it again if the topology of your graph changes
-void ggml_metal_graph_find_concurrency(struct ggml_metal_context * ctx, struct ggml_cgraph * gf, bool check_mem);
+GGML_API void ggml_metal_graph_find_concurrency(struct ggml_metal_context * ctx, struct ggml_cgraph * gf, bool check_mem);
 
 // if the graph has been optimized for concurrently dispatch, return length of the concur_list if optimized
-int ggml_metal_if_optimized(struct ggml_metal_context * ctx);
+GGML_API int ggml_metal_if_optimized(struct ggml_metal_context * ctx);
 
 // output the concur_list for ggml_alloc
-int * ggml_metal_get_concur_list(struct ggml_metal_context * ctx);
+GGML_API int * ggml_metal_get_concur_list(struct ggml_metal_context * ctx);
 
 // same as ggml_graph_compute but uses Metal
 // creates gf->n_threads command buffers in parallel
-void ggml_metal_graph_compute(struct ggml_metal_context * ctx, struct ggml_cgraph * gf);
+GGML_API void ggml_metal_graph_compute(struct ggml_metal_context * ctx, struct ggml_cgraph * gf);
+
+// backend API
+GGML_API ggml_backend_t ggml_backend_metal_init(void);
+GGML_API void ggml_backend_metal_set_n_threads(ggml_backend_t backend_metal, int n_threads);
 
 #ifdef __cplusplus
 }

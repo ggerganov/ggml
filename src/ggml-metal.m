@@ -1371,3 +1371,190 @@ void ggml_metal_graph_compute(
 
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+// backend interface
+
+#define UNUSED GGML_UNUSED
+
+static const char * ggml_backend_metal_name(ggml_backend_t backend) {
+    return "Metal";
+
+    UNUSED(backend);
+}
+
+static void ggml_backend_metal_free(ggml_backend_t backend) {
+    struct ggml_metal_context * metal_ctx = (struct ggml_metal_context *)backend->context;
+    ggml_metal_free(metal_ctx);
+    free(backend);
+}
+
+static void * ggml_backend_metal_buffer_get_base(ggml_backend_buffer_t buffer) {
+    return (void *)buffer->context;
+}
+
+static void ggml_backend_metal_buffer_free_buffer(ggml_backend_buffer_t buffer) {
+    free(buffer->context);
+    UNUSED(buffer);
+}
+
+static struct ggml_backend_buffer_i metal_backend_buffer_i = {
+    /* .free_buffer    = */ ggml_backend_metal_buffer_free_buffer,
+    /* .get_base       = */ ggml_backend_metal_buffer_get_base,
+    /* .get_alloc_size = */ NULL, // defaults to ggml_nbytes
+    /* .init_tensor    = */ NULL, // no initialization required
+    /* .free_tensor    = */ NULL, // no cleanup required
+};
+
+// for buffers from ptr, free is not called
+static struct ggml_backend_buffer_i metal_backend_buffer_i_from_ptr = {
+    /* .free_buffer    = */ NULL, // ptr is not owned by the buffer, so it does not need to be freed
+    /* .get_base       = */ ggml_backend_metal_buffer_get_base,
+    /* .get_alloc_size = */ NULL, // defaults to ggml_nbytes
+    /* .init_tensor    = */ NULL,
+    /* .free_tensor    = */ NULL,
+};
+
+static const size_t TENSOR_ALIGNMENT = 64; // should be enough for AVX 512
+
+static ggml_backend_buffer_t ggml_backend_metal_alloc_buffer(ggml_backend_t backend, size_t size) {
+    void * data = malloc(size + TENSOR_ALIGNMENT); // malloc may return an address that is not aligned
+                                                   // TODO: maybe use GGML_ALIGNED_MALLOC?
+    return ggml_backend_buffer_init(backend, metal_backend_buffer_i, data, size);
+}
+
+static size_t ggml_backend_metal_get_alignment(ggml_backend_t backend) {
+    return TENSOR_ALIGNMENT;
+    UNUSED(backend);
+}
+
+static void ggml_backend_metal_set_tensor_async(ggml_backend_t backend, struct ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
+    GGML_ASSERT(offset + size <= ggml_nbytes(tensor) && "tensor write out of bounds");
+    GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
+
+    memcpy((char *)tensor->data + offset, data, size);
+
+    UNUSED(backend);
+}
+
+static void ggml_backend_metal_get_tensor_async(ggml_backend_t backend, const struct ggml_tensor * tensor, void * data, size_t offset, size_t size) {
+    GGML_ASSERT(offset + size <= ggml_nbytes(tensor) && "tensor read out of bounds");
+    GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
+
+    memcpy(data, (const char *)tensor->data + offset, size);
+
+    UNUSED(backend);
+}
+
+static void ggml_backend_metal_synchronize(ggml_backend_t backend) {
+    UNUSED(backend);
+}
+
+static void ggml_backend_metal_cpy_tensor_from(ggml_backend_t backend, struct ggml_tensor * src, struct ggml_tensor * dst) {
+    ggml_backend_tensor_get(src, dst->data, 0, ggml_nbytes(src));
+
+    UNUSED(backend);
+}
+
+static void ggml_backend_metal_cpy_tensor_to(ggml_backend_t backend, struct ggml_tensor * src, struct ggml_tensor * dst) {
+    // for a backend such as CUDA that can queue async calls, it is ok to do this asynchronously, but it may not be the case for other backends
+    ggml_backend_tensor_set_async(dst, src->data, 0, ggml_nbytes(src));
+
+    UNUSED(backend);
+}
+
+struct ggml_backend_plan_metal {
+    struct ggml_cplan cplan;
+    struct ggml_cgraph cgraph;
+};
+
+static ggml_backend_graph_plan_t ggml_backend_metal_graph_plan_create(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
+    struct ggml_metal_context * metal_ctx = (struct ggml_metal_context *)backend->context;
+
+    struct ggml_backend_plan_metal * metal_plan = malloc(sizeof(struct ggml_backend_plan_metal));
+
+    metal_plan->cplan = ggml_graph_plan(cgraph, 1);
+    metal_plan->cgraph = *cgraph;
+
+    if (metal_plan->cplan.work_size > 0) {
+        metal_plan->cplan.work_data = malloc(metal_plan->cplan.work_size);
+    }
+
+    return metal_plan;
+}
+
+static void ggml_backend_metal_graph_plan_free(ggml_backend_t backend, ggml_backend_graph_plan_t plan) {
+    struct ggml_backend_plan_metal * metal_plan = (struct ggml_backend_plan_metal *)plan;
+
+    free(metal_plan->cplan.work_data);
+    free(metal_plan);
+
+    UNUSED(backend);
+}
+
+static void ggml_backend_metal_graph_plan_compute(ggml_backend_t backend, ggml_backend_graph_plan_t plan) {
+    struct ggml_backend_plan_metal * metal_plan = (struct ggml_backend_plan_metal *)plan;
+
+    ggml_graph_compute(&metal_plan->cgraph, &metal_plan->cplan);
+
+    UNUSED(backend);
+}
+
+static void ggml_backend_metal_graph_compute(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
+    struct ggml_metal_context * metal_ctx = (struct ggml_metal_context *)backend->context;
+
+    struct ggml_cplan cplan = ggml_graph_plan(cgraph, metal_ctx->n_threads);
+
+    if (metal_ctx->work_size < cplan.work_size) {
+        // TODO: may be faster to free and use malloc to avoid the copy
+        metal_ctx->work_data = realloc(metal_ctx->work_data, cplan.work_size);
+        metal_ctx->work_size = cplan.work_size;
+    }
+
+    cplan.work_data = metal_ctx->work_data;
+
+    ggml_graph_compute(cgraph, &cplan);
+}
+
+static bool ggml_backend_metal_supports_op(ggml_backend_t backend, const struct ggml_tensor * op) {
+    return true;
+    UNUSED(backend);
+    UNUSED(op);
+}
+
+static struct ggml_backend_i metal_backend_i = {
+    /* .get_name            = */ ggml_backend_metal_name,
+    /* .free                = */ ggml_backend_metal_free,
+    /* .alloc_buffer        = */ ggml_backend_metal_alloc_buffer,
+    /* .get_alignment       = */ ggml_backend_metal_get_alignment,
+    /* .set_tensor_async    = */ ggml_backend_metal_set_tensor_async,
+    /* .get_tensor_async    = */ ggml_backend_metal_get_tensor_async,
+    /* .synchronize         = */ ggml_backend_metal_synchronize,
+    /* .cpy_tensor_from     = */ ggml_backend_metal_cpy_tensor_from,
+    /* .cpy_tensor_to       = */ ggml_backend_metal_cpy_tensor_to,
+    /* .graph_plan_create   = */ ggml_backend_metal_graph_plan_create,
+    /* .graph_plan_free     = */ ggml_backend_metal_graph_plan_free,
+    /* .graph_plan_compute  = */ ggml_backend_metal_graph_plan_compute,
+    /* .graph_compute       = */ ggml_backend_metal_graph_compute,
+    /* .supports_op         = */ ggml_backend_metal_supports_op,
+};
+
+ggml_backend_t ggml_backend_metal_init(void) {
+    struct ggml_metal_context * ctx = malloc(sizeof(struct ggml_metal_context));
+
+    ggml_backend_t metal_backend = malloc(sizeof(struct ggml_backend));
+
+    *metal_backend = (struct ggml_backend) {
+        /* .interface = */ metal_backend_i,
+        /* .context   = */ ctx,
+    };
+
+    return metal_backend;
+}
+
+void ggml_backend_metal_set_n_threads(ggml_backend_t backend_metal, int n_threads) {
+    struct ggml_metal_context * ctx = (struct ggml_metal_context *)backend_metal->context;
+
+    ggml_metal_set_n_cb(ctx, n_threads);
+}
