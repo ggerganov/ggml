@@ -11,6 +11,22 @@
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+struct ggml_backend {
+    struct ggml_backend_i interface;
+
+    ggml_backend_context_t context;
+};
+
+struct ggml_backend_buffer {
+    struct ggml_backend * backend;
+
+    struct ggml_backend_buffer_i interface;
+
+    ggml_backend_buffer_context_t context;
+
+    size_t size; // GG: can we absorb the size inside the context?
+};
+
 // backend buffer
 
 struct ggml_backend_buffer * ggml_backend_buffer_init(
@@ -46,6 +62,10 @@ void * ggml_backend_buffer_get_base(struct ggml_backend_buffer * buffer) {
     return buffer->interface.get_base(buffer);
 }
 
+size_t ggml_backend_buffer_get_size(struct ggml_backend_buffer * buffer) {
+    return buffer->size;
+}
+
 size_t ggml_backend_buffer_get_alloc_size(struct ggml_backend_buffer * buffer, struct ggml_tensor * tensor) {
     if (buffer->interface.get_alloc_size) {
         return buffer->interface.get_alloc_size(buffer, tensor);
@@ -63,6 +83,70 @@ void ggml_backend_buffer_free_tensor(struct ggml_backend_buffer * buffer, struct
     if (buffer->interface.free_tensor) {
         buffer->interface.free_tensor(buffer, tensor);
     }
+}
+
+// backend
+
+struct ggml_backend * ggml_get_backend(const struct ggml_tensor * tensor) {
+    return tensor->buffer->backend;
+}
+
+const char * ggml_backend_name(struct ggml_backend * backend) {
+    return backend->interface.get_name(backend);
+}
+
+void ggml_backend_free(struct ggml_backend * backend) {
+    backend->interface.free(backend);
+}
+
+struct ggml_backend_buffer * ggml_backend_alloc_buffer(struct ggml_backend * backend, size_t size) {
+    return backend->interface.alloc_buffer(backend, size);
+}
+
+size_t ggml_backend_get_alignment(struct ggml_backend * backend) {
+    return backend->interface.get_alignment(backend);
+}
+
+void ggml_backend_tensor_set_async(struct ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
+    ggml_get_backend(tensor)->interface.set_tensor_async(ggml_get_backend(tensor), tensor, data, offset, size);
+}
+
+void ggml_backend_tensor_get_async(const struct ggml_tensor * tensor, void * data, size_t offset, size_t size) {
+    ggml_get_backend(tensor)->interface.get_tensor_async(ggml_get_backend(tensor), tensor, data, offset, size);
+}
+
+void ggml_backend_tensor_set(struct ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
+    ggml_get_backend(tensor)->interface.set_tensor_async(ggml_get_backend(tensor), tensor, data, offset, size);
+    ggml_get_backend(tensor)->interface.synchronize(ggml_get_backend(tensor));
+}
+
+void ggml_backend_tensor_get(const struct ggml_tensor * tensor, void * data, size_t offset, size_t size) {
+    ggml_get_backend(tensor)->interface.get_tensor_async(ggml_get_backend(tensor), tensor, data, offset, size);
+    ggml_get_backend(tensor)->interface.synchronize(ggml_get_backend(tensor));
+}
+
+void ggml_backend_synchronize(struct ggml_backend * backend) {
+    backend->interface.synchronize(backend);
+}
+
+ggml_backend_plan_t ggml_backend_graph_plan_create(struct ggml_backend * backend, struct ggml_cgraph * cgraph) {
+    return backend->interface.graph_plan_create(backend, cgraph);
+}
+
+void ggml_backend_graph_plan_free(struct ggml_backend * backend, ggml_backend_plan_t plan) {
+    backend->interface.graph_plan_free(backend, plan);
+}
+
+void ggml_backend_graph_plan_compute(struct ggml_backend * backend, ggml_backend_plan_t plan) {
+    backend->interface.graph_plan_compute(backend, plan);
+}
+
+void ggml_backend_graph_compute(struct ggml_backend * backend, struct ggml_cgraph * cgraph) {
+    backend->interface.graph_compute(backend, cgraph);
+}
+
+bool ggml_backend_supports_op(struct ggml_backend * backend, const struct ggml_tensor * op) {
+    return backend->interface.supports_op(backend, op);
 }
 
 // backend copy
