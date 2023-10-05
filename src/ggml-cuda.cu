@@ -7147,7 +7147,7 @@ void ggml_cuda_transform_tensor(void * data, struct ggml_tensor * tensor) {
 
     const size_t nb1 = tensor->nb[1];
 
-    ggml_backend backend = tensor->backend;
+    ggml_backend_type backend = tensor->backend;
     ggml_tensor_extra_gpu * extra = new struct ggml_tensor_extra_gpu;
     memset(extra, 0, sizeof(*extra));
 
@@ -7525,9 +7525,9 @@ void ggml_cuda_get_device_description(int device, char * description, size_t des
 
 // backend interface
 
-#define UNUSED(x) (void)(x)
+#define UNUSED GGML_UNUSED
 
-struct ggml_backend_cuda_context {
+struct ggml_backend_context_cuda {
 };
 
 static const char * ggml_backend_cuda_name(ggml_backend_t backend) {
@@ -7537,18 +7537,18 @@ static const char * ggml_backend_cuda_name(ggml_backend_t backend) {
 }
 
 static void ggml_backend_cuda_free(ggml_backend_t backend) {
-    ggml_backend_cuda_context * cuda_ctx = (ggml_backend_cuda_context *)backend->context;
+    ggml_backend_context_cuda * cuda_ctx = (ggml_backend_context_cuda *)backend->context;
     delete cuda_ctx;
     delete backend;
 }
 
-struct ggml_cuda_buffer_context {
+struct ggml_backend_buffer_context_cuda {
     void * device;
 
     ggml_tensor_extra_gpu * temp_tensor_extras = nullptr;
     size_t temp_tensor_extra_index = 0;
 
-    ~ggml_cuda_buffer_context() {
+    ~ggml_backend_buffer_context_cuda() {
         delete[] temp_tensor_extras;
     }
 
@@ -7567,13 +7567,13 @@ struct ggml_cuda_buffer_context {
 };
 
 static void ggml_backend_cuda_buffer_free_buffer(ggml_backend_buffer_t buffer) {
-    ggml_cuda_buffer_context * ctx = (ggml_cuda_buffer_context *)buffer->context;
+    ggml_backend_buffer_context_cuda * ctx = (ggml_backend_buffer_context_cuda *)buffer->context;
     CUDA_CHECK(cudaFree(ctx->device));
     delete ctx;
 }
 
 static void * ggml_backend_cuda_buffer_get_base(ggml_backend_buffer_t buffer) {
-    ggml_cuda_buffer_context * ctx = (ggml_cuda_buffer_context *)buffer->context;
+    ggml_backend_buffer_context_cuda * ctx = (ggml_backend_buffer_context_cuda *)buffer->context;
     return ctx->device;
 }
 
@@ -7597,7 +7597,7 @@ static size_t ggml_backend_cuda_buffer_get_alloc_size(ggml_backend_buffer_t buff
 }
 
 static void ggml_backend_cuda_buffer_init_tensor(ggml_backend_buffer_t buffer, ggml_tensor * tensor) {
-    ggml_cuda_buffer_context * ctx = (ggml_cuda_buffer_context *)buffer->context;
+    ggml_backend_buffer_context_cuda * ctx = (ggml_backend_buffer_context_cuda *)buffer->context;
     ggml_tensor_extra_gpu * extra = ctx->ggml_cuda_alloc_temp_tensor_extra();
 
     extra->data_device[g_main_device] = tensor->data;
@@ -7616,7 +7616,7 @@ static void ggml_backend_cuda_buffer_init_tensor(ggml_backend_buffer_t buffer, g
     UNUSED(buffer);
 }
 
-static struct ggml_backend_buffer_interface cuda_backend_buffer_interface = {
+static struct ggml_backend_buffer_i cuda_backend_buffer_interface = {
     /* .free_buffer    = */ ggml_backend_cuda_buffer_free_buffer,
     /* .get_base       = */ ggml_backend_cuda_buffer_get_base,
     /* .get_alloc_size = */ ggml_backend_cuda_buffer_get_alloc_size,
@@ -7625,9 +7625,9 @@ static struct ggml_backend_buffer_interface cuda_backend_buffer_interface = {
 };
 
 static ggml_backend_buffer_t ggml_backend_cuda_alloc_buffer(ggml_backend_t backend, size_t size) {
-    ggml_cuda_buffer_context * ctx = new ggml_cuda_buffer_context;
+    ggml_backend_buffer_context_cuda * ctx = new ggml_backend_buffer_context_cuda;
     CUDA_CHECK(cudaMalloc(&ctx->device, size));
-    return ggml_backend_buffer_init(cuda_backend_buffer_interface, backend, ctx, size);
+    return ggml_backend_buffer_init(backend, cuda_backend_buffer_interface, ctx, size);
 }
 
 static size_t ggml_backend_cuda_get_alignment(ggml_backend_t backend) {
@@ -7661,7 +7661,7 @@ static void ggml_backend_cuda_synchronize(ggml_backend_t backend) {
     UNUSED(backend);
 }
 
-static ggml_graph_plan_t ggml_backend_cuda_graph_plan_create(ggml_backend_t backend, ggml_cgraph * cgraph) {
+static ggml_backend_graph_plan_t ggml_backend_cuda_graph_plan_create(ggml_backend_t backend, ggml_cgraph * cgraph) {
     GGML_ASSERT(!"not implemented");
 
     return nullptr;
@@ -7670,14 +7670,14 @@ static ggml_graph_plan_t ggml_backend_cuda_graph_plan_create(ggml_backend_t back
     UNUSED(cgraph);
 }
 
-static void ggml_backend_cuda_graph_plan_free(ggml_backend_t backend, ggml_graph_plan_t plan) {
+static void ggml_backend_cuda_graph_plan_free(ggml_backend_t backend, ggml_backend_graph_plan_t plan) {
     GGML_ASSERT(!"not implemented");
 
     UNUSED(backend);
     UNUSED(plan);
 }
 
-static void ggml_backend_cuda_graph_plan_compute(ggml_backend_t backend, ggml_graph_plan_t plan) {
+static void ggml_backend_cuda_graph_plan_compute(ggml_backend_t backend, ggml_backend_graph_plan_t plan) {
     GGML_ASSERT(!"not implemented");
 
     UNUSED(backend);
@@ -7738,7 +7738,7 @@ static void ggml_backend_cuda_graph_compute(ggml_backend_t backend, ggml_cgraph 
     UNUSED(backend);
 }
 
-static ggml_backend_interface cuda_backend_interface = {
+static ggml_backend_i cuda_backend_i = {
     /* .get_name            = */ ggml_backend_cuda_name,
     /* .free                = */ ggml_backend_cuda_free,
     /* .alloc_buffer        = */ ggml_backend_cuda_alloc_buffer,
@@ -7758,12 +7758,13 @@ static ggml_backend_interface cuda_backend_interface = {
 ggml_backend_t ggml_backend_cuda_init() {
     ggml_init_cublas(); // TODO: remove from ggml.c
 
-    ggml_backend_cuda_context * ctx = new ggml_backend_cuda_context;
+    ggml_backend_context_cuda * ctx = new ggml_backend_context_cuda;
 
-    ggml_backend_t cuda_backend = new ggml_backend_s;
-    *cuda_backend = (ggml_backend_s){
-        /* .interface = */ cuda_backend_interface,
+    ggml_backend_t cuda_backend = new ggml_backend;
+    *cuda_backend = (ggml_backend){
+        /* .interface = */ cuda_backend_i,
         /* .context   = */ ctx
     };
+
     return cuda_backend;
 }

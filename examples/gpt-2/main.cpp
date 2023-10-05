@@ -75,9 +75,12 @@ struct gpt2_model {
 
     //
     struct ggml_context * ctx;
+
     ggml_backend_t backend = NULL;
+
     ggml_backend_buffer_t buffer_w;
     ggml_backend_buffer_t buffer_kv;
+
     std::map<std::string, struct ggml_tensor *> tensors;
 };
 
@@ -333,6 +336,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
         // allocate buffer and tensors
         model.buffer_kv = ggml_backend_alloc_buffer(model.backend, memory_size + 256);
+
         ggml_allocr * alloc = ggml_allocr_new_from_buffer(model.buffer_kv);
         ggml_allocr_alloc(alloc, model.memory_k);
         ggml_allocr_alloc(alloc, model.memory_v);

@@ -62,7 +62,7 @@ struct free_block {
 #define MAX_FREE_BLOCKS 256
 
 struct ggml_allocr {
-    ggml_backend_buffer_t buffer;
+    struct ggml_backend_buffer * buffer;
     bool buffer_owned;
     void * data;
     size_t alignment;
@@ -265,7 +265,7 @@ void ggml_allocr_reset(struct ggml_allocr * alloc) {
     alloc->n_free_blocks = 1;
     size_t align_offset = aligned_offset(alloc->data, 0, alloc->alignment);
     alloc->free_blocks[0].addr = (char *)alloc->data + align_offset;
-    alloc->free_blocks[0].size = alloc->buffer->size - align_offset;
+    alloc->free_blocks[0].size = ggml_backend_buffer_get_size(alloc->buffer) - align_offset;
 }
 
 struct ggml_allocr * ggml_allocr_new(void * data, size_t size, size_t alignment) {
