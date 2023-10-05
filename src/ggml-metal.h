@@ -86,7 +86,6 @@ GGML_API void ggml_metal_graph_compute(struct ggml_metal_context * ctx, struct g
 
 // backend API
 GGML_API ggml_backend_t ggml_backend_metal_init(void);
-GGML_API void ggml_backend_metal_set_n_threads(ggml_backend_t backend_metal, int n_threads);
 
 #ifdef __cplusplus
 }
