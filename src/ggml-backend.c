@@ -368,6 +368,10 @@ ggml_backend_t ggml_backend_cpu_init(void) {
     return cpu_backend;
 }
 
+bool ggml_backend_is_cpu(ggml_backend_t backend) {
+    return backend->interface.get_name == ggml_backend_cpu_name;
+}
+
 void ggml_backend_cpu_set_n_threads(ggml_backend_t backend_cpu, int n_threads) {
     struct ggml_backend_cpu_context * ctx = (struct ggml_backend_cpu_context *)backend_cpu->context;
     ctx->n_threads = n_threads;

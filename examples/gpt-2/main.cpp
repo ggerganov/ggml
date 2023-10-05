@@ -415,13 +415,17 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
                 return false;
             }
 
-            // read into a temporary buffer first, then copy to the tensor
-            // TODO: read directly into the tensor if the backend is CPU
-            read_buf.resize(ggml_nbytes(tensor));
-            fin.read(read_buf.data(), ggml_nbytes(tensor));
-
             ggml_allocr_alloc(alloc, tensor);
-            ggml_backend_tensor_set(tensor, read_buf.data(), 0, ggml_nbytes(tensor));
+
+            if (ggml_backend_is_cpu(model.backend)) {
+                // for the CPU backend, we can read directly into the tensor
+                fin.read(reinterpret_cast<char *>(tensor->data), ggml_nbytes(tensor));
+            } else {
+                // read into a temporary buffer first, then copy to device memory
+                read_buf.resize(ggml_nbytes(tensor));
+                fin.read(read_buf.data(), ggml_nbytes(tensor));
+                ggml_backend_tensor_set(tensor, read_buf.data(), 0, ggml_nbytes(tensor));
+            }
 
             // GPT-2 models share the WTE tensor as the LM head
             if (name == "model/wte" && has_lm_head == false) {
@@ -772,7 +776,7 @@ bool gpt2_eval(
     ggml_allocr_alloc_graph(allocr, gf);
 
     // run the computation
-    if (strcmp(ggml_backend_name(model.backend), "CPU") == 0) {
+    if (ggml_backend_is_cpu(model.backend)) {
         ggml_backend_cpu_set_n_threads(model.backend, n_threads);
     }
     ggml_backend_graph_compute(model.backend, gf);
