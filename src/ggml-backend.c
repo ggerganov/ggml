@@ -36,6 +36,7 @@ void ggml_backend_buffer_free(struct ggml_backend_buffer * buffer) {
     if (buffer->interface.free_buffer != NULL) {
         buffer->interface.free_buffer(buffer);
     }
+    free(buffer);
 }
 
 size_t ggml_backend_buffer_get_alignment(struct ggml_backend_buffer * buffer) {
