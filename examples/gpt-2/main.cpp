@@ -535,9 +535,8 @@ struct ggml_cgraph * gpt2_graph(
             // [ 768, N]
             cur = ggml_add(ctx0,
                     ggml_mul(ctx0,
-                        ggml_repeat(ctx0, model.layers[il].ln_1_g, cur),
-                        cur),
-                    //ggml_repeat(ctx0, model.layers[il].ln_1_b, cur));
+                        cur,
+                        model.layers[il].ln_1_g),
                     model.layers[il].ln_1_b);
         }
 
@@ -555,8 +554,8 @@ struct ggml_cgraph * gpt2_graph(
                     cur);
 
             cur = ggml_add(ctx0,
-                    ggml_repeat(ctx0, model.layers[il].c_attn_attn_b, cur),
-                    cur);
+                    cur,
+                    model.layers[il].c_attn_attn_b);
         }
 
         // self-attention
@@ -663,8 +662,8 @@ struct ggml_cgraph * gpt2_graph(
                     cur);
 
             cur = ggml_add(ctx0,
-                    ggml_repeat(ctx0, model.layers[il].c_attn_proj_b, cur),
-                    cur);
+                    cur,
+                    model.layers[il].c_attn_proj_b);
         }
 
         // add the input
@@ -682,9 +681,8 @@ struct ggml_cgraph * gpt2_graph(
                 // [ 768, N]
                 cur = ggml_add(ctx0,
                         ggml_mul(ctx0,
-                            ggml_repeat(ctx0, model.layers[il].ln_2_g, cur),
-                            cur),
-                        //ggml_repeat(ctx0, model.layers[il].ln_2_b, cur));
+                            cur,
+                            model.layers[il].ln_2_g),
                         model.layers[il].ln_2_b);
             }
 
@@ -701,8 +699,8 @@ struct ggml_cgraph * gpt2_graph(
                     cur);
 
             cur = ggml_add(ctx0,
-                    ggml_repeat(ctx0, model.layers[il].c_mlp_fc_b, cur),
-                    cur);
+                    cur,
+                    model.layers[il].c_mlp_fc_b);
 
             // GELU activation
             // [3072, N]
@@ -721,8 +719,8 @@ struct ggml_cgraph * gpt2_graph(
                     cur);
 
             cur = ggml_add(ctx0,
-                    ggml_repeat(ctx0, model.layers[il].c_mlp_proj_b, cur),
-                    cur);
+                    cur,
+                    model.layers[il].c_mlp_proj_b);
         }
 
         // input for next layer
@@ -738,9 +736,8 @@ struct ggml_cgraph * gpt2_graph(
         // [ 768, N]
         inpL = ggml_add(ctx0,
                 ggml_mul(ctx0,
-                    ggml_repeat(ctx0, model.ln_f_g, inpL),
-                    inpL),
-                //ggml_repeat(ctx0, model.ln_f_b, inpL));
+                    inpL,
+                    model.ln_f_g),
                 model.ln_f_b);
     }
 

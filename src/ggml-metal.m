@@ -151,8 +151,6 @@ static void ggml_metal_log(enum ggml_log_level level, const char* format, ...){
     }
 }
 
-
-
 struct ggml_metal_context * ggml_metal_init(int n_cb) {
     GGML_METAL_LOG_INFO("%s: allocating\n", __func__);
 
@@ -1419,7 +1417,11 @@ static struct ggml_backend_buffer_i metal_backend_buffer_i = {
 };
 
 static ggml_backend_buffer_t ggml_backend_metal_alloc_buffer(ggml_backend_t backend, size_t size) {
+    struct ggml_backend_metal_context * metal_ctx = (struct ggml_backend_metal_context *)backend->context;
+
     void * data = ggml_metal_host_malloc(size);
+
+    ggml_metal_add_buffer(metal_ctx->ctx, "backend", data, size, 0);
 
     return ggml_backend_buffer_init(backend, metal_backend_buffer_i, data, size);
 }
@@ -1537,6 +1539,12 @@ static struct ggml_backend_i metal_backend_i = {
 
 ggml_backend_t ggml_backend_metal_init(void) {
     struct ggml_backend_metal_context * ctx = malloc(sizeof(struct ggml_backend_metal_context));
+
+    ctx->n_threads = GGML_DEFAULT_N_THREADS;
+    ctx->work_data = NULL;
+    ctx->work_size = 0;
+
+    ctx->ctx = ggml_metal_init(ctx->n_threads);
 
     ggml_backend_t metal_backend = malloc(sizeof(struct ggml_backend));
 
