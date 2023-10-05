@@ -373,13 +373,14 @@ bool ggml_backend_is_cpu(ggml_backend_t backend) {
 }
 
 void ggml_backend_cpu_set_n_threads(ggml_backend_t backend_cpu, int n_threads) {
+    GGML_ASSERT(ggml_backend_is_cpu(backend_cpu));
+
     struct ggml_backend_cpu_context * ctx = (struct ggml_backend_cpu_context *)backend_cpu->context;
     ctx->n_threads = n_threads;
 }
 
 ggml_backend_buffer_t ggml_backend_cpu_buffer_from_ptr(void * ptr, size_t size) {
     // TODO: NULL backend?
-    // TODO: no free
     return ggml_backend_buffer_init(NULL, cpu_backend_buffer_i_from_ptr, ptr, size);
 }
 
