@@ -1,25 +1,30 @@
 #include "ggml-backend.h"
 #include "ggml-alloc.h"
+
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define UNUSED(x) (void)(x)
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define UNUSED GGML_UNUSED
 
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 // backend buffer
 
-struct ggml_backend_buffer * ggml_backend_buffer_init(struct ggml_backend_buffer_interface interface, ggml_backend_t backend, ggml_buffer_context_t context, size_t size) {
+struct ggml_backend_buffer * ggml_backend_buffer_init(
+        struct ggml_backend                  * backend,
+        struct ggml_backend_buffer_i           interface,
+               ggml_backend_buffer_context_t   context,
+               size_t                          size) {
     struct ggml_backend_buffer * buffer = malloc(sizeof(struct ggml_backend_buffer));
 
     GGML_ASSERT(interface.get_base != NULL);
 
     (*buffer) = (struct ggml_backend_buffer) {
-        /* .interface = */ interface,
         /* .backend   = */ backend,
+        /* .interface = */ interface,
         /* .context   = */ context,
         /* .size      = */ size,
     };
@@ -33,28 +38,28 @@ void ggml_backend_buffer_free(struct ggml_backend_buffer * buffer) {
     }
 }
 
-size_t ggml_backend_buffer_get_alignment(ggml_backend_buffer_t buffer) {
+size_t ggml_backend_buffer_get_alignment(struct ggml_backend_buffer * buffer) {
     return ggml_backend_get_alignment(buffer->backend);
 }
 
-void * ggml_backend_buffer_get_base(ggml_backend_buffer_t buffer) {
+void * ggml_backend_buffer_get_base(struct ggml_backend_buffer * buffer) {
     return buffer->interface.get_base(buffer);
 }
 
-size_t ggml_backend_buffer_get_alloc_size(ggml_backend_buffer_t buffer, struct ggml_tensor * tensor) {
+size_t ggml_backend_buffer_get_alloc_size(struct ggml_backend_buffer * buffer, struct ggml_tensor * tensor) {
     if (buffer->interface.get_alloc_size) {
         return buffer->interface.get_alloc_size(buffer, tensor);
     }
     return ggml_nbytes(tensor);
 }
 
-void ggml_backend_buffer_init_tensor(ggml_backend_buffer_t buffer, struct ggml_tensor * tensor) {
+void ggml_backend_buffer_init_tensor(struct ggml_backend_buffer * buffer, struct ggml_tensor * tensor) {
     if (buffer->interface.init_tensor) {
         buffer->interface.init_tensor(buffer, tensor);
     }
 }
 
-void ggml_backend_buffer_free_tensor(ggml_backend_buffer_t buffer, struct ggml_tensor * tensor) {
+void ggml_backend_buffer_free_tensor(struct ggml_backend_buffer * buffer, struct ggml_tensor * tensor) {
     if (buffer->interface.free_tensor) {
         buffer->interface.free_tensor(buffer, tensor);
     }
@@ -90,10 +95,10 @@ void ggml_backend_tensor_copy(struct ggml_tensor * src, struct ggml_tensor * dst
 
     // TODO: allow backends to support copy to/from same backend
 
-    if (get_backend(dst)->interface.cpy_tensor_from != NULL) {
-        get_backend(dst)->interface.cpy_tensor_from(get_backend(dst)->context, src, dst);
-    } else if (get_backend(src)->interface.cpy_tensor_to != NULL) {
-        get_backend(src)->interface.cpy_tensor_to(get_backend(src)->context, src, dst);
+    if (ggml_get_backend(dst)->interface.cpy_tensor_from != NULL) {
+        ggml_get_backend(dst)->interface.cpy_tensor_from(ggml_get_backend(dst)->context, src, dst);
+    } else if (ggml_get_backend(src)->interface.cpy_tensor_to != NULL) {
+        ggml_get_backend(src)->interface.cpy_tensor_to(ggml_get_backend(src)->context, src, dst);
     } else {
         // shouldn't be hit when copying from/to CPU
         #ifndef NDEBUG
@@ -115,29 +120,29 @@ struct ggml_backend_cpu_context {
     size_t work_size;
 };
 
-static const char * ggml_backend_cpu_name(ggml_backend_t backend) {
+static const char * ggml_backend_cpu_name(struct ggml_backend * backend) {
     return "CPU";
 
     UNUSED(backend);
 }
 
-static void ggml_backend_cpu_free(ggml_backend_t backend) {
+static void ggml_backend_cpu_free(struct ggml_backend * backend) {
     struct ggml_backend_cpu_context * cpu_ctx = (struct ggml_backend_cpu_context *)backend->context;
     free(cpu_ctx->work_data);
     free(cpu_ctx);
     free(backend);
 }
 
-static void * ggml_backend_cpu_buffer_get_base(ggml_backend_buffer_t buffer) {
+static void * ggml_backend_cpu_buffer_get_base(struct ggml_backend_buffer * buffer) {
     return (void *)buffer->context;
 }
 
-static void ggml_backend_cpu_buffer_free_buffer(ggml_backend_buffer_t buffer) {
+static void ggml_backend_cpu_buffer_free_buffer(struct ggml_backend_buffer * buffer) {
     free(buffer->context);
     UNUSED(buffer);
 }
 
-static struct ggml_backend_buffer_interface cpu_backend_buffer_interface = {
+static struct ggml_backend_buffer_i cpu_backend_buffer_i = {
     /* .free_buffer    = */ ggml_backend_cpu_buffer_free_buffer,
     /* .get_base       = */ ggml_backend_cpu_buffer_get_base,
     /* .get_alloc_size = */ NULL, // defaults to ggml_nbytes
@@ -146,7 +151,7 @@ static struct ggml_backend_buffer_interface cpu_backend_buffer_interface = {
 };
 
 // for buffers from ptr, free is not called
-static struct ggml_backend_buffer_interface cpu_backend_buffer_interface_from_ptr = {
+static struct ggml_backend_buffer_i cpu_backend_buffer_i_from_ptr = {
     /* .free_buffer    = */ NULL, // ptr is not owned by the buffer, so it does not need to be freed
     /* .get_base       = */ ggml_backend_cpu_buffer_get_base,
     /* .get_alloc_size = */ NULL, // defaults to ggml_nbytes
@@ -156,17 +161,18 @@ static struct ggml_backend_buffer_interface cpu_backend_buffer_interface_from_pt
 
 static const size_t TENSOR_ALIGNMENT = 64; // should be enough for AVX 512
 
-static struct ggml_backend_buffer * ggml_backend_cpu_alloc_buffer(ggml_backend_t backend, size_t size) {
+static struct ggml_backend_buffer * ggml_backend_cpu_alloc_buffer(struct ggml_backend * backend, size_t size) {
     void * data = malloc(size + TENSOR_ALIGNMENT); // malloc may return an address that is not aligned
-    return ggml_backend_buffer_init(cpu_backend_buffer_interface, backend, data, size);
+                                                   // TODO: maybe use GGML_ALIGNED_MALLOC?
+    return ggml_backend_buffer_init(backend, cpu_backend_buffer_i, data, size);
 }
 
-static size_t ggml_backend_cpu_get_alignment(ggml_backend_t backend) {
+static size_t ggml_backend_cpu_get_alignment(struct ggml_backend * backend) {
     return TENSOR_ALIGNMENT;
     UNUSED(backend);
 }
 
-static void ggml_backend_cpu_set_tensor_async(ggml_backend_t backend, struct ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
+static void ggml_backend_cpu_set_tensor_async(struct ggml_backend * backend, struct ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
     GGML_ASSERT(offset + size <= ggml_nbytes(tensor) && "tensor write out of bounds");
     GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
 
@@ -175,7 +181,7 @@ static void ggml_backend_cpu_set_tensor_async(ggml_backend_t backend, struct ggm
     UNUSED(backend);
 }
 
-static void ggml_backend_cpu_get_tensor_async(ggml_backend_t backend, const struct ggml_tensor * tensor, void * data, size_t offset, size_t size) {
+static void ggml_backend_cpu_get_tensor_async(struct ggml_backend * backend, const struct ggml_tensor * tensor, void * data, size_t offset, size_t size) {
     GGML_ASSERT(offset + size <= ggml_nbytes(tensor) && "tensor read out of bounds");
     GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
 
@@ -184,32 +190,32 @@ static void ggml_backend_cpu_get_tensor_async(ggml_backend_t backend, const stru
     UNUSED(backend);
 }
 
-static void ggml_backend_cpu_synchronize(ggml_backend_t backend) {
+static void ggml_backend_cpu_synchronize(struct ggml_backend * backend) {
     UNUSED(backend);
 }
 
-static void ggml_backend_cpu_cpy_tensor_from(ggml_backend_t backend, struct ggml_tensor * src, struct ggml_tensor * dst) {
+static void ggml_backend_cpu_cpy_tensor_from(struct ggml_backend * backend, struct ggml_tensor * src, struct ggml_tensor * dst) {
     ggml_backend_tensor_get(src, dst->data, 0, ggml_nbytes(src));
 
     UNUSED(backend);
 }
 
-static void ggml_backend_cpu_cpy_tensor_to(ggml_backend_t backend, struct ggml_tensor * src, struct ggml_tensor * dst) {
+static void ggml_backend_cpu_cpy_tensor_to(struct ggml_backend * backend, struct ggml_tensor * src, struct ggml_tensor * dst) {
     // for a backend such as CUDA that can queue async calls, it is ok to do this asynchronously, but it may not be the case for other backends
     ggml_backend_tensor_set_async(dst, src->data, 0, ggml_nbytes(src));
 
     UNUSED(backend);
 }
 
-struct ggml_backend_cpu_plan {
+struct ggml_backend_plan_cpu {
     struct ggml_cplan cplan;
     struct ggml_cgraph cgraph;
 };
 
-static ggml_graph_plan_t ggml_backend_cpu_graph_plan_create(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
+static ggml_backend_plan_t ggml_backend_cpu_graph_plan_create(struct ggml_backend * backend, struct ggml_cgraph * cgraph) {
     struct ggml_backend_cpu_context * cpu_ctx = (struct ggml_backend_cpu_context *)backend->context;
 
-    struct ggml_backend_cpu_plan * cpu_plan = malloc(sizeof(struct ggml_backend_cpu_plan));
+    struct ggml_backend_plan_cpu * cpu_plan = malloc(sizeof(struct ggml_backend_plan_cpu));
 
     cpu_plan->cplan = ggml_graph_plan(cgraph, cpu_ctx->n_threads);
     cpu_plan->cgraph = *cgraph;
@@ -221,8 +227,8 @@ static ggml_graph_plan_t ggml_backend_cpu_graph_plan_create(ggml_backend_t backe
     return cpu_plan;
 }
 
-static void ggml_backend_cpu_graph_plan_free(ggml_backend_t backend, ggml_graph_plan_t plan) {
-    struct ggml_backend_cpu_plan * cpu_plan = (struct ggml_backend_cpu_plan *)plan;
+static void ggml_backend_cpu_graph_plan_free(struct ggml_backend * backend, ggml_backend_plan_t plan) {
+    struct ggml_backend_plan_cpu * cpu_plan = (struct ggml_backend_plan_cpu *)plan;
 
     free(cpu_plan->cplan.work_data);
     free(cpu_plan);
@@ -230,15 +236,15 @@ static void ggml_backend_cpu_graph_plan_free(ggml_backend_t backend, ggml_graph_
     UNUSED(backend);
 }
 
-static void ggml_backend_cpu_graph_plan_compute(ggml_backend_t backend, ggml_graph_plan_t plan) {
-    struct ggml_backend_cpu_plan * cpu_plan = (struct ggml_backend_cpu_plan *)plan;
+static void ggml_backend_cpu_graph_plan_compute(struct ggml_backend * backend, ggml_backend_plan_t plan) {
+    struct ggml_backend_plan_cpu * cpu_plan = (struct ggml_backend_plan_cpu *)plan;
 
     ggml_graph_compute(&cpu_plan->cgraph, &cpu_plan->cplan);
 
     UNUSED(backend);
 }
 
-static void ggml_backend_cpu_graph_compute(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
+static void ggml_backend_cpu_graph_compute(struct ggml_backend * backend, struct ggml_cgraph * cgraph) {
     struct ggml_backend_cpu_context * cpu_ctx = (struct ggml_backend_cpu_context *)backend->context;
 
     struct ggml_cplan cplan = ggml_graph_plan(cgraph, cpu_ctx->n_threads);
@@ -254,13 +260,13 @@ static void ggml_backend_cpu_graph_compute(ggml_backend_t backend, struct ggml_c
     ggml_graph_compute(cgraph, &cplan);
 }
 
-static bool ggml_backend_cpu_supports_op(ggml_backend_t backend, const struct ggml_tensor * op) {
+static bool ggml_backend_cpu_supports_op(struct ggml_backend * backend, const struct ggml_tensor * op) {
     return true;
     UNUSED(backend);
     UNUSED(op);
 }
 
-static struct ggml_backend_interface cpu_backend_interface = {
+static struct ggml_backend_i cpu_backend_i = {
     /* .get_name            = */ ggml_backend_cpu_name,
     /* .free                = */ ggml_backend_cpu_free,
     /* .alloc_buffer        = */ ggml_backend_cpu_alloc_buffer,
@@ -277,22 +283,23 @@ static struct ggml_backend_interface cpu_backend_interface = {
     /* .supports_op         = */ ggml_backend_cpu_supports_op,
 };
 
-ggml_backend_t ggml_backend_cpu_init(void) {
+struct ggml_backend * ggml_backend_cpu_init(void) {
     struct ggml_backend_cpu_context * ctx = malloc(sizeof(struct ggml_backend_cpu_context));
+
     ctx->n_threads = GGML_DEFAULT_N_THREADS;
     ctx->work_data = NULL;
     ctx->work_size = 0;
 
-    ggml_backend_t cpu_backend = malloc(sizeof(struct ggml_backend_s));
+    struct ggml_backend * cpu_backend = malloc(sizeof(struct ggml_backend));
 
-    *cpu_backend = (struct ggml_backend_s) {
-        /* .interface = */ cpu_backend_interface,
+    *cpu_backend = (struct ggml_backend) {
+        /* .interface = */ cpu_backend_i,
         /* .context   = */ ctx
     };
     return cpu_backend;
 }
 
-void ggml_backend_cpu_set_n_threads(ggml_backend_t backend_cpu, int n_threads) {
+void ggml_backend_cpu_set_n_threads(struct ggml_backend * backend_cpu, int n_threads) {
     struct ggml_backend_cpu_context * ctx = (struct ggml_backend_cpu_context *)backend_cpu->context;
     ctx->n_threads = n_threads;
 }
@@ -300,7 +307,7 @@ void ggml_backend_cpu_set_n_threads(ggml_backend_t backend_cpu, int n_threads) {
 struct ggml_backend_buffer * ggml_backend_cpu_buffer_from_ptr(void * ptr, size_t size) {
     // TODO: NULL backend?
     // TODO: no free
-    return ggml_backend_buffer_init(cpu_backend_buffer_interface_from_ptr, NULL, ptr, size);
+    return ggml_backend_buffer_init(NULL, cpu_backend_buffer_i_from_ptr, ptr, size);
 }
 
 #if 0

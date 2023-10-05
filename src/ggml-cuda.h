@@ -44,7 +44,7 @@ GGML_API int    ggml_cuda_get_device_count(void);
 GGML_API void   ggml_cuda_get_device_description(int device, char * description, size_t description_size);
 
 // backend API
-GGML_API ggml_backend_t ggml_backend_cuda_init(void); // TODO: take a list of devices to use
+GGML_API struct ggml_backend * ggml_backend_cuda_init(void); // TODO: take a list of devices to use
 
 
 #ifdef  __cplusplus

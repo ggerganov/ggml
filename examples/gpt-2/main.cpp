@@ -75,9 +75,11 @@ struct gpt2_model {
 
     //
     struct ggml_context * ctx;
-    ggml_backend_t backend = NULL;
-    ggml_backend_buffer_t buffer_w;
-    ggml_backend_buffer_t buffer_kv;
+    struct ggml_backend * backend = NULL;
+
+    struct ggml_backend_buffer * buffer_w;
+    struct ggml_backend_buffer * buffer_kv;
+
     std::map<std::string, struct ggml_tensor *> tensors;
 };
 
@@ -826,7 +828,7 @@ int main(int argc, char ** argv) {
     }
 
     // keep this buffer alive while evaluating the model
-    ggml_backend_buffer_t buf_compute;
+    struct ggml_backend_buffer * buf_compute;
 
     struct ggml_allocr * allocr = NULL;
     // allocate the compute buffer

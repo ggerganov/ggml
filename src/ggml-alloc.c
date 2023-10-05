@@ -62,7 +62,7 @@ struct free_block {
 #define MAX_FREE_BLOCKS 256
 
 struct ggml_allocr {
-    ggml_backend_buffer_t buffer;
+    struct ggml_backend_buffer * buffer;
     bool buffer_owned;
     void * data;
     size_t alignment;
