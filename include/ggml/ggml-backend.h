@@ -9,8 +9,8 @@ extern "C" {
     struct ggml_backend_buffer;
 
     // type-erased backend-specific types / wrappers
-    typedef void * ggml_backend_plan_t;
     typedef void * ggml_backend_context_t;
+    typedef void * ggml_backend_graph_plan_t;
     typedef void * ggml_backend_buffer_context_t;
 
     //
@@ -23,6 +23,16 @@ extern "C" {
         size_t (*get_alloc_size)(struct ggml_backend_buffer * buffer, struct ggml_tensor * tensor); // pre-allocation callback
         void   (*init_tensor)   (struct ggml_backend_buffer * buffer, struct ggml_tensor * tensor); // post-allocation callback
         void   (*free_tensor)   (struct ggml_backend_buffer * buffer, struct ggml_tensor * tensor); // pre-free callback
+    };
+
+    struct ggml_backend_buffer {
+        struct ggml_backend * backend;
+
+        struct ggml_backend_buffer_i interface;
+
+        ggml_backend_buffer_context_t context;
+
+        size_t size; // GG: can we absorb the size inside the context?
     };
 
     // backend buffer functions
@@ -66,15 +76,21 @@ extern "C" {
         void (*cpy_tensor_to)  (struct ggml_backend * backend, struct ggml_tensor * src, struct ggml_tensor * dst);
 
         // compute graph with a plan
-        ggml_backend_plan_t (*graph_plan_create) (struct ggml_backend * backend, struct ggml_cgraph * cgraph);
-        void                (*graph_plan_free)   (struct ggml_backend * backend, ggml_backend_plan_t plan);
-        void                (*graph_plan_compute)(struct ggml_backend * backend, ggml_backend_plan_t plan);
+        ggml_backend_graph_plan_t (*graph_plan_create) (struct ggml_backend * backend, struct ggml_cgraph * cgraph);
+        void                      (*graph_plan_free)   (struct ggml_backend * backend, ggml_backend_graph_plan_t plan);
+        void                      (*graph_plan_compute)(struct ggml_backend * backend, ggml_backend_graph_plan_t plan);
 
         // compute graph without a plan
         void (*graph_compute)(struct ggml_backend * backend, struct ggml_cgraph * cgraph);
 
         // check if the backend supports an operation
         bool (*supports_op)(struct ggml_backend * backend, const struct ggml_tensor * op);
+    };
+
+    struct ggml_backend {
+        struct ggml_backend_i interface;
+
+        ggml_backend_context_t context;
     };
 
     // backend helper functions
@@ -95,11 +111,12 @@ extern "C" {
 
     GGML_API void ggml_backend_synchronize(struct ggml_backend * backend);
 
-    GGML_API ggml_backend_plan_t ggml_backend_graph_plan_create (struct ggml_backend * backend, struct ggml_cgraph * cgraph);
-    GGML_API void                ggml_backend_graph_plan_free   (struct ggml_backend * backend, ggml_backend_plan_t plan);
-    GGML_API void                ggml_backend_graph_plan_compute(struct ggml_backend * backend, ggml_backend_plan_t plan);
-    GGML_API void                ggml_backend_graph_compute     (struct ggml_backend * backend, struct ggml_cgraph * cgraph);
-    GGML_API bool                ggml_backend_supports_op       (struct ggml_backend * backend, const struct ggml_tensor * op);
+    GGML_API ggml_backend_graph_plan_t ggml_backend_graph_plan_create (struct ggml_backend * backend, struct ggml_cgraph * cgraph);
+
+    GGML_API void ggml_backend_graph_plan_free   (struct ggml_backend * backend, ggml_backend_graph_plan_t plan);
+    GGML_API void ggml_backend_graph_plan_compute(struct ggml_backend * backend, ggml_backend_graph_plan_t plan);
+    GGML_API void ggml_backend_graph_compute     (struct ggml_backend * backend, struct ggml_cgraph * cgraph);
+    GGML_API bool ggml_backend_supports_op       (struct ggml_backend * backend, const struct ggml_tensor * op);
 
     // tensor copy between different backends
     GGML_API void ggml_backend_tensor_copy(struct ggml_tensor * src, struct ggml_tensor * dst);

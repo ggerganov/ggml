@@ -6,6 +6,7 @@ build-sanitize-thread/
 build-cov/
 build-ci-debug/
 build-ci-release/
+build-cublas/
 out/
 tmp/
 models/

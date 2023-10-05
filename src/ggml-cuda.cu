@@ -7616,7 +7616,7 @@ static void ggml_backend_cuda_buffer_init_tensor(struct ggml_backend_buffer * bu
     UNUSED(buffer);
 }
 
-static struct ggml_backend_buffer_interface cuda_backend_buffer_interface = {
+static struct ggml_backend_buffer_i cuda_backend_buffer_interface = {
     /* .free_buffer    = */ ggml_backend_cuda_buffer_free_buffer,
     /* .get_base       = */ ggml_backend_cuda_buffer_get_base,
     /* .get_alloc_size = */ ggml_backend_cuda_buffer_get_alloc_size,
@@ -7661,7 +7661,7 @@ static void ggml_backend_cuda_synchronize(struct ggml_backend * backend) {
     UNUSED(backend);
 }
 
-static ggml_graph_plan_t ggml_backend_cuda_graph_plan_create(struct ggml_backend * backend, ggml_cgraph * cgraph) {
+static ggml_backend_graph_plan_t ggml_backend_cuda_graph_plan_create(struct ggml_backend * backend, ggml_cgraph * cgraph) {
     GGML_ASSERT(!"not implemented");
 
     return nullptr;
@@ -7670,14 +7670,14 @@ static ggml_graph_plan_t ggml_backend_cuda_graph_plan_create(struct ggml_backend
     UNUSED(cgraph);
 }
 
-static void ggml_backend_cuda_graph_plan_free(struct ggml_backend * backend, ggml_graph_plan_t plan) {
+static void ggml_backend_cuda_graph_plan_free(struct ggml_backend * backend, ggml_backend_graph_plan_t plan) {
     GGML_ASSERT(!"not implemented");
 
     UNUSED(backend);
     UNUSED(plan);
 }
 
-static void ggml_backend_cuda_graph_plan_compute(struct ggml_backend * backend, ggml_graph_plan_t plan) {
+static void ggml_backend_cuda_graph_plan_compute(struct ggml_backend * backend, ggml_backend_graph_plan_t plan) {
     GGML_ASSERT(!"not implemented");
 
     UNUSED(backend);

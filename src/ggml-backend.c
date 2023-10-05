@@ -11,22 +11,6 @@
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-struct ggml_backend {
-    struct ggml_backend_i interface;
-
-    ggml_backend_context_t context;
-};
-
-struct ggml_backend_buffer {
-    struct ggml_backend * backend;
-
-    struct ggml_backend_buffer_i interface;
-
-    ggml_backend_buffer_context_t context;
-
-    size_t size; // GG: can we absorb the size inside the context?
-};
-
 // backend buffer
 
 struct ggml_backend_buffer * ggml_backend_buffer_init(
@@ -129,15 +113,15 @@ void ggml_backend_synchronize(struct ggml_backend * backend) {
     backend->interface.synchronize(backend);
 }
 
-ggml_backend_plan_t ggml_backend_graph_plan_create(struct ggml_backend * backend, struct ggml_cgraph * cgraph) {
+ggml_backend_graph_plan_t ggml_backend_graph_plan_create(struct ggml_backend * backend, struct ggml_cgraph * cgraph) {
     return backend->interface.graph_plan_create(backend, cgraph);
 }
 
-void ggml_backend_graph_plan_free(struct ggml_backend * backend, ggml_backend_plan_t plan) {
+void ggml_backend_graph_plan_free(struct ggml_backend * backend, ggml_backend_graph_plan_t plan) {
     backend->interface.graph_plan_free(backend, plan);
 }
 
-void ggml_backend_graph_plan_compute(struct ggml_backend * backend, ggml_backend_plan_t plan) {
+void ggml_backend_graph_plan_compute(struct ggml_backend * backend, ggml_backend_graph_plan_t plan) {
     backend->interface.graph_plan_compute(backend, plan);
 }
 
@@ -296,7 +280,7 @@ struct ggml_backend_plan_cpu {
     struct ggml_cgraph cgraph;
 };
 
-static ggml_backend_plan_t ggml_backend_cpu_graph_plan_create(struct ggml_backend * backend, struct ggml_cgraph * cgraph) {
+static ggml_backend_graph_plan_t ggml_backend_cpu_graph_plan_create(struct ggml_backend * backend, struct ggml_cgraph * cgraph) {
     struct ggml_backend_cpu_context * cpu_ctx = (struct ggml_backend_cpu_context *)backend->context;
 
     struct ggml_backend_plan_cpu * cpu_plan = malloc(sizeof(struct ggml_backend_plan_cpu));
@@ -311,7 +295,7 @@ static ggml_backend_plan_t ggml_backend_cpu_graph_plan_create(struct ggml_backen
     return cpu_plan;
 }
 
-static void ggml_backend_cpu_graph_plan_free(struct ggml_backend * backend, ggml_backend_plan_t plan) {
+static void ggml_backend_cpu_graph_plan_free(struct ggml_backend * backend, ggml_backend_graph_plan_t plan) {
     struct ggml_backend_plan_cpu * cpu_plan = (struct ggml_backend_plan_cpu *)plan;
 
     free(cpu_plan->cplan.work_data);
@@ -320,7 +304,7 @@ static void ggml_backend_cpu_graph_plan_free(struct ggml_backend * backend, ggml
     UNUSED(backend);
 }
 
-static void ggml_backend_cpu_graph_plan_compute(struct ggml_backend * backend, ggml_backend_plan_t plan) {
+static void ggml_backend_cpu_graph_plan_compute(struct ggml_backend * backend, ggml_backend_graph_plan_t plan) {
     struct ggml_backend_plan_cpu * cpu_plan = (struct ggml_backend_plan_cpu *)plan;
 
     ggml_graph_compute(&cpu_plan->cgraph, &cpu_plan->cplan);
