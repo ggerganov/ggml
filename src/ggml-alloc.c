@@ -393,7 +393,7 @@ static void init_view(struct ggml_allocr * alloc, struct ggml_tensor * view) {
     view->data    = (char *)view->view_src->data + view->view_offs;
 
     // FIXME: the view should be initialized by the owning buffer, but currently this breaks the CUDA backend
-    // due to the ggml_tensor_extra_gpu ring buffer overwriting the with the KV cache extras
+    // due to the ggml_tensor_extra_gpu ring buffer overwriting the KV cache extras
     assert(ggml_allocr_is_measure(alloc) || view->buffer->backend == alloc->buffer->backend);
     ggml_backend_buffer_init_tensor(alloc->buffer, view);
 }

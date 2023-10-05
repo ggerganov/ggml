@@ -7586,9 +7586,11 @@ static size_t ggml_backend_cuda_buffer_get_alloc_size(ggml_backend_buffer_t buff
 
     int64_t ne0 = tensor->ne[0];
 
-    if (ne0 % MATRIX_ROW_PADDING != 0) {
-        size += (MATRIX_ROW_PADDING - ne0 % MATRIX_ROW_PADDING)
-            * ggml_type_size(tensor->type)/ggml_blck_size(tensor->type);
+    if (ggml_is_quantized(tensor->type)) {
+        if (ne0 % MATRIX_ROW_PADDING != 0) {
+            size += (MATRIX_ROW_PADDING - ne0 % MATRIX_ROW_PADDING)
+                * ggml_type_size(tensor->type)/ggml_blck_size(tensor->type);
+        }
     }
 
     return size;
@@ -7598,6 +7600,14 @@ static size_t ggml_backend_cuda_buffer_get_alloc_size(ggml_backend_buffer_t buff
 
 static void ggml_backend_cuda_buffer_init_tensor(ggml_backend_buffer_t buffer, ggml_tensor * tensor) {
     ggml_backend_buffer_context_cuda * ctx = (ggml_backend_buffer_context_cuda *)buffer->context;
+
+    if (tensor->view_src != NULL && tensor->view_offs == 0) {
+        assert(tensor->view_src->buffer->backend == buffer->backend);
+        tensor->backend = tensor->view_src->backend;
+        tensor->extra = tensor->view_src->extra;
+        return;
+    }
+
     ggml_tensor_extra_gpu * extra = ctx->ggml_cuda_alloc_temp_tensor_extra();
 
     extra->data_device[g_main_device] = tensor->data;
@@ -7605,12 +7615,18 @@ static void ggml_backend_cuda_buffer_init_tensor(ggml_backend_buffer_t buffer, g
     tensor->backend = GGML_BACKEND_GPU;
     tensor->extra = extra;
 
-    // initialize padding to 0 to avoid possible NaN values
-    size_t original_size = ggml_nbytes(tensor);
-    size_t size = ggml_backend_cuda_buffer_get_alloc_size(buffer, tensor);
+    if (ggml_is_quantized(tensor->type)) {
+        // initialize padding to 0 to avoid possible NaN values
+        int64_t row_low = 0;
+        int64_t row_high = ggml_nrows(tensor);
+        int64_t nrows_split = row_high - row_low;
 
-    if (size > original_size && tensor->view_src == nullptr) {
-        CUDA_CHECK(cudaMemsetAsync((char *)tensor->data + original_size, 0, size - original_size, g_cudaStreams[g_main_device][0]));
+        size_t original_size = ggml_nbytes_split(tensor, nrows_split);
+        size_t padded_size = ggml_backend_cuda_buffer_get_alloc_size(tensor->buffer, tensor);
+
+        if (padded_size > original_size && tensor->view_src == nullptr) {
+            CUDA_CHECK(cudaMemsetAsync((char *)tensor->data + original_size, 0, padded_size - original_size, g_cudaStreams[g_main_device][0]));
+        }
     }
 
     UNUSED(buffer);
@@ -7690,18 +7706,11 @@ static void ggml_backend_cuda_graph_compute(ggml_backend_t backend, ggml_cgraph 
     params.ith = 0;
     for (int i = 0; i < cgraph->n_nodes; i++) {
         ggml_tensor * node = cgraph->nodes[i];
-        // views of allocated tensors don't call init_tensor, handle them here
-        // TODO: handle in ggml-alloc
-        if (node->extra == nullptr) {
-            GGML_ASSERT(node->view_src != nullptr);
-            GGML_ASSERT(node->view_src->backend == GGML_BACKEND_GPU);
-            ggml_backend_cuda_buffer_init_tensor(node->buffer, node);
-        }
+
+        assert(node->backend == GGML_BACKEND_GPU);
         for (int j = 0; j < GGML_MAX_SRC; j++) {
-            if (node->src[j] != nullptr && node->src[j]->extra == nullptr) {
-                GGML_ASSERT(node->src[j]->view_src != nullptr);
-                GGML_ASSERT(node->src[j]->view_src->backend == GGML_BACKEND_GPU);
-                ggml_backend_cuda_buffer_init_tensor(node->src[j]->buffer, node->src[j]);
+            if (node->src[j] != nullptr) {
+                assert(node->src[j]->backend == GGML_BACKEND_GPU);
             }
         }
 
