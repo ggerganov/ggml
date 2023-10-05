@@ -32,7 +32,7 @@ extern "C" {
 
         ggml_backend_buffer_context_t context;
 
-        size_t size; // GG: can we absorb the size inside the context?
+        size_t size;
     };
 
     // backend buffer functions
