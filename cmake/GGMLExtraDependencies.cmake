@@ -1,0 +1,35 @@
+macro(ggml_get_extra_dependencies)
+    get_property(GGML_EXTRA_DEPENDENCIES GLOBAL PROPERTY GGML_EXTRA_DEPENDENCIES)
+endmacro()
+
+function(ggml_add_extra_dependency KIND NAME)
+    ggml_get_extra_dependencies()
+    if (NOT GGML_EXTRA_DEPENDENCIES)
+        set_property(GLOBAL PROPERTY GGML_EXTRA_DEPENDENCIES "include(CMakeFindDependencyMacro)\n")
+    endif ()
+    set_property(GLOBAL APPEND_STRING PROPERTY GGML_EXTRA_DEPENDENCIES "find_${KIND}(${NAME}")
+    foreach(ARG ${ARGN})
+        set_property(GLOBAL APPEND_STRING PROPERTY GGML_EXTRA_DEPENDENCIES " ${ARG}")
+    endforeach()
+    set_property(GLOBAL APPEND_STRING PROPERTY GGML_EXTRA_DEPENDENCIES ")\n")
+endfunction()
+
+macro(ggml_find_package NAME)
+    find_package(${NAME} ${ARGN})
+    if (${NAME}_FOUND)
+        ggml_add_extra_dependency(dependency ${NAME} ${ARGN})
+    endif ()
+endmacro()
+
+macro(ggml_wrap_library WRAPPED_NAME NAME)
+    find_library(${NAME} ${ARGN})
+    if (${NAME})
+        ggml_add_extra_dependency(library ${NAME} ${ARGN})
+        add_library(${WRAPPED_NAME} UNKNOWN IMPORTED)
+        set_target_properties(${WRAPPED_NAME} PROPERTIES
+            IMPORTED_LOCATION "${${NAME}}"
+        )
+        set_property(GLOBAL APPEND_STRING PROPERTY GGML_EXTRA_DEPENDENCIES
+        "add_library(${WRAPPED_NAME} UNKNOWN IMPORTED)\nset_target_properties(${WRAPPED_NAME} PROPERTIES\n  IMPORTED_LOCATION \"\${${NAME}}\"\n)\n")
+    endif ()
+endmacro()
