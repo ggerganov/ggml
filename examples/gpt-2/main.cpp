@@ -439,8 +439,9 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
             ggml_allocr_alloc(alloc, tensor);
 
-            if (ggml_backend_is_cpu(model.backend)) {
-                // for the CPU backend, we can read directly into the tensor
+            if (ggml_backend_is_cpu  (model.backend) ||
+                ggml_backend_is_metal(model.backend)) {
+                // for the CPU and Metal backend, we can read directly into the tensor
                 fin.read(reinterpret_cast<char *>(tensor->data), ggml_nbytes(tensor));
             } else {
                 // read into a temporary buffer first, then copy to device memory
