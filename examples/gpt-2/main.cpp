@@ -360,12 +360,12 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         model.buffer_kv = ggml_backend_alloc_buffer(model.backend, memory_size + 256);
 
         // allocate the tensors into the backend buffer
-        // TODO: better API for this
         {
             ggml_allocr * alloc = ggml_allocr_new_from_buffer(model.buffer_kv);
 
             // this updates the pointers in the tensors to point to the correct location in the buffer
             // this is necessary since the ggml_context is .no_alloc == true
+            // note that the buffer can actually be a device buffer, depending on the backend
             ggml_allocr_alloc(alloc, model.memory_k);
             ggml_allocr_alloc(alloc, model.memory_v);
 
