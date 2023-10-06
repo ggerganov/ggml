@@ -797,7 +797,7 @@ bool gpt2_eval(
     // run the computation
     if (ggml_backend_is_cpu(model.backend)) {
         ggml_backend_cpu_set_n_threads(model.backend, n_threads);
-    } else if (strcmp(ggml_backend_name(model.backend), "Metal") == 0) {
+    } else if (ggml_backend_is_metal(model.backend)) {
         ggml_backend_metal_set_n_threads(model.backend, n_threads);
     }
     ggml_backend_graph_compute(model.backend, gf);
