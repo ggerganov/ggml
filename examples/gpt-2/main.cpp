@@ -26,6 +26,13 @@
 #pragma warning(disable: 4244 4267) // possible loss of data
 #endif
 
+static void ggml_log_callback_default(ggml_log_level level, const char * text, void * user_data) {
+    (void) level;
+    (void) user_data;
+    fputs(text, stderr);
+    fflush(stderr);
+}
+
 // default hparams (GPT-2 117M)
 struct gpt2_hparams {
     int32_t n_vocab = 50257;
@@ -241,6 +248,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 #ifdef GGML_USE_METAL
     if (n_gpu_layers > 0) {
         fprintf(stderr, "%s: using Metal backend\n", __func__);
+        ggml_metal_log_set_callback(ggml_log_callback_default, nullptr);
         model.backend = ggml_backend_metal_init();
         if (!model.backend) {
             fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
@@ -789,6 +797,8 @@ bool gpt2_eval(
     // run the computation
     if (ggml_backend_is_cpu(model.backend)) {
         ggml_backend_cpu_set_n_threads(model.backend, n_threads);
+    } else if (strcmp(ggml_backend_name(model.backend), "Metal") == 0) {
+        ggml_backend_metal_set_n_threads(model.backend, n_threads);
     }
     ggml_backend_graph_compute(model.backend, gf);
 
