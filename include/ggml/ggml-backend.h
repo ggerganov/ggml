@@ -132,13 +132,16 @@ extern "C" {
 
     GGML_API ggml_backend_t ggml_backend_cpu_init(void);
 
-    GGML_API bool ggml_backend_is_cpu(ggml_backend_t backend);
-
     GGML_API void ggml_backend_cpu_set_n_threads(ggml_backend_t backend_cpu, int n_threads);
 
     GGML_API ggml_backend_buffer_t ggml_backend_cpu_buffer_from_ptr(void * ptr, size_t size);
 
     ///////////////////////////
+
+    // TODO: we should probably do something better here
+    GGML_API bool ggml_backend_is_cpu  (ggml_backend_t backend);
+    GGML_API bool ggml_backend_is_cuda (ggml_backend_t backend);
+    GGML_API bool ggml_backend_is_metal(ggml_backend_t backend);
 
 #if 0
     // graph splitting

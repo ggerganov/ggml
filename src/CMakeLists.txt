@@ -229,7 +229,7 @@ if (GGML_METAL)
     set(GGML_METAL_SOURCES ggml-metal.m ggml-metal.h)
 
     add_compile_definitions(GGML_USE_METAL)
-    add_compile_definitions(GGML_METAL_NDEBUG)
+    #add_compile_definitions(GGML_METAL_NDEBUG)
 
     # get full path to the file
     #add_compile_definitions(GGML_METAL_DIR_KERNELS="${CMAKE_CURRENT_SOURCE_DIR}/")
