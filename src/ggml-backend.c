@@ -369,6 +369,10 @@ ggml_backend_t ggml_backend_cpu_init(void) {
     return cpu_backend;
 }
 
+bool ggml_backend_is_cpu(ggml_backend_t backend) {
+    return backend->interface.get_name == ggml_backend_cpu_name;
+}
+
 void ggml_backend_cpu_set_n_threads(ggml_backend_t backend_cpu, int n_threads) {
     GGML_ASSERT(ggml_backend_is_cpu(backend_cpu));
 
@@ -379,18 +383,6 @@ void ggml_backend_cpu_set_n_threads(ggml_backend_t backend_cpu, int n_threads) {
 ggml_backend_buffer_t ggml_backend_cpu_buffer_from_ptr(void * ptr, size_t size) {
     // TODO: NULL backend?
     return ggml_backend_buffer_init(NULL, cpu_backend_buffer_i_from_ptr, ptr, size);
-}
-
-bool ggml_backend_is_cpu(ggml_backend_t backend) {
-    return backend->interface.get_name == ggml_backend_cpu_name;
-}
-
-bool ggml_backend_is_cuda(ggml_backend_t backend) {
-    return strcmp(ggml_backend_name(backend), "CUDA") == 0;
-}
-
-bool ggml_backend_is_metal(ggml_backend_t backend) {
-    return strcmp(ggml_backend_name(backend), "Metal") == 0;
 }
 
 #if 0
