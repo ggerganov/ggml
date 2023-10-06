@@ -439,8 +439,11 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
             ggml_allocr_alloc(alloc, tensor);
 
-            if (ggml_backend_is_cpu  (model.backend) ||
-                ggml_backend_is_metal(model.backend)) {
+            if (ggml_backend_is_cpu  (model.backend)
+#ifdef GGML_USE_METAL
+                || ggml_backend_is_metal(model.backend)
+#endif
+                ) {
                 // for the CPU and Metal backend, we can read directly into the tensor
                 fin.read(reinterpret_cast<char *>(tensor->data), ggml_nbytes(tensor));
             } else {
@@ -800,7 +803,6 @@ bool gpt2_eval(
         ggml_backend_cpu_set_n_threads(model.backend, n_threads);
     }
 #ifdef GGML_USE_METAL
-    // TODO: not great - what should we do?
     if (ggml_backend_is_metal(model.backend)) {
         ggml_backend_metal_set_n_threads(model.backend, n_threads);
     }
