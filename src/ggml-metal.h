@@ -98,7 +98,7 @@ GGML_API ggml_backend_t ggml_backend_metal_init(void);
 
 GGML_API bool ggml_backend_is_metal(ggml_backend_t backend);
 
-GGML_API void ggml_backend_metal_set_n_threads(ggml_backend_t backend, int n_threads);
+GGML_API void ggml_backend_metal_set_n_cb(ggml_backend_t backend, int n_cb);
 
 #ifdef __cplusplus
 }

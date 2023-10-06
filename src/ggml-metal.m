@@ -1501,8 +1501,8 @@ bool ggml_backend_is_metal(ggml_backend_t backend) {
     return backend->interface.get_name == ggml_backend_metal_name;
 }
 
-void ggml_backend_metal_set_n_threads(ggml_backend_t backend, int n_threads) {
+void ggml_backend_metal_set_n_cb(ggml_backend_t backend, int n_cb) {
     struct ggml_metal_context * ctx = (struct ggml_metal_context *)backend->context;
 
-    ggml_metal_set_n_cb(ctx, n_threads);
+    ggml_metal_set_n_cb(ctx, n_cb);
 }
