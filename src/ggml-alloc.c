@@ -269,7 +269,7 @@ void ggml_allocr_reset(struct ggml_allocr * alloc) {
 }
 
 struct ggml_allocr * ggml_allocr_new(void * data, size_t size, size_t alignment) {
-    struct ggml_backend_buffer * buffer = ggml_backend_cpu_buffer_from_ptr(data, size);
+    struct ggml_backend_buffer * buffer = ggml_backend_cpu_buffer_from_ptr(NULL, data, size);
 
     struct ggml_allocr * alloc = ggml_allocr_new_from_buffer(buffer);
     alloc->alignment = alignment;
@@ -306,11 +306,7 @@ struct ggml_allocr * ggml_allocr_new_from_buffer(struct ggml_backend_buffer * bu
 struct ggml_allocr * ggml_allocr_new_measure(size_t alignment) {
     struct ggml_allocr * alloc = (struct ggml_allocr *)malloc(sizeof(struct ggml_allocr) /* + n_free_blocks * sizeof(struct free_block) */);
 
-    // TODO: these should be set by the backend:
-    //  - get_alignment()
-    //  - get_alloc_size()
-    // TODO: support other backends
-    struct ggml_backend_buffer * buffer = ggml_backend_cpu_buffer_from_ptr((void *)0x1000, (size_t)-0x1001);
+    struct ggml_backend_buffer * buffer = ggml_backend_cpu_buffer_from_ptr(NULL, (void *)0x1000, (size_t)-0x1001);
 
     *alloc = (struct ggml_allocr){
         /*.buffer        = */ buffer,

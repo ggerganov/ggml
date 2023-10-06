@@ -132,56 +132,11 @@ extern "C" {
 
     GGML_API ggml_backend_t ggml_backend_cpu_init(void);
 
-    GGML_API bool ggml_backend_is_cpu  (ggml_backend_t backend);
+    GGML_API bool ggml_backend_is_cpu(ggml_backend_t backend);
 
     GGML_API void ggml_backend_cpu_set_n_threads(ggml_backend_t backend_cpu, int n_threads);
 
-    GGML_API ggml_backend_buffer_t ggml_backend_cpu_buffer_from_ptr(void * ptr, size_t size);
-
-    ///////////////////////////
-
-#if 0
-    // graph splitting
-    #define GGML_MAX_SPLITS 200
-    #define GGML_MAX_SPLIT_INPUTS 4
-
-    struct ggml_graph_split {
-        char name[GGML_MAX_NAME];
-        struct ggml_context * ctx;
-        struct ggml_tensor  * src_inputs[GGML_MAX_SPLIT_INPUTS + 1];
-        struct ggml_tensor  * dst_inputs[GGML_MAX_SPLIT_INPUTS + 1];
-        struct ggml_cgraph  * graph;
-    };
-
-    // TODO: this shouldn't be fixed size, allocate from ggml_context
-    struct ggml_graph_splits {
-        int n_splits;
-        struct ggml_graph_split splits[GGML_MAX_SPLITS];
-    };
-
-    // TODO: allocate in ggml_context
-    GGML_API struct ggml_graph_splits ggml_graph_split_init(void);
-
-    // this won't be needed once we can allocate graphs from a ggml_context
-    GGML_API void ggml_graph_splits_free(struct ggml_graph_splits * splits);
-
-    // add a split to the graph - single and multiple inputs versions
-    GGML_API void ggml_graph_splits_add(struct ggml_graph_splits * splits, struct ggml_tensor ** input, struct ggml_context * ctx, const char * fmt, ...);
-    GGML_API void ggml_graph_splits_add_n(struct ggml_graph_splits * splits, struct ggml_tensor *** inputs, struct ggml_context * ctx, const char * fmt, ...);
-
-    // build graphs for all splits
-    GGML_API void ggml_graph_splits_build_forward(struct ggml_graph_splits * splits, struct ggml_tensor * output);
-
-    // compute
-    GGML_API void ggml_graph_splits_compute(struct ggml_graph_splits * splits);
-
-    // graph tensor allocator
-    GGML_API void ggml_graph_allocate_tensors(struct ggml_cgraph * graph, struct ggml_context * ctx);
-    GGML_API void ggml_graph_splits_allocate_tensors(struct ggml_graph_splits * splits);
-
-    // automatically split a graph into multiple graphs based on the location of the tensors
-    GGML_API struct ggml_graph_splits ggml_graph_split(struct ggml_cgraph * graph, struct ggml_context * ctx);
-#endif
+    GGML_API ggml_backend_buffer_t ggml_backend_cpu_buffer_from_ptr(ggml_backend_t backend_cpu, void * ptr, size_t size);
 
 #ifdef  __cplusplus
 }
