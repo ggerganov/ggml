@@ -6,6 +6,7 @@ build-sanitize-thread/
 build-cov/
 build-ci-debug/
 build-ci-release/
+build-cublas/
 out/
 tmp/
 models/
@@ -15,6 +16,7 @@ compile_commands.json
 CMakeSettings.json
 .vs/
 .vscode/
+.clangd
 
 .exrc
 .cache

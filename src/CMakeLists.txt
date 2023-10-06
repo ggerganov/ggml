@@ -212,6 +212,9 @@ if (GGML_CUBLAS)
             set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} CUDA::cudart CUDA::cublas CUDA::cublasLt)
         endif()
 
+        if (CMAKE_BUILD_TYPE MATCHES Debug)
+            set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -lineinfo")
+        endif()
     else()
         message(WARNING "cuBLAS not found")
     endif()
@@ -226,7 +229,7 @@ if (GGML_METAL)
     set(GGML_METAL_SOURCES ggml-metal.m ggml-metal.h)
 
     add_compile_definitions(GGML_USE_METAL)
-    add_compile_definitions(GGML_METAL_NDEBUG)
+    #add_compile_definitions(GGML_METAL_NDEBUG)
 
     # get full path to the file
     #add_compile_definitions(GGML_METAL_DIR_KERNELS="${CMAKE_CURRENT_SOURCE_DIR}/")
@@ -249,8 +252,10 @@ endif()
 add_library(${TARGET}
     ggml.c
     ggml-alloc.c
+    ggml-backend.c
     ../include/ggml/ggml.h
     ../include/ggml/ggml-alloc.h
+    ../include/ggml/ggml-backend.h
     ${GGML_CUDA_SOURCES}
     ${GGML_OPENCL_SOURCES}
     ${GGML_METAL_SOURCES}
@@ -301,7 +306,7 @@ endif()
 
 if (GGML_CUDA_SOURCES)
     message(STATUS "GGML CUDA sources found, configuring CUDA architecture")
-    set_property(TARGET ggml  PROPERTY CUDA_ARCHITECTURES "52;61")
+    set_property(TARGET ggml  PROPERTY CUDA_ARCHITECTURES "52;61;70")
     set_property(TARGET ggml  PROPERTY CUDA_SELECT_NVCC_ARCH_FLAGS "Auto")
     if (NOT MSVC)
         target_link_libraries(ggml PUBLIC stdc++)
