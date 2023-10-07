@@ -1498,7 +1498,7 @@ ggml_backend_t ggml_backend_metal_init(void) {
 }
 
 bool ggml_backend_is_metal(ggml_backend_t backend) {
-    return backend->interface.get_name == ggml_backend_metal_name;
+    return backend->iface.get_name == ggml_backend_metal_name;
 }
 
 void ggml_backend_metal_set_n_cb(ggml_backend_t backend, int n_cb) {
