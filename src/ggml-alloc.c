@@ -189,22 +189,21 @@ static void ggml_allocr_free_tensor(struct ggml_allocr * alloc, struct ggml_tens
         // the tensor was not allocated in this buffer
         // this can happen because the graph allocator will try to free weights and other tensors from different buffers
         // the easiest way to deal with this is just to ignore it
-        AT_PRINTF("ignoring %s (their buffer: %p, our buffer: %p)\n", tensor->name, tensor->buffer, alloc->buffer);
+        AT_PRINTF("ignoring %s (their buffer: %p, our buffer: %p)\n", tensor->name, (void *)tensor->buffer, (void *)alloc->buffer);
         return;
     }
+
+    void * ptr = tensor->data;
 
     size_t size = ggml_backend_buffer_get_alloc_size(alloc->buffer, tensor);
     size = aligned_offset(NULL, size, alloc->alignment);
     AT_PRINTF("%s: freeing %s at %p (%zu bytes) - n_free_blocks = %d\n", __func__, tensor->name, ptr, size, alloc->n_free_blocks);
-    AT_PRINTF("%s: alloc->data = %p alloc->data+alloc->size = %p alloc->data+alloc->max_size = %p\n", __func__, alloc->data, (char*)alloc->data + alloc->size, (char*)alloc->data + alloc->max_size);
 
     ggml_backend_buffer_free_tensor(alloc->buffer, tensor);
 
 #ifdef GGML_ALLOCATOR_DEBUG
     remove_allocated_tensor(alloc, tensor);
 #endif
-
-    void * ptr = tensor->data;
 
     // see if we can merge with an existing block
     for (int i = 0; i < alloc->n_free_blocks; i++) {
@@ -423,7 +422,8 @@ static void allocate_node(struct ggml_allocr * alloc, struct ggml_tensor * node)
                                 // adding a view_src pointer to the tensor would solve this and simplify the code dealing with views
                                 // for now, we only reuse the parent's data if the offset is zero (view_src->data == parent->data)
                                 AT_PRINTF("reusing view parent %s (%s) for %s\n", parent->name, view_src->name, node->name);
-                                node->view_src = parent;
+                                node->view_src = view_src;
+                                view_src_hn->n_views += 1;
                                 init_view(alloc, node);
                                 return;
                             }
@@ -431,6 +431,7 @@ static void allocate_node(struct ggml_allocr * alloc, struct ggml_tensor * node)
                         else {
                             AT_PRINTF("reusing parent %s for %s\n", parent->name, node->name);
                             node->view_src = parent;
+                            p_hn->n_views += 1;
                             init_view(alloc, node);
                             return;
                         }
