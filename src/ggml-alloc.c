@@ -271,21 +271,13 @@ void ggml_allocr_reset(struct ggml_allocr * alloc) {
 struct ggml_allocr * ggml_allocr_new(void * data, size_t size, size_t alignment) {
     struct ggml_backend_buffer * buffer = ggml_backend_cpu_buffer_from_ptr(NULL, data, size);
 
-    struct ggml_allocr * alloc = ggml_allocr_new_from_buffer(buffer);
-    alloc->alignment = alignment;
-    alloc->buffer_owned = true;
-
-    return alloc;
-}
-
-struct ggml_allocr * ggml_allocr_new_from_buffer(struct ggml_backend_buffer * buffer) {
-    struct ggml_allocr * alloc = (struct ggml_allocr *)malloc(sizeof(struct ggml_allocr) /* + n_free_blocks * sizeof(struct free_block) */);
+    struct ggml_allocr * alloc = (struct ggml_allocr *)malloc(sizeof(struct ggml_allocr));
 
     *alloc = (struct ggml_allocr){
         /*.buffer        = */ buffer,
-        /*.buffer_owned  = */ false,
+        /*.buffer_owned  = */ true,
         /*.base          = */ ggml_backend_buffer_get_base(buffer),
-        /*.alignment     = */ ggml_backend_buffer_get_alignment(buffer),
+        /*.alignment     = */ alignment,
         /*.n_free_blocks = */ 0,
         /*.free_blocks   = */ {{0}},
         /*.hash_table    = */ {{0}},
@@ -304,20 +296,25 @@ struct ggml_allocr * ggml_allocr_new_from_buffer(struct ggml_backend_buffer * bu
 }
 
 struct ggml_allocr * ggml_allocr_new_measure(size_t alignment) {
-    struct ggml_allocr * alloc = (struct ggml_allocr *)malloc(sizeof(struct ggml_allocr) /* + n_free_blocks * sizeof(struct free_block) */);
+    struct ggml_allocr * alloc = ggml_allocr_new((void *)0x1000, (size_t)-0x1001, alignment);
+    alloc->measure = true;
 
-    struct ggml_backend_buffer * buffer = ggml_backend_cpu_buffer_from_ptr(NULL, (void *)0x1000, (size_t)-0x1001);
+    return alloc;
+}
+
+struct ggml_allocr * ggml_allocr_new_from_buffer(struct ggml_backend_buffer * buffer) {
+    struct ggml_allocr * alloc = (struct ggml_allocr *)malloc(sizeof(struct ggml_allocr));
 
     *alloc = (struct ggml_allocr){
         /*.buffer        = */ buffer,
-        /*.buffer_owned  = */ true,
+        /*.buffer_owned  = */ false,
         /*.base          = */ ggml_backend_buffer_get_base(buffer),
-        /*.alignment     = */ alignment,
+        /*.alignment     = */ ggml_backend_buffer_get_alignment(buffer),
         /*.n_free_blocks = */ 0,
         /*.free_blocks   = */ {{0}},
         /*.hash_table    = */ {{0}},
         /*.max_size      = */ 0,
-        /*.measure       = */ true,
+        /*.measure       = */ false,
         /*.parse_seq     = */ {0},
         /*.parse_seq_len = */ 0,
 #ifdef GGML_ALLOCATOR_DEBUG
