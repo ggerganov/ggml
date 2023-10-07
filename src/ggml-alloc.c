@@ -189,22 +189,21 @@ static void ggml_allocr_free_tensor(struct ggml_allocr * alloc, struct ggml_tens
         // the tensor was not allocated in this buffer
         // this can happen because the graph allocator will try to free weights and other tensors from different buffers
         // the easiest way to deal with this is just to ignore it
-        AT_PRINTF("ignoring %s (their buffer: %p, our buffer: %p)\n", tensor->name, tensor->buffer, alloc->buffer);
+        AT_PRINTF("ignoring %s (their buffer: %p, our buffer: %p)\n", tensor->name, (void *)tensor->buffer, (void *)alloc->buffer);
         return;
     }
+
+    void * ptr = tensor->data;
 
     size_t size = ggml_backend_buffer_get_alloc_size(alloc->buffer, tensor);
     size = aligned_offset(NULL, size, alloc->alignment);
     AT_PRINTF("%s: freeing %s at %p (%zu bytes) - n_free_blocks = %d\n", __func__, tensor->name, ptr, size, alloc->n_free_blocks);
-    AT_PRINTF("%s: alloc->data = %p alloc->data+alloc->size = %p alloc->data+alloc->max_size = %p\n", __func__, alloc->data, (char*)alloc->data + alloc->size, (char*)alloc->data + alloc->max_size);
 
     ggml_backend_buffer_free_tensor(alloc->buffer, tensor);
 
 #ifdef GGML_ALLOCATOR_DEBUG
     remove_allocated_tensor(alloc, tensor);
 #endif
-
-    void * ptr = tensor->data;
 
     // see if we can merge with an existing block
     for (int i = 0; i < alloc->n_free_blocks; i++) {
@@ -271,21 +270,13 @@ void ggml_allocr_reset(struct ggml_allocr * alloc) {
 struct ggml_allocr * ggml_allocr_new(void * data, size_t size, size_t alignment) {
     struct ggml_backend_buffer * buffer = ggml_backend_cpu_buffer_from_ptr(NULL, data, size);
 
-    struct ggml_allocr * alloc = ggml_allocr_new_from_buffer(buffer);
-    alloc->alignment = alignment;
-    alloc->buffer_owned = true;
-
-    return alloc;
-}
-
-struct ggml_allocr * ggml_allocr_new_from_buffer(struct ggml_backend_buffer * buffer) {
-    struct ggml_allocr * alloc = (struct ggml_allocr *)malloc(sizeof(struct ggml_allocr) /* + n_free_blocks * sizeof(struct free_block) */);
+    struct ggml_allocr * alloc = (struct ggml_allocr *)malloc(sizeof(struct ggml_allocr));
 
     *alloc = (struct ggml_allocr){
         /*.buffer        = */ buffer,
-        /*.buffer_owned  = */ false,
+        /*.buffer_owned  = */ true,
         /*.base          = */ ggml_backend_buffer_get_base(buffer),
-        /*.alignment     = */ ggml_backend_buffer_get_alignment(buffer),
+        /*.alignment     = */ alignment,
         /*.n_free_blocks = */ 0,
         /*.free_blocks   = */ {{0}},
         /*.hash_table    = */ {{0}},
@@ -304,20 +295,25 @@ struct ggml_allocr * ggml_allocr_new_from_buffer(struct ggml_backend_buffer * bu
 }
 
 struct ggml_allocr * ggml_allocr_new_measure(size_t alignment) {
-    struct ggml_allocr * alloc = (struct ggml_allocr *)malloc(sizeof(struct ggml_allocr) /* + n_free_blocks * sizeof(struct free_block) */);
+    struct ggml_allocr * alloc = ggml_allocr_new((void *)0x1000, (size_t)-0x1001, alignment);
+    alloc->measure = true;
 
-    struct ggml_backend_buffer * buffer = ggml_backend_cpu_buffer_from_ptr(NULL, (void *)0x1000, (size_t)-0x1001);
+    return alloc;
+}
+
+struct ggml_allocr * ggml_allocr_new_from_buffer(struct ggml_backend_buffer * buffer) {
+    struct ggml_allocr * alloc = (struct ggml_allocr *)malloc(sizeof(struct ggml_allocr));
 
     *alloc = (struct ggml_allocr){
         /*.buffer        = */ buffer,
-        /*.buffer_owned  = */ true,
+        /*.buffer_owned  = */ false,
         /*.base          = */ ggml_backend_buffer_get_base(buffer),
-        /*.alignment     = */ alignment,
+        /*.alignment     = */ ggml_backend_buffer_get_alignment(buffer),
         /*.n_free_blocks = */ 0,
         /*.free_blocks   = */ {{0}},
         /*.hash_table    = */ {{0}},
         /*.max_size      = */ 0,
-        /*.measure       = */ true,
+        /*.measure       = */ false,
         /*.parse_seq     = */ {0},
         /*.parse_seq_len = */ 0,
 #ifdef GGML_ALLOCATOR_DEBUG
@@ -426,7 +422,8 @@ static void allocate_node(struct ggml_allocr * alloc, struct ggml_tensor * node)
                                 // adding a view_src pointer to the tensor would solve this and simplify the code dealing with views
                                 // for now, we only reuse the parent's data if the offset is zero (view_src->data == parent->data)
                                 AT_PRINTF("reusing view parent %s (%s) for %s\n", parent->name, view_src->name, node->name);
-                                node->view_src = parent;
+                                node->view_src = view_src;
+                                view_src_hn->n_views += 1;
                                 init_view(alloc, node);
                                 return;
                             }
@@ -434,6 +431,7 @@ static void allocate_node(struct ggml_allocr * alloc, struct ggml_tensor * node)
                         else {
                             AT_PRINTF("reusing parent %s for %s\n", parent->name, node->name);
                             node->view_src = parent;
+                            p_hn->n_views += 1;
                             init_view(alloc, node);
                             return;
                         }
