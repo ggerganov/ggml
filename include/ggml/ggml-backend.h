@@ -31,7 +31,7 @@ extern "C" {
 
     // TODO: hide behind API
     struct ggml_backend_buffer {
-        struct ggml_backend_buffer_i interface;
+        struct ggml_backend_buffer_i iface;
 
         ggml_backend_t                backend;
         ggml_backend_buffer_context_t context;
@@ -42,7 +42,7 @@ extern "C" {
     // backend buffer functions
     GGML_API ggml_backend_buffer_t ggml_backend_buffer_init(
             struct ggml_backend                  * backend,
-            struct ggml_backend_buffer_i           interface,
+            struct ggml_backend_buffer_i           iface,
                    ggml_backend_buffer_context_t   context,
                    size_t                          size);
 
@@ -93,7 +93,7 @@ extern "C" {
 
     // TODO: hide behind API
     struct ggml_backend {
-        struct ggml_backend_i interface;
+        struct ggml_backend_i iface;
 
         ggml_backend_context_t context;
     };
