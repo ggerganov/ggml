@@ -571,7 +571,6 @@ int64_t ggml_cycles_per_ms(void) {
 #define ggml_perf_cycles_per_ms() 0
 #endif
 
-
 //
 // cache line
 //
@@ -1827,7 +1826,6 @@ ggml_type_traits_t ggml_internal_get_type_traits(enum ggml_type type) {
     GGML_ASSERT(type < GGML_TYPE_COUNT);
     return type_traits[type];
 }
-
 
 //
 // simd mappings
@@ -5925,7 +5923,6 @@ struct ggml_tensor * ggml_sqrt_inplace(
     return ggml_sqrt_impl(ctx, a, true);
 }
 
-
 // ggml_log
 
 static struct ggml_tensor * ggml_log_impl(
@@ -5978,7 +5975,6 @@ struct ggml_tensor * ggml_sum(
 
     return result;
 }
-
 
 // ggml_sum_rows
 
@@ -6611,7 +6607,6 @@ struct ggml_tensor * ggml_set_2d_inplace(
     return ggml_set_impl(ctx, a, b, nb1, a->nb[2], a->nb[3], offset, false);
 }
 
-
 // ggml_cpy
 
 static struct ggml_tensor * ggml_cpy_impl(
@@ -6690,7 +6685,6 @@ struct ggml_tensor * ggml_cont_inplace(
         struct ggml_tensor * a) {
     return ggml_cont_impl(ctx, a, true);
 }
-
 
 // make contiguous, with new shape
 GGML_API struct ggml_tensor * ggml_cont_1d(
@@ -7144,7 +7138,6 @@ struct ggml_tensor * ggml_diag(
     return result;
 }
 
-
 // ggml_diag_mask_inf
 
 static struct ggml_tensor * ggml_diag_mask_inf_impl(
@@ -7255,7 +7248,6 @@ struct ggml_tensor * ggml_soft_max_inplace(
         struct ggml_tensor  * a) {
     return ggml_soft_max_impl(ctx, a, true);
 }
-
 
 // ggml_soft_max_back
 
@@ -7773,7 +7765,6 @@ struct ggml_tensor * ggml_conv_2d(
 
 }
 
-
 // ggml_conv_2d_sk_p0
 struct ggml_tensor * ggml_conv_2d_sk_p0(
         struct ggml_context * ctx,
@@ -8212,7 +8203,6 @@ static struct ggml_tensor * ggml_add_rel_pos_impl(
 
     return result;
 }
-
 
 struct ggml_tensor * ggml_add_rel_pos(
         struct ggml_context * ctx,
@@ -8657,8 +8647,6 @@ struct ggml_tensor * ggml_map_custom3_inplace(
         void                         * userdata) {
     return ggml_map_custom3_impl(ctx, a, b, c, fun, n_tasks, userdata, true);
 }
-
-
 
 // ggml_cross_entropy_loss
 
@@ -9860,7 +9848,6 @@ static void ggml_compute_forward_add1(
     }
 }
 
-
 // ggml_compute_forward_acc
 
 static void ggml_compute_forward_acc_f32(
@@ -9999,7 +9986,6 @@ static void ggml_compute_forward_sub_f32(
             const int i3 = ir/(ne2*ne1);
             const int i2 = (ir - i3*ne2*ne1)/ne1;
             const int i1 = (ir - i3*ne2*ne1 - i2*ne1);
-
 
 #ifdef GGML_USE_ACCELERATE
             vDSP_vsub(
@@ -10181,7 +10167,6 @@ static void ggml_compute_forward_div_f32(
             const int i2 = (ir - i3*ne2*ne1)/ne1;
             const int i1 = (ir - i3*ne2*ne1 - i2*ne1);
 
-
 #ifdef GGML_USE_ACCELERATE
             UNUSED(ggml_vec_div_f32);
 
@@ -10318,7 +10303,6 @@ static void ggml_compute_forward_sqrt(
             } break;
     }
 }
-
 
 // ggml_compute_forward_log
 
@@ -12152,7 +12136,6 @@ static void ggml_compute_forward_out_prod_f32(
         }
     }
 
-
     //int64_t t1 = ggml_perf_time_us();
     //static int64_t acc = 0;
     //acc += t1 - t0;
@@ -12347,7 +12330,6 @@ static void ggml_compute_forward_scale_f32(
     const size_t nb01 = src0->nb[1];
 
     const size_t nb1 = dst->nb[1];
-
 
     for (int i1 = ir0; i1 < ir1; i1++) {
         if (dst->data != src0->data) {
@@ -12745,7 +12727,6 @@ static void ggml_compute_forward_get_rows_back_f32(
                 (float *) ((char *) src0->data + i*src0->nb[1]));
     }
 }
-
 
 static void ggml_compute_forward_get_rows_back(
         const struct ggml_compute_params * params,
@@ -14032,6 +14013,7 @@ static void ggml_compute_forward_conv_1d_f32(
     }
 }
 
+// TODO: reuse ggml_mul_mat or implement ggml_im2col and remove stage_0 and stage_1
 static void gemm_f16_out_f32(int64_t m, int64_t n, int64_t k,
                              ggml_fp16_t * A,
                              ggml_fp16_t * B,
@@ -16360,7 +16342,6 @@ static void ggml_compute_forward_add_rel_pos_f32(
     const int ip0 = dp*ith;
     const int ip1 = MIN(ip0 + dp, np);
 
-
     for (int64_t i13 = ip0; i13 < ip1; ++i13) {
         for (int64_t i12 = 0; i12 < ne12; ++i12) {
             for (int64_t i11 = 0; i11 < ne11; ++i11) {
@@ -16427,7 +16408,6 @@ static void ggml_compute_forward_map_unary_f32(
     }
 }
 
-
 static void ggml_compute_forward_map_unary(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
@@ -16474,7 +16454,6 @@ static void ggml_compute_forward_map_binary_f32(
                 (float *) ((char *) src1->data + i*(src1->nb[1])));
     }
 }
-
 
 static void ggml_compute_forward_map_binary(
         const struct ggml_compute_params * params,
@@ -16526,7 +16505,6 @@ static void ggml_compute_forward_map_custom2_f32(
 
     fun(dst, a, b);
 }
-
 
 // ggml_compute_forward_map_custom3
 
@@ -16802,7 +16780,6 @@ static void ggml_compute_forward_cross_entropy_loss_back_f32(
         ggml_vec_sub_f32(nc, ds0, ds0, s1);
         ggml_vec_scale_f32(nc, ds0, d[0] / (float) nr);
 
-
 #ifndef NDEBUG
         for (int i = 0; i < nc; ++i) {
             assert(!isnan(ds0[i]));
@@ -16829,7 +16806,6 @@ static void ggml_compute_forward_cross_entropy_loss_back(
             } break;
     }
 }
-
 
 /////////////////////////////////
 
@@ -20132,7 +20108,6 @@ static enum ggml_opt_result ggml_opt_adam(
         fx *= accum_norm;
 
         opt->loss_after = fx;
-
 
         // check convergence
         if (fabsf(fx - fx_prev[0])/fx < params.adam.eps_f) {
