@@ -7640,6 +7640,8 @@ static struct ggml_backend_buffer_i cuda_backend_buffer_interface = {
 };
 
 static ggml_backend_buffer_t ggml_backend_cuda_alloc_buffer(ggml_backend_t backend, size_t size) {
+    ggml_cuda_set_device(g_main_device);
+
     ggml_backend_buffer_context_cuda * ctx = new ggml_backend_buffer_context_cuda;
     CUDA_CHECK(cudaMalloc(&ctx->device, size));
     return ggml_backend_buffer_init(backend, cuda_backend_buffer_interface, ctx, size);
@@ -7700,6 +7702,8 @@ static void ggml_backend_cuda_graph_plan_compute(ggml_backend_t backend, ggml_ba
 }
 
 static void ggml_backend_cuda_graph_compute(ggml_backend_t backend, ggml_cgraph * cgraph) {
+    ggml_cuda_set_device(g_main_device);
+
     ggml_compute_params params = {};
     params.type = GGML_TASK_COMPUTE;
     params.ith = 0;
@@ -7768,8 +7772,7 @@ ggml_backend_t ggml_backend_cuda_init() {
 
     ggml_backend_context_cuda * ctx = new ggml_backend_context_cuda;
 
-    ggml_backend_t cuda_backend = new ggml_backend;
-    *cuda_backend = (ggml_backend){
+    ggml_backend_t cuda_backend = new ggml_backend {
         /* .interface = */ cuda_backend_i,
         /* .context   = */ ctx
     };
