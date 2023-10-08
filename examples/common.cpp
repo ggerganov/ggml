@@ -1,3 +1,5 @@
+#define _USE_MATH_DEFINES // for M_PI
+
 #include "common.h"
 
 // third-party utilities
@@ -12,10 +14,6 @@
 #include <locale>
 #include <codecvt>
 #include <sstream>
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
 
 #if defined(_MSC_VER)
 #pragma warning(disable: 4244 4267) // possible loss of data
@@ -794,7 +792,7 @@ bool sam_params_parse(int argc, char ** argv, sam_params & params) {
     return true;
 }
 
-void sam_print_usage(int argc, char ** argv, const sam_params & params) {
+void sam_print_usage(int /*argc*/, char ** argv, const sam_params & params) {
     fprintf(stderr, "usage: %s [options]\n", argv[0]);
     fprintf(stderr, "\n");
     fprintf(stderr, "options:\n");

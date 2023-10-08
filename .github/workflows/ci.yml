@@ -7,6 +7,75 @@ on:
     branches: [ master ]
 
 jobs:
+  test-ubuntu-opencl:
+    runs-on: ubuntu-latest
+    env:
+      GGML_NLOOP: 3
+      GGML_NITER: 1
+      GGML_N_THREADS: 2
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Dependencies
+      run: |
+        wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
+        echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list  
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends llvm intel-oneapi-runtime-opencl intel-oneapi-runtime-compilers libclblast-dev
+    - name: Create Build Environment
+      run: mkdir build
+
+    - name: Configure CMake
+      working-directory: ./build
+      run: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DGGML_TEST_COVERAGE=ON -DGGML_CLBLAST=ON ..
+
+    - name: Build
+      working-directory: ./build
+      run: make
+
+    - name: Test
+      working-directory: ./build
+      run: ctest --verbose --timeout 900
+
+    - name: Test Coverage
+      working-directory: ./build
+      run: |
+        llvm-profdata merge -sparse tests/*.profraw -o ggml.profdata
+        llvm-cov      report ./bin/test-grad0 -instr-profile=ggml.profdata
+        llvm-cov      report ./bin/test-opt   -instr-profile=ggml.profdata
+  test-macos-metal:
+    runs-on: macos-13
+    env:
+      GGML_NLOOP: 3
+      GGML_NITER: 1
+      GGML_N_THREADS: 2
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Create Build Environment
+      run: mkdir build
+
+    - name: Configure CMake
+      working-directory: ./build
+      run: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DGGML_TEST_COVERAGE=ON -DGGML_METAL=ON ..
+
+    - name: Build
+      working-directory: ./build
+      run: make
+
+    - name: Test
+      working-directory: ./build
+      run: ctest --verbose --timeout 900
+
+    - name: Test Coverage
+      working-directory: ./build
+      run: |
+        xcrun llvm-profdata merge -sparse tests/*.profraw -o ggml.profdata
+        xcrun llvm-cov      report ./bin/test-grad0 -instr-profile=ggml.profdata
+        xcrun llvm-cov      report ./bin/test-opt   -instr-profile=ggml.profdata
+
   build:
 
     strategy:
@@ -20,7 +89,7 @@ jobs:
       GGML_NITER: 1
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Dependencies for Ubuntu
       if: matrix.os == 'ubuntu-latest'

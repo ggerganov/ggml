@@ -40,6 +40,7 @@ struct starcoder_hparams {
     int32_t n_head  = 16;
     int32_t n_layer = 24;
     int32_t ftype   = 1;
+    float   eps     = 1e-5f;
 };
 
 struct starcoder_layer {
@@ -263,7 +264,7 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
         }
 
         // Add StarChat special tokens.
-        for (const std::string & token : {
+        for (std::string token : {
                 "<|system|>",
                 "<|user|>",
                 "<|assistant|>",
@@ -698,7 +699,7 @@ bool starcoder_eval(
         // norm
         {
             // [ 768, N]
-            cur = ggml_norm(ctx0, inpL);
+            cur = ggml_norm(ctx0, inpL, hparams.eps);
 
             // cur = ln_1_g*cur + ln_1_b
             // [ 768, N]
@@ -847,7 +848,7 @@ bool starcoder_eval(
         {
             // norm
             {
-                cur = ggml_norm(ctx0, inpFF);
+                cur = ggml_norm(ctx0, inpFF, hparams.eps);
 
                 // cur = ln_2_g*cur + ln_2_b
                 // [ 768, N]
@@ -904,7 +905,7 @@ bool starcoder_eval(
     // norm
     {
         // [ 768, N]
-        inpL = ggml_norm(ctx0, inpL);
+        inpL = ggml_norm(ctx0, inpL, hparams.eps);
 
         // inpL = ln_f_g*inpL + ln_f_b
         // [ 768, N]
@@ -1008,8 +1009,8 @@ int main(int argc, char ** argv) {
 
     printf("%s: prompt: '%s'\n", __func__, params.prompt.c_str());
     printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
-    for (int i = 0; i < embd_inp.size(); i++) {
-        printf("%s: token[%d] = %6d, %s\n", __func__, i, embd_inp[i], vocab.id_to_token.at(embd_inp[i]).c_str());
+    for (size_t i = 0; i < embd_inp.size(); i++) {
+        printf("%s: token[%zu] = %6d, %s\n", __func__, i, embd_inp[i], vocab.id_to_token.at(embd_inp[i]).c_str());
     }
     printf("\n\n");
 
@@ -1031,7 +1032,7 @@ int main(int argc, char ** argv) {
     printf("Calling starcoder_eval\n");
     starcoder_eval(model, params.n_threads, 0, { 0, 1, 2, 3 }, logits, mem_per_token);
 
-    for (int i = int(embd.size()); i < embd_inp.size() + params.n_predict; i++) {
+    for (size_t i = embd.size(); i < embd_inp.size() + params.n_predict; i++) {
         // predict
         if (embd.size() > 0) {
             const int64_t t_start_us = ggml_time_us();
@@ -1072,9 +1073,9 @@ int main(int argc, char ** argv) {
             embd.push_back(id);
         } else {
             // if here, it means we are still processing the input prompt
-            for (int k = i; k < embd_inp.size(); k++) {
+            for (size_t k = i; k < embd_inp.size(); k++) {
                 embd.push_back(embd_inp[k]);
-                if (embd.size() >= params.n_batch) {
+                if (int32_t(embd.size()) >= params.n_batch) {
                     break;
                 }
             }

@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.0)
+cmake_minimum_required (VERSION 3.3)
 project(ggml VERSION 0.1.0)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS "on")
@@ -13,7 +13,19 @@ else()
     set(GGML_STANDALONE OFF)
 endif()
 
+if (EMSCRIPTEN)
+    set(BUILD_SHARED_LIBS_DEFAULT OFF)
+else()
+    if (MINGW)
+        set(BUILD_SHARED_LIBS_DEFAULT OFF)
+    else()
+        set(BUILD_SHARED_LIBS_DEFAULT ON)
+    endif()
+endif()
+
 # options
+
+option(BUILD_SHARED_LIBS            "ggml: build shared libs" ${BUILD_SHARED_LIBS_DEFAULT})
 
 option(GGML_ALL_WARNINGS            "ggml: enable all compiler warnings"                   ON)
 option(GGML_ALL_WARNINGS_3RD_PARTY  "ggml: enable all compiler warnings in 3rd party libs" OFF)
@@ -66,6 +78,81 @@ endif()
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffast-math")
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=native")
+
+# warning flags
+
+if (GGML_ALL_WARNINGS)
+    if (NOT MSVC)
+        set(c_flags   -Wall -Wpedantic -Wformat=2 -Wno-unused -Wstrict-prototypes)
+        set(cxx_flags -Wall -Wpedantic -Wformat=2)
+    else()
+        # todo : windows
+    endif()
+
+    add_compile_options(
+        "$<$<COMPILE_LANGUAGE:C>:${c_flags}>"
+        "$<$<COMPILE_LANGUAGE:CXX>:${cxx_flags}>"
+    )
+endif()
+
+if (NOT MSVC)
+    add_compile_options(
+        "$<$<COMPILE_LANGUAGE:C>:-Werror=vla>"
+        "$<$<COMPILE_LANGUAGE:CXX>:-Werror=vla>"
+        "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler;-Werror=vla>"
+    )
+endif()
+
+#
+# POSIX conformance
+#
+
+# clock_gettime came in POSIX.1b (1993)
+# CLOCK_MONOTONIC came in POSIX.1-2001 / SUSv3 as optional
+# posix_memalign came in POSIX.1-2001 / SUSv3
+# M_PI is an XSI extension since POSIX.1-2001 / SUSv3, came in XPG1 (1985)
+add_compile_definitions(_XOPEN_SOURCE=600)
+
+# Somehow in OpenBSD whenever POSIX conformance is specified
+# some string functions rely on locale_t availability,
+# which was introduced in POSIX.1-2008, forcing us to go higher
+if (CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
+    remove_definitions(-D_XOPEN_SOURCE=600)
+    add_compile_definitions(_XOPEN_SOURCE=700)
+endif()
+
+# Data types, macros and functions related to controlling CPU affinity
+# are available on Linux through GNU extensions in libc
+if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+    add_compile_definitions(_GNU_SOURCE)
+endif()
+
+# RLIMIT_MEMLOCK came in BSD, is not specified in POSIX.1,
+# and on macOS its availability depends on enabling Darwin extensions
+# similarly on DragonFly, enabling BSD extensions is necessary
+if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    add_compile_definitions(_DARWIN_C_SOURCE)
+endif()
+if (CMAKE_SYSTEM_NAME MATCHES "DragonFly")
+    add_compile_definitions(_DARWIN_C_SOURCE)
+endif()
+
+# alloca is a non-standard interface that is not visible on BSDs when
+# POSIX conformance is specified, but not all of them provide a clean way
+# to enable it in such cases
+if (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+    add_compile_definitions(__BSD_VISIBLE)
+endif()
+if (CMAKE_SYSTEM_NAME MATCHES "NetBSD")
+    add_compile_definitions(_NETBSD_SOURCE)
+endif()
+if (CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
+    add_compile_definitions(_BSD_SOURCE)
+endif()
+
+if (WHISPER_PERF)
+    set(WHISPER_EXTRA_FLAGS ${WHISPER_EXTRA_FLAGS} -DGGML_PERF)
+endif()
 
 # dependencies
 

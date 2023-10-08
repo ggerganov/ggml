@@ -52,9 +52,9 @@ std::pair<std::vector<std::size_t>, float> encode_word(const std::string & word,
     std::vector<float> best_segmentations_scores(word.length() + 1, -std::numeric_limits<float>::infinity());
     best_segmentations_scores[0] = 1.0;
 
-    for (int start_idx = 0; start_idx < word.length(); ++start_idx) {
+    for (size_t start_idx = 0; start_idx < word.length(); ++start_idx) {
         float best_score_at_start = best_segmentations_scores[start_idx];
-        for (int end_idx = start_idx + 1; end_idx <= word.length(); ++end_idx) {
+        for (size_t end_idx = start_idx + 1; end_idx <= word.length(); ++end_idx) {
             std::string token = word.substr(start_idx, end_idx - start_idx);
             if (model.count(token) && best_score_at_start != -std::numeric_limits<float>::infinity()) {
                 float token_score = model.at(token).second;
@@ -92,7 +92,7 @@ bool replit_tokenizer_load(replit_tokenizer & tokenizer, std::istream & fin, int
     std::string word;
     std::vector<char> buf(128);
 
-    for (std::size_t i = 0; i < max_vocab_size; i++) {
+    for (int i = 0; i < max_vocab_size; i++) {
         uint32_t len;
         fin.read((char *)&len, sizeof(len));
 
@@ -450,6 +450,7 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
     const int n_head = hparams.n_heads;
     const int n_vocab = hparams.n_vocab;
     const int n_ctx = hparams.max_seq_len;
+    const float eps = 1e-5f;
 
     static size_t buf_size = 256u * 1024 * 1024;
     static void * buf = malloc(buf_size);
@@ -488,7 +489,7 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
 
         // a = self.ln_1(x)
         {
-            cur = ggml_norm(ctx0, inpL);
+            cur = ggml_norm(ctx0, inpL, eps);
 
             cur = ggml_mul(ctx0, ggml_repeat(ctx0, model.layers[il].norm_1_weight, cur), cur);
         }
@@ -577,7 +578,7 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
 
         // m = self.ln_2(x)
         {
-            cur = ggml_norm(ctx0, inpL);
+            cur = ggml_norm(ctx0, inpL, eps);
 
             cur = ggml_mul(ctx0, ggml_repeat(ctx0, model.layers[il].norm_2_weight, cur), cur);
         }
@@ -601,7 +602,7 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
 
     // norm
     {
-        inpL = ggml_norm(ctx0, inpL);
+        inpL = ggml_norm(ctx0, inpL, eps);
         // inpL = ln_f_g*inpL
         inpL = ggml_mul(ctx0, ggml_repeat(ctx0, model.norm_f_weight, inpL), inpL);
     }
@@ -701,8 +702,8 @@ int main(int argc, char ** argv) {
 
     printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
 
-    for (int i = 0; i < embd_inp.size(); i++) {
-        printf("%s: token[%d] = %6zu\n", __func__, i, embd_inp[i]);
+    for (size_t i = 0; i < embd_inp.size(); i++) {
+        printf("%s: token[%zu] = %6zu\n", __func__, i, embd_inp[i]);
         // vocab.id_to_token.at(embd_inp[i]).c_str()
     }
     printf("\n");
@@ -715,7 +716,7 @@ int main(int argc, char ** argv) {
     size_t mem_per_token = 0;
     replit_eval(model, params.n_threads, 0, {0, 1, 2, 3}, logits, false, mem_per_token);
 
-    for (int i = embd.size(); i < embd_inp.size() + params.n_predict; i++) {
+    for (size_t i = embd.size(); i < embd_inp.size() + params.n_predict; i++) {
         // predict
         if (embd.size() > 0) {
             const int64_t t_start_us = ggml_time_us();
@@ -754,9 +755,9 @@ int main(int argc, char ** argv) {
             embd.push_back(id);
         } else {
             // if here, it means we are still processing the input prompt
-            for (int k = i; k < embd_inp.size(); k++) {
+            for (size_t k = i; k < embd_inp.size(); k++) {
                 embd.push_back(embd_inp[k]);
-                if (embd.size() > params.n_batch) {
+                if (int32_t(embd.size()) > params.n_batch) {
                     break;
                 }
             }

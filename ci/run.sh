@@ -161,6 +161,70 @@ function gg_sum_gpt_2 {
     gg_printf '```\n'
 }
 
+# mnist
+
+function gg_run_mnist {
+    cd ${SRC}
+
+    cd build-ci-release
+
+    set -e
+
+    mkdir -p models/mnist
+    python3 ../examples/mnist/convert-h5-to-ggml.py ../examples/mnist/models/mnist/mnist_model.state_dict
+
+    model_f32="./models/mnist/ggml-model-f32.bin"
+    samples="../examples/mnist/models/mnist/t10k-images.idx3-ubyte"
+
+    # first command runs and exports "mnist.ggml", the second command runs the exported model
+
+    (time ./bin/mnist     ${model_f32} ${samples} ) 2>&1 | tee -a $OUT/${ci}-mnist.log
+    (time ./bin/mnist-cpu ./mnist.ggml ${samples} ) 2>&1 | tee -a $OUT/${ci}-mnist.log
+
+    set +e
+}
+
+function gg_sum_mnist {
+    gg_printf '### %s\n\n' "${ci}"
+
+    gg_printf 'MNIST\n'
+    gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
+    gg_printf '```\n'
+    gg_printf '%s\n' "$(cat $OUT/${ci}-mnist.log)"
+    gg_printf '```\n'
+}
+
+# whisper
+
+function gg_run_whisper {
+    cd ${SRC}
+
+    gg_wget models-mnt/whisper/ https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+    gg_wget models-mnt/whisper/ https://github.com/ggerganov/whisper.cpp/raw/master/samples/jfk.wav
+
+    cd build-ci-release
+
+    set -e
+
+    path_models="../models-mnt/whisper/"
+    model_f16="${path_models}/ggml-base.en.bin"
+    audio_0="${path_models}/jfk.wav"
+
+    (time ./bin/whisper -m ${model_f16} -f ${audio_0} 2>&1 | tee -a $OUT/${ci}-main.log) || true
+
+    set +e
+}
+
+function gg_sum_whisper {
+    gg_printf '### %s\n\n' "${ci}"
+
+    gg_printf 'Runs short Whisper transcription\n'
+    gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
+    gg_printf '```\n'
+    gg_printf '%s\n' "$(cat $OUT/${ci}-main.log)"
+    gg_printf '```\n'
+}
+
 # mpt
 
 function gg_run_mpt {
@@ -201,39 +265,6 @@ function gg_sum_mpt {
     gg_printf '```\n'
 }
 
-# mnist
-
-function gg_run_mnist {
-    cd ${SRC}
-
-    cd build-ci-release
-
-    set -e
-
-    mkdir -p models/mnist
-    python3 ../examples/mnist/convert-h5-to-ggml.py ../examples/mnist/models/mnist/mnist_model.state_dict
-
-    model_f32="./models/mnist/ggml-model-f32.bin"
-    samples="../examples/mnist/models/mnist/t10k-images.idx3-ubyte"
-
-    # first command runs and exports "mnist.ggml", the second command runs the exported model
-
-    (time ./bin/mnist     ${model_f32} ${samples} ) 2>&1 | tee -a $OUT/${ci}-mnist.log
-    (time ./bin/mnist-cpu ./mnist.ggml ${samples} ) 2>&1 | tee -a $OUT/${ci}-mnist.log
-
-    set +e
-}
-
-function gg_sum_mnist {
-    gg_printf '### %s\n\n' "${ci}"
-
-    gg_printf 'MNIST\n'
-    gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
-    gg_printf '```\n'
-    gg_printf '%s\n' "$(cat $OUT/${ci}-mnist.log)"
-    gg_printf '```\n'
-}
-
 ## main
 
 if [ -z $GG_BUILD_LOW_PERF ]; then
@@ -252,6 +283,7 @@ test $ret -eq 0 && gg_run ctest_debug
 test $ret -eq 0 && gg_run ctest_release
 test $ret -eq 0 && gg_run gpt_2
 test $ret -eq 0 && gg_run mnist
+test $ret -eq 0 && gg_run whisper
 
 if [ -z $GG_BUILD_LOW_PERF ]; then
     test $ret -eq 0 && gg_run mpt

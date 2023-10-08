@@ -13,7 +13,7 @@
 
 #define MAX_NARGS 2
 
-float frand() {
+float frand(void) {
     return (float)rand()/(float)RAND_MAX;
 }
 
@@ -163,10 +163,6 @@ bool check_mat_mul(
         const struct ggml_tensor * y,
         const struct ggml_tensor * x0,
         const struct ggml_tensor * x1) {
-    float * dst  = (float *) y->data;
-    float * src0 = (float *) x0->data;
-    float * src1 = (float *) x1->data;
-
     const int64_t n00 = x0->ne[0];
     const int64_t n10 = x0->ne[1];
     const int64_t n20 = x0->ne[2];

@@ -243,7 +243,7 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
             // Convert token from utf-8
             std::wstring word_multibytes = convert_to_wstring(word);
             word.resize(word_multibytes.size());
-            for (int w = 0; w < word_multibytes.size(); w++) {
+            for (size_t w = 0; w < word_multibytes.size(); w++) {
                 word[w] = uint8_t(word_multibytes[w]);
             }
 
@@ -465,6 +465,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
     const int n_head  = hparams.n_heads;
     const int n_vocab = hparams.n_vocab;
     const int n_ctx   = hparams.n_ctx;
+    const float eps   = 1e-5f;
 
     static size_t buf_size = 256u * 1024 * 1024;
     static void * buf = malloc(buf_size);
@@ -513,7 +514,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
 
         // a = self.ln_1(x)
         {
-            cur = ggml_norm(ctx0, inpL);
+            cur = ggml_norm(ctx0, inpL, eps);
 
             cur = ggml_mul(ctx0, ggml_repeat(ctx0, model.layers[il].norm_1_weight, cur), cur);
         }
@@ -609,7 +610,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
 
         // m = self.ln_2(x)
         {
-            cur = ggml_norm(ctx0, inpL);
+            cur = ggml_norm(ctx0, inpL, eps);
 
             cur = ggml_mul(ctx0, ggml_repeat(ctx0, model.layers[il].norm_2_weight, cur), cur);
         }
@@ -635,7 +636,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
 
     // norm
     {
-        inpL = ggml_norm(ctx0, inpL);
+        inpL = ggml_norm(ctx0, inpL, eps);
         // inpL = ln_f_g*inpL
         inpL = ggml_mul(ctx0, ggml_repeat(ctx0, model.norm_f_weight, inpL), inpL);
     }
