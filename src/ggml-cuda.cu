@@ -6489,13 +6489,13 @@ inline void ggml_cuda_op_alibi(
     (void) src1_dd;
 }
 
-inline void ggml_cuda_op_conv2d_stage_0(
+inline void ggml_cuda_op_im2col(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
     const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
 
-    GGML_ASSERT(src0->type == GGML_TYPE_F16);
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
-    GGML_ASSERT( dst->type == GGML_TYPE_F16);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
 
     const int32_t s0 = ((const int32_t*)(dst->op_params))[0];
     const int32_t s1 = ((const int32_t*)(dst->op_params))[1];
@@ -7241,12 +7241,8 @@ static void ggml_cuda_alibi(const ggml_tensor * src0, const ggml_tensor * src1, 
     ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_alibi);
 }
 
-void ggml_cuda_conv2d_stage_0(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
-    ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_conv2d_stage_0);
-}
-
-void ggml_cuda_conv2d_stage_1(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
-    ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_conv2d_stage_1);
+void ggml_cuda_im2col(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+    ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_im2col);
 }
 
 static void ggml_cuda_nop(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
@@ -7610,11 +7606,8 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
         case GGML_OP_ALIBI:
             func = ggml_cuda_alibi;
             break;
-        case GGML_OP_CONV_2D_STAGE_0:
-            func = ggml_cuda_conv2d_stage_0;
-            break;
-        case GGML_OP_CONV_2D_STAGE_1:
-            func = ggml_cuda_conv2d_stage_1;
+        case GGML_OP_IM2COL:
+            func = ggml_cuda_im2col;
             break;
         default:
             return false;
