@@ -6422,7 +6422,10 @@ struct ggml_tensor * ggml_mul_mat(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * b) {
-    GGML_ASSERT(ggml_can_mul_mat(a, b));
+    // hack to admit GEMM custom multiplication
+    bool special_case0 = (a->ne[0] * a->ne[1] * a->ne[2]) == b->ne[0];
+    bool special_case1 = (a->ne[0] * a->ne[1]) == b->ne[0];
+    GGML_ASSERT(ggml_can_mul_mat(a, b) || special_case0 || special_case1);
     GGML_ASSERT(!ggml_is_transposed(a));
 
     bool is_node = false;
@@ -6431,7 +6434,11 @@ struct ggml_tensor * ggml_mul_mat(
         is_node = true;
     }
 
-    const int64_t ne[4] = { a->ne[1], b->ne[1], b->ne[2], b->ne[3] };
+    const int64_t ne[4] = {
+        special_case0 || special_case1 ? b->ne[1] : a->ne[1],
+        special_case1 ? a->ne[2] : b->ne[special_case0 ? 2 : 1],
+        special_case0 ? a->ne[3] : b->ne[2],
+        special_case1 ? 1 : b->ne[3]  };
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, MAX(a->n_dims, b->n_dims), ne);
 
     result->op   = GGML_OP_MUL_MAT;
@@ -7487,8 +7494,8 @@ GGML_API struct ggml_tensor * ggml_conv_1d(
         int                   s0,
         int                   p0,
         int                   d0) {
-    struct ggml_tensor * result = ggml_im2col(ctx, a, b, s0, 0, p0, 0, d0, 0, false);
-    result = ggml_mul_mat(ctx, a, result);
+    struct ggml_tensor * result = ggml_im2col(ctx, a, b, s0, 0, p0, 0, d0, 0, false); // [N, OH, OW, IC * KH * KW]
+    result = ggml_mul_mat(ctx, a, result); // [N, OC, OL] = [OC, IC * K] x [N*OL, IC * K]
     return result;
 }
 
@@ -7610,18 +7617,17 @@ static struct ggml_tensor * ggml_im2col(
         is_node = true;
     }
 
-    const int64_t OH = ggml_calc_conv_output_size(b->ne[1], a->ne[1], s1, p1, d1);
+    const int64_t OH = is_2D ? ggml_calc_conv_output_size(b->ne[1], a->ne[1], s1, p1, d1) : 0;
     const int64_t OW = ggml_calc_conv_output_size(b->ne[0], a->ne[0], s0, p0, d0);
 
     const int64_t ne[4] = {
-        is_2D ? a->ne[2] * a->ne[1] * a->ne[0] : a->ne[1] * a->ne[0],
-        is_2D ? OW : OH,
+        is_2D ? (a->ne[2] * a->ne[1] * a->ne[0]) : a->ne[1] * a->ne[0],
+        OW,
         is_2D ? OH : b->ne[2],
         is_2D ? b->ne[3] : 1,
     };
 
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F16, 4, ne);
-
     int32_t params[] = { s0, s1, p0, p1, d0, d1, (is_2D ? 1 : 0) };
     ggml_set_op_params(result, params, sizeof(params));
 
@@ -7649,10 +7655,8 @@ struct ggml_tensor * ggml_conv_2d(
     int                  d1) {
 
     struct ggml_tensor * result = ggml_im2col(ctx, a, b, s0, s1, p0, p1, d0, d1, true); // [N, OH, OW, IC * KH * KW]
-    result = ggml_mul_mat(ctx, a, result);
-
+    result = ggml_mul_mat(ctx, a, result); // [N, OC, OH, OW] = [OC, IC * KH * KW] x [N*OH*OW, IC * KH * KW]
     return result;
-
 }
 
 // ggml_conv_2d_sk_p0
@@ -11930,28 +11934,23 @@ static void ggml_compute_forward_mul_mat_f16_f32(
     GGML_ASSERT(nb10 == sizeof(ggml_fp16_t));
     GGML_ASSERT(nb0  == sizeof(float));
 
-    const int N = ne13;
-    const int OH = ne12;
-    const int OW = ne11;
-
-    const int OC = ne03;
-    const int IC = ne02;
-    const int KH = ne01;
-    const int KW = ne00;
+    bool case_conv_2d = (ne00 * ne01 * ne02) == ne10;
 
     const int ith = params->ith;
     const int nth = params->nth;
 
-    int64_t m = OC;
-    int64_t n = OH * OW;
-    int64_t k = IC * KH * KW;
+    int64_t m = case_conv_2d ? ne03 : ne02;
+    int64_t n = (case_conv_2d ? ne12 : 1) * ne11;
+    int64_t k = (case_conv_2d ? ne02 : 1) * ne01 * ne00;
 
     // [N, OC, OH, OW] = [OC, IC * KH * KW] x [N*OH*OW, IC * KH * KW]
+    int64_t N = case_conv_2d ? ne13 : ne12;
     for (int i = 0; i < N; i++) {
         ggml_fp16_t * A = (ggml_fp16_t *)src0->data; // [m, k]
         ggml_fp16_t * B = (ggml_fp16_t *)src1->data + i * m * k; // [n, k]
         float * C = (float *)dst->data + i * m * n; // [m, n]
-            // does not seem to make a difference
+
+        // does not seem to make a difference
         int64_t m0, m1, n0, n1;
         // patches per thread
         if (m > n) {
