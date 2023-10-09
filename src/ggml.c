@@ -14329,7 +14329,7 @@ static void ggml_compute_forward_im2col_f16(
     const int32_t p1 = ((const int32_t*)(dst->op_params))[3];
     const int32_t d0 = ((const int32_t*)(dst->op_params))[4];
     const int32_t d1 = ((const int32_t*)(dst->op_params))[5];
-    const bool is_2D = ((const int32_t*)(dst->op_params))[5] == 1;
+    const bool is_2D = ((const int32_t*)(dst->op_params))[6] == 1;
 
     const int ith = params->ith;
     const int nth = params->nth;

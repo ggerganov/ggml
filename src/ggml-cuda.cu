@@ -6503,6 +6503,7 @@ inline void ggml_cuda_op_im2col(
     const int32_t p1 = ((const int32_t*)(dst->op_params))[3];
     const int32_t d0 = ((const int32_t*)(dst->op_params))[4];
     const int32_t d1 = ((const int32_t*)(dst->op_params))[5];
+    const bool is_2D = ((const int32_t*)(dst->op_params))[6] == 1;
 
     const int64_t N = src1->ne[3];
     const int64_t IC = src1->ne[2];
@@ -6510,6 +6511,7 @@ inline void ggml_cuda_op_im2col(
     const int64_t IW = src1->ne[0];
 
     const int64_t OC = src0->ne[3];
+
     // const int64_t IC = ne02;
     const int64_t KH = src0->ne[1];
     const int64_t KW = src0->ne[0];
