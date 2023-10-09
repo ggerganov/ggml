@@ -105,6 +105,19 @@ The inference speeds that I get for the different models on my 32GB MacBook M1 P
 
 For more information, checkout the corresponding programs in the [examples](examples) folder.
 
+## Using Metal (only with GPT-2)
+
+For GPT-2 models, offloading to GPU is possible. Note that it will not improve inference performances but will reduce power consumption and free up the CPU for other tasks.
+
+To enable GPU offloading on MacOS:
+
+```bash
+cmake -DGGML_METAL=ON -DBUILD_SHARED_LIBS=Off ..
+
+# add -ngl 1
+./bin/gpt-2 -t 4 -ngl 100 -m models/gpt-2-117M/ggml-model.bin -p "This is an example"
+```
+
 ## Using cuBLAS
 
 ```bash
