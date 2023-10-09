@@ -244,7 +244,10 @@
     do { \
         if (!(x)) { \
             fprintf(stderr, "GGML_ASSERT: %s:%d: %s\n", __FILE__, __LINE__, #x); \
-            abort(); \
+            fflush(stderr); \
+            fflush(stdout); \
+            ggml_print_backtrace(); \
+            exit(1); \
         } \
     } while (0)
 
@@ -560,7 +563,7 @@ extern "C" {
         struct ggml_tensor * grads[GGML_MAX_NODES];
         struct ggml_tensor * leafs[GGML_MAX_NODES];
 
-        void * visited_hash_table[GGML_GRAPH_HASHTABLE_SIZE];
+        const struct ggml_tensor * visited_hash_table[GGML_GRAPH_HASHTABLE_SIZE];
 
         enum ggml_cgraph_eval_order order;
 
@@ -615,6 +618,8 @@ extern "C" {
     GGML_API int64_t ggml_time_us(void);
     GGML_API int64_t ggml_cycles(void);
     GGML_API int64_t ggml_cycles_per_ms(void);
+
+    GGML_API void    ggml_print_backtrace(void);
 
     GGML_API void    ggml_numa_init(void); // call once for better performance on NUMA systems
     GGML_API bool    ggml_is_numa(void); // true if init detected that system has >1 NUMA node

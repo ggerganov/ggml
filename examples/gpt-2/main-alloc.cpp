@@ -1,14 +1,5 @@
 #include "ggml/ggml.h"
 #include "ggml/ggml-alloc.h"
-#include "ggml/ggml-backend.h"
-
-#ifdef GGML_USE_CUBLAS
-#include "ggml-cuda.h"
-#endif
-
-#ifdef GGML_USE_METAL
-#include "ggml-metal.h"
-#endif
 
 #include "common.h"
 #include "common-ggml.h"
@@ -25,13 +16,6 @@
 #if defined(_MSC_VER)
 #pragma warning(disable: 4244 4267) // possible loss of data
 #endif
-
-static void ggml_log_callback_default(ggml_log_level level, const char * text, void * user_data) {
-    (void) level;
-    (void) user_data;
-    fputs(text, stderr);
-    fflush(stderr);
-}
 
 // default hparams (GPT-2 117M)
 struct gpt2_hparams {
@@ -86,55 +70,11 @@ struct gpt2_model {
 
     //
     struct ggml_context * ctx;
-
-    std::vector<ggml_backend_t> backends;
-    std::vector<ggml_backend_buffer_t> buffers_w;
-    ggml_backend_buffer_t buffer_kv;
-    ggml_backend_buffer_t buffer_input;
-
     std::map<std::string, struct ggml_tensor *> tensors;
-
-    // inputs/constants
-    struct ggml_tensor * embd;
-    struct ggml_tensor * position;
-    struct ggml_tensor * KQ_scale;
 };
 
-void init_backends(gpt2_model & model, const gpt_params & params) {
-    ggml_backend_t gpu_backend = NULL;
-
-    // initialize the backends
-#ifdef GGML_USE_CUBLAS
-    if (params.n_gpu_layers > 0) {
-        fprintf(stderr, "%s: using CUDA backend\n", __func__);
-        gpu_backend = ggml_backend_cuda_init();
-        if (!gpu_backend) {
-            fprintf(stderr, "%s: ggml_backend_cuda_init() failed\n", __func__);
-        }
-    }
-#endif
-
-#ifdef GGML_USE_METAL
-    if (params.n_gpu_layers > 0) {
-        fprintf(stderr, "%s: using Metal backend\n", __func__);
-        ggml_metal_log_set_callback(ggml_log_callback_default, nullptr);
-        gpu_backend = ggml_backend_metal_init();
-        if (gpu_backend) {
-            fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
-        }
-    }
-#endif
-
-    if (gpu_backend) {
-        model.backends.push_back(gpu_backend);
-    }
-
-    // always add the CPU backend as a fallback
-    model.backends.push_back(ggml_backend_cpu_init());
-}
-
 // load the model's weights from a file
-bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & vocab, const gpt_params & params) {
+bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & vocab) {
     printf("%s: loading model from '%s'\n", __func__, fname.c_str());
 
     auto fin = std::ifstream(fname, std::ios::binary);
@@ -215,13 +155,56 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
     auto & ctx = model.ctx;
 
+    size_t ctx_size = 0;
+
+    {
+        const auto & hparams = model.hparams;
+
+        const int n_embd  = hparams.n_embd;
+        const int n_layer = hparams.n_layer;
+        const int n_ctx   = hparams.n_ctx;
+        const int n_vocab = hparams.n_vocab;
+
+        ctx_size += n_embd*ggml_type_sizef(GGML_TYPE_F32); // ln_f_g
+        ctx_size += n_embd*ggml_type_sizef(GGML_TYPE_F32); // ln_f_b
+
+        ctx_size += n_vocab*n_embd*ggml_type_sizef(wtype);         // wte
+        ctx_size +=   n_ctx*n_embd*ggml_type_sizef(GGML_TYPE_F32); // wpe
+        ctx_size += n_vocab*n_embd*ggml_type_sizef(wtype);         // lm_head
+
+        ctx_size += n_layer*(n_embd*ggml_type_sizef(GGML_TYPE_F32)); // ln_1_g
+        ctx_size += n_layer*(n_embd*ggml_type_sizef(GGML_TYPE_F32)); // ln_1_b
+
+        ctx_size += n_layer*(n_embd*ggml_type_sizef(GGML_TYPE_F32)); // ln_2_g
+        ctx_size += n_layer*(n_embd*ggml_type_sizef(GGML_TYPE_F32)); // ln_2_b
+
+        ctx_size += n_layer*(3*n_embd*n_embd*ggml_type_sizef(wtype));         // c_attn_attn_w
+        ctx_size += n_layer*(       3*n_embd*ggml_type_sizef(GGML_TYPE_F32)); // c_attn_attn_b
+
+        ctx_size += n_layer*(n_embd*n_embd*ggml_type_sizef(wtype));           // c_attn_proj_w
+        ctx_size += n_layer*(       n_embd*ggml_type_sizef(GGML_TYPE_F32));   // c_attn_proj_b
+
+        ctx_size += n_layer*(4*n_embd*n_embd*ggml_type_sizef(wtype));         // c_mlp_fc_w
+        ctx_size += n_layer*(       4*n_embd*ggml_type_sizef(GGML_TYPE_F32)); // c_mlp_fc_b
+
+        ctx_size += n_layer*(4*n_embd*n_embd*ggml_type_sizef(wtype));         // c_mlp_proj_w
+        ctx_size += n_layer*(         n_embd*ggml_type_sizef(GGML_TYPE_F32)); // c_mlp_proj_b
+
+        ctx_size += n_ctx*n_layer*n_embd*ggml_type_sizef(GGML_TYPE_F32); // memory_k
+        ctx_size += n_ctx*n_layer*n_embd*ggml_type_sizef(GGML_TYPE_F32); // memory_v
+
+        ctx_size += (6 + 12*n_layer)*512; // object overhead
+
+        printf("%s: ggml tensor size = %d bytes\n", __func__, (int) sizeof(ggml_tensor));
+        printf("%s: ggml ctx size = %6.2f MB\n", __func__, ctx_size/(1024.0*1024.0));
+    }
+
     // create the ggml context
     {
-        size_t n_tensors = 3 /* input */ + 2 /* kv */ + 6 + 12*model.hparams.n_layer;
         struct ggml_init_params params = {
-            /*.mem_size   =*/ ggml_tensor_overhead() * n_tensors,
+            /*.mem_size   =*/ ctx_size,
             /*.mem_buffer =*/ NULL,
-            /*.no_alloc   =*/ true,
+            /*.no_alloc   =*/ false,
         };
 
         model.ctx = ggml_init(params);
@@ -231,7 +214,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         }
     }
 
-    // create tensors for the weights
+    // prepare memory for the weights
     {
         const auto & hparams = model.hparams;
 
@@ -299,69 +282,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         }
     }
 
-    // assign tensors to backends
-    init_backends(model, params);
-    ggml_backend_t backend_gpu = model.backends.front();
-    ggml_backend_t backend_cpu = model.backends.back();
-    std::map<std::string, ggml_backend_t> tensor_backends;
-    {
-        const int i_gpu_first_layer = model.hparams.n_layer - params.n_gpu_layers;
-        for (auto it : model.tensors) {
-            const std::string & name = it.first;
-            // input tensors
-            if (name == "model/wte" || name == "model/wpe") {
-                if (params.n_gpu_layers > model.hparams.n_layer) {
-                    tensor_backends[name] = backend_gpu;
-                } else {
-                    tensor_backends[name] = backend_cpu;
-                }
-            }
-            // output tensors
-            if (name == "model/ln_f/g" || name == "model/ln_f/b" || name == "model/lm_head") {
-                if (params.n_gpu_layers > 0) {
-                    tensor_backends[name] = backend_gpu;
-                } else {
-                    tensor_backends[name] = backend_cpu;
-                }
-            }
-            // layer tensors
-            if (name.substr(0, 7) == "model/h") {
-                // parse layer number
-                int layer = std::stoi(name.substr(7, 2));
-                if (layer >= i_gpu_first_layer) {
-                    tensor_backends[name] = backend_gpu;
-                } else {
-                    tensor_backends[name] = backend_cpu;
-                }
-            }
-        }
-    }
-
-    // allocate buffers
-    std::map<ggml_backend_t, std::unique_ptr<ggml_allocr, decltype(&ggml_allocr_free)>> backend_buffers;
-    for (auto backend : model.backends) {
-        // compute the size of the buffer
-        size_t size = 0;
-        for (auto it : model.tensors) {
-            if (tensor_backends[it.first] == backend) {
-                size += ggml_nbytes(it.second) + 512;
-            }
-        }
-        if (size > 0) {
-            printf("%s: %8s buffer size = %8.2f MB\n", __func__, ggml_backend_name(backend), size/1024.0/1024.0);
-            // allocate the buffer
-            ggml_backend_buffer_t buffer = ggml_backend_alloc_buffer(backend, size);
-            model.buffers_w.push_back(buffer);
-
-            // create an allocator for the buffer to allocate the tensors
-            auto alloc = std::unique_ptr<ggml_allocr, decltype(&ggml_allocr_free)>(ggml_allocr_new_from_buffer(buffer), ggml_allocr_free);
-            backend_buffers.insert(std::make_pair(backend, std::move(alloc)));
-        } else {
-            model.buffers_w.push_back(NULL);
-        }
-    }
-
-    // allocate key + value memory
+    // key + value memory
     {
         const auto & hparams = model.hparams;
 
@@ -375,30 +296,9 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         model.memory_k = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_elements);
         model.memory_v = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_elements);
 
-        ggml_set_name(model.memory_k, "model/memory_k");
-        ggml_set_name(model.memory_v, "model/memory_v");
-
         const size_t memory_size = ggml_nbytes(model.memory_k) + ggml_nbytes(model.memory_v);
 
         printf("%s: memory size = %8.2f MB, n_mem = %d\n", __func__, memory_size/1024.0/1024.0, n_mem);
-
-        // create a backend buffer (can be in host or device memory)
-        ggml_backend_t backend_kv = params.n_gpu_layers >= hparams.n_layer/2 ? backend_gpu : backend_cpu;
-        printf("%s: backend_kv = %s\n", __func__, ggml_backend_name(backend_kv));
-        model.buffer_kv = ggml_backend_alloc_buffer(backend_kv, memory_size + 512*2);
-
-        // allocate the tensors into the backend buffer
-        {
-            ggml_allocr * alloc = ggml_allocr_new_from_buffer(model.buffer_kv);
-
-            // this updates the pointers in the tensors to point to the correct location in the buffer
-            // this is necessary since the ggml_context is .no_alloc == true
-            // note that the buffer can actually be a device buffer, depending on the backend
-            ggml_allocr_alloc(alloc, model.memory_k);
-            ggml_allocr_alloc(alloc, model.memory_v);
-
-            ggml_allocr_free(alloc);
-        }
     }
 
     // load weights
@@ -406,8 +306,6 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         size_t total_size = 0;
 
         bool has_lm_head = false;
-
-        std::vector<char> read_buf;
 
         while (true) {
             int32_t n_dims;
@@ -438,7 +336,6 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             }
 
             auto tensor = model.tensors[name];
-            ggml_set_name(tensor, name.c_str());
             if (ggml_nelements(tensor) != nelements) {
                 fprintf(stderr, "%s: tensor '%s' has wrong size in model file\n", __func__, name.c_str());
                 return false;
@@ -463,32 +360,11 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
                 return false;
             }
 
-            // allocate the tensor
-            ggml_backend_t backend = tensor_backends[name];
-            ggml_allocr * alloc = backend_buffers.find(backend)->second.get();
-            ggml_allocr_alloc(alloc, tensor);
-            //printf("%s: [%5.5s] %s\n", __func__, ggml_backend_name(backend), name.c_str());
-
-            if (ggml_backend_is_cpu(backend)
-#ifdef GGML_USE_METAL
-                || ggml_backend_is_metal(backend)
-#endif
-                ) {
-                // for the CPU and Metal backend, we can read directly into the tensor
-                fin.read(reinterpret_cast<char *>(tensor->data), ggml_nbytes(tensor));
-            } else {
-                // read into a temporary buffer first, then copy to device memory
-                read_buf.resize(ggml_nbytes(tensor));
-                fin.read(read_buf.data(), ggml_nbytes(tensor));
-                ggml_backend_tensor_set(tensor, read_buf.data(), 0, ggml_nbytes(tensor));
-            }
+            fin.read(reinterpret_cast<char *>(tensor->data), ggml_nbytes(tensor));
 
             // GPT-2 models share the WTE tensor as the LM head
             if (name == "model/wte" && has_lm_head == false) {
-                ggml_allocr_alloc(backend_buffers.find(tensor_backends["model/lm_head"])->second.get(), model.lm_head);
-                //printf("%s: [%5.5s] %s (copied)\n", __func__, ggml_backend_name(tensor_backends["model/lm_head"]), "model/lm_head");
-                ggml_backend_tensor_copy(tensor, model.lm_head);
-                total_size += ggml_nbytes(model.lm_head);
+                memcpy(model.lm_head->data, tensor->data, ggml_nbytes(tensor));
             }
 
             if (name == "model/lm_head") {
@@ -497,40 +373,11 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
             total_size += ggml_nbytes(tensor);
         }
+
         printf("%s: model size  = %8.2f MB\n", __func__, total_size/1024.0/1024.0);
     }
 
     fin.close();
-
-    // allocate input tensors
-    {
-        model.embd = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, model.hparams.n_ctx);
-        model.position = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, model.hparams.n_ctx);
-        model.KQ_scale = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 1); // FIXME: should be in backend_kv, but also shouldn't matter
-
-        ggml_set_name(model.embd, "in/embd");
-        ggml_set_name(model.position, "in/position");
-        ggml_set_name(model.KQ_scale, "KQ_scale");
-
-        // add input tensors to cpu backend
-        size_t input_size = ggml_nbytes(model.embd) + ggml_nbytes(model.position) + ggml_nbytes(model.KQ_scale);
-
-        // FIXME: use cpu backend after sched impl
-        ggml_backend_t backend_input = params.n_gpu_layers >= model.hparams.n_layer ? backend_gpu : backend_cpu;
-        model.buffer_input = ggml_backend_alloc_buffer(backend_input, input_size + 512*3);
-        printf("%s: backend_in = %s (%zu bytes)\n", __func__, ggml_backend_name(backend_input), input_size);
-
-        // allocate the tensors into the backend buffer
-        ggml_allocr * alloc = ggml_allocr_new_from_buffer(model.buffer_input);
-        ggml_allocr_alloc(alloc, model.embd);
-        ggml_allocr_alloc(alloc, model.position);
-        ggml_allocr_alloc(alloc, model.KQ_scale);
-        ggml_allocr_free(alloc);
-
-        // initialize KQ_scale
-        float s = 1.0f/sqrtf(float(model.hparams.n_embd)/model.hparams.n_head);
-        ggml_backend_tensor_set(model.KQ_scale, &s, 0, sizeof(s));
-    }
 
     return true;
 }
@@ -538,6 +385,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 // build the computation graph
 struct ggml_cgraph * gpt2_graph(
         const gpt2_model & model,
+        struct ggml_allocr * allocr,
         const int n_past,
         const std::vector<gpt_vocab::id> & embd_inp) {
     const int N = embd_inp.size();
@@ -563,36 +411,33 @@ struct ggml_cgraph * gpt2_graph(
 
     struct ggml_cgraph  * gf = ggml_new_graph(ctx0);
 
-    struct ggml_tensor * embd = ggml_view_1d(ctx0, model.embd, N, 0);
+    struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
+    ggml_allocr_alloc(allocr, embd);
 
-    // TODO: avoid writing to tensors if we are only measuring the memory usage
-    // not critical, just a minor optimization
+    // avoid writing to tensors if we are only measuring the memory usage
+    if (!ggml_allocr_is_measure(allocr)) {
+        memcpy(embd->data, embd_inp.data(), N*ggml_element_size(embd));
+    }
 
-    //if (!ggml_allocr_is_measure(allocr)) {
-        //ggml_backend_tensor_set(embd, embd_inp.data(), 0, N*ggml_element_size(embd));
-        ggml_backend_tensor_set(model.embd, embd_inp.data(), 0, N*ggml_element_size(embd)); // FIXME: cannot use the view here because it's not initialized yet (buffer not set), but we should
-    //}
-    //memcpy(embd->data, embd_inp.data(), N*ggml_element_size(embd));
-
-    struct ggml_tensor * position = ggml_view_1d(ctx0, model.position, N, 0);
-    //if (!ggml_allocr_is_measure(allocr)) {
+    struct ggml_tensor * position = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
+    ggml_allocr_alloc(allocr, position);
+    if (!ggml_allocr_is_measure(allocr)) {
         for (int i = 0; i < N; ++i) {
-            int32_t v = n_past + i;
-            ggml_backend_tensor_set(model.position, &v, i*sizeof(int32_t), sizeof(v)); // FIXME: same
-            //((int32_t *) position->data)[i] = n_past + i;
+            ((int32_t *) position->data)[i] = n_past + i;
         }
-    //}
+    }
 
-    struct ggml_tensor * KQ_scale = model.KQ_scale;
+    struct ggml_tensor * KQ_scale = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, 1);
+    ggml_allocr_alloc(allocr, KQ_scale);
+    if (!ggml_allocr_is_measure(allocr)) {
+        ggml_set_f32(KQ_scale, 1.0f/sqrtf(float(n_embd)/n_head));
+    }
 
     // wte + wpe
     struct ggml_tensor * inpL =
         ggml_add(ctx0,
                 ggml_get_rows(ctx0, model.wte, embd),
                 ggml_get_rows(ctx0, model.wpe, position));
-    ggml_set_name(inpL, "inpL");
-    ggml_set_name(inpL->src[0], "wte");
-    ggml_set_name(inpL->src[1], "wpe");
 
     for (int il = 0; il < n_layer; ++il) {
         struct ggml_tensor * cur;
@@ -601,17 +446,14 @@ struct ggml_cgraph * gpt2_graph(
         {
             // [ 768, N]
             cur = ggml_norm(ctx0, inpL, hparams.eps);
-            ggml_format_name(cur, "l%d.norm", il);
 
             // cur = ln_1_g*cur + ln_1_b
             // [ 768, N]
             cur = ggml_add(ctx0,
                     ggml_mul(ctx0,
-                        cur,
-                        model.layers[il].ln_1_g),
-                    model.layers[il].ln_1_b);
-            ggml_format_name(cur, "l%d.ln_1_b", il);
-            ggml_format_name(cur->src[0], "l%d.ln_1_g", il);
+                        ggml_repeat(ctx0, model.layers[il].ln_1_g, cur),
+                        cur),
+                    ggml_repeat(ctx0, model.layers[il].ln_1_b, cur));
         }
 
         // attn
@@ -626,12 +468,10 @@ struct ggml_cgraph * gpt2_graph(
             cur = ggml_mul_mat(ctx0,
                     model.layers[il].c_attn_attn_w,
                     cur);
-            ggml_format_name(cur, "l%d.attn_w", il);
 
             cur = ggml_add(ctx0,
-                    cur,
-                    model.layers[il].c_attn_attn_b);
-            ggml_format_name(cur, "l%d.attn_b", il);
+                    ggml_repeat(ctx0, model.layers[il].c_attn_attn_b, cur),
+                    cur);
         }
 
         // self-attention
@@ -639,10 +479,6 @@ struct ggml_cgraph * gpt2_graph(
             struct ggml_tensor * Qcur = ggml_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 0*sizeof(float)*n_embd);
             struct ggml_tensor * Kcur = ggml_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 1*sizeof(float)*n_embd);
             struct ggml_tensor * Vcur = ggml_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 2*sizeof(float)*n_embd);
-
-            ggml_format_name(Qcur, "l%d.Qcur", il);
-            ggml_format_name(Kcur, "l%d.Kcur", il);
-            ggml_format_name(Vcur, "l%d.Vcur", il);
 
             // store key and value to memory
             if (N >= 1) {
@@ -661,7 +497,6 @@ struct ggml_cgraph * gpt2_graph(
                             Qcur,
                             ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_embd/n_head, n_head, N)),
                         0, 2, 1, 3);
-            ggml_format_name(Q, "l%d.Q", il);
 
             // K = Kmem.view(n_embd/n_head, n_head, n_past + N).permute(0, 2, 1, 3)
             // [64, n_past + N, 12]
@@ -671,7 +506,6 @@ struct ggml_cgraph * gpt2_graph(
                             ggml_view_1d(ctx0, model.memory_k, (n_past + N)*n_embd, il*n_ctx*ggml_element_size(model.memory_k)*n_embd),
                             n_embd/n_head, n_head, n_past + N),
                         0, 2, 1, 3);
-            ggml_format_name(K, "l%d.K", il);
 
             // GG: flash attention
             //struct ggml_tensor * V =
@@ -688,7 +522,6 @@ struct ggml_cgraph * gpt2_graph(
             // K * Q
             // [n_past + N, N, 12]
             struct ggml_tensor * KQ = ggml_mul_mat(ctx0, K, Q);
-            ggml_format_name(KQ, "l%d.KQ", il);
 
             // KQ_scaled = KQ / sqrt(n_embd/n_head)
             // [n_past + N, N, 12]
@@ -696,17 +529,14 @@ struct ggml_cgraph * gpt2_graph(
                 ggml_scale(ctx0,
                         KQ,
                         KQ_scale);
-            ggml_format_name(KQ_scaled, "l%d.KQ_scaled", il);
 
             // KQ_masked = mask_past(KQ_scaled)
             // [n_past + N, N, 12]
             struct ggml_tensor * KQ_masked = ggml_diag_mask_inf(ctx0, KQ_scaled, n_past);
-            ggml_format_name(KQ_masked, "l%d.KQ_masked", il);
 
             // KQ = soft_max(KQ_masked)
             // [n_past + N, N, 12]
             struct ggml_tensor * KQ_soft_max = ggml_soft_max(ctx0, KQ_masked);
-            ggml_format_name(KQ_soft_max, "l%d.KQ_soft_max", il);
 
             // V_trans = Vmem.view(n_embd/n_head, n_head, n_past + N).permute(1, 2, 0, 3).contiguous()
             // [n_past + N, 64, 12]
@@ -718,24 +548,20 @@ struct ggml_cgraph * gpt2_graph(
                                 n_embd/n_head, n_head, n_past + N),
                             1, 2, 0, 3),
                         ggml_new_tensor_3d(ctx0, model.memory_v->type, n_past + N, n_embd/n_head, n_head));
-            ggml_format_name(V_trans, "l%d.V_trans", il);
 
             // KQV = transpose(V) * KQ_soft_max
             // [64, N, 12]
             struct ggml_tensor * KQV = ggml_mul_mat(ctx0, V_trans, KQ_soft_max);
-            ggml_format_name(KQV, "l%d.KQV", il);
 
             // KQV_merged = KQV.permute(0, 2, 1, 3)
             // [64, 12, N]
             struct ggml_tensor * KQV_merged = ggml_permute(ctx0, KQV, 0, 2, 1, 3);
-            ggml_format_name(KQV_merged, "l%d.KQV_merged", il);
 
             // cur = KQV_merged.contiguous().view(n_embd, N)
             // [768, N]
             cur = ggml_cpy(ctx0,
                     KQV_merged,
                     ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_embd, N));
-            ggml_format_name(cur, "l%d.KQV_merged_contiguous", il);
         }
 
         // projection
@@ -750,17 +576,14 @@ struct ggml_cgraph * gpt2_graph(
             cur = ggml_mul_mat(ctx0,
                     model.layers[il].c_attn_proj_w,
                     cur);
-            ggml_format_name(cur, "l%d.attn_proj_w", il);
 
             cur = ggml_add(ctx0,
-                    cur,
-                    model.layers[il].c_attn_proj_b);
-            ggml_format_name(cur, "l%d.attn_proj_b", il);
+                    ggml_repeat(ctx0, model.layers[il].c_attn_proj_b, cur),
+                    cur);
         }
 
         // add the input
         cur = ggml_add(ctx0, cur, inpL);
-        ggml_format_name(cur, "l%d.add", il);
 
         struct ggml_tensor * inpFF = cur;
 
@@ -769,17 +592,14 @@ struct ggml_cgraph * gpt2_graph(
             // norm
             {
                 cur = ggml_norm(ctx0, inpFF, hparams.eps);
-                ggml_format_name(cur, "l%d.FFnorm", il);
 
                 // cur = ln_2_g*cur + ln_2_b
                 // [ 768, N]
                 cur = ggml_add(ctx0,
                         ggml_mul(ctx0,
-                            cur,
-                            model.layers[il].ln_2_g),
-                        model.layers[il].ln_2_b);
-                ggml_format_name(cur, "l%d.ln_2_b", il);
-                ggml_format_name(cur->src[0], "l%d.ln_2_g", il);
+                            ggml_repeat(ctx0, model.layers[il].ln_2_g, cur),
+                            cur),
+                        ggml_repeat(ctx0, model.layers[il].ln_2_b, cur));
             }
 
             // fully connected
@@ -793,17 +613,14 @@ struct ggml_cgraph * gpt2_graph(
             cur = ggml_mul_mat(ctx0,
                     model.layers[il].c_mlp_fc_w,
                     cur);
-            ggml_format_name(cur, "l%d.mlp_fc_w", il);
 
             cur = ggml_add(ctx0,
-                    cur,
-                    model.layers[il].c_mlp_fc_b);
-            ggml_format_name(cur, "l%d.mlp_fc_b", il);
+                    ggml_repeat(ctx0, model.layers[il].c_mlp_fc_b, cur),
+                    cur);
 
             // GELU activation
             // [3072, N]
             cur = ggml_gelu(ctx0, cur);
-            ggml_format_name(cur, "l%d.gelu", il);
 
             // projection
             // [ 768, 3072] - model.layers[il].c_mlp_proj_w
@@ -816,41 +633,34 @@ struct ggml_cgraph * gpt2_graph(
             cur = ggml_mul_mat(ctx0,
                     model.layers[il].c_mlp_proj_w,
                     cur);
-            ggml_format_name(cur, "l%d.mlp_proj_w", il);
 
             cur = ggml_add(ctx0,
-                    cur,
-                    model.layers[il].c_mlp_proj_b);
-            ggml_format_name(cur, "l%d.mlp_proj_b", il);
+                    ggml_repeat(ctx0, model.layers[il].c_mlp_proj_b, cur),
+                    cur);
         }
 
         // input for next layer
         inpL = ggml_add(ctx0, cur, inpFF);
-        ggml_format_name(inpL, "l%d.add2", il);
     }
 
     // norm
     {
         // [ 768, N]
         inpL = ggml_norm(ctx0, inpL, hparams.eps);
-        ggml_format_name(inpL, "out_norm");
 
         // inpL = ln_f_g*inpL + ln_f_b
         // [ 768, N]
         inpL = ggml_add(ctx0,
                 ggml_mul(ctx0,
-                    inpL,
-                    model.ln_f_g),
-                model.ln_f_b);
-        ggml_format_name(inpL, "out_ln_f_b");
-        ggml_format_name(inpL->src[0], "out_ln_f_g");
+                    ggml_repeat(ctx0, model.ln_f_g, inpL),
+                    inpL),
+                ggml_repeat(ctx0, model.ln_f_b, inpL));
     }
 
     // inpL = WTE * inpL
     // [ 768, 50257] - model.lm_head
     // [ 768, N]     - inpL
     inpL = ggml_mul_mat(ctx0, model.lm_head, inpL);
-    ggml_format_name(inpL, "out_lm_head");
 
     // logits -> probs
     //inpL = ggml_soft_max(ctx0, inpL);
@@ -873,7 +683,7 @@ struct ggml_cgraph * gpt2_graph(
 //
 bool gpt2_eval(
         const gpt2_model & model,
-        ggml_backend_sched_t sched,
+        struct ggml_allocr * allocr,
         const int n_threads,
         const int n_past,
         const std::vector<gpt_vocab::id> & embd_inp,
@@ -884,23 +694,20 @@ bool gpt2_eval(
 
     const int n_vocab = hparams.n_vocab;
 
-    struct ggml_cgraph * gf = gpt2_graph(model, n_past, embd_inp);
+    // reset the allocator to free all the memory allocated during the previous inference
+    ggml_allocr_reset(allocr);
+
+    struct ggml_cgraph * gf = gpt2_graph(model, allocr, n_past, embd_inp);
 
     // allocate tensors
+    ggml_allocr_alloc_graph(allocr, gf);
 
     // run the computation
-#if 0
-    ggml_backend_t backend = model.backends.front();
-    if (ggml_backend_is_cpu(backend)) {
-        ggml_backend_cpu_set_n_threads(backend, n_threads);
-    }
-#ifdef GGML_USE_METAL
-    if (ggml_backend_is_metal(backend)) {
-        ggml_backend_metal_set_n_cb(backend, n_threads);
-    }
-#endif
-#endif
-    ggml_backend_sched_graph_compute(sched, gf);
+    struct ggml_cplan plan = ggml_graph_plan(gf, n_threads);
+    static std::vector<uint8_t> work_buffer;
+    work_buffer.resize(plan.work_size);
+    plan.work_data = work_buffer.data();
+    ggml_graph_compute(gf, &plan);
 
     //if (n_past%100 == 0) {
     //    ggml_graph_print   (&gf);
@@ -911,11 +718,11 @@ bool gpt2_eval(
     struct ggml_tensor * inpL = gf->nodes[gf->n_nodes - 1];
 
     //embd_w.resize(n_vocab*N);
-    //ggml_backend_tensor_get(inpL, embd_w.data(), 0, sizeof(float)*n_vocab*N);
+    //memcpy(embd_w.data(), ggml_get_data(inpL), sizeof(float)*n_vocab*N);
 
     // return result just for the last token
     embd_w.resize(n_vocab);
-    ggml_backend_tensor_get(inpL, embd_w.data(), (n_vocab*(N-1))*sizeof(float), sizeof(float)*n_vocab);
+    memcpy(embd_w.data(), (float *) ggml_get_data(inpL) + (n_vocab*(N-1)), sizeof(float)*n_vocab);
 
     return true;
 }
@@ -952,7 +759,7 @@ int main(int argc, char ** argv) {
     {
         const int64_t t_start_us = ggml_time_us();
 
-        if (!gpt2_model_load(params.model, model, vocab, params)) {
+        if (!gpt2_model_load(params.model, model, vocab)) {
             fprintf(stderr, "%s: failed to load model from '%s'\n", __func__, params.model.c_str());
             return 1;
         }
@@ -962,34 +769,28 @@ int main(int argc, char ** argv) {
         test_gpt_tokenizer(vocab, params.token_test);
     }
 
-    // create the backend scheduler
-    // the scheduler handles the allocation of the compute buffers and the scheduling of the computation between the different backends
-    ggml_backend_sched_t sched;
+    // keep this buffer alive while evaluating the model
+    std::vector<uint8_t> compute_buffer;
+
+    struct ggml_allocr * allocr = NULL;
+    // allocate the compute buffer
     {
-        // initialize the scheduler
-        sched = ggml_backend_sched_new(model.backends.data(), model.backends.size());
+        allocr = ggml_allocr_new_measure(GGML_MEM_ALIGN);
 
         // create the worst case graph for memory usage estimation
         int n_tokens = std::min(model.hparams.n_ctx, params.n_batch);
         int n_past = model.hparams.n_ctx - n_tokens;
-        struct ggml_cgraph * gf = gpt2_graph(model, n_past, std::vector<gpt_vocab::id>(n_tokens, 0));
-
-        ggml_backend_sched_init_measure(sched, gf);
-
+        struct ggml_cgraph * gf = gpt2_graph(model, allocr, n_past, std::vector<gpt_vocab::id>(n_tokens, 0));
 
         // compute the required memory
-        size_t mem_size = 0;
-        for (size_t i = 0; i < model.backends.size(); i++) {
-            ggml_backend_buffer_t buf = ggml_backend_sched_get_buffer(sched, model.backends[i]);
-            size_t size = ggml_backend_buffer_get_size(buf);
-            if (size > 0) {
-                mem_size += size;
-                printf("%s: %8s compute buffer size = %8.2f MB\n", __func__, ggml_backend_name(model.backends[i]), size/1024.0/1024.0);
-                //printf("%s: %8s compute buffer size = %zu bytes\n", __func__, ggml_backend_name(model.backends[i]), size);
-            }
-        }
+        size_t mem_size = ggml_allocr_alloc_graph(allocr, gf) + GGML_MEM_ALIGN;
 
-        printf("%s: total compute buffer size: %.2f MB\n", __func__, mem_size/1024.0/1024.0);
+        // recreate the allocator with the required memory
+        ggml_allocr_free(allocr);
+        compute_buffer.resize(mem_size);
+        allocr = ggml_allocr_new(compute_buffer.data(), mem_size, GGML_MEM_ALIGN);
+
+        fprintf(stderr, "%s: compute buffer size: %.2f MB\n", __func__, mem_size/1024.0/1024.0);
     }
 
     int n_past = 0;
@@ -1020,7 +821,7 @@ int main(int argc, char ** argv) {
         if (embd.size() > 0) {
             const int64_t t_start_us = ggml_time_us();
 
-            if (!gpt2_eval(model, sched, params.n_threads, n_past, embd, logits)) {
+            if (!gpt2_eval(model, allocr, params.n_threads, n_past, embd, logits)) {
                 printf("Failed to predict\n");
                 return 1;
             }
@@ -1086,15 +887,6 @@ int main(int argc, char ** argv) {
     }
 
     ggml_free(model.ctx);
-
-    ggml_backend_sched_free(sched);
-    ggml_backend_buffer_free(model.buffer_kv);
-    for (auto & buf : model.buffers_w) {
-        ggml_backend_buffer_free(buf);
-    }
-    for (auto backend : model.backends) {
-        ggml_backend_free(backend);
-    }
 
     return 0;
 }

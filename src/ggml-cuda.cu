@@ -79,6 +79,7 @@
 
 #include "ggml-cuda.h"
 #include "ggml.h"
+#include "ggml-backend-impl.h"
 
 #define MIN_CC_DP4A   610 // minimum compute capability for __dp4a, an intrinsic for byte-wise dot products
 #define CC_VOLTA      700
@@ -7640,10 +7641,13 @@ static struct ggml_backend_buffer_i cuda_backend_buffer_interface = {
 };
 
 static ggml_backend_buffer_t ggml_backend_cuda_alloc_buffer(ggml_backend_t backend, size_t size) {
-    ggml_cuda_set_device(g_main_device);
-
     ggml_backend_buffer_context_cuda * ctx = new ggml_backend_buffer_context_cuda;
+
+    size = std::max(size, (size_t)1); // cudaMalloc returns null for size 0
+
+    ggml_cuda_set_device(g_main_device);
     CUDA_CHECK(cudaMalloc(&ctx->device, size));
+
     return ggml_backend_buffer_init(backend, cuda_backend_buffer_interface, ctx, size);
 }
 

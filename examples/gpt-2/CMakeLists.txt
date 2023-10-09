@@ -1,7 +1,19 @@
 #
 # gpt-2
 
-set(TEST_TARGET gpt-2)
+set(TEST_TARGET gpt-2-ctx)
+add_executable(${TEST_TARGET} main-ctx.cpp)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml common common-ggml)
+
+set(TEST_TARGET gpt-2-alloc)
+add_executable(${TEST_TARGET} main-alloc.cpp)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml common common-ggml)
+
+set(TEST_TARGET gpt-2-backend)
+add_executable(${TEST_TARGET} main-backend.cpp)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml common common-ggml)
+
+set(TEST_TARGET gpt-2-backend2)
 add_executable(${TEST_TARGET} main.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml common common-ggml)
 

@@ -1,5 +1,6 @@
 #import "ggml-metal.h"
 
+#import "ggml-backend-impl.h"
 #import "ggml.h"
 
 #import <Foundation/Foundation.h>
