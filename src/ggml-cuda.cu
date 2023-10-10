@@ -7678,6 +7678,24 @@ static void ggml_backend_cuda_synchronize(ggml_backend_t backend) {
     UNUSED(backend);
 }
 
+static void ggml_backend_cuda_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data) {
+    GGML_ASSERT(tensor->buffer == NULL);
+
+    ggml_tensor_extra_gpu* extra = nullptr;
+    if (tensor->extra) {
+        extra = (ggml_tensor_extra_gpu *) extra;
+        GGML_ASSERT(tensor->backend == GGML_BACKEND_GPU);
+    }
+    else {
+        ggml_tensor_extra_gpu* extra = ggml_cuda_alloc_temp_tensor_extra();
+        tensor->backend = GGML_BACKEND_GPU;
+        tensor->extra = extra;
+    }
+
+    tensor->data = data;
+    extra->data_device[g_main_device] = tensor->data;
+}
+
 static ggml_backend_graph_plan_t ggml_backend_cuda_graph_plan_create(ggml_backend_t backend, ggml_cgraph * cgraph) {
     GGML_ASSERT(!"not implemented");
 
@@ -7758,6 +7776,7 @@ static ggml_backend_i cuda_backend_i = {
     /* .set_tensor_async    = */ ggml_backend_cuda_set_tensor_async,
     /* .get_tensor_async    = */ ggml_backend_cuda_get_tensor_async,
     /* .synchronize         = */ ggml_backend_cuda_synchronize,
+    /* .set_tensor_external_data = */ ggml_backend_cuda_set_tensor_external_data,
     /* .cpy_tensor_from     = */ nullptr,
     /* .cpy_tensor_to       = */ nullptr,
     /* .graph_plan_create   = */ ggml_backend_cuda_graph_plan_create,
