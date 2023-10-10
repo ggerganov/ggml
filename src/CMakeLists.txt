@@ -196,7 +196,11 @@ endif()
 if (GGML_CUBLAS)
     cmake_minimum_required(VERSION 3.17)
 
-    find_package(CUDAToolkit)
+    if (NOT CUDAToolkit_FOUND)
+        # only find package if not already found by an external source
+        find_package(CUDAToolkit)
+    endif()
+
     if (CUDAToolkit_FOUND)
         message(STATUS "cuBLAS found")
 
