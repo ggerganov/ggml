@@ -11696,9 +11696,7 @@ static bool ggml_compute_forward_mul_mat_use_blas(
 }
 #endif
 
-// legacy multiplication matrix just float 32 data type
-
-static void ggml_compute_forward_mul_mat_f32_f32(
+static void ggml_compute_forward_mul_mat_x(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
@@ -12006,16 +12004,10 @@ static void ggml_compute_forward_mul_mat(
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
               struct ggml_tensor * dst) {
-    GGML_ASSERT(
-        src0->type == GGML_TYPE_F32 && src1->type == GGML_TYPE_F32 ||
-        src0->type == GGML_TYPE_F16 && src1->type == GGML_TYPE_F16);
-    GGML_ASSERT(dst->type == GGML_TYPE_F32);
-    if(src0->type == GGML_TYPE_F32) {
-        // full precision
-        ggml_compute_forward_mul_mat_f32_f32(params, src0, src1, dst);
-    } else {
-        // reduce memory usage
+    if(src0->type == GGML_TYPE_F16 && src1->type == GGML_TYPE_F16 && dst->type == GGML_TYPE_F32) {
         ggml_compute_forward_mul_mat_f16_f32(params, src0, src1, dst);
+    } else {
+        ggml_compute_forward_mul_mat_x(params, src0, src1, dst);
     }
 }
 
