@@ -2,7 +2,7 @@
 #include "ggml/ggml-alloc.h"
 #include "ggml/ggml-backend.h"
 
-//#define GGML_USE_CUBLAS
+#define GGML_USE_CUBLAS
 
 #ifdef GGML_USE_CUBLAS
 #include "ggml-cuda.h"
@@ -199,7 +199,7 @@ int main(void)
     ggml_time_init();
 
     test_model model;
-    load_model(model, false);
+    load_model(model, true);
 
     ggml_backend_buffer_t buf_compute; // for compute
     struct ggml_allocr * allocr = NULL;

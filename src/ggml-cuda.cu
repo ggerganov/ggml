@@ -4597,13 +4597,13 @@ static __global__ void gemm_f16_f32(const half  *x,const half  *y, float *dst, i
     }
 }
 
-static  __global__ void im2col_f32_f16(const float* x, half* dst, int nb12, int nb13, int IW,int IH,int CHW,int s0,int s1,int p0,int p1,int d0,int d1) {
+static  __global__ void im2col_f32_f16(const float* x, half* dst, int ofs0, int ofs1, int IW,int IH,int CHW,int s0,int s1,int p0,int p1,int d0,int d1) {
     int iiw = blockIdx.z * s0 + threadIdx.z * d0 - p0;
 	int iih = blockIdx.y * s1 + threadIdx.y * d1 - p1;
     __syncthreads();
     if (!(iih < 0 || iih >= IH || iiw < 0 || iiw >= IW)) {
         int offset_dst = (threadIdx.x * gridDim.y * gridDim.z + blockIdx.y * gridDim.z + blockIdx.z) * CHW;
-        int offset_src = threadIdx.x * nb13 +  blockIdx.x * nb12;
+        int offset_src = threadIdx.x * ofs0 +  blockIdx.x * ofs1;
         dst[offset_dst + (blockIdx.x * (blockDim.y * blockDim.z) + threadIdx.y * blockDim.z + threadIdx.z)] = __float2half(x[offset_src + iih * IW + iiw]);
     }
 }
@@ -5557,32 +5557,22 @@ static void soft_max_f32_cuda(const float * x, float * dst, const int ncols_x, c
 }
 
 static void im2col_f32_f16_cuda(const float* x, half* dst,
-    int OC, int OH,
-    int IW, int IH,
+    int OH, int IW, int IH,
     int OW, int IC,
-    int KH, int KW, int N,
+    int KH, int KW, int N, int ofs0, int ofs1,
     int s0,int s1,int p0,int p1,int d0,int d1, cudaStream_t stream) {
-
-    int nb11 = IW;
-    int nb12 = nb11 * IH;
-    int nb13 = nb12 * IC;
-
-    int CHW = IC * KH * KW;
     dim3 block_nums(IC, OH, OW);
     dim3 block_dims(N, KH, KW);
-    im2col_f32_f16<<<block_nums, block_dims, 0, stream>>>(x, dst, nb12, nb13, IW, IH, CHW, s0, s1, p0, p1, d0, d1);
+    im2col_f32_f16<<<block_nums, block_dims, 0, stream>>>(x, dst, ofs0, ofs1, IW, IH, (IC * KH * KW), s0, s1, p0, p1, d0, d1);
 }
 
 // GEMM
-static void gemm_f16_f32_cuda(const half* x,const half* y, float* dst, int OC, int OH, int OW,int IC, int KH, int KW, int N, cudaStream_t stream) {
-        int m = OC;
-        int n = OH * OW;
-        int k = IC * KH * KW;
-        for(int i = 0; i < N; i++) {
-            dim3 block_dims(16, 16);
-            dim3 block_nums((n + block_dims.x - 1) / block_dims.x, (m + block_dims.y - 1) / block_dims.y);
-            gemm_f16_f32<<<block_nums, block_dims, 0, stream>>>(x, y + i * m * k, dst + i * m * n, m, k, n);
-        }
+static void gemm_f16_f32_cuda(const half* x,const half* y, float* dst, int m, int n, int k, int N, cudaStream_t stream) {
+    for(int i = 0; i < N; i++) {
+        dim3 block_dims(16, 16);
+        dim3 block_nums((n + block_dims.x - 1) / block_dims.x, (m + block_dims.y - 1) / block_dims.y);
+        gemm_f16_f32<<<block_nums, block_dims, 0, stream>>>(x, y + i * m * k, dst + i * m * n, m, k, n);
+    }
 }
 
 // buffer pool for cuda
@@ -6493,9 +6483,9 @@ inline void ggml_cuda_op_im2col(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
     const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
 
-    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT(src0->type == GGML_TYPE_F16);
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
-    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F16);
 
     const int32_t s0 = ((const int32_t*)(dst->op_params))[0];
     const int32_t s1 = ((const int32_t*)(dst->op_params))[1];
@@ -6503,30 +6493,32 @@ inline void ggml_cuda_op_im2col(
     const int32_t p1 = ((const int32_t*)(dst->op_params))[3];
     const int32_t d0 = ((const int32_t*)(dst->op_params))[4];
     const int32_t d1 = ((const int32_t*)(dst->op_params))[5];
+
     const bool is_2D = ((const int32_t*)(dst->op_params))[6] == 1;
 
-    const int64_t N = src1->ne[3];
-    const int64_t IC = src1->ne[2];
-    const int64_t IH = src1->ne[1];
+    const int64_t N = src1->ne[is_2D ? 3 : 2];
+    const int64_t IC = src1->ne[is_2D ? 2 : 1];
+    const int64_t IH = is_2D ? src1->ne[1] : 1;
     const int64_t IW = src1->ne[0];
 
-    const int64_t OC = src0->ne[3];
-
-    // const int64_t IC = ne02;
-    const int64_t KH = src0->ne[1];
+    const int64_t KH = is_2D ? src0->ne[1] : 1;
     const int64_t KW = src0->ne[0];
 
-    const int64_t OH = dst->ne[2];
+    const int64_t OH = is_2D ? dst->ne[2] : 1;
     const int64_t OW = dst->ne[1];
 
+
     im2col_f32_f16_cuda(src1_dd, (half*) dst_dd,
-        OC, OH, IW, IH, OW, IC, KH, KW, N, s0, s1, p0, p1, d0, d1, main_stream);
+        OH, IW, IH, OW, IC, KH, KW, N,
+        src1->nb[is_2D ? 3 : 2] / 4, // nb is byte offset, src is type float32
+        src1->nb[is_2D ? 2 : 1] / 4, // nb is byte offset, src is type float32
+        s0, s1, p0, p1, d0, d1, main_stream);
 
     (void) src0;
     (void) src0_dd;
 }
 
-inline void ggml_cuda_op_conv2d_stage_1(
+inline void ggml_cuda_op_mul_mat_gemm_f16(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
     const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
 
@@ -6534,18 +6526,16 @@ inline void ggml_cuda_op_conv2d_stage_1(
     GGML_ASSERT(src1->type == GGML_TYPE_F16);
     GGML_ASSERT( dst->type == GGML_TYPE_F32);
 
-    const int N = src1->ne[3];
-    const int OH = src1->ne[2];
-    const int OW = src1->ne[1];
+    bool case_conv_2d = (src0->ne[0] * src0->ne[1] * src0->ne[2]) == src1->ne[0];
 
-    const int OC = src0->ne[3];
-    const int IC = src0->ne[2];
-    const int KH = src0->ne[1];
-    const int KW = src0->ne[0];
+    int m = src0->ne[case_conv_2d ? 3 : 2];
+    int n = (case_conv_2d ? src1->ne[2] : 1) * src1->ne[1];
+    int k = (case_conv_2d ? src0->ne[2] : 1) * src0->ne[1] *  src0->ne[0];
+    int N = src1->ne[case_conv_2d ? 3 : 2];
 
     gemm_f16_f32_cuda(
         (const half*)src0_dd, (const half*)src1_dd,
-        dst_dd, OC, OH, OW, IC, KH, KW, N, main_stream);
+        dst_dd, m, n, k, N, main_stream);
 }
 
 inline void ggml_cuda_op_diag_mask_inf(
@@ -7135,7 +7125,9 @@ static void ggml_cuda_mul_mat(const ggml_tensor * src0, const ggml_tensor * src1
         }
     }
 
-    if (all_on_device && src0->type == GGML_TYPE_F16 && ggml_is_permuted(src0) && ggml_is_permuted(src1) && src1->ne[1] == 1) {
+    if(src0->type == GGML_TYPE_F16 && src1->type == GGML_TYPE_F16 && dst->type == GGML_TYPE_F32) {
+        ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_mul_mat_gemm_f16);
+    } else if (all_on_device && src0->type == GGML_TYPE_F16 && ggml_is_permuted(src0) && ggml_is_permuted(src1) && src1->ne[1] == 1) {
         ggml_cuda_mul_mat_vec_p021(src0, src1, dst);
     } else if (all_on_device && !ggml_is_contiguous(src0) && ggml_is_contiguous(src1) && src1->ne[1] == 1) {
         ggml_cuda_mul_mat_vec_nc(src0, src1, dst);

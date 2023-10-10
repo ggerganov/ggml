@@ -11944,7 +11944,7 @@ static void ggml_compute_forward_mul_mat_f16_f32(
     int64_t k = (case_conv_2d ? ne02 : 1) * ne01 * ne00;
     int64_t N = case_conv_2d ? ne13 : ne12;
 
-    // [N, OC, OH, OW] = [OC, IC * KH * KW] x [N*OH*OW, IC * KH * KW]
+    // GEMM
     for (int i = 0; i < N; i++) {
         ggml_fp16_t * A = (ggml_fp16_t *)src0->data; // [m, k]
         ggml_fp16_t * B = (ggml_fp16_t *)src1->data + i * m * k; // [n, k]
@@ -11987,7 +11987,6 @@ static void ggml_compute_forward_mul_mat_f16_f32(
 
         for (int j = n0; j < n1; j+=blck_n) {
             for (int i = m0; i < m1; i+=blck_m) {
-                // printf("i j k => %d %d %d\n", i, j, K);
                 for (int ii = i; ii < i + blck_m && ii < m1; ii++) {
                     for (int jj = j; jj < j + blck_n && jj < n1; jj++) {
                         ggml_vec_dot_f16(k,
