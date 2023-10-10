@@ -154,16 +154,19 @@ struct ggml_cgraph * build_graph(const test_model& model, struct ggml_allocr * a
     int d0 = 1;
     int d1 = 1;
 
-    struct ggml_tensor* result = ggml_conv_2d(ctx0, model.a, model.b, s0, s1, p0, p1, d0, d1);
-
-    ggml_build_forward_expand(gf, result);
+    // split conv2d in fundamental methods for test unit
+    struct ggml_tensor* im2col_res = ggml_im2col(ctx0, model.a, model.b, s0, s1, p0, p1, d0, d1, true);
+    ggml_set_name(im2col_res, "im2col_res");
+    struct ggml_tensor* conv2d_res = ggml_mul_mat(ctx0, model.a, im2col_res);
+    ggml_set_name(conv2d_res, "conv2d_res");
+    ggml_build_forward_expand(gf, conv2d_res);
 
     // delete the temporally context used to build the graph
     ggml_free(ctx0);
     return gf;
 }
 
-struct ggml_tensor* compute(const test_model & model, struct ggml_allocr * allocr) {
+struct ggml_cgraph * compute_graph(const test_model & model, struct ggml_allocr * allocr) {
     // reset the allocator to free all the memory allocated during the previous inference
     ggml_allocr_reset(allocr);
 
@@ -188,7 +191,7 @@ struct ggml_tensor* compute(const test_model & model, struct ggml_allocr * alloc
     //ggml_graph_print(gf);
 
     // in this case, the output tensor is the last one in the graph
-    return gf->nodes[gf->n_nodes - 1];
+    return gf;
 }
 
 int main(void)
@@ -196,7 +199,7 @@ int main(void)
     ggml_time_init();
 
     test_model model;
-    load_model(model, true);
+    load_model(model, false);
 
     ggml_backend_buffer_t buf_compute; // for compute
     struct ggml_allocr * allocr = NULL;
@@ -216,15 +219,29 @@ int main(void)
         fprintf(stderr, "%s: compute buffer size: %.2f MB\n", __func__, mem_size/1024.0f/1024.0f);
     }
 
-    struct ggml_tensor * result = compute(model, allocr);
+    struct ggml_cgraph * gf_res = compute_graph(model, allocr);
 
-    float* out_data = new float[ggml_nelements(result)];
+    struct ggml_tensor * im2col_res = NULL;
+    struct ggml_tensor * conv2d_res = NULL;
 
-    ggml_backend_tensor_get(result, out_data, 0, ggml_nbytes(result));
+    for(int i = 0; i < gf_res->n_nodes; i++) {
+        if(strcmp(ggml_get_name(gf_res->nodes[i]), "im2col_res") == 0) {
+            im2col_res = gf_res->nodes[i];
+        } else if(strcmp(ggml_get_name(gf_res->nodes[i]), "conv2d_res") == 0) {
+            conv2d_res = gf_res->nodes[i];
+        }
+    }
 
-    const int n_test = 64;
+    ggml_fp16_t* im2col_data = new ggml_fp16_t[ggml_nelements(im2col_res)];
+    float* conv2d_data = new float[ggml_nelements(conv2d_res)];
 
-    float expected [n_test] = {
+    ggml_backend_tensor_get(im2col_res, im2col_data, 0, ggml_nbytes(im2col_res));
+    ggml_backend_tensor_get(conv2d_res, conv2d_data, 0, ggml_nbytes(conv2d_res));
+
+    const int n_conv2d_test = 64;
+    const int n_im2col_test = 576;
+
+    float expected_conv2d [n_conv2d_test] = {
         32.00f, 48.00f, 48.00f, 32.00f, 48.00f, 72.00f,
         72.00f, 48.00f, 48.00f, 72.00f, 72.00f, 48.00f,
         32.00f, 48.00f, 48.00f, 32.00f, 32.00f, 48.00f,
@@ -237,15 +254,40 @@ int main(void)
         72.00f, 48.00f, 48.00f, 72.00f, 72.00f, 48.00f,
         32.00f, 48.00f, 48.00f, 32.00f };
 
+    ggml_fp16_t expected_im2col[n_conv2d_test] = {
+        0, 0, 0, 0, 15360, 15360, 0, 15360,
+        15360, 0, 0, 0, 0, 15360, 15360, 0,
+        15360, 15360, 0, 0, 0, 0, 15360,
+        15360, 0, 15360, 15360, 0, 0, 0, 0,
+        15360, 15360, 0, 15360, 15360, 0, 0, 0,
+        15360, 15360, 15360, 15360, 15360, 15360,
+        0, 0, 0, 15360, 15360, 15360, 15360, 15360,
+        15360, 0, 0, 0, 15360, 15360, 15360, 15360,
+        15360, 15360, 0
+    };
+
+    printf("\nPerforming test:\n");
+
     bool passed = true;
-    for(int i = 0; i < n_test; i++) {
-        if(out_data[i] != expected[i]) {
+    for(int i = 0; i < n_conv2d_test; i++) {
+        if(
+            im2col_data[i] != expected_im2col[i]) {
             passed = false;
             break;
         }
     }
 
-    printf("ggml_conv2d (%i): %s", ggml_nelements(result), passed && (ggml_nelements(result) == n_test) ? "PASS" : "FAILED");
+    printf("ggml_im2col (%i): %s\n", ggml_nelements(im2col_res), passed && (ggml_nelements(im2col_res) == n_im2col_test) ? "PASS" : "FAILED");
+
+    passed = true;
+    for(int i = 0; i < n_conv2d_test; i++) {
+        if(conv2d_data[i] != expected_conv2d[i]) {
+            passed = false;
+            break;
+        }
+    }
+
+    printf("ggml_conv2d (%i): %s\n", ggml_nelements(conv2d_res), passed && (ggml_nelements(conv2d_res) == n_conv2d_test) ? "PASS" : "FAILED");
     ggml_free(model.ctx);
 
     ggml_backend_buffer_free(model.buffer);

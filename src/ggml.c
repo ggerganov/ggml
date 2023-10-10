@@ -6422,10 +6422,11 @@ struct ggml_tensor * ggml_mul_mat(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * b) {
-    // hack to admit GEMM custom multiplication
-    bool special_case0 = (a->ne[0] * a->ne[1] * a->ne[2]) == b->ne[0];
-    bool special_case1 = (a->ne[0] * a->ne[1]) == b->ne[0];
-    GGML_ASSERT(ggml_can_mul_mat(a, b) || special_case0 || special_case1);
+    // hack to admit GEMM custom operator
+    bool mult_mat_conv1d = (a->ne[0] * a->ne[1]) == b->ne[0];
+    bool mult_mat_conv2d = (a->ne[0] * a->ne[1] * a->ne[2]) == b->ne[0];
+
+    GGML_ASSERT(ggml_can_mul_mat(a, b) || mult_mat_conv1d || mult_mat_conv2d);
     GGML_ASSERT(!ggml_is_transposed(a));
 
     bool is_node = false;
@@ -6435,10 +6436,10 @@ struct ggml_tensor * ggml_mul_mat(
     }
 
     const int64_t ne[4] = {
-        special_case0 || special_case1 ? b->ne[1] : a->ne[1],
-        special_case1 ? a->ne[2] : b->ne[special_case0 ? 2 : 1],
-        special_case0 ? a->ne[3] : b->ne[2],
-        special_case1 ? 1 : b->ne[3]  };
+        mult_mat_conv2d || mult_mat_conv1d ? b->ne[1] : a->ne[1],
+        mult_mat_conv1d ? a->ne[2] : b->ne[mult_mat_conv2d ? 2 : 1],
+        mult_mat_conv2d ? a->ne[3] : b->ne[2],
+        mult_mat_conv1d ? 1 : b->ne[3]  };
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, MAX(a->n_dims, b->n_dims), ne);
 
     result->op   = GGML_OP_MUL_MAT;
@@ -11908,7 +11909,6 @@ static void ggml_compute_forward_mul_mat_f32_f32(
     }
 }
 
-
 // GEMM
 // TODO: compare gemm op with the current implementation of mul_mat
 
@@ -11942,9 +11942,9 @@ static void ggml_compute_forward_mul_mat_f16_f32(
     int64_t m = case_conv_2d ? ne03 : ne02;
     int64_t n = (case_conv_2d ? ne12 : 1) * ne11;
     int64_t k = (case_conv_2d ? ne02 : 1) * ne01 * ne00;
+    int64_t N = case_conv_2d ? ne13 : ne12;
 
     // [N, OC, OH, OW] = [OC, IC * KH * KW] x [N*OH*OW, IC * KH * KW]
-    int64_t N = case_conv_2d ? ne13 : ne12;
     for (int i = 0; i < N; i++) {
         ggml_fp16_t * A = (ggml_fp16_t *)src0->data; // [m, k]
         ggml_fp16_t * B = (ggml_fp16_t *)src1->data + i * m * k; // [n, k]
@@ -14021,62 +14021,6 @@ static void ggml_compute_forward_conv_1d_f32(
     }
 }
 
-// TODO: GEMM conv1d differ GEMM conv2d
-
-// gemm: [N, OC, OL] = [OC, IC * K] x [N*OL, IC * K]
-// src0: [OC, IC, K]
-// src1: [N, OL, IC * K]
-// result: [N, OC, OL]
-static void ggml_compute_forward_conv_1d_stage_1_f16(
-        const struct ggml_compute_params * params,
-        const struct ggml_tensor * src0,
-        const struct ggml_tensor * src1,
-              struct ggml_tensor * dst) {
-    GGML_ASSERT(src0->type == GGML_TYPE_F16);
-    GGML_ASSERT(src1->type == GGML_TYPE_F16);
-    GGML_ASSERT( dst->type == GGML_TYPE_F32);
-
-    int64_t t0 = ggml_perf_time_us();
-    UNUSED(t0);
-
-    if (params->type == GGML_TASK_INIT) {
-        return;
-    }
-
-    if (params->type == GGML_TASK_FINALIZE) {
-        return;
-    }
-
-    GGML_TENSOR_BINARY_OP_LOCALS;
-
-    GGML_ASSERT(nb00 == sizeof(ggml_fp16_t));
-    GGML_ASSERT(nb10 == sizeof(ggml_fp16_t));
-    GGML_ASSERT(nb0  == sizeof(float));
-
-    const int N = ne12;
-    const int OL = ne11;
-
-    const int OC = ne02;
-    const int IC = ne01;
-    const int K  = ne00;
-
-    const int ith = params->ith;
-    const int nth = params->nth;
-
-    int64_t m = OC;
-    int64_t n = OL;
-    int64_t k = IC * K;
-
-    // [N, OC, OL] = [OC, IC * K] x [N*OL, IC * K]
-    for (int i = 0; i < N; i++) {
-        ggml_fp16_t * A = (ggml_fp16_t *)src0->data; // [m, k]
-        ggml_fp16_t * B = (ggml_fp16_t *)src1->data + i * m * k; // [n, k]
-        float * C = (float *)dst->data + i * m * n; // [m, n]
-
-        //gemm_f16_out_f32(m, n, k, A, B, C, ith, nth);
-    }
-}
-
 static void ggml_compute_forward_conv_1d(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
@@ -14303,8 +14247,6 @@ static void ggml_compute_forward_conv_transpose_1d(
     }
 }
 
-// ggml_compute_forward_conv_2d
-
 // src0: kernel [OC, IC, KH, KW]
 // src1: image [N, IC, IH, IW]
 // dst:  result [N, OH, OW, IC*KH*KW]
@@ -14332,98 +14274,53 @@ static void ggml_compute_forward_im2col_f16(
 
     const int ith = params->ith;
     const int nth = params->nth;
+    const int64_t N = is_2D ? ne13 : ne12;
+    const int64_t IC = is_2D ? ne12 : ne11;
+    const int64_t IH = is_2D ? ne11 : 1;
+    const int64_t IW = ne10;
 
-    if(is_2D) {
-        const int64_t N = ne13;
-        const int64_t IC = ne12;
-        const int64_t IH = ne11;
-        const int64_t IW = ne10;
+    const int64_t KH = is_2D ? ne01 : 1;
+    const int64_t KW = ne00;
 
-        // const int64_t OC = ne03;
-        // const int64_t IC = ne02;
-        const int64_t KH = ne01;
-        const int64_t KW = ne00;
+    const int64_t OH = is_2D ? ne2 : 1;
+    const int64_t OW = ne1;
 
-        const int64_t OH = ne2;
-        const int64_t OW = ne1;
+    int ofs0 = is_2D ? nb13 : nb12;
+    int ofs1 = is_2D ? nb12 : nb11;
 
-        GGML_ASSERT(nb00 == sizeof(ggml_fp16_t));
-        GGML_ASSERT(nb10 == sizeof(float));
+    GGML_ASSERT(nb00 == sizeof(ggml_fp16_t));
+    GGML_ASSERT(nb10 == sizeof(float));
 
-        if (params->type == GGML_TASK_INIT) {
-            memset(dst->data, 0, ggml_nbytes(dst));
-            return;
-        }
+    if (params->type == GGML_TASK_INIT) {
+        memset(dst->data, 0, ggml_nbytes(dst));
+        return;
+    }
 
-        if (params->type == GGML_TASK_FINALIZE) {
-            return;
-        }
+    if (params->type == GGML_TASK_FINALIZE) {
+        return;
+    }
 
-        // im2col: [N, IC, IH, IW] => [N, OH, OW, IC*KH*KW]
-        {
-            ggml_fp16_t * const wdata = (ggml_fp16_t *) dst->data;
+    // im2col: [N, IC, IH, IW] => [N, OH, OW, IC*KH*KW]
+    {
+        ggml_fp16_t * const wdata = (ggml_fp16_t *) dst->data;
 
-            for (int64_t in = 0; in < N; in++) {
-                for (int64_t ioh = 0; ioh < OH; ioh++) {
-                    for (int64_t iow = 0; iow < OW; iow++) {
-                        for (int64_t iic = ith; iic < IC; iic+=nth) {
-
-                            // micro kernel
-                            ggml_fp16_t * dst_data = wdata + (in*OH*OW + ioh*OW + iow)*(IC*KH*KW); // [IC, KH, KW]
-                            const float * const src_data = (float *)((char *) src1->data + in*nb13 + iic*nb12); // [IH, IW]
-
-                            for (int64_t ikh = 0; ikh < KH; ikh++) {
-                                for (int64_t ikw = 0; ikw < KW; ikw++) {
-                                    const int64_t iiw = iow*s0 + ikw*d0 - p0;
-                                    const int64_t iih = ioh*s1 + ikh*d1 - p1;
-
-                                    if (!(iih < 0 || iih >= IH || iiw < 0 || iiw >= IW)) {
-                                        dst_data[iic*(KH*KW) + ikh*KW + ikw] = GGML_FP32_TO_FP16(src_data[iih*IW + iiw]);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    } else {
-        const int64_t N  = ne12;
-        const int64_t IC = ne11;
-        const int64_t IL = ne10;
-
-        const int64_t K = ne00;
-
-        const int64_t OL = ne1;
-        GGML_ASSERT(nb00 == sizeof(ggml_fp16_t));
-        GGML_ASSERT(nb10 == sizeof(float));
-
-        if (params->type == GGML_TASK_INIT) {
-            memset(dst->data, 0, ggml_nbytes(dst));
-            return;
-        }
-
-        if (params->type == GGML_TASK_FINALIZE) {
-            return;
-        }
-
-        // im2col: [N, IC, IL] => [N, OL, IC*K]
-        {
-            ggml_fp16_t * const wdata = (ggml_fp16_t *) dst->data;
-
-            for (int64_t in = 0; in < N; in++) {
-                for (int64_t iol = 0; iol < OL; iol++) {
-                    for (int64_t iic = ith; iic < IC; iic+=nth) {
+        for (int64_t in = 0; in < N; in++) {
+            for (int64_t ioh = 0; ioh < OH; ioh++) { // 1
+                for (int64_t iow = 0; iow < OW; iow++) {
+                    for (int64_t iic = ith; iic < IC; iic += nth) {
 
                         // micro kernel
-                        ggml_fp16_t * dst_data = wdata + (in*OL + iol)*(IC*K); // [IC, K]
-                        const float * const src_data = (float *)((char *) src1->data + in*nb12 + iic*nb11); // [IL]
+                        ggml_fp16_t * dst_data = wdata + (in*OH*OW + ioh*OW + iow)*(IC*KH*KW); // [IC, KH, KW]
+                        const float * const src_data = (float *)((char *) src1->data + in*ofs0 + iic*ofs1); // [IH, IW]
 
-                        for (int64_t ik = 0; ik < K; ik++) {
-                            const int64_t iil = iol*s0 + ik*d0 - p0;
+                        for (int64_t ikh = 0; ikh < KH; ikh++) {  // 1
+                            for (int64_t ikw = 0; ikw < KW; ikw++) {
+                                const int64_t iiw = iow*s0 + ikw*d0 - p0;
+                                const int64_t iih = ioh*s1 + ikh*d1 - p1;
 
-                            if (!(iil < 0 || iil >= IL)) {
-                                dst_data[iic*K + ik] = GGML_FP32_TO_FP16(src_data[iil]);
+                                if (!(iih < 0 || iih >= IH || iiw < 0 || iiw >= IW)) {
+                                    dst_data[iic*(KH*KW) + ikh*KW + ikw] = GGML_FP32_TO_FP16(src_data[iih*IW + iiw]);
+                                }
                             }
                         }
                     }
