@@ -214,7 +214,7 @@
 #define GGML_QNT_VERSION_FACTOR 1000 // do not change this
 
 #define GGML_MAX_DIMS          4
-#define GGML_MAX_NODES         16384
+#define GGML_MAX_NODES         100000
 #define GGML_MAX_PARAMS        1024
 #define GGML_MAX_CONTEXTS      64
 #define GGML_MAX_SRC           6
@@ -544,7 +544,7 @@ extern "C" {
     // next prime after GGML_MAX_NODES * 2 (nodes + leafs)
     // #define GGML_GRAPH_HASHTABLE_SIZE 8273
     // #define GGML_GRAPH_HASHTABLE_SIZE 16411
-    #define GGML_GRAPH_HASHTABLE_SIZE 32771
+    #define GGML_GRAPH_HASHTABLE_SIZE 200003
 
     enum ggml_cgraph_eval_order {
         GGML_CGRAPH_EVAL_ORDER_LEFT_TO_RIGHT = 0,
