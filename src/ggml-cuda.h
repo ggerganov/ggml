@@ -45,6 +45,7 @@ GGML_API void   ggml_cuda_get_device_description(int device, char * description,
 
 // backend API
 GGML_API ggml_backend_t ggml_backend_cuda_init(void); // TODO: take a list of devices to use
+GGML_API ggml_backend_t ggml_backend_cuda_init_plugin(int main_device, void * cublas_handle, void * cuda_stream);
 
 #ifdef  __cplusplus
 }

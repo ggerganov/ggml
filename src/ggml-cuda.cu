@@ -463,6 +463,8 @@ inline cudaError_t ggml_cuda_set_device(const int device) {
     return cudaSetDevice(device);
 }
 
+static bool g_cublas_initialized = false;
+
 static int g_device_count = -1;
 static int g_main_device = 0;
 static int g_compute_capabilities[GGML_CUDA_MAX_DEVICES];
@@ -5632,9 +5634,7 @@ static void ggml_cuda_pool_free(void * ptr, size_t size) {
 
 
 void ggml_init_cublas() {
-    static bool initialized = false;
-
-    if (!initialized) {
+    if (!g_cublas_initialized) {
 
 #ifdef __HIP_PLATFORM_AMD__
         // Workaround for a rocBLAS bug when using multiple graphics cards:
@@ -5655,9 +5655,9 @@ void ggml_init_cublas() {
             g_tensor_split[id] = total_vram;
             total_vram += prop.totalGlobalMem;
 #if defined(GGML_USE_HIPBLAS) && defined(__HIP_PLATFORM_AMD__)
-            g_compute_capabilities[id] = 100*prop.major + 10*prop.minor + CC_OFFSET_AMD;
+            g_compute_capabilities[id] = 100 * prop.major + 10 * prop.minor + CC_OFFSET_AMD;
 #else
-            g_compute_capabilities[id] = 100*prop.major + 10*prop.minor;
+            g_compute_capabilities[id] = 100 * prop.major + 10 * prop.minor;
 #endif // defined(GGML_USE_HIPBLAS) && defined(__HIP_PLATFORM_AMD__)
         }
         for (int id = 0; id < g_device_count; ++id) {
@@ -5680,7 +5680,7 @@ void ggml_init_cublas() {
         // configure logging to stdout
         // CUBLAS_CHECK(cublasLoggerConfigure(1, 1, 0, nullptr));
 
-        initialized = true;
+        g_cublas_initialized = true;
     }
 }
 
@@ -7687,7 +7687,7 @@ static void ggml_backend_cuda_set_tensor_external_data(ggml_backend_t backend, s
         GGML_ASSERT(tensor->backend == GGML_BACKEND_GPU);
     }
     else {
-        ggml_tensor_extra_gpu* extra = ggml_cuda_alloc_temp_tensor_extra();
+        extra = ggml_cuda_alloc_temp_tensor_extra();
         tensor->backend = GGML_BACKEND_GPU;
         tensor->extra = extra;
     }
@@ -7797,4 +7797,32 @@ ggml_backend_t ggml_backend_cuda_init() {
     };
 
     return cuda_backend;
+}
+
+ggml_backend_t ggml_backend_cuda_init_plugin(int main_device, void * cublas_handle, void * cuda_stream) {
+    GGML_ASSERT(g_cublas_initialized == false && "currently only a single cuda backend is supported");
+
+    g_device_count = main_device + 1;
+    int id = g_main_device = main_device;
+
+    cudaDeviceProp prop;
+    CUDA_CHECK(cudaGetDeviceProperties(&prop, id));
+    fprintf(stderr, "  Device %d: %s, compute capability %d.%d\n", id, prop.name, prop.major, prop.minor);
+
+    // g_tensor_split[id] = 0;
+    g_compute_capabilities[id] = 100 * prop.major + 10 * prop.minor;
+    g_cublas_handles[id] = (cublasHandle_t)cublas_handle;
+    g_cudaStreams[id][0] = (cudaStream_t)cuda_stream;
+
+    g_cublas_initialized = true;
+
+    ggml_backend_context_cuda* ctx = new ggml_backend_context_cuda;
+
+    ggml_backend_t cuda_backend = new ggml_backend {
+        /* .interface = */ cuda_backend_i,
+        /* .context   = */ ctx
+    };
+
+    return cuda_backend;
+
 }
