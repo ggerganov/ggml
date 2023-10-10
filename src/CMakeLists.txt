@@ -253,7 +253,12 @@ if (GGML_PERF)
     set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_PERF)
 endif()
 
-add_library(${TARGET}
+if (GGML_PLUGIN)
+    set(GGML_LIB_TYPE STATIC)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
+
+add_library(${TARGET} ${GGML_LIB_TYPE}
     ggml.c
     ggml-alloc.c
     ggml-backend.c
@@ -264,6 +269,8 @@ add_library(${TARGET}
     ${GGML_OPENCL_SOURCES}
     ${GGML_METAL_SOURCES}
     )
+
+add_library(ggml::ggml ALIAS ggml)
 
 target_include_directories(${TARGET} PUBLIC
     .
@@ -278,7 +285,7 @@ else()
     target_link_libraries(${TARGET} PUBLIC m ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
-if (BUILD_SHARED_LIBS)
+if (BUILD_SHARED_LIBS AND NOT GGML_PLUGIN)
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
     target_link_libraries(${TARGET} PUBLIC
