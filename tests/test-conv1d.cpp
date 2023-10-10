@@ -2,7 +2,7 @@
 #include "ggml/ggml-alloc.h"
 #include "ggml/ggml-backend.h"
 
-#define GGML_USE_CUBLAS
+//#define GGML_USE_CUBLAS
 
 #ifdef GGML_USE_CUBLAS
 #include "ggml-cuda.h"
@@ -31,13 +31,13 @@ struct test_model {
 
 void load_model(test_model & model, bool use_gpu = false) {
     // create data
-    int K = 3, IC = 3, OC = 3;
-    int IL = 5, N = 1;
+    int K = 3, IC = 10, OC = 10;
+    int IL = 8, N = 1;
 
     // Initialize adata
     float* adata = new float[K * IC * OC];
     for (size_t i = 0; i < K * IC * OC; i++) {
-        adata[i] = 2.0f;
+        adata[i] = 4.5f;
     }
 
     // Convert adata to fp16 format
@@ -47,7 +47,7 @@ void load_model(test_model & model, bool use_gpu = false) {
     // Initialize bdata
     float* bdata =  new float[IL * IC * N];
     for (size_t i = 0; i < IL * IC * N; i++) {
-        bdata[i] = 3.0f;
+        bdata[i] = 2.5f;
     }
 
     size_t buffer_size = 0;
@@ -235,20 +235,34 @@ int main(void)
     ggml_backend_tensor_get(im2col_res, im2col_data, 0, ggml_nbytes(im2col_res));
     ggml_backend_tensor_get(conv1d_res, conv2d_data, 0, ggml_nbytes(conv1d_res));
 
-    const int n_conv1d_test = 15;
-    const int n_im2col_test = 45;
+    const int n_conv1d_test = 80;
+    const int n_im2col_test = 240;
 
     float expected_conv1d[n_conv1d_test] = {
-        36.00f, 54.00f, 54.00f, 54.00f, 36.00f, 36.00f,
-        54.00f, 54.00f, 54.00f, 36.00f, 36.00f, 54.00f,
-        54.00f, 54.00f, 36.00f
+        225.00f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 225.00f,
+        225.00f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 225.00f,
+        225.00f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 225.00f,
+        225.00f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 225.00f,
+        225.00f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 225.00f,
+        225.00f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 225.00f,
+        225.00f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 225.00f,
+        225.00f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 225.00f,
+        225.00f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 225.00f,
+        225.00f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 337.50f, 225.00f
     };
     // first im2col test
 
     ggml_fp16_t expected_im2col[n_conv1d_test] = {
-        0, 16896, 16896, 0, 16896, 16896, 0,
-        16896, 16896, 16896, 16896, 16896,
-        16896, 16896, 16896
+        0, 16640, 16640, 0, 16640, 16640, 0, 16640,
+        16640, 0, 16640, 16640, 0, 16640, 16640, 0,
+        16640, 16640, 0, 16640, 16640, 0, 16640, 16640,
+        0, 16640, 16640, 0, 16640, 16640, 16640, 16640,
+        16640, 16640, 16640, 16640, 16640, 16640, 16640, 16640,
+        16640, 16640, 16640, 16640, 16640, 16640, 16640, 16640,
+        16640, 16640, 16640, 16640, 16640, 16640, 16640, 16640,
+        16640, 16640, 16640, 16640, 16640, 16640, 16640, 16640,
+        16640, 16640, 16640, 16640, 16640, 16640, 16640, 16640,
+        16640, 16640, 16640, 16640, 16640, 16640, 16640, 16640
     };
 
     printf("\nPerforming test:\n");
@@ -262,7 +276,7 @@ int main(void)
         }
     }
 
-    printf("ggml_im2col (%i): %s\n", ggml_nelements(im2col_res), passed && (ggml_nelements(im2col_res) == n_im2col_test) ? "PASS" : "FAILED");
+    printf("ggml_im2col (%i): %s\n", ggml_nelements(im2col_res), passed && (ggml_nelements(im2col_res) == n_im2col_test) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
 
     passed = true;
     for(int i = 0; i < n_conv1d_test; i++) {
@@ -272,7 +286,7 @@ int main(void)
         }
     }
 
-    printf("ggml_conv1d (%i): %s\n", ggml_nelements(conv1d_res), passed && (ggml_nelements(conv1d_res) == n_conv1d_test) ? "PASS" : "FAILED");
+    printf("ggml_conv1d (%i): %s\n", ggml_nelements(conv1d_res), passed && (ggml_nelements(conv1d_res) == n_conv1d_test) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
     ggml_free(model.ctx);
 
     ggml_backend_buffer_free(model.buffer);
