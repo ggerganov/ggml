@@ -7694,6 +7694,8 @@ static void ggml_backend_cuda_set_tensor_external_data(ggml_backend_t backend, s
 
     tensor->data = data;
     extra->data_device[g_main_device] = tensor->data;
+
+    UNUSED(backend);
 }
 
 static ggml_backend_graph_plan_t ggml_backend_cuda_graph_plan_create(ggml_backend_t backend, ggml_cgraph * cgraph) {
@@ -7824,5 +7826,4 @@ ggml_backend_t ggml_backend_cuda_init_plugin(int main_device, void * cublas_hand
     };
 
     return cuda_backend;
-
 }
