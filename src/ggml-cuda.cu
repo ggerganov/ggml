@@ -7536,6 +7536,21 @@ static const char * ggml_backend_cuda_name(ggml_backend_t backend) {
 }
 
 static void ggml_backend_cuda_free(ggml_backend_t backend) {
+    for (int id = 0; id < GGML_CUDA_MAX_DEVICES; ++id) {
+        for (int is = 0; is < MAX_STREAMS; ++is) {
+            auto& stream = g_cudaStreams[id][is];
+            if (!stream) break;
+            cudaStreamDestroy(stream);
+            stream = nullptr;
+        }
+
+        auto& cublasHandle = g_cublas_handles[id];
+        if (!cublasHandle) continue;
+        cublasDestroy(cublasHandle);
+        cublasHandle = nullptr;
+    }
+    g_cublas_initialized = false;
+
     ggml_backend_context_cuda * cuda_ctx = (ggml_backend_context_cuda *)backend->context;
     delete cuda_ctx;
     delete backend;
