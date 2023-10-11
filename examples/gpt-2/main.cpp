@@ -562,20 +562,36 @@ struct ggml_cgraph * gpt2_graph(
 
     struct ggml_cgraph  * gf = ggml_new_graph(ctx0);
 
-    struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
-    ggml_allocr_alloc(allocr, embd);
+    struct ggml_tensor * inpL;
+    if (batch.token) {
+        struct ggml_tensor * inp_tokens = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
+        ggml_allocr_alloc(allocr, inp_tokens);
+        if (!ggml_allocr_is_measure(allocr)) {
+            memcpy(inp_tokens->data, batch.token, n_tokens*ggml_element_size(inp_tokens));
+        }
 
-    // avoid writing to tensors if we are only measuring the memory usage
-    if (!ggml_allocr_is_measure(allocr)) {
-        ggml_backend_tensor_set(embd, batch.embd, 0, n_tokens*ggml_element_size(embd));
-    }
+        struct ggml_tensor * position = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
+        ggml_allocr_alloc(allocr, position);
+        if (!ggml_allocr_is_measure(allocr)) {
+            for (int i = 0; i < n_tokens; ++i) {
+                int32_t v = batch.pos[i];
+                ggml_backend_tensor_set(position, &v, i*sizeof(int32_t), sizeof(v));
+            }
+        }
 
-    struct ggml_tensor * position = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
-    ggml_allocr_alloc(allocr, position);
-    if (!ggml_allocr_is_measure(allocr)) {
-        for (int i = 0; i < n_tokens; ++i) {
-            int32_t v = batch.pos[i];
-            ggml_backend_tensor_set(position, &v, i*sizeof(int32_t), sizeof(v));
+        // wte + wpe
+        inpL =
+            ggml_add(ctx0,
+                    ggml_get_rows(ctx0, model.wte, inp_tokens),
+                    ggml_get_rows(ctx0, model.wpe, position));
+    } else {
+        GGML_ASSERT(batch.embd);
+
+        inpL = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_embd, n_tokens);
+
+        ggml_allocr_alloc(allocr, inpL);
+        if (!ggml_allocr_is_measure(allocr)) {
+            ggml_backend_tensor_set(inpL, batch.embd, 0, n_tokens * n_embd * ggml_element_size(inpL));
         }
     }
 
@@ -609,12 +625,6 @@ struct ggml_cgraph * gpt2_graph(
             }
         }
     }
-
-    // wte + wpe
-    struct ggml_tensor * inpL =
-        ggml_add(ctx0,
-                ggml_get_rows(ctx0, model.wte, embd),
-                ggml_get_rows(ctx0, model.wpe, position));
 
     for (int il = 0; il < n_layer; ++il) {
         struct ggml_tensor * cur;
