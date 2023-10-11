@@ -2,6 +2,7 @@
 #include "ggml/ggml-alloc.h"
 #include "ggml/ggml-backend.h"
 
+
 #ifdef GGML_USE_CUBLAS
 #include "ggml-cuda.h"
 #endif
@@ -19,6 +20,7 @@
 #include <cstring>
 #include <fstream>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -32,6 +34,10 @@ static void ggml_log_callback_default(ggml_log_level level, const char * text, v
     fputs(text, stderr);
     fflush(stderr);
 }
+
+
+typedef int32_t gpt2_pos;
+typedef int32_t gpt2_seq_id;
 
 // default hparams (GPT-2 117M)
 struct gpt2_hparams {
@@ -67,6 +73,34 @@ struct gpt2_layer {
     struct ggml_tensor * c_mlp_proj_b;
 };
 
+struct gpt2_kv_cell {
+    gpt2_pos pos   = -1;
+    gpt2_pos delta = 0;
+
+    std::set<gpt2_seq_id> seq_id;
+
+    bool has_seq_id(const gpt2_seq_id & id) const {
+        return seq_id.find(id) != seq_id.end();
+    }
+};
+
+struct gpt2_kv_cache {
+    // key + value memory
+    struct ggml_tensor * k;
+    struct ggml_tensor * v;
+    //
+
+    uint32_t head = 0;
+    uint32_t size = 0;
+
+    // computed before each graph build
+    uint32_t n = 0;
+
+    std::vector<gpt2_kv_cell> cells;
+
+    ggml_backend_buffer_t buffer;
+};
+
 struct gpt2_model {
     gpt2_hparams hparams;
 
@@ -80,19 +114,35 @@ struct gpt2_model {
 
     std::vector<gpt2_layer> layers;
 
-    // key + value memory
-    struct ggml_tensor * memory_k;
-    struct ggml_tensor * memory_v;
+    gpt2_kv_cache kv_cache;
 
-    //
     struct ggml_context * ctx;
 
     ggml_backend_t backend = NULL;
 
     ggml_backend_buffer_t buffer_w;
-    ggml_backend_buffer_t buffer_kv;
 
     std::map<std::string, struct ggml_tensor *> tensors;
+};
+
+// Input data for gpt2_decode
+// A gpt2_batch object can contain input about one or many sequences
+// The provided arrays (i.e. token, embd, pos, etc.) must have size of n_tokens
+//
+// - token  : the token ids of the input (used when embd is NULL)
+// - embd   : token embeddings (i.e. float vector of size n_embd) (used when token is NULL)
+// - pos    : the positions of the respective token in the sequence
+// - seq_id : the sequence to which the respective token belongs
+// - logits : if zero, the logits for the respective token will not be output
+//
+struct gpt2_batch {
+    int32_t n_tokens = -1;
+
+    gpt_vocab::id  * token  = {};
+    float          * embd   = {};
+    gpt2_pos       * pos    = {};
+    gpt2_seq_id    * seq_id = {};
+    int8_t         * logits = {};
 };
 
 // load the model's weights from a file
@@ -349,25 +399,30 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         const int n_mem      = n_layer*n_ctx;
         const int n_elements = n_embd*n_mem;
 
-        model.memory_k = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_elements);
-        model.memory_v = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_elements);
+        model.kv_cache.k = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_elements);
+        model.kv_cache.v = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_elements);
 
-        const size_t memory_size = ggml_nbytes(model.memory_k) + ggml_nbytes(model.memory_v);
+        model.kv_cache.head      = 0;
+        model.kv_cache.size      = n_ctx;
+
+        model.kv_cache.cells.resize(n_ctx);
+
+        const size_t memory_size = ggml_nbytes(model.kv_cache.k) + ggml_nbytes(model.kv_cache.v);
 
         printf("%s: memory size = %8.2f MB, n_mem = %d\n", __func__, memory_size/1024.0/1024.0, n_mem);
 
         // create a backend buffer (can be in host or device memory)
-        model.buffer_kv = ggml_backend_alloc_buffer(model.backend, memory_size + 256);
+        model.kv_cache.buffer = ggml_backend_alloc_buffer(model.backend, memory_size + 256);
 
         // allocate the tensors into the backend buffer
         {
-            ggml_allocr * alloc = ggml_allocr_new_from_buffer(model.buffer_kv);
+            ggml_allocr * alloc = ggml_allocr_new_from_buffer(model.kv_cache.buffer);
 
             // this updates the pointers in the tensors to point to the correct location in the buffer
             // this is necessary since the ggml_context is .no_alloc == true
             // note that the buffer can actually be a device buffer, depending on the backend
-            ggml_allocr_alloc(alloc, model.memory_k);
-            ggml_allocr_alloc(alloc, model.memory_v);
+            ggml_allocr_alloc(alloc, model.kv_cache.k);
+            ggml_allocr_alloc(alloc, model.kv_cache.v);
 
             ggml_allocr_free(alloc);
         }
@@ -478,18 +533,21 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
 // build the computation graph
 struct ggml_cgraph * gpt2_graph(
-        const gpt2_model & model,
+        const  gpt2_model  & model,
         struct ggml_allocr * allocr,
-        const int n_past,
-        const std::vector<gpt_vocab::id> & embd_inp) {
-    const int N = embd_inp.size();
-
+        const  gpt2_batch  & batch) {
     const auto & hparams = model.hparams;
 
     const int n_embd  = hparams.n_embd;
     const int n_layer = hparams.n_layer;
     const int n_ctx   = hparams.n_ctx;
     const int n_head  = hparams.n_head;
+
+    const auto & kv_cache = model.kv_cache;
+
+    const int32_t n_tokens = batch.n_tokens;
+    const int32_t n_kv     = ggml_allocr_is_measure(allocr) ? n_ctx            : kv_cache.n;
+    const int32_t kv_head  = ggml_allocr_is_measure(allocr) ? n_ctx - n_tokens : kv_cache.head;
 
     // since we are using ggml-alloc, this buffer only needs enough space to hold the ggml_tensor and ggml_cgraph structs, but not the tensor data
     static size_t buf_size = ggml_tensor_overhead()*GGML_MAX_NODES + ggml_graph_overhead();
@@ -505,20 +563,36 @@ struct ggml_cgraph * gpt2_graph(
 
     struct ggml_cgraph  * gf = ggml_new_graph(ctx0);
 
-    struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
-    ggml_allocr_alloc(allocr, embd);
+    struct ggml_tensor * inpL;
+    if (batch.token) {
+        struct ggml_tensor * inp_tokens = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
+        ggml_allocr_alloc(allocr, inp_tokens);
+        if (!ggml_allocr_is_measure(allocr)) {
+            ggml_backend_tensor_set(inp_tokens, batch.token, 0, n_tokens*ggml_element_size(inp_tokens));
+        }
 
-    // avoid writing to tensors if we are only measuring the memory usage
-    if (!ggml_allocr_is_measure(allocr)) {
-        ggml_backend_tensor_set(embd, embd_inp.data(), 0, N*ggml_element_size(embd));
-    }
+        struct ggml_tensor * position = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
+        ggml_allocr_alloc(allocr, position);
+        if (!ggml_allocr_is_measure(allocr)) {
+            for (int i = 0; i < n_tokens; ++i) {
+                int32_t v = batch.pos[i];
+                ggml_backend_tensor_set(position, &v, i*sizeof(int32_t), sizeof(v));
+            }
+        }
 
-    struct ggml_tensor * position = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
-    ggml_allocr_alloc(allocr, position);
-    if (!ggml_allocr_is_measure(allocr)) {
-        for (int i = 0; i < N; ++i) {
-            int32_t v = n_past + i;
-            ggml_backend_tensor_set(position, &v, i*sizeof(int32_t), sizeof(v));
+        // wte + wpe
+        inpL =
+            ggml_add(ctx0,
+                    ggml_get_rows(ctx0, model.wte, inp_tokens),
+                    ggml_get_rows(ctx0, model.wpe, position));
+    } else {
+        GGML_ASSERT(batch.embd);
+
+        inpL = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_embd, n_tokens);
+
+        ggml_allocr_alloc(allocr, inpL);
+        if (!ggml_allocr_is_measure(allocr)) {
+            ggml_backend_tensor_set(inpL, batch.embd, 0, n_tokens * n_embd * ggml_element_size(inpL));
         }
     }
 
@@ -529,11 +603,30 @@ struct ggml_cgraph * gpt2_graph(
         ggml_backend_tensor_set(KQ_scale, &s, 0, sizeof(s));
     }
 
-    // wte + wpe
-    struct ggml_tensor * inpL =
-        ggml_add(ctx0,
-                ggml_get_rows(ctx0, model.wte, embd),
-                ggml_get_rows(ctx0, model.wpe, position));
+
+    // KQ_mask (mask for 1 head, it will be broadcasted to all heads)
+    struct ggml_tensor * KQ_mask = ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_kv, n_tokens, 1);
+    ggml_set_name(KQ_mask, "KQ_mask");
+    ggml_allocr_alloc(allocr, KQ_mask);
+    if (!ggml_allocr_is_measure(allocr)) {
+        std::vector<float> data_buf(n_kv*n_tokens);
+        const float neg_inf_v = -INFINITY;
+        for (int h = 0; h < 1; ++h) {
+            int h_offset = h*(n_kv*n_tokens);
+            for (int j = 0; j < n_tokens; ++j) {
+                const gpt2_pos    pos    = batch.pos[j];
+                const gpt2_seq_id seq_id = batch.seq_id[j];
+
+                for (int i = 0; i < n_kv; ++i) {
+                    if (!kv_cache.cells[i].has_seq_id(seq_id) || kv_cache.cells[i].pos > pos) {
+                        data_buf[h_offset + j*n_kv + i] = neg_inf_v;
+                    }
+                }
+            }
+        }
+
+        ggml_backend_tensor_set(KQ_mask, data_buf.data(), 0, data_buf.size() * sizeof(float));
+    }
 
     for (int il = 0; il < n_layer; ++il) {
         struct ggml_tensor * cur;
@@ -553,13 +646,13 @@ struct ggml_cgraph * gpt2_graph(
         }
 
         // attn
-        // [2304, 768] - model.layers[il].c_attn_attn_w
-        // [2304,   1] - model.layers[il].c_attn_attn_b
-        // [ 768,   N] - cur (in)
-        // [2304,   N] - cur (out)
+        // [2304,        768] - model.layers[il].c_attn_attn_w
+        // [2304,          1] - model.layers[il].c_attn_attn_b
+        // [ 768,   n_tokens] - cur (in)
+        // [2304,   n_tokens] - cur (out)
         //
         // cur = attn_w*cur + attn_b
-        // [2304, N]
+        // [2304, n_tokens]
         {
             cur = ggml_mul_mat(ctx0,
                     model.layers[il].c_attn_attn_w,
@@ -572,14 +665,14 @@ struct ggml_cgraph * gpt2_graph(
 
         // self-attention
         {
-            struct ggml_tensor * Qcur = ggml_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 0*sizeof(float)*n_embd);
-            struct ggml_tensor * Kcur = ggml_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 1*sizeof(float)*n_embd);
-            struct ggml_tensor * Vcur = ggml_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 2*sizeof(float)*n_embd);
+            struct ggml_tensor * Qcur = ggml_view_2d(ctx0, cur, n_embd, n_tokens, cur->nb[1], 0*sizeof(float)*n_embd);
+            struct ggml_tensor * Kcur = ggml_view_2d(ctx0, cur, n_embd, n_tokens, cur->nb[1], 1*sizeof(float)*n_embd);
+            struct ggml_tensor * Vcur = ggml_view_2d(ctx0, cur, n_embd, n_tokens, cur->nb[1], 2*sizeof(float)*n_embd);
 
             // store key and value to memory
-            if (N >= 1) {
-                struct ggml_tensor * k = ggml_view_1d(ctx0, model.memory_k, N*n_embd, (ggml_element_size(model.memory_k)*n_embd)*(il*n_ctx + n_past));
-                struct ggml_tensor * v = ggml_view_1d(ctx0, model.memory_v, N*n_embd, (ggml_element_size(model.memory_v)*n_embd)*(il*n_ctx + n_past));
+            if (n_tokens >= 1) {
+                struct ggml_tensor * k = ggml_view_1d(ctx0, model.kv_cache.k, n_tokens*n_embd, (ggml_element_size(model.kv_cache.k)*n_embd)*(il*n_ctx + kv_head));
+                struct ggml_tensor * v = ggml_view_1d(ctx0, model.kv_cache.v, n_tokens*n_embd, (ggml_element_size(model.kv_cache.v)*n_embd)*(il*n_ctx + kv_head));
 
                 ggml_build_forward_expand(gf, ggml_cpy(ctx0, Kcur, k));
                 ggml_build_forward_expand(gf, ggml_cpy(ctx0, Vcur, v));
@@ -591,16 +684,16 @@ struct ggml_cgraph * gpt2_graph(
                 ggml_permute(ctx0,
                         ggml_cpy(ctx0,
                             Qcur,
-                            ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_embd/n_head, n_head, N)),
+                            ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_embd/n_head, n_head, n_tokens)),
                         0, 2, 1, 3);
 
-            // K = Kmem.view(n_embd/n_head, n_head, n_past + N).permute(0, 2, 1, 3)
-            // [64, n_past + N, 12]
+            // K = Kmem.view(n_embd/n_head, n_head, n_kv).permute(0, 2, 1, 3)
+            // [64, n_kv, 12]
             struct ggml_tensor * K =
                 ggml_permute(ctx0,
                         ggml_reshape_3d(ctx0,
-                            ggml_view_1d(ctx0, model.memory_k, (n_past + N)*n_embd, il*n_ctx*ggml_element_size(model.memory_k)*n_embd),
-                            n_embd/n_head, n_head, n_past + N),
+                            ggml_view_1d(ctx0, model.kv_cache.k, n_kv*n_embd, il*n_ctx*ggml_element_size(model.kv_cache.k)*n_embd),
+                            n_embd/n_head, n_head, n_kv),
                         0, 2, 1, 3);
 
             // GG: flash attention
@@ -608,56 +701,56 @@ struct ggml_cgraph * gpt2_graph(
             //    ggml_cpy(ctx0,
             //            ggml_permute(ctx0,
             //                ggml_reshape_3d(ctx0,
-            //                    ggml_view_1d(ctx0, model.memory_v, (n_past + N)*n_embd, il*n_ctx*ggml_element_size(model.memory_v)*n_embd),
-            //                    n_embd/n_head, n_head, n_past + N),
+            //                    ggml_view_1d(ctx0, model.kv_cache.v, n_kv*n_embd, il*n_ctx*ggml_element_size(model.kv_cache.v)*n_embd),
+            //                    n_embd/n_head, n_head, n_kv),
             //                1, 2, 0, 3),
-            //            ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_past + N, n_embd/n_head, n_head));
+            //            ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_kv, n_embd/n_head, n_head));
 
             //struct ggml_tensor * KQV = ggml_flash_attn(ctx0, Q, K, V, true);
 
             // K * Q
-            // [n_past + N, N, 12]
+            // [n_kv, n_tokens, 12]
             struct ggml_tensor * KQ = ggml_mul_mat(ctx0, K, Q);
 
             // KQ_scaled = KQ / sqrt(n_embd/n_head)
-            // [n_past + N, N, 12]
+            // [n_kv, n_tokens, 12]
             struct ggml_tensor * KQ_scaled =
                 ggml_scale(ctx0,
                         KQ,
                         KQ_scale);
 
             // KQ_masked = mask_past(KQ_scaled)
-            // [n_past + N, N, 12]
-            struct ggml_tensor * KQ_masked = ggml_diag_mask_inf(ctx0, KQ_scaled, n_past);
+            // [n_kv, n_tokens, 12]
+            struct ggml_tensor * KQ_masked = ggml_add(ctx0, KQ_scaled, KQ_mask);
 
             // KQ = soft_max(KQ_masked)
-            // [n_past + N, N, 12]
+            // [n_kv, N, 12]
             struct ggml_tensor * KQ_soft_max = ggml_soft_max(ctx0, KQ_masked);
 
-            // V_trans = Vmem.view(n_embd/n_head, n_head, n_past + N).permute(1, 2, 0, 3).contiguous()
-            // [n_past + N, 64, 12]
+            // V_trans = Vmem.view(n_embd/n_head, n_head, n_kv).permute(1, 2, 0, 3).contiguous()
+            // [n_kv, 64, 12]
             struct ggml_tensor * V_trans =
                 ggml_cpy(ctx0,
                         ggml_permute(ctx0,
                             ggml_reshape_3d(ctx0,
-                                ggml_view_1d(ctx0, model.memory_v, (n_past + N)*n_embd, il*n_ctx*ggml_element_size(model.memory_v)*n_embd),
-                                n_embd/n_head, n_head, n_past + N),
+                                ggml_view_1d(ctx0, model.kv_cache.v, n_kv*n_embd, il*n_ctx*ggml_element_size(model.kv_cache.v)*n_embd),
+                                n_embd/n_head, n_head, n_kv),
                             1, 2, 0, 3),
-                        ggml_new_tensor_3d(ctx0, model.memory_v->type, n_past + N, n_embd/n_head, n_head));
+                        ggml_new_tensor_3d(ctx0, model.kv_cache.v->type, n_kv, n_embd/n_head, n_head));
 
             // KQV = transpose(V) * KQ_soft_max
-            // [64, N, 12]
+            // [64, n_tokens, 12]
             struct ggml_tensor * KQV = ggml_mul_mat(ctx0, V_trans, KQ_soft_max);
 
             // KQV_merged = KQV.permute(0, 2, 1, 3)
-            // [64, 12, N]
+            // [64, 12, n_tokens]
             struct ggml_tensor * KQV_merged = ggml_permute(ctx0, KQV, 0, 2, 1, 3);
 
             // cur = KQV_merged.contiguous().view(n_embd, N)
-            // [768, N]
+            // [768, n_tokens]
             cur = ggml_cpy(ctx0,
                     KQV_merged,
-                    ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_embd, N));
+                    ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_embd, n_tokens));
         }
 
         // projection
@@ -768,32 +861,151 @@ struct ggml_cgraph * gpt2_graph(
     return gf;
 }
 
-// evaluate the transformer
-//
-//   - model:     the model
-//   - allocr:    ggml_allocr to use to allocate the compute buffer
-//   - n_threads: number of threads to use
-//   - n_past:    the context size so far
-//   - embd_inp:  the embeddings of the tokens in the context
-//   - embd_w:    the predicted logits for the next token
-//
-bool gpt2_eval(
-        const gpt2_model & model,
+// find an empty slot of size "n_tokens" in the cache
+// updates the cache head
+// Note: On success, it's important that cache.head points
+// to the first cell of the slot.
+static bool gpt2_kv_cache_find_slot(
+           struct gpt2_kv_cache & cache,
+        const struct gpt2_batch & batch) {
+    const uint32_t n_ctx    = cache.size;
+    const uint32_t n_tokens = batch.n_tokens;
+
+    if (n_tokens > n_ctx) {
+        printf("%s: n_tokens=%d > n_ctx=%d\n", __func__, n_tokens, n_ctx);
+        return false;
+    }
+
+    uint32_t n_tested = 0;
+
+    while (true) {
+        if (cache.head + n_tokens > n_ctx) {
+            n_tested += n_ctx - cache.head;
+            cache.head = 0;
+            continue;
+        }
+
+        bool found = true;
+        for (uint32_t i = 0; i < n_tokens; i++) {
+            if (cache.cells[cache.head + i].pos >= 0) {
+                found = false;
+                cache.head += i + 1;
+                n_tested   += i + 1;
+                break;
+            }
+        }
+
+        if (found) {
+            break;
+        }
+
+        if (n_tested >= n_ctx) {
+            printf("%s: failed to find a slot for %d tokens\n", __func__, n_tokens);
+            return false;
+        }
+    }
+
+    for (uint32_t i = 0; i < n_tokens; i++) {
+        cache.cells[cache.head + i].pos = batch.pos[i];
+        cache.cells[cache.head + i].seq_id.insert(batch.seq_id[i]);
+    }
+
+    return true;
+}
+
+static void gpt2_kv_cache_seq_cp(
+        struct gpt2_kv_cache & cache,
+                 gpt2_seq_id   seq_id_src,
+                 gpt2_seq_id   seq_id_dst,
+                    gpt2_pos   p0,
+                    gpt2_pos   p1) {
+    if (p0 < 0) p0 = 0;
+    if (p1 < 0) p1 = std::numeric_limits<gpt2_pos>::max();
+
+    cache.head = 0;
+
+    for (uint32_t i = 0; i < cache.size; ++i) {
+        if (cache.cells[i].has_seq_id(seq_id_src) && cache.cells[i].pos >= p0 && cache.cells[i].pos < p1) {
+            cache.cells[i].seq_id.insert(seq_id_dst);
+        }
+    }
+}
+
+// find how many cells are currently in use
+int32_t gpt2_kv_cache_cell_max(const struct gpt2_kv_cache & cache) {
+    for (uint32_t i = cache.size - 1; i > 0; --i) {
+        if (cache.cells[i].pos >= 0 && !cache.cells[i].seq_id.empty()) {
+            return i + 1;
+        }
+    }
+
+    return 0;
+}
+
+struct gpt2_batch gpt2_batch_init(int32_t n_tokens, int32_t embd) {
+    gpt2_batch batch;
+
+    if (embd) {
+        batch.embd = (float *) malloc(sizeof(float) * n_tokens * embd);
+    } else {
+        batch.token = (gpt_vocab::id *) malloc(sizeof(gpt_vocab::id) * n_tokens);
+    }
+
+    batch.pos    = (gpt2_pos *)    malloc(sizeof(gpt2_pos)    * n_tokens);
+    batch.seq_id = (gpt2_seq_id *) malloc(sizeof(gpt2_seq_id) * n_tokens);
+    batch.logits = (int8_t *)      malloc(sizeof(int8_t)      * n_tokens);
+
+    return batch;
+}
+
+void gpt2_batch_free(struct gpt2_batch batch) {
+    if (batch.token)  free(batch.token);
+    if (batch.embd)   free(batch.embd);
+    if (batch.pos)    free(batch.pos);
+    if (batch.seq_id) free(batch.seq_id);
+    if (batch.logits) free(batch.logits);
+}
+
+// Positive return values does not mean a fatal error, but rather a warning.
+//   0 - success
+//   1 - could not find a KV slot for the batch (try reducing the size of the batch or increase the context)
+// < 0 - error
+int gpt2_decode(
+        struct gpt2_model  & model,
         struct ggml_allocr * allocr,
-        const int n_threads,
-        const int n_past,
-        const std::vector<gpt_vocab::id> & embd_inp,
-              std::vector<float>         & embd_w) {
-    const int N = embd_inp.size();
+        struct gpt2_batch    batch,
+        int                  n_threads,
+        std::vector<float> & logits) {
+    const int32_t n_tokens = batch.n_tokens;
+    const auto &  hparams  = model.hparams;
+    const int     n_vocab  = hparams.n_vocab;
 
-    const auto & hparams = model.hparams;
+    if (n_tokens == 0) {
+        printf("%s: n_tokens == 0", __func__);
+        return -1;
+    }
 
-    const int n_vocab = hparams.n_vocab;
+    GGML_ASSERT((!batch.token && batch.embd) || (batch.token && !batch.embd));
+
+
+    auto& cache = model.kv_cache;
+    // we always start to search for a free slot from the start of the cache
+    // TODO: better strategies can be implemented
+    cache.head = 0;
+
+    if (!gpt2_kv_cache_find_slot(cache, batch)) {
+        return 1;
+    }
+
+    // a heuristic, to avoid attending the full cache if it is not yet utilized
+    // after enough generations, the benefit from this heuristic disappears
+    // if we start defragmenting the cache, the benefit from this will be more important
+    cache.n = gpt2_kv_cache_cell_max(cache);
 
     // reset the allocator to free all the memory allocated during the previous inference
     ggml_allocr_reset(allocr);
 
-    struct ggml_cgraph * gf = gpt2_graph(model, allocr, n_past, embd_inp);
+    struct ggml_cgraph * gf = gpt2_graph(model, allocr, batch);
 
     // allocate tensors
     ggml_allocr_alloc_graph(allocr, gf);
@@ -817,14 +1029,30 @@ bool gpt2_eval(
     // in this case, the output tensor is the last one in the graph
     struct ggml_tensor * inpL = gf->nodes[gf->n_nodes - 1];
 
-    //embd_w.resize(n_vocab*N);
-    //ggml_backend_tensor_get(inpL, embd_w.data(), 0, sizeof(float)*n_vocab*N);
+    if (batch.logits) {
+        // return logits for all tokens
+        logits.resize(n_vocab*n_tokens);
+        for (int32_t i = 0; i < n_tokens; i++) {
+            if (batch.logits[i] == 0) {
+                continue;
+            }
+            ggml_backend_tensor_get(inpL, logits.data() + n_vocab*i, n_vocab*i*sizeof(float), sizeof(float)*n_vocab);
+        }
+    }
+    else {
+        // return result just for the last token
+        logits.resize(n_vocab);
+        ggml_backend_tensor_get(inpL, logits.data(), (n_vocab*(n_tokens-1))*sizeof(float), sizeof(float)*n_vocab);
+    }
 
-    // return result just for the last token
-    embd_w.resize(n_vocab);
-    ggml_backend_tensor_get(inpL, embd_w.data(), (n_vocab*(N-1))*sizeof(float), sizeof(float)*n_vocab);
+    // update the kv ring buffer
+    cache.head += n_tokens;
+    // Ensure kv cache head points to a valid index.
+    if (cache.head >= cache.size) {
+        cache.head = 0;
+    }
 
-    return true;
+    return 0;
 }
 
 int main(int argc, char ** argv) {
@@ -833,7 +1061,8 @@ int main(int argc, char ** argv) {
     const int64_t t_main_start_us = ggml_time_us();
 
     gpt_params params;
-    params.model = "models/gpt-2-117M/ggml-model.bin";
+    params.model = "/home/yavor/repo/ggml/examples/gpt-2/models/gpt-2-117M/ggml-model.bin";
+    params.prompt = "I believe the meaning of life is";
 
     if (gpt_params_parse(argc, argv, params) == false) {
         return 1;
@@ -869,8 +1098,29 @@ int main(int argc, char ** argv) {
         test_gpt_tokenizer(vocab, params.token_test);
     }
 
+    // tokenize the prompt
+    std::vector<gpt_vocab::id> embd_inp = ::gpt_tokenize(vocab, params.prompt);
+
     // keep this buffer alive while evaluating the model
     ggml_backend_buffer_t buf_compute;
+
+    // create a gpt2_batch
+    // we use this object to submit token data for decoding
+    const int n_parallel = params.n_parallel;
+    gpt2_batch batch = gpt2_batch_init(std::max(embd_inp.size(), (size_t)n_parallel), 0);
+
+    // evaluate the initial prompt
+    batch.n_tokens = embd_inp.size();
+
+    for (int32_t i = 0; i < batch.n_tokens; i++) {
+        batch.token[i]  = embd_inp[i];
+        batch.pos[i]    = i;
+        batch.seq_id[i] = 0;
+        batch.logits[i] = false;
+    }
+
+    // gpt2_decode will output logits only for the last token of the prompt
+    batch.logits[batch.n_tokens - 1] = true;
 
     struct ggml_allocr * allocr = NULL;
     // allocate the compute buffer
@@ -880,9 +1130,7 @@ int main(int argc, char ** argv) {
         allocr = ggml_allocr_new_measure(align);
 
         // create the worst case graph for memory usage estimation
-        int n_tokens = std::min(model.hparams.n_ctx, params.n_batch);
-        int n_past = model.hparams.n_ctx - n_tokens;
-        struct ggml_cgraph * gf = gpt2_graph(model, allocr, n_past, std::vector<gpt_vocab::id>(n_tokens, 0));
+        struct ggml_cgraph * gf = gpt2_graph(model, allocr, batch);
 
         // compute the required memory
         size_t mem_size = ggml_allocr_alloc_graph(allocr, gf);
@@ -895,15 +1143,27 @@ int main(int argc, char ** argv) {
         fprintf(stderr, "%s: compute buffer size: %.2f MB\n", __func__, mem_size/1024.0/1024.0);
     }
 
-    int n_past = 0;
 
     int64_t t_sample_us  = 0;
     int64_t t_predict_us = 0;
 
     std::vector<float> logits;
 
-    // tokenize the prompt
-    std::vector<gpt_vocab::id> embd_inp = ::gpt_tokenize(vocab, params.prompt);
+    if (gpt2_decode(model, allocr, batch, params.n_threads, logits) != 0) {
+        printf("%s: gpt2_decode() failed\n", __func__);
+        return 1;
+    }
+
+    // assign the system KV cache to all parallel sequences
+    // this way, the parallel sequences will "reuse" the prompt tokens without having to copy them
+    for (int32_t i = 1; i < n_parallel; ++i) {
+        gpt2_kv_cache_seq_cp(model.kv_cache, 0, i, 0, batch.n_tokens);
+    }
+
+    if (n_parallel > 1) {
+        printf("\n\n%s: generating %d sequences ...\n", __func__, n_parallel);
+    }
+
 
     params.n_predict = std::min(params.n_predict, model.hparams.n_ctx - (int) embd_inp.size());
 
@@ -914,66 +1174,87 @@ int main(int argc, char ** argv) {
     }
     printf("\n\n");
 
-    // submit the input prompt token-by-token
-    // this reduces the memory usage during inference, at the cost of a bit of speed at the beginning
-    std::vector<gpt_vocab::id> embd;
+    std::vector<gpt_vocab::token> streams(n_parallel);
 
-    for (size_t i = embd.size(); i < embd_inp.size() + params.n_predict; i++) {
-        // predict
-        if (embd.size() > 0) {
+    // remember the batch index of the last token for each parallel sequence
+    // we need this to determine which logits to sample from
+    std::vector<int32_t> i_batch(n_parallel, batch.n_tokens - 1);
+
+    int n_cur    = batch.n_tokens;
+    int n_decode = 0;
+
+    const int   n_vocab = model.hparams.n_vocab;
+    const int   top_k = params.top_k;
+    const float top_p = params.top_p;
+    const float temp  = params.temp;
+
+    while (n_cur <= params.n_predict) {
+        batch.n_tokens = 0;
+
+        for (int32_t i = 0; i < n_parallel; ++i) {
+            if (i_batch[i] < 0) {
+                // the stream has already finished
+                continue;
+            }
+
+            auto * logits_i = logits.data() + i_batch[i]*n_vocab;
+
+            gpt_vocab::id id = 0;
+            {
+                const int64_t t_start_sample_us = ggml_time_us();
+
+                id = gpt_sample_top_k_top_p(vocab, logits_i, top_k, top_p, temp, rng);
+
+                t_sample_us += ggml_time_us() - t_start_sample_us;
+            }
+
+            auto& token = vocab.id_to_token[id];
+            if (n_parallel == 1) {
+                printf("%s", token.c_str());
+                fflush(stdout);
+            }
+
+            streams[i] += token;
+
+            // push this new token for next evaluation
+            batch.token [batch.n_tokens] = id;
+            batch.pos   [batch.n_tokens] = n_cur;
+            batch.seq_id[batch.n_tokens] = i;
+            batch.logits[batch.n_tokens] = true;
+
+            i_batch[i] = batch.n_tokens;
+
+            batch.n_tokens += 1;
+
+            n_decode += 1;
+        }
+
+        // all streams are finished
+        if (batch.n_tokens == 0) {
+            break;
+        }
+
+        n_cur += 1;
+
+        {
             const int64_t t_start_us = ggml_time_us();
 
-            if (!gpt2_eval(model, allocr, params.n_threads, n_past, embd, logits)) {
-                printf("Failed to predict\n");
+            // evaluate the current batch with the transformer model
+            int ret_code = gpt2_decode(model, allocr, batch, params.n_threads, logits);
+            if (ret_code != 0) {
+                fprintf(stderr, "%s : failed to eval, return code %d\n", __func__, ret_code);
                 return 1;
             }
 
             t_predict_us += ggml_time_us() - t_start_us;
         }
+    }
 
-        n_past += embd.size();
-        embd.clear();
+    if (n_parallel > 1) {
+        printf("\n");
 
-        if (i >= embd_inp.size()) {
-            // sample next token
-            const int   top_k = params.top_k;
-            const float top_p = params.top_p;
-            const float temp  = params.temp;
-
-            const int n_vocab = model.hparams.n_vocab;
-
-            gpt_vocab::id id = 0;
-
-            {
-                const int64_t t_start_sample_us = ggml_time_us();
-
-                id = gpt_sample_top_k_top_p(vocab, logits.data() + (logits.size() - n_vocab), top_k, top_p, temp, rng);
-
-                t_sample_us += ggml_time_us() - t_start_sample_us;
-            }
-
-            // add it to the context
-            embd.push_back(id);
-        } else {
-            // if here, it means we are still processing the input prompt
-            for (size_t k = i; k < embd_inp.size(); k++) {
-                embd.push_back(embd_inp[k]);
-                if (int32_t(embd.size()) >= params.n_batch) {
-                    break;
-                }
-            }
-            i += embd.size() - 1;
-        }
-
-        // display text
-        for (auto id : embd) {
-            printf("%s", vocab.id_to_token[id].c_str());
-        }
-        fflush(stdout);
-
-        // end of text token
-        if (embd.back() == 50256) {
-            break;
+        for (int32_t i = 0; i < n_parallel; ++i) {
+            printf("sequence %d:\n\n%s%s\n\n", i, params.prompt.c_str(), streams[i].c_str());
         }
     }
 
@@ -984,14 +1265,14 @@ int main(int argc, char ** argv) {
         printf("\n\n");
         printf("%s:     load time = %8.2f ms\n", __func__, t_load_us/1000.0f);
         printf("%s:   sample time = %8.2f ms\n", __func__, t_sample_us/1000.0f);
-        printf("%s:  predict time = %8.2f ms / %.2f ms per token\n", __func__, t_predict_us/1000.0f, t_predict_us/1000.0f/n_past);
+        printf("%s:  predict time = %8.2f ms\n", __func__, t_predict_us/1000.0f);
         printf("%s:    total time = %8.2f ms\n", __func__, (t_main_end_us - t_main_start_us)/1000.0f);
     }
 
     ggml_free(model.ctx);
 
     ggml_backend_buffer_free(model.buffer_w);
-    ggml_backend_buffer_free(model.buffer_kv);
+    ggml_backend_buffer_free(model.kv_cache.buffer);
     ggml_backend_buffer_free(buf_compute);
     ggml_backend_free(model.backend);
 
