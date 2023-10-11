@@ -1000,7 +1000,7 @@ int gpt2_decode(
     // a heuristic, to avoid attending the full cache if it is not yet utilized
     // after enough generations, the benefit from this heuristic disappears
     // if we start defragmenting the cache, the benefit from this will be more important
-    cache.n = gpt2_kv_cache_cell_max(cache);
+    cache.n = std::min((int32_t) hparams.n_ctx, std::max(32, gpt2_kv_cache_cell_max(cache)));
 
     // reset the allocator to free all the memory allocated during the previous inference
     ggml_allocr_reset(allocr);
