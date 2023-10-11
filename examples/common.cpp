@@ -44,7 +44,7 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
             params.prompt = get_next_arg(i, argc, argv, arg, params);
         } else if (arg == "-n" || arg == "--n_predict") {
             params.n_predict = std::stoi(get_next_arg(i, argc, argv, arg, params));
-        } else if (arg == "--n_parallel") {
+        } else if (arg == "-np" || arg == "--n_parallel") {
             params.n_parallel = std::stoi(get_next_arg(i, argc, argv, arg, params));
         } else if (arg == "--top_k") {
             params.top_k = std::stoi(get_next_arg(i, argc, argv, arg, params));
