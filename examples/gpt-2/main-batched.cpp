@@ -1267,6 +1267,7 @@ int main(int argc, char ** argv) {
         printf("%s:    total time = %8.2f ms\n", __func__, (t_main_end_us - t_main_start_us)/1000.0f);
     }
 
+    gpt2_batch_free(batch);
     ggml_free(model.ctx);
 
     ggml_backend_buffer_free(model.buffer_w);
