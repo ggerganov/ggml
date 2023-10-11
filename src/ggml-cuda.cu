@@ -7698,8 +7698,8 @@ static void ggml_backend_cuda_set_tensor_external_data(ggml_backend_t backend, s
 
     ggml_tensor_extra_gpu* extra = nullptr;
     if (tensor->extra) {
-        extra = (ggml_tensor_extra_gpu *) extra;
         GGML_ASSERT(tensor->backend == GGML_BACKEND_GPU);
+        extra = (ggml_tensor_extra_gpu *) tensor->extra;
     }
     else {
         extra = ggml_cuda_alloc_temp_tensor_extra();
