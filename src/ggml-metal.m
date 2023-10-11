@@ -1528,14 +1528,14 @@ static void ggml_backend_metal_synchronize(ggml_backend_t backend) {
     UNUSED(backend);
 }
 
-static void ggml_backend_metal_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data) {
+static void ggml_backend_metal_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data, size_t offset) {
     if (tensor->buffer) {
         GGML_ASSERT(tensor->buffer == &backend->dummy_external_tensor_buffer);
     }
     else {
         tensor->buffer = &backend->dummy_external_tensor_buffer;
     }
-    tensor->data = data;
+    tensor->data = (uint8_t *)data + offset;
 }
 
 static void ggml_backend_metal_cpy_tensor_from(ggml_backend_t backend, struct ggml_tensor * src, struct ggml_tensor * dst) {

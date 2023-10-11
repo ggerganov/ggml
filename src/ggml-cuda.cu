@@ -7699,7 +7699,7 @@ static void ggml_backend_cuda_synchronize(ggml_backend_t backend) {
     UNUSED(backend);
 }
 
-static void ggml_backend_cuda_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data) {
+static void ggml_backend_cuda_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data, size_t offset) {
     ggml_tensor_extra_gpu* extra = nullptr;
     if (tensor->extra) {
         GGML_ASSERT(tensor->buffer == &backend->dummy_external_tensor_buffer);
@@ -7715,7 +7715,7 @@ static void ggml_backend_cuda_set_tensor_external_data(ggml_backend_t backend, s
         tensor->extra = extra;
     }
 
-    tensor->data = data;
+    tensor->data = (uint8_t *)data + offset;
     extra->data_device[g_main_device] = tensor->data;
 
     UNUSED(backend);

@@ -118,8 +118,8 @@ void ggml_backend_synchronize(ggml_backend_t backend) {
     backend->iface.synchronize(backend);
 }
 
-void ggml_backend_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data) {
-    backend->iface.set_tensor_external_data(backend, tensor, data);
+void ggml_backend_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data, size_t offset) {
+    backend->iface.set_tensor_external_data(backend, tensor, data, offset);
 }
 
 ggml_backend_graph_plan_t ggml_backend_graph_plan_create(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
@@ -272,14 +272,14 @@ static void ggml_backend_cpu_synchronize(ggml_backend_t backend) {
     UNUSED(backend);
 }
 
-static void ggml_backend_cpu_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data) {
+static void ggml_backend_cpu_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data, size_t offset) {
     if (tensor->buffer) {
         GGML_ASSERT(tensor->buffer == &backend->dummy_external_tensor_buffer);
     }
     else {
         tensor->buffer = &backend->dummy_external_tensor_buffer;
     }
-    tensor->data = data;
+    tensor->data = (uint8_t *)data + offset;
 }
 
 static void ggml_backend_cpu_cpy_tensor_from(ggml_backend_t backend, struct ggml_tensor * src, struct ggml_tensor * dst) {
