@@ -2,6 +2,7 @@
 #include "ggml/ggml-alloc.h"
 #include "ggml/ggml-backend.h"
 
+
 #ifdef GGML_USE_CUBLAS
 #include "ggml-cuda.h"
 #endif
@@ -567,7 +568,7 @@ struct ggml_cgraph * gpt2_graph(
         struct ggml_tensor * inp_tokens = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
         ggml_allocr_alloc(allocr, inp_tokens);
         if (!ggml_allocr_is_measure(allocr)) {
-            memcpy(inp_tokens->data, batch.token, n_tokens*ggml_element_size(inp_tokens));
+            ggml_backend_tensor_set(inp_tokens, batch.token, 0, n_tokens*ggml_element_size(inp_tokens));
         }
 
         struct ggml_tensor * position = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
@@ -608,22 +609,23 @@ struct ggml_cgraph * gpt2_graph(
     ggml_set_name(KQ_mask, "KQ_mask");
     ggml_allocr_alloc(allocr, KQ_mask);
     if (!ggml_allocr_is_measure(allocr)) {
-        float * data = (float *) KQ_mask->data;
-        memset(data, 0, ggml_nbytes(KQ_mask));
-
+        std::vector<float> data_buf(n_kv*n_tokens);
         const float neg_inf_v = -INFINITY;
         for (int h = 0; h < 1; ++h) {
+            int h_offset = h*(n_kv*n_tokens);
             for (int j = 0; j < n_tokens; ++j) {
                 const gpt2_pos    pos    = batch.pos[j];
                 const gpt2_seq_id seq_id = batch.seq_id[j];
 
                 for (int i = 0; i < n_kv; ++i) {
                     if (!kv_cache.cells[i].has_seq_id(seq_id) || kv_cache.cells[i].pos > pos) {
-                        ggml_backend_tensor_set(KQ_mask, &neg_inf_v, h*(n_kv*n_tokens) + j*n_kv + i, sizeof(float));
+                        data_buf[h_offset + j*n_kv + i] = neg_inf_v;
                     }
                 }
             }
         }
+
+        ggml_backend_tensor_set(KQ_mask, data_buf.data(), 0, data_buf.size() * sizeof(float));
     }
 
     for (int il = 0; il < n_layer; ++il) {
@@ -973,7 +975,7 @@ int gpt2_decode(
         struct ggml_allocr * allocr,
         struct gpt2_batch    batch,
         int                  n_threads,
-        std::vector<float> & embd_w) {
+        std::vector<float> & logits) {
     const int32_t n_tokens = batch.n_tokens;
     const auto &  hparams  = model.hparams;
     const int     n_vocab  = hparams.n_vocab;
@@ -998,7 +1000,7 @@ int gpt2_decode(
     // a heuristic, to avoid attending the full cache if it is not yet utilized
     // after enough generations, the benefit from this heuristic disappears
     // if we start defragmenting the cache, the benefit from this will be more important
-    cache.n = std::min((int32_t) hparams.n_ctx, std::max(32, gpt2_kv_cache_cell_max(cache)));
+    cache.n = gpt2_kv_cache_cell_max(cache);
 
     // reset the allocator to free all the memory allocated during the previous inference
     ggml_allocr_reset(allocr);
@@ -1027,12 +1029,28 @@ int gpt2_decode(
     // in this case, the output tensor is the last one in the graph
     struct ggml_tensor * inpL = gf->nodes[gf->n_nodes - 1];
 
-    // return result just for the last token
-    embd_w.resize(n_vocab);
-    ggml_backend_tensor_get(inpL, embd_w.data(), (n_vocab*(n_tokens-1))*sizeof(float), sizeof(float)*n_vocab);
+    if (batch.logits) {
+        // return logits for all tokens
+        logits.resize(n_vocab*n_tokens);
+        for (int32_t i = 0; i < n_tokens; i++) {
+            if (batch.logits[i] == 0) {
+                continue;
+            }
+            ggml_backend_tensor_get(inpL, logits.data() + n_vocab*i, n_vocab*i*sizeof(float), sizeof(float)*n_vocab);
+        }
+    }
+    else {
+        // return result just for the last token
+        logits.resize(n_vocab);
+        ggml_backend_tensor_get(inpL, logits.data(), (n_vocab*(n_tokens-1))*sizeof(float), sizeof(float)*n_vocab);
+    }
 
     // update the kv ring buffer
     cache.head += n_tokens;
+    // Ensure kv cache head points to a valid index.
+    if (cache.head >= cache.size) {
+        cache.head = 0;
+    }
 
     return 0;
 }
@@ -1044,7 +1062,7 @@ int main(int argc, char ** argv) {
 
     gpt_params params;
     params.model = "/home/yavor/repo/ggml/examples/gpt-2/models/gpt-2-117M/ggml-model.bin";
-    params.prompt = "The quick brown fox jumps over the lazy dog";
+    params.prompt = "I believe the meaning of life is";
 
     if (gpt_params_parse(argc, argv, params) == false) {
         return 1;
@@ -1179,7 +1197,7 @@ int main(int argc, char ** argv) {
                 continue;
             }
 
-            auto * logits_i = logits.data() + i*n_vocab;
+            auto * logits_i = logits.data() + i_batch[i]*n_vocab;
 
             gpt_vocab::id id = 0;
             {
@@ -1190,11 +1208,13 @@ int main(int argc, char ** argv) {
                 t_sample_us += ggml_time_us() - t_start_sample_us;
             }
 
+            auto& token = vocab.id_to_token[id];
             if (n_parallel == 1) {
-                printf("%s", vocab.id_to_token[id].c_str());
+                printf("%s", token.c_str());
+                fflush(stdout);
             }
 
-            streams[i] += vocab.id_to_token[id];
+            streams[i] += token;
 
             // push this new token for next evaluation
             batch.token [batch.n_tokens] = id;
