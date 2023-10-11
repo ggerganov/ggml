@@ -1468,6 +1468,8 @@ extern "C" {
             int                   s0, // stride
             int                   p0); // padding
 
+    // the result will have 2*p0 padding for the first dimension
+    // and 2*p1 padding for the second dimension
     GGML_API struct ggml_tensor * ggml_pool_2d(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
@@ -1476,8 +1478,8 @@ extern "C" {
             int                   k1,
             int                   s0,
             int                   s1,
-            int                   p0,
-            int                   p1);
+            float                 p0,
+            float                 p1);
 
     // nearest interpolate
     // used in stable-diffusion

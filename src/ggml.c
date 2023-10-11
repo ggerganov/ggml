@@ -7864,7 +7864,7 @@ struct ggml_tensor * ggml_conv_transpose_2d_p0(
 
 // ggml_pool_*
 
-static int64_t ggml_calc_pool_output_size(int64_t ins, int ks, int s, int p) {
+static int64_t ggml_calc_pool_output_size(int64_t ins, int ks, int s, float p) {
     return (ins + 2 * p - ks) / s + 1;
 }
 
@@ -7911,8 +7911,8 @@ struct ggml_tensor * ggml_pool_2d(
         int                   k1,
         int                   s0,
         int                   s1,
-        int                   p0,
-        int                   p1) {
+        float                 p0,
+        float                 p1) {
 
     bool is_node = false;
 
@@ -7920,7 +7920,6 @@ struct ggml_tensor * ggml_pool_2d(
         GGML_ASSERT(false); // TODO: implement backward
         is_node = true;
     }
-
     const int64_t ne[3] = {
         ggml_calc_pool_output_size(a->ne[0], k0, s0, p0),
         ggml_calc_pool_output_size(a->ne[1], k1, s1, p1),
@@ -15046,14 +15045,11 @@ static void ggml_compute_forward_pool_1d(
     ggml_compute_forward_pool_1d_sk_p0(params, op, src0, k0, dst);
 }
 
-// ggml_compute_forward_pool_2d_sk_p0
+// ggml_compute_forward_pool_2d
 
-static void ggml_compute_forward_pool_2d_sk_p0(
+static void ggml_compute_forward_pool_2d(
         const struct ggml_compute_params * params,
-        const enum   ggml_op_pool op,
         const struct ggml_tensor * src,
-        const int k0,
-        const int k1,
         struct ggml_tensor * dst) {
     assert(src->type == GGML_TYPE_F32);
     assert(params->ith == 0);
@@ -15062,6 +15058,14 @@ static void ggml_compute_forward_pool_2d_sk_p0(
         return;
     }
 
+    const int32_t * opts = (const int32_t *)dst->op_params;
+    enum ggml_op_pool op = opts[0];
+    const int k0 = opts[1];
+    const int k1 = opts[2];
+    const int s0 = opts[3];
+    const int s1 = opts[4];
+    const int p0 = opts[5];
+    const int p1 = opts[6];
     const char * cdata = (const char*)src->data;
     const char * const data_end = cdata + ggml_nbytes(src);
 
@@ -15072,6 +15076,8 @@ static void ggml_compute_forward_pool_2d_sk_p0(
     float * dplane = (float *)dst->data;
 
     const int ka = k0 * k1;
+    const int offset0 = -p0;
+    const int offset1 = -p1;
 
     while (cdata < data_end) {
         for (int oy = 0; oy < py; ++oy) {
@@ -15084,13 +15090,15 @@ static void ggml_compute_forward_pool_2d_sk_p0(
                     case GGML_OP_POOL_COUNT: GGML_ASSERT(false); break;
                 }
 
-                const int ix = ox * k0;
-                const int iy = oy * k1;
+                const int ix = offset0 + ox * s0;
+                const int iy = offset1 + oy * s1;
 
                 for (int ky = 0; ky < k1; ++ky) {
+                    if (iy + ky < 0 || iy + ky >= src->ne[1]) continue;
                     const float * const srow = (const float *)(cdata + src->nb[1] * (iy + ky));
                     for (int kx = 0; kx < k0; ++kx) {
                         int j = ix + kx;
+                        if (j < 0 || j >= src->ne[0]) continue;
                         switch (op) {
                             case GGML_OP_POOL_AVG:                     *out += srow[j]; break;
                             case GGML_OP_POOL_MAX: if (srow[j] > *out) *out  = srow[j]; break;
@@ -15109,29 +15117,6 @@ static void ggml_compute_forward_pool_2d_sk_p0(
         cdata  += src->nb[2];
         dplane += pa;
     }
-}
-
-// ggml_compute_forward_pool_2d
-
-static void ggml_compute_forward_pool_2d(
-        const struct ggml_compute_params * params,
-        const struct ggml_tensor * src0,
-              struct ggml_tensor * dst) {
-
-    const int32_t * opts = (const int32_t *)dst->op_params;
-    enum ggml_op_pool op = opts[0];
-    const int k0 = opts[1];
-    const int k1 = opts[2];
-    const int s0 = opts[3];
-    const int s1 = opts[4];
-    const int p0 = opts[5];
-    const int p1 = opts[6];
-    GGML_ASSERT(p0 == 0);
-    GGML_ASSERT(p1 == 0); // padding not supported
-    GGML_ASSERT(k0 == s0);
-    GGML_ASSERT(k1 == s1); // only s = k supported
-
-    ggml_compute_forward_pool_2d_sk_p0(params, op, src0, k0, k1, dst);
 }
 
 // ggml_compute_forward_upscale
