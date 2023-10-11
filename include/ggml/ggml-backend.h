@@ -78,7 +78,7 @@ extern "C" {
         // set tensor data from external pointer (shallow copy)
         // WARNING! It is the responsibility of the user to ensure that the provided pointer:
         // * is compatible with the backend (same address space)
-        // * points to a memory of the right sie and type/quantization as described by the tensor
+        // * points to a memory buffer of the right size and type/quantization as described by the tensor
         void (*set_tensor_external_data)(ggml_backend_t backend, struct ggml_tensor * tensor, void * data);
 
         // (optional) copy tensor between different backends, allow for single-copy tranfers
