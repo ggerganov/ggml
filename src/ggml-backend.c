@@ -110,6 +110,10 @@ void ggml_backend_tensor_get(const struct ggml_tensor * tensor, void * data, siz
     ggml_get_backend(tensor)->iface.synchronize(ggml_get_backend(tensor));
 }
 
+bool ggml_backend_is_tensor_external(const struct ggml_tensor* tensor) {
+    return tensor->buffer == &ggml_get_backend(tensor)->dummy_external_tensor_buffer;
+}
+
 void ggml_backend_synchronize(ggml_backend_t backend) {
     backend->iface.synchronize(backend);
 }
@@ -269,9 +273,13 @@ static void ggml_backend_cpu_synchronize(ggml_backend_t backend) {
 }
 
 static void ggml_backend_cpu_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data) {
-    GGML_ASSERT(tensor->buffer == NULL);
+    if (tensor->buffer) {
+        GGML_ASSERT(tensor->buffer == &backend->dummy_external_tensor_buffer);
+    }
+    else {
+        tensor->buffer = &backend->dummy_external_tensor_buffer;
+    }
     tensor->data = data;
-    UNUSED(backend);
 }
 
 static void ggml_backend_cpu_cpy_tensor_from(ggml_backend_t backend, struct ggml_tensor * src, struct ggml_tensor * dst) {
@@ -364,6 +372,16 @@ static struct ggml_backend_i cpu_backend_i = {
     /* .supports_op         = */ ggml_backend_cpu_supports_op,
 };
 
+struct ggml_backend_buffer iggml_create_dummy_external_tensor_buffer(ggml_backend_t backend) {
+    struct ggml_backend_buffer ret = {
+        /* .interface = */ cpu_backend_buffer_i_from_ptr,
+        /* .backend   = */ backend,
+        /* .context   = */ NULL,
+        /* .size      = */ 0,
+    };
+    return ret;
+}
+
 ggml_backend_t ggml_backend_cpu_init(void) {
     struct ggml_backend_cpu_context * ctx = malloc(sizeof(struct ggml_backend_cpu_context));
 
@@ -373,9 +391,10 @@ ggml_backend_t ggml_backend_cpu_init(void) {
 
     ggml_backend_t cpu_backend = malloc(sizeof(struct ggml_backend));
 
-    *cpu_backend = (struct ggml_backend) {
+    *cpu_backend = (struct ggml_backend){
         /* .interface = */ cpu_backend_i,
-        /* .context   = */ ctx
+        /* .context   = */ ctx,
+        /* .dummy_external_tensor_buffer = */ iggml_create_dummy_external_tensor_buffer(cpu_backend)
     };
     return cpu_backend;
 }

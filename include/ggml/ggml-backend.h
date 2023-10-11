@@ -102,6 +102,8 @@ extern "C" {
         struct ggml_backend_i iface;
 
         ggml_backend_context_t context;
+
+        struct ggml_backend_buffer dummy_external_tensor_buffer;
     };
 
     // backend helper functions
@@ -119,6 +121,8 @@ extern "C" {
 
     GGML_API void ggml_backend_tensor_set(      struct ggml_tensor * tensor, const void * data, size_t offset, size_t size);
     GGML_API void ggml_backend_tensor_get(const struct ggml_tensor * tensor,       void * data, size_t offset, size_t size);
+
+    GGML_API bool ggml_backend_is_tensor_external(const struct ggml_tensor* tensor);
 
     GGML_API void ggml_backend_synchronize(ggml_backend_t backend);
 

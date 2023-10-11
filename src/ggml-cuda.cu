@@ -7700,14 +7700,16 @@ static void ggml_backend_cuda_synchronize(ggml_backend_t backend) {
 }
 
 static void ggml_backend_cuda_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data) {
-    GGML_ASSERT(tensor->buffer == NULL);
-
     ggml_tensor_extra_gpu* extra = nullptr;
     if (tensor->extra) {
+        GGML_ASSERT(tensor->buffer == &backend->dummy_external_tensor_buffer);
         GGML_ASSERT(tensor->backend == GGML_BACKEND_GPU);
         extra = (ggml_tensor_extra_gpu *) tensor->extra;
     }
     else {
+        GGML_ASSERT(tensor->buffer == NULL);
+        tensor->buffer = &backend->dummy_external_tensor_buffer;
+
         extra = ggml_cuda_alloc_temp_tensor_extra();
         tensor->backend = GGML_BACKEND_GPU;
         tensor->extra = extra;
@@ -7809,6 +7811,7 @@ static ggml_backend_i cuda_backend_i = {
     /* .supports_op         = */ nullptr,
 };
 
+extern "C" struct ggml_backend_buffer iggml_create_dummy_external_tensor_buffer(ggml_backend_t backend);
 ggml_backend_t ggml_backend_cuda_init() {
     ggml_init_cublas(); // TODO: remove from ggml.c
 
@@ -7816,8 +7819,10 @@ ggml_backend_t ggml_backend_cuda_init() {
 
     ggml_backend_t cuda_backend = new ggml_backend {
         /* .interface = */ cuda_backend_i,
-        /* .context   = */ ctx
+        /* .context   = */ ctx,
+        /* .dummy_external_tensor_buffer = */ nullptr
     };
+    cuda_backend->dummy_external_tensor_buffer = iggml_create_dummy_external_tensor_buffer(cuda_backend);
 
     return cuda_backend;
 }
@@ -7844,8 +7849,10 @@ ggml_backend_t ggml_backend_cuda_init_plugin(int main_device, void * cublas_hand
 
     ggml_backend_t cuda_backend = new ggml_backend {
         /* .interface = */ cuda_backend_i,
-        /* .context   = */ ctx
+        /* .context   = */ ctx,
+        /* .dummy_external_tensor_buffer = */ nullptr
     };
+    cuda_backend->dummy_external_tensor_buffer = iggml_create_dummy_external_tensor_buffer(cuda_backend);
 
     return cuda_backend;
 }

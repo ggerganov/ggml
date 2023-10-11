@@ -1529,9 +1529,13 @@ static void ggml_backend_metal_synchronize(ggml_backend_t backend) {
 }
 
 static void ggml_backend_metal_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data) {
-    GGML_ASSERT(tensor->buffer == NULL);
+    if (tensor->buffer) {
+        GGML_ASSERT(tensor->buffer == &backend->dummy_external_tensor_buffer);
+    }
+    else {
+        tensor->buffer = &backend->dummy_external_tensor_buffer;
+    }
     tensor->data = data;
-    UNUSED(backend);
 }
 
 static void ggml_backend_metal_cpy_tensor_from(ggml_backend_t backend, struct ggml_tensor * src, struct ggml_tensor * dst) {
@@ -1576,6 +1580,7 @@ static struct ggml_backend_i metal_backend_i = {
     /* .supports_op         = */ ggml_backend_metal_supports_op,
 };
 
+extern struct ggml_backend_buffer iggml_create_dummy_external_tensor_buffer(ggml_backend_t backend);
 ggml_backend_t ggml_backend_metal_init(void) {
     struct ggml_metal_context * ctx = malloc(sizeof(struct ggml_metal_context));
 
@@ -1586,6 +1591,7 @@ ggml_backend_t ggml_backend_metal_init(void) {
     *metal_backend = (struct ggml_backend) {
         /* .interface = */ metal_backend_i,
         /* .context   = */ ctx,
+        /* .dummy_external_tensor_buffer = */ iggml_create_dummy_external_tensor_buffer(metal_backend)
     };
 
     return metal_backend;
