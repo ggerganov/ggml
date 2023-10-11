@@ -7812,20 +7812,25 @@ static ggml_backend_i cuda_backend_i = {
 };
 
 extern "C" struct ggml_backend_buffer iggml_create_dummy_external_tensor_buffer(ggml_backend_t backend);
-
-ggml_backend_t ggml_backend_cuda_init() {
-    ggml_init_cublas(); // TODO: remove from ggml.c
-
-    ggml_backend_context_cuda * ctx = new ggml_backend_context_cuda;
-
-    ggml_backend_t cuda_backend = new ggml_backend {
+static ggml_backend_t create_cuda_backend(ggml_backend_context_cuda* ctx) {
+    ggml_backend_t cuda_backend = new ggml_backend{
         /* .interface = */ cuda_backend_i,
         /* .context   = */ ctx,
         /* .dummy_external_tensor_buffer = */ {}
     };
     cuda_backend->dummy_external_tensor_buffer = iggml_create_dummy_external_tensor_buffer(cuda_backend);
 
+    //auto buf_ctx = new ggml_backend_buffer_context_cuda;
+    //buf_ctx->device = nullptr;
+
     return cuda_backend;
+}
+
+ggml_backend_t ggml_backend_cuda_init() {
+    ggml_init_cublas(); // TODO: remove from ggml.c
+
+    ggml_backend_context_cuda * ctx = new ggml_backend_context_cuda;
+    return create_cuda_backend(ctx);
 }
 
 ggml_backend_t ggml_backend_cuda_init_plugin(int main_device, void * cublas_handle, void * cuda_stream) {
@@ -7847,13 +7852,5 @@ ggml_backend_t ggml_backend_cuda_init_plugin(int main_device, void * cublas_hand
     g_cublas_initialized_as_plugin = true;
 
     ggml_backend_context_cuda* ctx = new ggml_backend_context_cuda;
-
-    ggml_backend_t cuda_backend = new ggml_backend {
-        /* .interface = */ cuda_backend_i,
-        /* .context   = */ ctx,
-        /* .dummy_external_tensor_buffer = */ {}
-    };
-    cuda_backend->dummy_external_tensor_buffer = iggml_create_dummy_external_tensor_buffer(cuda_backend);
-
-    return cuda_backend;
+    return create_cuda_backend(ctx);
 }
