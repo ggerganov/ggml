@@ -159,7 +159,7 @@ target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 
 #
 # test-vec1 (x86)
-if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86")
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86" AND ${CMAKE_C_FLAGS} MATCHES "avx")
     set(TEST_TARGET test-vec1)
     add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
     target_link_libraries(${TEST_TARGET} PRIVATE ggml)
