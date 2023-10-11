@@ -1061,8 +1061,6 @@ int main(int argc, char ** argv) {
     const int64_t t_main_start_us = ggml_time_us();
 
     gpt_params params;
-    params.model = "/home/yavor/repo/ggml/examples/gpt-2/models/gpt-2-117M/ggml-model.bin";
-    params.prompt = "I believe the meaning of life is";
 
     if (gpt_params_parse(argc, argv, params) == false) {
         return 1;
