@@ -81,8 +81,8 @@ void load_model(test_model & model, float* a, float* b, int M, int N, int K, boo
     model.ctx = ggml_init(params);
 
     // create tensors
-    model.a = ggml_new_tensor_2d(model.ctx, GGML_TYPE_F32, M, N);
-    model.b = ggml_new_tensor_2d(model.ctx, GGML_TYPE_F32, N, K);
+    model.a = ggml_new_tensor_2d(model.ctx, GGML_TYPE_F32, N, M);
+    model.b = ggml_new_tensor_2d(model.ctx, GGML_TYPE_F32, K, N);
 
     // create a allocator
     ggml_allocr * alloc = ggml_allocr_new_from_buffer(model.buffer);
@@ -130,11 +130,13 @@ struct ggml_cgraph * build_graph(const test_model& model, struct ggml_allocr * a
     // create a temporally context to build the graph
     struct ggml_context * ctx0 = ggml_init(params0);
 
-    struct ggml_cgraph  * gf = ggml_new_graph(ctx0);
+    struct ggml_cgraph * gf = ggml_new_graph(ctx0);
 
-    struct ggml_tensor* result = ggml_mul_mat(ctx0, model.a, ggml_reshape_2d(ctx0, model.b, 3, 2));
+    // zT = x @ yT
+    struct ggml_tensor * result = ggml_mul_mat(ctx0, model.a, ggml_cont(ctx0, ggml_transpose(ctx0, model.b)));
 
-    ggml_build_forward_expand(gf, result);
+    // z = (zT)T
+    ggml_build_forward_expand(gf, ggml_cont(ctx0, ggml_transpose(ctx0, result)));
 
     // delete the temporally context used to build the graph
     ggml_free(ctx0);

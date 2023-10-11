@@ -7594,7 +7594,7 @@ GGML_API struct ggml_tensor * ggml_conv_transpose_1d(
 // a: [OC，IC, KH, KW]
 // b: [N, IC, IH, IW]
 // result: [N, OH, OW, IC*KH*KW]
-static struct ggml_tensor * ggml_im2col(
+struct ggml_tensor * ggml_im2col(
     struct ggml_context * ctx,
     struct ggml_tensor  * a,
     struct ggml_tensor  * b,
@@ -7604,7 +7604,7 @@ static struct ggml_tensor * ggml_im2col(
     int                  p1,
     int                  d0,
     int                  d1,
-    bool             is_2D) {
+    bool                 is_2D) {
 
     if(is_2D) {
         GGML_ASSERT(a->ne[2] == b->ne[2]);
@@ -7638,7 +7638,6 @@ static struct ggml_tensor * ggml_im2col(
     result->src[1] = b;
 
     return result;
-
 }
 
 // a: [OC，IC, KH, KW]
