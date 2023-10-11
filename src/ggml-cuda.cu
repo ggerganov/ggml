@@ -464,6 +464,7 @@ inline cudaError_t ggml_cuda_set_device(const int device) {
 }
 
 static bool g_cublas_initialized = false;
+static bool g_cublas_initialized_as_plugin = false;
 
 static int g_device_count = -1;
 static int g_main_device = 0;
@@ -7540,16 +7541,21 @@ static void ggml_backend_cuda_free(ggml_backend_t backend) {
         for (int is = 0; is < MAX_STREAMS; ++is) {
             auto& stream = g_cudaStreams[id][is];
             if (!stream) break;
-            cudaStreamDestroy(stream);
+            if (!g_cublas_initialized_as_plugin) {
+                cudaStreamDestroy(stream);
+            }
             stream = nullptr;
         }
 
         auto& cublasHandle = g_cublas_handles[id];
         if (!cublasHandle) continue;
-        cublasDestroy(cublasHandle);
+        if (!g_cublas_initialized_as_plugin) {
+            cublasDestroy(cublasHandle);
+        }
         cublasHandle = nullptr;
     }
     g_cublas_initialized = false;
+    g_cublas_initialized_as_plugin = false;
 
     ggml_backend_context_cuda * cuda_ctx = (ggml_backend_context_cuda *)backend->context;
     delete cuda_ctx;
@@ -7832,6 +7838,7 @@ ggml_backend_t ggml_backend_cuda_init_plugin(int main_device, void * cublas_hand
     g_cudaStreams[id][0] = (cudaStream_t)cuda_stream;
 
     g_cublas_initialized = true;
+    g_cublas_initialized_as_plugin = true;
 
     ggml_backend_context_cuda* ctx = new ggml_backend_context_cuda;
 
