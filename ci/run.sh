@@ -286,7 +286,9 @@ test $ret -eq 0 && gg_run mnist
 test $ret -eq 0 && gg_run whisper
 
 if [ -z $GG_BUILD_LOW_PERF ]; then
-    test $ret -eq 0 && gg_run mpt
+    if [ -z ${GG_BUILD_VRAM_GB} ] || [ ${GG_BUILD_VRAM_GB} -ge 16 ]; then
+        test $ret -eq 0 && gg_run mpt
+    fi
 fi
 
 exit $ret
