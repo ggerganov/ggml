@@ -1,6 +1,5 @@
 #include "model.hpp"
 
-#include <ggml.h>
 #include <ggml-backend.h>
 
 #include <vector>

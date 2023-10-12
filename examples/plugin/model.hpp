@@ -1,10 +1,8 @@
 #pragma once
+#include <ggml.h>
 #include <cstdint>
 
-struct ggml_tensor;
 typedef struct ggml_backend* ggml_backend_t;
-struct ggml_context;
-enum ggml_type;
 struct ggml_backend_buffer;
 struct ggml_allocr;
 
