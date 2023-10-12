@@ -183,7 +183,7 @@ void ggml_allocr_alloc(struct ggml_allocr * alloc, struct ggml_tensor * tensor) 
     alloc->max_size = MAX(alloc->max_size, (char*)addr - (char*)alloc->data + size);
 }
 
-void ggml_allocr_set_tensor_external_data(struct ggml_allocr* alloc, struct ggml_tensor* tensor, void* data, size_t data_offset) {
+void ggml_allocr_set_tensor_external_data(struct ggml_allocr * alloc, struct ggml_tensor * tensor, void * data, size_t data_offset) {
     GGML_ASSERT(!ggml_is_view(tensor)); // views generally get data pointer from one of their sources
     GGML_ASSERT(tensor->data == NULL); // avoid allocating tensor which already has memory allocated
     GGML_ASSERT(data_offset == 0); // not supported yet

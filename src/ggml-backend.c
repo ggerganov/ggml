@@ -365,7 +365,7 @@ ggml_backend_t ggml_backend_cpu_init(void) {
 
     ggml_backend_t cpu_backend = malloc(sizeof(struct ggml_backend));
 
-    *cpu_backend = (struct ggml_backend){
+    *cpu_backend = (struct ggml_backend) {
         /* .interface = */ cpu_backend_i,
         /* .context   = */ ctx,
     };
