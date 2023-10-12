@@ -2,7 +2,6 @@
 #include "ggml/ggml-alloc.h"
 #include "ggml/ggml-backend.h"
 
-
 #ifdef GGML_USE_CUBLAS
 #include "ggml-cuda.h"
 #endif
@@ -34,7 +33,6 @@ static void ggml_log_callback_default(ggml_log_level level, const char * text, v
     fputs(text, stderr);
     fflush(stderr);
 }
-
 
 typedef int32_t gpt2_pos;
 typedef int32_t gpt2_seq_id;
@@ -611,6 +609,7 @@ struct ggml_cgraph * gpt2_graph(
     if (!ggml_allocr_is_measure(allocr)) {
         std::vector<float> data_buf(n_kv*n_tokens);
         const float neg_inf_v = -INFINITY;
+
         for (int h = 0; h < 1; ++h) {
             int h_offset = h*(n_kv*n_tokens);
             for (int j = 0; j < n_tokens; ++j) {
@@ -861,58 +860,6 @@ struct ggml_cgraph * gpt2_graph(
     return gf;
 }
 
-// find an empty slot of size "n_tokens" in the cache
-// updates the cache head
-// Note: On success, it's important that cache.head points
-// to the first cell of the slot.
-static bool gpt2_kv_cache_find_slot(
-           struct gpt2_kv_cache & cache,
-        const struct gpt2_batch & batch) {
-    const uint32_t n_ctx    = cache.size;
-    const uint32_t n_tokens = batch.n_tokens;
-
-    if (n_tokens > n_ctx) {
-        printf("%s: n_tokens=%d > n_ctx=%d\n", __func__, n_tokens, n_ctx);
-        return false;
-    }
-
-    uint32_t n_tested = 0;
-
-    while (true) {
-        if (cache.head + n_tokens > n_ctx) {
-            n_tested += n_ctx - cache.head;
-            cache.head = 0;
-            continue;
-        }
-
-        bool found = true;
-        for (uint32_t i = 0; i < n_tokens; i++) {
-            if (cache.cells[cache.head + i].pos >= 0) {
-                found = false;
-                cache.head += i + 1;
-                n_tested   += i + 1;
-                break;
-            }
-        }
-
-        if (found) {
-            break;
-        }
-
-        if (n_tested >= n_ctx) {
-            printf("%s: failed to find a slot for %d tokens\n", __func__, n_tokens);
-            return false;
-        }
-    }
-
-    for (uint32_t i = 0; i < n_tokens; i++) {
-        cache.cells[cache.head + i].pos = batch.pos[i];
-        cache.cells[cache.head + i].seq_id.insert(batch.seq_id[i]);
-    }
-
-    return true;
-}
-
 static void gpt2_kv_cache_seq_cp(
         struct gpt2_kv_cache & cache,
                  gpt2_seq_id   seq_id_src,
@@ -922,24 +869,11 @@ static void gpt2_kv_cache_seq_cp(
     if (p0 < 0) p0 = 0;
     if (p1 < 0) p1 = std::numeric_limits<gpt2_pos>::max();
 
-    cache.head = 0;
-
     for (uint32_t i = 0; i < cache.size; ++i) {
         if (cache.cells[i].has_seq_id(seq_id_src) && cache.cells[i].pos >= p0 && cache.cells[i].pos < p1) {
             cache.cells[i].seq_id.insert(seq_id_dst);
         }
     }
-}
-
-// find how many cells are currently in use
-int32_t gpt2_kv_cache_cell_max(const struct gpt2_kv_cache & cache) {
-    for (uint32_t i = cache.size - 1; i > 0; --i) {
-        if (cache.cells[i].pos >= 0 && !cache.cells[i].seq_id.empty()) {
-            return i + 1;
-        }
-    }
-
-    return 0;
 }
 
 struct gpt2_batch gpt2_batch_init(int32_t n_tokens, int32_t embd) {
@@ -968,7 +902,6 @@ void gpt2_batch_free(struct gpt2_batch batch) {
 
 // Positive return values does not mean a fatal error, but rather a warning.
 //   0 - success
-//   1 - could not find a KV slot for the batch (try reducing the size of the batch or increase the context)
 // < 0 - error
 int gpt2_decode(
         struct gpt2_model  & model,
@@ -987,20 +920,14 @@ int gpt2_decode(
 
     GGML_ASSERT((!batch.token && batch.embd) || (batch.token && !batch.embd));
 
+    auto & cache = model.kv_cache;
 
-    auto& cache = model.kv_cache;
-    // we always start to search for a free slot from the start of the cache
-    // TODO: better strategies can be implemented
-    cache.head = 0;
-
-    if (!gpt2_kv_cache_find_slot(cache, batch)) {
-        return 1;
+    for (uint32_t i = 0; i < n_tokens; i++) {
+        cache.cells[cache.head + i].pos = batch.pos[i];
+        cache.cells[cache.head + i].seq_id.insert(batch.seq_id[i]);
     }
 
-    // a heuristic, to avoid attending the full cache if it is not yet utilized
-    // after enough generations, the benefit from this heuristic disappears
-    // if we start defragmenting the cache, the benefit from this will be more important
-    cache.n = std::min((int32_t) hparams.n_ctx, std::max(32, gpt2_kv_cache_cell_max(cache)));
+    cache.n = cache.head + n_tokens;
 
     // reset the allocator to free all the memory allocated during the previous inference
     ggml_allocr_reset(allocr);
@@ -1038,8 +965,7 @@ int gpt2_decode(
             }
             ggml_backend_tensor_get(inpL, logits.data() + n_vocab*i, n_vocab*i*sizeof(float), sizeof(float)*n_vocab);
         }
-    }
-    else {
+    } else {
         // return result just for the last token
         logits.resize(n_vocab);
         ggml_backend_tensor_get(inpL, logits.data(), (n_vocab*(n_tokens-1))*sizeof(float), sizeof(float)*n_vocab);
@@ -1047,9 +973,11 @@ int gpt2_decode(
 
     // update the kv ring buffer
     cache.head += n_tokens;
-    // Ensure kv cache head points to a valid index.
+
+    // ensure kv cache head points to a valid index.
     if (cache.head >= cache.size) {
-        cache.head = 0;
+        printf("%s: cache.head >= cache.size\n", __func__);
+        return -2;
     }
 
     return 0;
@@ -1141,7 +1069,6 @@ int main(int argc, char ** argv) {
         fprintf(stderr, "%s: compute buffer size: %.2f MB\n", __func__, mem_size/1024.0/1024.0);
     }
 
-
     int64_t t_sample_us  = 0;
     int64_t t_predict_us = 0;
 
@@ -1162,7 +1089,6 @@ int main(int argc, char ** argv) {
         printf("\n\n%s: generating %d sequences ...\n", __func__, n_parallel);
     }
 
-
     params.n_predict = std::min(params.n_predict, model.hparams.n_ctx - (int) embd_inp.size());
 
     printf("%s: prompt: '%s'\n", __func__, params.prompt.c_str());
@@ -1178,8 +1104,8 @@ int main(int argc, char ** argv) {
     // we need this to determine which logits to sample from
     std::vector<int32_t> i_batch(n_parallel, batch.n_tokens - 1);
 
-    int n_cur    = batch.n_tokens;
-    int n_decode = 0;
+    int n_cur     = batch.n_tokens;
+    int n_decoded = 0;
 
     const int   n_vocab = model.hparams.n_vocab;
     const int   top_k = params.top_k;
@@ -1224,7 +1150,7 @@ int main(int argc, char ** argv) {
 
             batch.n_tokens += 1;
 
-            n_decode += 1;
+            n_decoded += 1;
         }
 
         // all streams are finished
@@ -1261,6 +1187,7 @@ int main(int argc, char ** argv) {
         const int64_t t_main_end_us = ggml_time_us();
 
         printf("\n\n");
+        printf("%s:     n_decoded = %8d\n",      __func__, n_decoded);
         printf("%s:     load time = %8.2f ms\n", __func__, t_load_us/1000.0f);
         printf("%s:   sample time = %8.2f ms\n", __func__, t_sample_us/1000.0f);
         printf("%s:  predict time = %8.2f ms\n", __func__, t_predict_us/1000.0f);
