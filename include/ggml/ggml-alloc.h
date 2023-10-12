@@ -23,6 +23,11 @@ GGML_API void   ggml_allocr_alloc      (struct ggml_allocr * alloc, struct ggml_
 GGML_API size_t ggml_allocr_alloc_graph(struct ggml_allocr * alloc, struct ggml_cgraph * graph);
 GGML_API size_t ggml_allocr_max_size   (struct ggml_allocr * alloc);
 
+// set tensor data from external pointer (shallow copy)
+// WARNING! It is the responsibility of the user to ensure that the provided pointer:
+// * is compatible with the buffer backend (same address space)
+// * points to memory of the right size and type/quantization as described by the tensor
+// * remains valid while the associated tensor is used
 GGML_API void   ggml_allocr_set_tensor_external_data(struct ggml_allocr * alloc, struct ggml_tensor * tensor, void * data, size_t data_offset);
 
 GGML_API size_t ggml_allocr_alloc_graph_n(
