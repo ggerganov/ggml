@@ -1132,6 +1132,17 @@ int main(int argc, char ** argv) {
                 t_sample_us += ggml_time_us() - t_start_sample_us;
             }
 
+            // is it an end of stream? -> mark the stream as finished
+            if (id == 50256 || n_cur == n_len - 1) {
+                i_batch[i] = -1;
+                printf("\n");
+                if (n_parallel > 1) {
+                    printf("%s: stream %d finished at n_cur = %d", __func__, i, n_cur);
+                }
+
+                continue;
+            }
+
             auto& token = vocab.id_to_token[id];
             if (n_parallel == 1) {
                 printf("%s", token.c_str());
