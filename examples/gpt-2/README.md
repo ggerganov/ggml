@@ -159,7 +159,7 @@ You generally want to quantize larger models.
 
 ## Batched generation example
 
-You can try the batched geberation from a given prompt using the gpt-2-batched
+You can try the batched generation from a given prompt using the gpt-2-batched binary.
 
 Sample output:
 

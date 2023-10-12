@@ -601,7 +601,6 @@ struct ggml_cgraph * gpt2_graph(
         ggml_backend_tensor_set(KQ_scale, &s, 0, sizeof(s));
     }
 
-
     // KQ_mask (mask for 1 head, it will be broadcasted to all heads)
     struct ggml_tensor * KQ_mask = ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_kv, n_tokens, 1);
     ggml_set_name(KQ_mask, "KQ_mask");
