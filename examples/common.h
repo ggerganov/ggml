@@ -15,10 +15,11 @@
 //
 
 struct gpt_params {
-    int32_t seed      = -1;  // RNG seed
-    int32_t n_threads = std::min(4, (int32_t) std::thread::hardware_concurrency());
-    int32_t n_predict = 200; // new tokens to predict
-    int32_t n_batch   = 8;   // batch size for prompt processing
+    int32_t seed       = -1;  // RNG seed
+    int32_t n_threads  = std::min(4, (int32_t) std::thread::hardware_concurrency());
+    int32_t n_predict  = 200; // new tokens to predict
+    int32_t n_parallel = 1;   // number of parallel streams
+    int32_t n_batch    = 8;   // batch size for prompt processing
 
     // sampling parameters
     int32_t top_k          = 40;
