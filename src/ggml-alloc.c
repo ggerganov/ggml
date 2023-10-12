@@ -295,7 +295,7 @@ struct ggml_allocr * ggml_allocr_new(void * data, size_t size, size_t alignment)
 }
 
 struct ggml_allocr * ggml_allocr_new_measure(size_t alignment) {
-    struct ggml_allocr * alloc = ggml_allocr_new((void *)0x1000, (size_t)-0x1001, alignment);
+    struct ggml_allocr * alloc = ggml_allocr_new((void *)0x1000, (size_t)SIZE_MAX / 2, alignment);
     alloc->measure = true;
 
     return alloc;
@@ -327,6 +327,9 @@ struct ggml_allocr * ggml_allocr_new_from_buffer(struct ggml_backend_buffer * bu
 }
 
 void ggml_allocr_free(struct ggml_allocr * alloc) {
+    if (alloc == NULL) {
+        return;
+    }
     if (alloc->buffer_owned) {
         ggml_backend_buffer_free(alloc->buffer);
     }

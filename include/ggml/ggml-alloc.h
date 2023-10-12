@@ -8,6 +8,8 @@ extern "C" {
 
 struct ggml_backend_buffer;
 
+typedef struct ggml_allocr * ggml_allocr_t;
+
 GGML_API struct ggml_allocr * ggml_allocr_new(void * data, size_t size, size_t alignment);
 GGML_API struct ggml_allocr * ggml_allocr_new_measure(size_t alignment);
 GGML_API struct ggml_allocr * ggml_allocr_new_from_buffer(struct ggml_backend_buffer * buffer);
