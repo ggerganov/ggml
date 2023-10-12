@@ -7661,10 +7661,14 @@ static struct ggml_backend_buffer_i cuda_backend_buffer_interface = {
 };
 
 static ggml_backend_buffer_t ggml_backend_cuda_alloc_buffer(ggml_backend_t backend, size_t size) {
-    ggml_cuda_set_device(g_main_device);
-
     ggml_backend_buffer_context_cuda * ctx = new ggml_backend_buffer_context_cuda;
-    CUDA_CHECK(cudaMalloc(&ctx->device, size));
+    if (size) {
+        ggml_cuda_set_device(g_main_device);
+        CUDA_CHECK(cudaMalloc(&ctx->device, size));
+    }
+    else {
+        ctx->device = NULL;
+    }
     return ggml_backend_buffer_init(backend, cuda_backend_buffer_interface, ctx, size);
 }
 
@@ -7695,28 +7699,6 @@ static void ggml_backend_cuda_get_tensor_async(ggml_backend_t backend, const ggm
 
 static void ggml_backend_cuda_synchronize(ggml_backend_t backend) {
     CUDA_CHECK(cudaStreamSynchronize(g_cudaStreams[g_main_device][0]));
-
-    UNUSED(backend);
-}
-
-static void ggml_backend_cuda_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data, size_t offset) {
-    ggml_tensor_extra_gpu* extra = nullptr;
-    if (tensor->extra) {
-        GGML_ASSERT(tensor->buffer == &backend->dummy_external_tensor_buffer);
-        GGML_ASSERT(tensor->backend == GGML_BACKEND_GPU);
-        extra = (ggml_tensor_extra_gpu *) tensor->extra;
-    }
-    else {
-        GGML_ASSERT(tensor->buffer == NULL);
-        tensor->buffer = &backend->dummy_external_tensor_buffer;
-
-        extra = ggml_cuda_alloc_temp_tensor_extra();
-        tensor->backend = GGML_BACKEND_GPU;
-        tensor->extra = extra;
-    }
-
-    tensor->data = (uint8_t *)data + offset;
-    extra->data_device[g_main_device] = tensor->data;
 
     UNUSED(backend);
 }
@@ -7801,7 +7783,6 @@ static ggml_backend_i cuda_backend_i = {
     /* .set_tensor_async    = */ ggml_backend_cuda_set_tensor_async,
     /* .get_tensor_async    = */ ggml_backend_cuda_get_tensor_async,
     /* .synchronize         = */ ggml_backend_cuda_synchronize,
-    /* .set_tensor_external_data = */ ggml_backend_cuda_set_tensor_external_data,
     /* .cpy_tensor_from     = */ nullptr,
     /* .cpy_tensor_to       = */ nullptr,
     /* .graph_plan_create   = */ ggml_backend_cuda_graph_plan_create,
@@ -7811,17 +7792,11 @@ static ggml_backend_i cuda_backend_i = {
     /* .supports_op         = */ nullptr,
 };
 
-extern "C" struct ggml_backend_buffer iggml_create_dummy_external_tensor_buffer(ggml_backend_t backend);
 static ggml_backend_t create_cuda_backend(ggml_backend_context_cuda* ctx) {
     ggml_backend_t cuda_backend = new ggml_backend{
         /* .interface = */ cuda_backend_i,
         /* .context   = */ ctx,
-        /* .dummy_external_tensor_buffer = */ {}
     };
-    cuda_backend->dummy_external_tensor_buffer = iggml_create_dummy_external_tensor_buffer(cuda_backend);
-
-    //auto buf_ctx = new ggml_backend_buffer_context_cuda;
-    //buf_ctx->device = nullptr;
 
     return cuda_backend;
 }

@@ -110,16 +110,8 @@ void ggml_backend_tensor_get(const struct ggml_tensor * tensor, void * data, siz
     ggml_get_backend(tensor)->iface.synchronize(ggml_get_backend(tensor));
 }
 
-bool ggml_backend_is_tensor_external(const struct ggml_tensor* tensor) {
-    return tensor->buffer == &ggml_get_backend(tensor)->dummy_external_tensor_buffer;
-}
-
 void ggml_backend_synchronize(ggml_backend_t backend) {
     backend->iface.synchronize(backend);
-}
-
-void ggml_backend_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data, size_t offset) {
-    backend->iface.set_tensor_external_data(backend, tensor, data, offset);
 }
 
 ggml_backend_graph_plan_t ggml_backend_graph_plan_create(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
@@ -239,8 +231,11 @@ static struct ggml_backend_buffer_i cpu_backend_buffer_i_from_ptr = {
 static const size_t TENSOR_ALIGNMENT = 64; // should be enough for AVX 512
 
 static ggml_backend_buffer_t ggml_backend_cpu_alloc_buffer(ggml_backend_t backend, size_t size) {
-    size += TENSOR_ALIGNMENT;   // malloc may return an address that is not aligned
-    void * data = malloc(size); // TODO: maybe use GGML_ALIGNED_MALLOC?
+    void * data = NULL;
+    if (size) {
+        size += TENSOR_ALIGNMENT; // malloc may return an address that is not aligned
+        data = malloc(size);      // TODO: maybe use GGML_ALIGNED_MALLOC?
+    }
 
     return ggml_backend_buffer_init(backend, cpu_backend_buffer_i, data, size);
 }
@@ -270,16 +265,6 @@ static void ggml_backend_cpu_get_tensor_async(ggml_backend_t backend, const stru
 
 static void ggml_backend_cpu_synchronize(ggml_backend_t backend) {
     UNUSED(backend);
-}
-
-static void ggml_backend_cpu_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data, size_t offset) {
-    if (tensor->buffer) {
-        GGML_ASSERT(tensor->buffer == &backend->dummy_external_tensor_buffer);
-    }
-    else {
-        tensor->buffer = &backend->dummy_external_tensor_buffer;
-    }
-    tensor->data = (uint8_t *)data + offset;
 }
 
 static void ggml_backend_cpu_cpy_tensor_from(ggml_backend_t backend, struct ggml_tensor * src, struct ggml_tensor * dst) {
@@ -362,7 +347,6 @@ static struct ggml_backend_i cpu_backend_i = {
     /* .set_tensor_async    = */ ggml_backend_cpu_set_tensor_async,
     /* .get_tensor_async    = */ ggml_backend_cpu_get_tensor_async,
     /* .synchronize         = */ ggml_backend_cpu_synchronize,
-    /* .set_tensor_external_data = */ ggml_backend_cpu_set_tensor_external_data,
     /* .cpy_tensor_from     = */ ggml_backend_cpu_cpy_tensor_from,
     /* .cpy_tensor_to       = */ ggml_backend_cpu_cpy_tensor_to,
     /* .graph_plan_create   = */ ggml_backend_cpu_graph_plan_create,
@@ -371,16 +355,6 @@ static struct ggml_backend_i cpu_backend_i = {
     /* .graph_compute       = */ ggml_backend_cpu_graph_compute,
     /* .supports_op         = */ ggml_backend_cpu_supports_op,
 };
-
-struct ggml_backend_buffer iggml_create_dummy_external_tensor_buffer(ggml_backend_t backend) {
-    struct ggml_backend_buffer ret = {
-        /* .interface = */ cpu_backend_buffer_i_from_ptr,
-        /* .backend   = */ backend,
-        /* .context   = */ NULL,
-        /* .size      = */ 0,
-    };
-    return ret;
-}
 
 ggml_backend_t ggml_backend_cpu_init(void) {
     struct ggml_backend_cpu_context * ctx = malloc(sizeof(struct ggml_backend_cpu_context));
@@ -394,7 +368,6 @@ ggml_backend_t ggml_backend_cpu_init(void) {
     *cpu_backend = (struct ggml_backend){
         /* .interface = */ cpu_backend_i,
         /* .context   = */ ctx,
-        /* .dummy_external_tensor_buffer = */ iggml_create_dummy_external_tensor_buffer(cpu_backend)
     };
     return cpu_backend;
 }

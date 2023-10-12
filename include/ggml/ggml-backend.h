@@ -75,12 +75,6 @@ extern "C" {
         void (*get_tensor_async)(ggml_backend_t backend, const struct ggml_tensor * tensor,       void * data, size_t offset, size_t size);
         void (*synchronize)     (ggml_backend_t backend);
 
-        // set tensor data from external pointer (shallow copy)
-        // WARNING! It is the responsibility of the user to ensure that the provided pointer:
-        // * is compatible with the backend (same address space)
-        // * points to a memory buffer of the right size and type/quantization as described by the tensor
-        void (*set_tensor_external_data)(ggml_backend_t backend, struct ggml_tensor * tensor, void * data, size_t offset);
-
         // (optional) copy tensor between different backends, allow for single-copy tranfers
         void (*cpy_tensor_from)(ggml_backend_t backend, struct ggml_tensor * src, struct ggml_tensor * dst);
         void (*cpy_tensor_to)  (ggml_backend_t backend, struct ggml_tensor * src, struct ggml_tensor * dst);
@@ -102,8 +96,6 @@ extern "C" {
         struct ggml_backend_i iface;
 
         ggml_backend_context_t context;
-
-        struct ggml_backend_buffer dummy_external_tensor_buffer;
     };
 
     // backend helper functions
@@ -122,11 +114,7 @@ extern "C" {
     GGML_API void ggml_backend_tensor_set(      struct ggml_tensor * tensor, const void * data, size_t offset, size_t size);
     GGML_API void ggml_backend_tensor_get(const struct ggml_tensor * tensor,       void * data, size_t offset, size_t size);
 
-    GGML_API bool ggml_backend_is_tensor_external(const struct ggml_tensor* tensor);
-
     GGML_API void ggml_backend_synchronize(ggml_backend_t backend);
-
-    GGML_API void ggml_backend_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data, size_t offset);
 
     GGML_API ggml_backend_graph_plan_t ggml_backend_graph_plan_create (ggml_backend_t backend, struct ggml_cgraph * cgraph);
 

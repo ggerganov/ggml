@@ -23,6 +23,8 @@ GGML_API void   ggml_allocr_alloc      (struct ggml_allocr * alloc, struct ggml_
 GGML_API size_t ggml_allocr_alloc_graph(struct ggml_allocr * alloc, struct ggml_cgraph * graph);
 GGML_API size_t ggml_allocr_max_size   (struct ggml_allocr * alloc);
 
+GGML_API void   ggml_allocr_set_tensor_external_data(struct ggml_allocr * alloc, struct ggml_tensor * tensor, void * data, size_t data_offset);
+
 GGML_API size_t ggml_allocr_alloc_graph_n(
                     struct ggml_allocr * alloc,
                     struct ggml_cgraph ** graphs, int n_graphs,

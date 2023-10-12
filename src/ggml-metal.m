@@ -1528,16 +1528,6 @@ static void ggml_backend_metal_synchronize(ggml_backend_t backend) {
     UNUSED(backend);
 }
 
-static void ggml_backend_metal_set_tensor_external_data(ggml_backend_t backend, struct ggml_tensor * tensor, void * data, size_t offset) {
-    if (tensor->buffer) {
-        GGML_ASSERT(tensor->buffer == &backend->dummy_external_tensor_buffer);
-    }
-    else {
-        tensor->buffer = &backend->dummy_external_tensor_buffer;
-    }
-    tensor->data = (uint8_t *)data + offset;
-}
-
 static void ggml_backend_metal_cpy_tensor_from(ggml_backend_t backend, struct ggml_tensor * src, struct ggml_tensor * dst) {
     ggml_backend_tensor_get(src, dst->data, 0, ggml_nbytes(src));
 
@@ -1570,7 +1560,6 @@ static struct ggml_backend_i metal_backend_i = {
     /* .set_tensor_async    = */ ggml_backend_metal_set_tensor_async,
     /* .get_tensor_async    = */ ggml_backend_metal_get_tensor_async,
     /* .synchronize         = */ ggml_backend_metal_synchronize,
-    /* .set_tensor_external_data = */ ggml_backend_metal_set_tensor_external_data,
     /* .cpy_tensor_from     = */ ggml_backend_metal_cpy_tensor_from,
     /* .cpy_tensor_to       = */ ggml_backend_metal_cpy_tensor_to,
     /* .graph_plan_create   = */ NULL, // the metal implementation does not require creating graph plans atm
@@ -1580,7 +1569,6 @@ static struct ggml_backend_i metal_backend_i = {
     /* .supports_op         = */ ggml_backend_metal_supports_op,
 };
 
-extern struct ggml_backend_buffer iggml_create_dummy_external_tensor_buffer(ggml_backend_t backend);
 ggml_backend_t ggml_backend_metal_init(void) {
     struct ggml_metal_context * ctx = malloc(sizeof(struct ggml_metal_context));
 
@@ -1591,7 +1579,6 @@ ggml_backend_t ggml_backend_metal_init(void) {
     *metal_backend = (struct ggml_backend) {
         /* .interface = */ metal_backend_i,
         /* .context   = */ ctx,
-        /* .dummy_external_tensor_buffer = */ iggml_create_dummy_external_tensor_buffer(metal_backend)
     };
 
     return metal_backend;
