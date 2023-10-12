@@ -11067,16 +11067,26 @@ static void ggml_compute_forward_tanh_f32(
         return;
     }
 
-    const int n  = ggml_nrows(src0);
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int nr  = ggml_nrows(src0);
     const int nc = src0->ne[0];
 
     assert(dst->nb[0]  == sizeof(float));
     assert(src0->nb[0] == sizeof(float));
 
-    for (int i = 0; i < n; i++) {
+    // rows per thread
+    const int dr = (nr + nth - 1)/nth;
+
+    // row range for this thread
+    const int ir0 = dr*ith;
+    const int ir1 = MIN(ir0 + dr, nr);
+
+    for (int i1 = ir0; i1 < ir1; i1++) {
         ggml_vec_tanh_f32(nc,
-                (float *) ((char *) dst->data  + i*( dst->nb[1])),
-                (float *) ((char *) src0->data + i*(src0->nb[1])));
+                (float *) ((char *) dst->data  + i1*( dst->nb[1])),
+                (float *) ((char *) src0->data + i1*(src0->nb[1])));
     }
 }
 
@@ -18734,13 +18744,13 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
                         case GGML_UNARY_OP_SGN:
                         case GGML_UNARY_OP_NEG:
                         case GGML_UNARY_OP_STEP:
-                        case GGML_UNARY_OP_TANH:
                         case GGML_UNARY_OP_ELU:
                         case GGML_UNARY_OP_RELU:
                             {
                                 n_tasks = 1;
                             } break;
 
+                        case GGML_UNARY_OP_TANH:
                         case GGML_UNARY_OP_GELU:
                         case GGML_UNARY_OP_GELU_QUICK:
                         case GGML_UNARY_OP_SILU:
