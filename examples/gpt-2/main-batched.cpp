@@ -922,7 +922,7 @@ int gpt2_decode(
 
     auto & cache = model.kv_cache;
 
-    for (uint32_t i = 0; i < n_tokens; i++) {
+    for (int i = 0; i < n_tokens; i++) {
         cache.cells[cache.head + i].pos = batch.pos[i];
         cache.cells[cache.head + i].seq_id.insert(batch.seq_id[i]);
     }
@@ -1105,6 +1105,7 @@ int main(int argc, char ** argv) {
     std::vector<int32_t> i_batch(n_parallel, batch.n_tokens - 1);
 
     int n_cur     = batch.n_tokens;
+    int n_len     = batch.n_tokens + params.n_predict;
     int n_decoded = 0;
 
     const int   n_vocab = model.hparams.n_vocab;
@@ -1112,7 +1113,7 @@ int main(int argc, char ** argv) {
     const float top_p = params.top_p;
     const float temp  = params.temp;
 
-    while (n_cur <= params.n_predict) {
+    while (n_cur < n_len) {
         batch.n_tokens = 0;
 
         for (int32_t i = 0; i < n_parallel; ++i) {
