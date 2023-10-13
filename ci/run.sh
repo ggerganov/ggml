@@ -148,6 +148,8 @@ function gg_run_gpt_2 {
     (time ./bin/gpt-2 --model ${model} -s 1234 -n 64 -tt ${prompts}                       ) 2>&1 | tee -a $OUT/${ci}-tg.log
     (time ./bin/gpt-2 --model ${model} -s 1234 -n 64 -p "I believe the meaning of life is") 2>&1 | tee -a $OUT/${ci}-tg.log
 
+    (time ./bin/gpt-2-batched --model ${model} -s 1234 -n 64 -np 8 -p "I believe the meaning of life is") 2>&1 | tee -a $OUT/${ci}-tg.log
+
     set +e
 }
 
@@ -286,7 +288,9 @@ test $ret -eq 0 && gg_run mnist
 test $ret -eq 0 && gg_run whisper
 
 if [ -z $GG_BUILD_LOW_PERF ]; then
-    test $ret -eq 0 && gg_run mpt
+    if [ -z ${GG_BUILD_VRAM_GB} ] || [ ${GG_BUILD_VRAM_GB} -ge 16 ]; then
+        test $ret -eq 0 && gg_run mpt
+    fi
 fi
 
 exit $ret
