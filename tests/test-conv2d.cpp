@@ -155,13 +155,17 @@ struct ggml_cgraph * build_graph(const test_model& model, struct ggml_allocr * a
     int d1 = 1;
 
     // split conv2d in fundamental methods for test unit
+    struct ggml_tensor* im2col_0 = ggml_im2col(ctx0, model.a, model.b, s0, s1, p0, p1, d0, d1, true);
+    ggml_set_name(im2col_0, "im2col_res");
+    ggml_build_forward_expand(gf, im2col_0);
+
+    // recalculate for avoid fragmentation
     struct ggml_tensor* im2col_res = ggml_im2col(ctx0, model.a, model.b, s0, s1, p0, p1, d0, d1, true);
-    ggml_set_name(im2col_res, "im2col_res");
     struct ggml_tensor* conv2d_res = ggml_reshape_4d(ctx0,
             ggml_cont(ctx0, ggml_transpose(ctx0,
             ggml_mul_mat(ctx0,
-            ggml_cont(ctx0, ggml_reshape_2d(ctx0, model.a, (model.a->ne[0] * model.a->ne[1] * model.a->ne[2]),  model.a->ne[3])),
-            ggml_cont(ctx0, ggml_reshape_2d(ctx0, im2col_res, im2col_res->ne[0],  (im2col_res->ne[3] * im2col_res->ne[2] * im2col_res->ne[1])))))),
+            ggml_reshape_2d(ctx0, model.a, (model.a->ne[0] * model.a->ne[1] * model.a->ne[2]),  model.a->ne[3]),
+            ggml_reshape_2d(ctx0, im2col_res, im2col_res->ne[0],  (im2col_res->ne[3] * im2col_res->ne[2] * im2col_res->ne[1]))))),
             im2col_res->ne[1], im2col_res->ne[2], model.a->ne[3], im2col_res->ne[3]);
     ggml_set_name(conv2d_res, "conv2d_res");
     ggml_build_forward_expand(gf, conv2d_res);
@@ -238,6 +242,7 @@ int main(void)
     }
 
     ggml_fp16_t* im2col_data = new ggml_fp16_t[ggml_nelements(im2col_res)];
+    printf("Res [%i, %i, %i, %i]\n", im2col_res->ne[0], im2col_res->ne[1], im2col_res->ne[2], im2col_res->ne[3]);
     float* conv2d_data = new float[ggml_nelements(conv2d_res)];
 
     ggml_backend_tensor_get(im2col_res, im2col_data, 0, ggml_nbytes(im2col_res));
@@ -393,6 +398,7 @@ int main(void)
     }
 
     printf("ggml_conv2d (%i): %s\n", ggml_nelements(conv2d_res), passed && (ggml_nelements(conv2d_res) == n_conv2d_test) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
+
     ggml_free(model.ctx);
 
     ggml_backend_buffer_free(model.buffer);
