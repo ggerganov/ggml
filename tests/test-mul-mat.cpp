@@ -2,7 +2,7 @@
 #include "ggml/ggml-alloc.h"
 #include "ggml/ggml-backend.h"
 
-//#define GGML_USE_CUBLAS uncomment this to use cuda backend, make sure build ggml lib with GGML_CUBLAS=ON
+//#define GGML_USE_CUBLAS // uncomment this to use cuda backend, make sure build ggml lib with GGML_CUBLAS=ON
 
 #ifdef GGML_USE_CUBLAS
 #include "ggml-cuda.h"

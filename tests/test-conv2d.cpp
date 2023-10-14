@@ -242,7 +242,6 @@ int main(void)
     }
 
     ggml_fp16_t* im2col_data = new ggml_fp16_t[ggml_nelements(im2col_res)];
-    printf("Res [%i, %i, %i, %i]\n", im2col_res->ne[0], im2col_res->ne[1], im2col_res->ne[2], im2col_res->ne[3]);
     float* conv2d_data = new float[ggml_nelements(conv2d_res)];
 
     ggml_backend_tensor_get(im2col_res, im2col_data, 0, ggml_nbytes(im2col_res));
