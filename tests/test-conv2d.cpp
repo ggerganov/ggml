@@ -157,7 +157,10 @@ struct ggml_cgraph * build_graph(const test_model& model, struct ggml_allocr * a
     // split conv2d in fundamental methods for test unit
     struct ggml_tensor* im2col_res = ggml_im2col(ctx0, model.a, model.b, s0, s1, p0, p1, d0, d1, true);
     ggml_set_name(im2col_res, "im2col_res");
+    printf("MatrixA [%i, %i, %i, %i]\n", model.a->ne[0], model.a->ne[1], model.a->ne[2], model.a->ne[3]);
+    printf("MatrixB [%i, %i, %i, %i]\n", im2col_res->ne[0], im2col_res->ne[1], im2col_res->ne[2], im2col_res->ne[3]);
     struct ggml_tensor* conv2d_res = ggml_mul_mat(ctx0, model.a, im2col_res);
+    printf("MatrixR [%i, %i, %i, %i]\n", conv2d_res->ne[0], conv2d_res->ne[1], conv2d_res->ne[2], conv2d_res->ne[3]);
     ggml_set_name(conv2d_res, "conv2d_res");
     ggml_build_forward_expand(gf, conv2d_res);
 

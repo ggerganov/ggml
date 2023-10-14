@@ -3,7 +3,8 @@
 #include "ggml/ggml-backend.h"
 
 //#define GGML_USE_CUBLAS uncomment this to use cuda backend, make sure build ggml lib with GGML_CUBLAS=ON
-//#define LONG_MATRIX test a conv2d expected matrix
+// test a conv2d expected matrix
+#define LONG_MATRIX
 
 #ifdef GGML_USE_CUBLAS
 #include "ggml-cuda.h"
@@ -81,8 +82,10 @@ void load_model(test_model & model, float* a, float* b, int M, int N, int K, boo
     model.ctx = ggml_init(params);
 
     // create tensors
-    model.a = ggml_new_tensor_2d(model.ctx, GGML_TYPE_F32, N, M);
+    model.a = ggml_new_tensor_2d(model.ctx, GGML_TYPE_F32, K, M);
+    printf("Matrix A: [%i, %i]\n", K, M);
     model.b = ggml_new_tensor_2d(model.ctx, GGML_TYPE_F32, K, N);
+    printf("Matrix B: [%i, %i]\n", K, N);
 
     // create a allocator
     ggml_allocr * alloc = ggml_allocr_new_from_buffer(model.buffer);
@@ -133,7 +136,7 @@ struct ggml_cgraph * build_graph(const test_model& model, struct ggml_allocr * a
     struct ggml_cgraph * gf = ggml_new_graph(ctx0);
 
     // zT = x @ yT
-    struct ggml_tensor * result = ggml_mul_mat(ctx0, model.a, ggml_cont(ctx0, ggml_transpose(ctx0, model.b)));
+    struct ggml_tensor * result = ggml_mul_mat(ctx0, model.a, ggml_cont(ctx0, model.b));
 
     // z = (zT)T
     ggml_build_forward_expand(gf, ggml_cont(ctx0, ggml_transpose(ctx0, result)));
@@ -185,6 +188,7 @@ static void gemm_f16_out_f32(int m, int n, int k,
                              float * B,
                              float * C,
                              const int ith, const int nth) {
+    printf("M: %i, N: %i, K: %i\n", m, n, k);
     // does not seem to make a difference
     int m0, m1, n0, n1;
     // patches per thread
@@ -238,42 +242,27 @@ static void gemm_f16_out_f32(int m, int n, int k,
 
 void perform_gemm_test(float* a, float* b, float* expected, int M, int N, int K) {
     printf("\nPerforming gemm_f16_out_f32 test:\n");
-    // transpose b
-    float* transposed = new float[K * N];
-    for(int i = 0; i < N; i++) {
-        for(int j = 0; j < K; j++) {
-            transposed[j * N + i] = b[i * K + j];
-        }
-    }
 
-    for (int i = 0; i < K; i++) {
-        for (int j = 0; j < N; j++) {
-            printf("%.1f ", transposed[i * N + j]);
-        }
-        printf("\n");
-    }
-
-    float* gemm_out = new float[M * K];
-                    //  N, K => transpose => K, N
-    gemm_f16_out_f32(M, K, N, a, transposed, gemm_out, 0, 1);
+    float* gemm_out = new float[M * N];
+    gemm_f16_out_f32(M, N, K, a, b, gemm_out, 0, 1);
 
     for (int i = 0; i < M; i++) {
-        for (int j = 0; j < K; j++) {
-            printf("%.1f ", gemm_out[i * K + j]);
+        for (int j = 0; j < N; j++) {
+            printf("%.1ff,", gemm_out[i * N + j]);
         }
         printf("\n");
     }
 
     bool passed = true;
 
-    for(int i = 0; i < M * K; i++) {
+    for(int i = 0; i < M * N; i++) {
         if(gemm_out[i] != expected[i]) {
             passed = false;
             break;
         }
     }
 
-    printf("gemm_mult: %s\n", passed ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
+    printf("gemm_mult (%i): %s\n", (M * N), passed ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
 }
 
 int main(void)
@@ -285,13 +274,13 @@ int main(void)
     const int M = 3, N = 2, K = 3; // a normal matrix multiplication
 #endif
 
-    // matrix A (4 X 16)
-    float matrixA[M * N] = {
+    // matrix A (4 X 36)
+    float matrixA[M * K] = {
 #ifdef LONG_MATRIX
-        2.0f, 8.0f, 5.0f, 1.0f, 10.0f, 5.0f, 9.0f, 9.0f, 3.0f, 5.0f, 6.0f, 6.0f, 2.0f, 8.0f, 2.0f, 2.0f,
-        6.0f, 3.0f, 8.0f, 7.0f, 2.0f, 5.0f, 3.0f, 4.0f, 3.0f, 3.0f, 2.0f, 7.0f, 9.0f, 6.0f, 8.0f, 7.0f,
-        2.0f, 9.0f, 10.0f, 3.0f, 8.0f, 10.0f, 6.0f, 5.0f, 4.0f, 2.0f, 3.0f, 4.0f, 4.0f, 5.0f, 2.0f, 2.0f,
-        4.0f, 9.0f, 8.0f, 5.0f, 3.0f, 8.0f, 8.0f, 10.0f, 4.0f, 2.0f, 10.0f, 9.0f, 7.0f, 6.0f, 1.0f, 3.0f
+       2.0f, 9.0f, 2.0f, 10.0f, 6.0f, 4.0f, 3.0f, 6.0f, 3.0f, 6.0f, 9.0f, 7.0f, 8.0f, 8.0f, 3.0f, 3.0f, 10.0f, 5.0f, 2.0f, 10.0f, 7.0f, 10.0f, 9.0f, 3.0f, 6.0f, 6.0f, 5.0f, 10.0f, 2.0f, 3.0f, 6.0f, 1.0f, 9.0f, 4.0f, 10.0f, 4.0f,
+        10.0f, 7.0f, 8.0f, 10.0f, 10.0f, 8.0f, 7.0f, 10.0f, 4.0f, 6.0f, 8.0f, 7.0f, 7.0f, 6.0f, 9.0f, 3.0f, 6.0f, 5.0f, 5.0f, 2.0f, 7.0f, 2.0f, 7.0f, 4.0f, 4.0f, 6.0f, 6.0f, 4.0f, 3.0f, 9.0f, 3.0f, 6.0f, 4.0f, 7.0f, 2.0f, 9.0f,
+        7.0f, 3.0f, 2.0f, 5.0f, 7.0f, 3.0f, 10.0f, 2.0f, 6.0f, 1.0f, 4.0f, 7.0f, 5.0f, 10.0f, 3.0f, 10.0f, 4.0f, 5.0f, 5.0f, 1.0f, 6.0f, 10.0f, 7.0f, 4.0f, 5.0f, 3.0f, 9.0f, 9.0f, 8.0f, 6.0f, 9.0f, 2.0f, 3.0f, 6.0f, 8.0f, 5.0f,
+        5.0f, 5.0f, 5.0f, 5.0f, 3.0f, 10.0f, 4.0f, 1.0f, 8.0f, 8.0f, 9.0f, 8.0f, 4.0f, 1.0f, 4.0f, 9.0f, 3.0f, 6.0f, 3.0f, 1.0f, 4.0f, 8.0f, 3.0f, 10.0f, 8.0f, 6.0f, 4.0f, 5.0f, 4.0f, 3.0f, 2.0f, 2.0f, 4.0f, 3.0f, 6.0f, 4.0f,
 #else
         2, 8,
         5, 1,
@@ -319,19 +308,18 @@ int main(void)
         8.0f, 7.0f, 6.0f, 2.0f, 4.0f, 10.0f, 10.0f, 6.0f, 10.0f, 3.0f, 7.0f, 6.0f, 4.0f, 3.0f, 5.0f, 5.0f, 5.0f, 3.0f, 8.0f, 10.0f, 3.0f, 4.0f, 8.0f, 4.0f, 2.0f, 6.0f, 8.0f, 9.0f, 6.0f, 9.0f, 4.0f, 3.0f, 5.0f, 2.0f, 2.0f, 6.0f,
         10.0f, 6.0f, 2.0f, 1.0f, 7.0f, 5.0f, 6.0f, 4.0f, 1.0f, 9.0f, 10.0f, 2.0f, 4.0f, 5.0f, 8.0f, 5.0f, 7.0f, 4.0f, 7.0f, 6.0f, 3.0f, 9.0f, 2.0f, 1.0f, 4.0f, 2.0f, 6.0f, 6.0f, 3.0f, 3.0f, 2.0f, 8.0f, 5.0f, 9.0f, 3.0f, 4.0f,
 #else
-
         10, 9, 5,
         5, 9, 4
 #endif
     };
 
     // matrix C (4 x 16)
-    float expected_result[M * K] = {
+    float expected_result[M * N] = {
 #ifdef LONG_MATRIX
-        548.0f, 413.0f, 494.0f, 613.0f, 506.0f, 509.0f, 452.0f, 399.0f, 348.0f, 530.0f, 467.0f, 505.0f, 378.0f, 440.0f, 377.0f, 465.0f, 548.0f, 353.0f, 455.0f, 480.0f, 368.0f, 443.0f, 462.0f, 421.0f, 467.0f, 575.0f, 571.0f, 594.0f, 415.0f, 420.0f, 484.0f, 226.0f, 415.0f, 424.0f, 448.0f, 448.0f,
-        590.0f, 365.0f, 481.0f, 458.0f, 531.0f, 511.0f, 453.0f, 425.0f, 299.0f, 562.0f, 454.0f, 479.0f, 361.0f, 469.0f, 369.0f, 487.0f, 505.0f, 389.0f, 503.0f, 486.0f, 336.0f, 404.0f, 437.0f, 443.0f, 311.0f, 542.0f, 545.0f, 624.0f, 520.0f, 492.0f, 476.0f, 261.0f, 401.0f, 425.0f, 436.0f, 421.0f,
-        545.0f, 339.0f, 488.0f, 579.0f, 503.0f, 440.0f, 437.0f, 388.0f, 319.0f, 520.0f, 460.0f, 495.0f, 340.0f, 482.0f, 331.0f, 461.0f, 550.0f, 311.0f, 456.0f, 474.0f, 317.0f, 410.0f, 405.0f, 385.0f, 364.0f, 583.0f, 543.0f, 576.0f, 416.0f, 430.0f, 463.0f, 204.0f, 354.0f, 380.0f, 404.0f, 444.0f,
-        634.0f, 429.0f, 583.0f, 652.0f, 631.0f, 526.0f, 493.0f, 506.0f, 359.0f, 608.0f, 516.0f, 596.0f, 417.0f, 542.0f, 443.0f, 552.0f, 602.0f, 432.0f, 553.0f, 560.0f, 451.0f, 452.0f, 478.0f, 512.0f, 440.0f, 650.0f, 657.0f, 690.0f, 552.0f, 560.0f, 564.0f, 269.0f, 422.0f, 499.0f, 561.0f, 508.0f
+        1224.0f, 1023.0f, 1158.0f,1259.0f,1359.0f,1194.0f,1535.0f,1247.0f,1185.0f,1029.0f,889.0f,1182.0f,955.0f,1179.0f,1147.0f,1048.0f,
+        1216.0f, 1087.0f, 1239.0f,1361.0f,1392.0f,1260.0f,1247.0f,1563.0f,1167.0f,1052.0f,942.0f,1214.0f,1045.0f,1134.0f,1264.0f,1126.0f,
+        1125.0f, 966.0f, 1079.0f,1333.0f,1287.0f,1101.0f,1185.0f,1167.0f,1368.0f,990.0f,967.0f,1121.0f,971.0f,1086.0f,1130.0f,980.0f,
+        999.0f, 902.0f, 1020.0f,1056.0f,1076.0f,929.0f,1029.0f,1052.0f,990.0f,1108.0f,823.0f,989.0f,759.0f,1041.0f,1003.0f,870.0f
 #else
         60.0f, 90.0f, 42.0f,
         55.0f, 54.0f, 29.0f,
@@ -373,7 +361,7 @@ int main(void)
     printf("\nPerforming ggml_mul_mat test:\n");
 
     passed = true;
-    for(int i = 0; i < M * K; i++) {
+    for(int i = 0; i < M * N; i++) {
         if(out_data[i] != expected_result[i]) {
             passed = false;
             break;
@@ -381,13 +369,13 @@ int main(void)
     }
 
     for (int i = 0; i < M; i++) {
-        for (int j = 0; j < K; j++) {
-            printf("%.1f ", out_data[i * K + j]);
+        for (int j = 0; j < N; j++) {
+            printf("%.1f ", out_data[i * N + j]);
         }
         printf("\n");
     }
 
-    printf("ggml_mul_mat (%i): %s\n", ggml_nelements(result), passed && (ggml_nelements(result) == M * K) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
+    printf("ggml_mul_mat (%i): %s\n", ggml_nelements(result), passed && (ggml_nelements(result) == M * N) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
 
    // free memory
     ggml_free(model.ctx);
