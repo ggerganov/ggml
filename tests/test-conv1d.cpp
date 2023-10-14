@@ -154,7 +154,12 @@ struct ggml_cgraph * build_graph(const test_model& model, struct ggml_allocr * a
     // split conv1d in fundamental methods for test unit
     struct ggml_tensor* im2col_res = ggml_im2col(ctx0, model.a, model.b, s0, 0, p0, 0, d0, 0, false);
     ggml_set_name(im2col_res, "im2col_res");
-    struct ggml_tensor* conv1d_res = ggml_mul_mat(ctx0, model.a, im2col_res);
+    struct ggml_tensor* conv1d_res = ggml_reshape_3d(ctx0,
+            ggml_cont(ctx0, ggml_transpose(ctx0,
+            ggml_mul_mat(ctx0,
+            ggml_cont(ctx0, ggml_reshape_2d(ctx0, model.a, (model.a->ne[0] * model.a->ne[1]),  model.a->ne[2])),
+            ggml_cont(ctx0, ggml_reshape_2d(ctx0, im2col_res, im2col_res->ne[0],  (im2col_res->ne[2] * im2col_res->ne[1])))))),
+            im2col_res->ne[1],  model.a->ne[2], im2col_res->ne[2]);
     ggml_set_name(conv1d_res, "conv1d_res");
     ggml_build_forward_expand(gf, conv1d_res);
 

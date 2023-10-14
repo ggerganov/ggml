@@ -4585,17 +4585,6 @@ static __global__ void scale_f32(const float * x, float * dst, const float scale
     dst[i] = scale * x[i];
 }
 
-static __global__ void gemm_f16_f32(const half  *x,const half  *y, float *dst, int N, int M, int K) {
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
-    if (row < N && col < K) {
-        float sum = 0.0f;
-        for (int i = 0; i < M; ++i) {
-            sum += __half2float(x[row * M + i]) * __half2float(y[col * M + i]);
-        }
-        dst[row * K + col] = sum;
-    }
-}
 
 static  __global__ void im2col_f32_f16(const float* x, half* dst, int ofs0, int ofs1, int IW,int IH,int CHW,int s0,int s1,int p0,int p1,int d0,int d1) {
     int iiw = blockIdx.z * s0 + threadIdx.z * d0 - p0;
@@ -5566,15 +5555,6 @@ static void im2col_f32_f16_cuda(const float* x, half* dst,
     im2col_f32_f16<<<block_nums, block_dims, 0, stream>>>(x, dst, ofs0, ofs1, IW, IH, (IC * KH * KW), s0, s1, p0, p1, d0, d1);
 }
 
-// GEMM
-static void gemm_f16_f32_cuda(const half* x,const half* y, float* dst, int m, int n, int k, int N, cudaStream_t stream) {
-    for(int i = 0; i < N; i++) {
-        dim3 block_dims(16, 16);
-        dim3 block_nums((n + block_dims.x - 1) / block_dims.x, (m + block_dims.y - 1) / block_dims.y);
-        gemm_f16_f32<<<block_nums, block_dims, 0, stream>>>(x, y + i * m * k, dst + i * m * n, m, k, n);
-    }
-}
-
 // buffer pool for cuda
 #define MAX_CUDA_BUFFERS 256
 
@@ -6518,26 +6498,6 @@ inline void ggml_cuda_op_im2col(
     (void) src0_dd;
 }
 
-inline void ggml_cuda_op_mul_mat_gemm_f16(
-    const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
-    const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
-
-    GGML_ASSERT(src0->type == GGML_TYPE_F16);
-    GGML_ASSERT(src1->type == GGML_TYPE_F16);
-    GGML_ASSERT( dst->type == GGML_TYPE_F32);
-
-    bool case_conv_2d = (src0->ne[0] * src0->ne[1] * src0->ne[2]) == src1->ne[0];
-
-    int m = src0->ne[case_conv_2d ? 3 : 2];
-    int n = (case_conv_2d ? src1->ne[2] : 1) * src1->ne[1];
-    int k = (case_conv_2d ? src0->ne[2] : 1) * src0->ne[1] *  src0->ne[0];
-    int N = src1->ne[case_conv_2d ? 3 : 2];
-
-    gemm_f16_f32_cuda(
-        (const half*)src0_dd, (const half*)src1_dd,
-        dst_dd, m, n, k, N, main_stream);
-}
-
 inline void ggml_cuda_op_diag_mask_inf(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
     const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
@@ -7125,9 +7085,7 @@ static void ggml_cuda_mul_mat(const ggml_tensor * src0, const ggml_tensor * src1
         }
     }
 
-    if(src0->type == GGML_TYPE_F16 && src1->type == GGML_TYPE_F16 && dst->type == GGML_TYPE_F32) {
-        ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_mul_mat_gemm_f16);
-    } else if (all_on_device && src0->type == GGML_TYPE_F16 && ggml_is_permuted(src0) && ggml_is_permuted(src1) && src1->ne[1] == 1) {
+    if (all_on_device && src0->type == GGML_TYPE_F16 && ggml_is_permuted(src0) && ggml_is_permuted(src1) && src1->ne[1] == 1) {
         ggml_cuda_mul_mat_vec_p021(src0, src1, dst);
     } else if (all_on_device && !ggml_is_contiguous(src0) && ggml_is_contiguous(src1) && src1->ne[1] == 1) {
         ggml_cuda_mul_mat_vec_nc(src0, src1, dst);

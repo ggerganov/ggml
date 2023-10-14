@@ -6422,11 +6422,8 @@ struct ggml_tensor * ggml_mul_mat(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * b) {
-    // hack to admit GEMM custom operator
-    bool mult_mat_conv1d = (a->ne[0] * a->ne[1]) == b->ne[0];
-    bool mult_mat_conv2d = (a->ne[0] * a->ne[1] * a->ne[2]) == b->ne[0];
 
-    GGML_ASSERT(ggml_can_mul_mat(a, b) || mult_mat_conv1d || mult_mat_conv2d);
+    GGML_ASSERT(ggml_can_mul_mat(a, b));
     GGML_ASSERT(!ggml_is_transposed(a));
 
     bool is_node = false;
@@ -6435,11 +6432,7 @@ struct ggml_tensor * ggml_mul_mat(
         is_node = true;
     }
 
-    const int64_t ne[4] = {
-        mult_mat_conv2d || mult_mat_conv1d ? b->ne[1] : a->ne[1],
-        mult_mat_conv1d ? a->ne[2] : b->ne[mult_mat_conv2d ? 2 : 1],
-        mult_mat_conv2d ? a->ne[3] : b->ne[2],
-        mult_mat_conv1d ? 1 : b->ne[3]  };
+    const int64_t ne[4] = { a->ne[1], b->ne[1], b->ne[2], b->ne[3] };
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, MAX(a->n_dims, b->n_dims), ne);
 
     result->op   = GGML_OP_MUL_MAT;
@@ -7496,7 +7489,12 @@ GGML_API struct ggml_tensor * ggml_conv_1d(
         int                   p0,
         int                   d0) {
     struct ggml_tensor * result = ggml_im2col(ctx, a, b, s0, 0, p0, 0, d0, 0, false); // [N, OH, OW, IC * KH * KW]
-    result = ggml_mul_mat(ctx, a, result); // [N, OC, OL] = [OC, IC * K] x [N*OL, IC * K]
+    result = ggml_reshape_3d(ctx,
+            ggml_cont(ctx, ggml_transpose(ctx,
+            ggml_mul_mat(ctx,
+            ggml_cont(ctx, ggml_reshape_2d(ctx, a, (a->ne[0] * a->ne[1]),  a->ne[2])),
+            ggml_cont(ctx, ggml_reshape_2d(ctx, result, result->ne[0],  (result->ne[2] * result->ne[1])))))),
+            result->ne[1],  a->ne[2], result->ne[2]);
     return result;
 }
 
@@ -7655,7 +7653,12 @@ struct ggml_tensor * ggml_conv_2d(
     int                  d1) {
 
     struct ggml_tensor * result = ggml_im2col(ctx, a, b, s0, s1, p0, p1, d0, d1, true); // [N, OH, OW, IC * KH * KW]
-    result = ggml_mul_mat(ctx, a, result); // [N, OC, OH, OW] = [OC, IC * KH * KW] x [N*OH*OW, IC * KH * KW]
+    result = ggml_reshape_4d(ctx,
+            ggml_cont(ctx, ggml_transpose(ctx,
+            ggml_mul_mat(ctx,
+            ggml_cont(ctx, ggml_reshape_2d(ctx, a, (a->ne[0] * a->ne[1] * a->ne[2]),  a->ne[3])),
+            ggml_cont(ctx, ggml_reshape_2d(ctx, result, result->ne[0],  (result->ne[3] * result->ne[2] * result->ne[1])))))),
+            result->ne[1], result->ne[2], a->ne[3], result->ne[3]); // [N, OC, OH, OW] = [OC, IC * KH * KW] x [N*OH*OW, IC * KH * KW]
     return result;
 }
 
@@ -11695,8 +11698,9 @@ static bool ggml_compute_forward_mul_mat_use_blas(
 }
 #endif
 
-static void ggml_compute_forward_mul_mat_x(
-        const struct ggml_compute_params * params,
+
+static void ggml_compute_forward_mul_mat(
+         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
               struct ggml_tensor * dst) {
@@ -11903,110 +11907,6 @@ static void ggml_compute_forward_mul_mat_x(
                 memcpy(&dst_col[iir0], tmp, (MIN(iir0 + blck_0, ir011) - iir0)*sizeof(float));
             }
         }
-    }
-}
-
-// GEMM
-// TODO: compare gemm op with the current implementation of mul_mat
-
-static void ggml_compute_forward_mul_mat_f16_f32(
-        const struct ggml_compute_params * params,
-        const struct ggml_tensor * src0,
-        const struct ggml_tensor * src1,
-              struct ggml_tensor * dst) {
-    int64_t t0 = ggml_perf_time_us();
-    UNUSED(t0);
-
-    GGML_TENSOR_BINARY_OP_LOCALS
-
-    if (params->type == GGML_TASK_INIT) {
-        return;
-    }
-
-    if (params->type == GGML_TASK_FINALIZE) {
-        return;
-    }
-
-    GGML_ASSERT(nb00 == sizeof(ggml_fp16_t));
-    GGML_ASSERT(nb10 == sizeof(ggml_fp16_t));
-    GGML_ASSERT(nb0  == sizeof(float));
-
-    bool case_conv_2d = (ne00 * ne01 * ne02) == ne10;
-
-    const int ith = params->ith;
-    const int nth = params->nth;
-
-    int64_t m = case_conv_2d ? ne03 : ne02;
-    int64_t n = (case_conv_2d ? ne12 : 1) * ne11;
-    int64_t k = (case_conv_2d ? ne02 : 1) * ne01 * ne00;
-    int64_t N = case_conv_2d ? ne13 : ne12;
-
-    // GEMM
-    for (int i = 0; i < N; i++) {
-        ggml_fp16_t * A = (ggml_fp16_t *)src0->data; // [m, k]
-        ggml_fp16_t * B = (ggml_fp16_t *)src1->data + i * m * k; // [n, k]
-        float * C = (float *)dst->data + i * m * n; // [m, n]
-
-        // does not seem to make a difference
-        int64_t m0, m1, n0, n1;
-        // patches per thread
-        if (m > n) {
-            n0 = 0;
-            n1 = n;
-
-            // total patches in dst
-            const int np = m;
-
-            // patches per thread
-            const int dp = (np + nth - 1)/nth;
-
-            // patch range for this thread
-            m0 = dp*ith;
-            m1 = MIN(m0 + dp, np);
-        } else {
-            m0 = 0;
-            m1 = m;
-
-            // total patches in dst
-            const int np = n;
-
-            // patches per thread
-            const int dp = (np + nth - 1)/nth;
-
-            // patch range for this thread
-            n0 = dp*ith;
-            n1 = MIN(n0 + dp, np);
-        }
-
-        // block-tiling attempt
-        int64_t blck_n = 16;
-        int64_t blck_m = 16;
-
-        for (int j = n0; j < n1; j+=blck_n) {
-            for (int i = m0; i < m1; i+=blck_m) {
-                for (int ii = i; ii < i + blck_m && ii < m1; ii++) {
-                    for (int jj = j; jj < j + blck_n && jj < n1; jj++) {
-                        ggml_vec_dot_f16(k,
-                                        C + ii*n + jj,
-                                        A + ii * k,
-                                        B + jj * k);
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-static void ggml_compute_forward_mul_mat(
-        const struct ggml_compute_params * params,
-        const struct ggml_tensor * src0,
-        const struct ggml_tensor * src1,
-              struct ggml_tensor * dst) {
-    if(src0->type == GGML_TYPE_F16 && src1->type == GGML_TYPE_F16 && dst->type == GGML_TYPE_F32) {
-        ggml_compute_forward_mul_mat_f16_f32(params, src0, src1, dst);
-    } else {
-        ggml_compute_forward_mul_mat_x(params, src0, src1, dst);
     }
 }
 
