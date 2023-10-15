@@ -6416,7 +6416,6 @@ struct ggml_tensor * ggml_mul_mat(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * b) {
-
     GGML_ASSERT(ggml_can_mul_mat(a, b));
     GGML_ASSERT(!ggml_is_transposed(a));
 
@@ -11658,7 +11657,7 @@ static bool ggml_compute_forward_mul_mat_use_blas(
 
 
 static void ggml_compute_forward_mul_mat(
-         const struct ggml_compute_params * params,
+        const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
               struct ggml_tensor * dst) {
