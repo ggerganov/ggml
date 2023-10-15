@@ -58,7 +58,7 @@ namespace ggml {
     };
 
     inline ctx_stack & get_ctx_stack() {
-        static ctx_stack s;
+        static thread_local ctx_stack s;
         return s;
     }
 
