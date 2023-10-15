@@ -477,7 +477,7 @@ struct ggml::graph gpt2_graph(
     }
 
     // wte + wpe
-    ggml::tensor inpL = ggml::get_rows(model.wte, embd) + ggml::get_rows(model.wpe, position);
+    ggml::tensor inpL = get_rows(model.wte, embd) + get_rows(model.wpe, position);
 
     for (int il = 0; il < n_layer; ++il) {
         ggml::tensor cur;
@@ -485,7 +485,7 @@ struct ggml::graph gpt2_graph(
         // norm
         {
             // [ 768, N]
-            cur = ggml::norm(inpL, hparams.eps);
+            cur = norm(inpL, hparams.eps);
 
             // [ 768, N]
             cur = cur*model.layers[il].ln_1_g + model.layers[il].ln_1_b;
@@ -500,7 +500,7 @@ struct ggml::graph gpt2_graph(
         // cur = attn_w*cur + attn_b
         // [2304, N]
         {
-            cur = ggml::mul_mat(model.layers[il].c_attn_attn_w, cur) + model.layers[il].c_attn_attn_b;
+            cur = mul_mat(model.layers[il].c_attn_attn_w, cur) + model.layers[il].c_attn_attn_b;
         }
 
         // self-attention
@@ -547,7 +547,7 @@ struct ggml::graph gpt2_graph(
 
             // K * Q
             // [n_past + N, N, 12]
-            ggml::tensor KQ = ggml::mul_mat(K, Q);
+            ggml::tensor KQ = mul_mat(K, Q);
 
             // KQ_scaled = KQ / sqrt(n_embd/n_head)
             // [n_past + N, N, 12]
@@ -555,11 +555,11 @@ struct ggml::graph gpt2_graph(
 
             // KQ_masked = mask_past(KQ_scaled)
             // [n_past + N, N, 12]
-            ggml::tensor KQ_masked = ggml::diag_mask_inf(KQ_scaled, n_past);
+            ggml::tensor KQ_masked = diag_mask_inf(KQ_scaled, n_past);
 
             // KQ = soft_max(KQ_masked)
             // [n_past + N, N, 12]
-            ggml::tensor KQ_soft_max = ggml::soft_max(KQ_masked);
+            ggml::tensor KQ_soft_max = soft_max(KQ_masked);
 
             // V_trans = Vmem.view(n_embd/n_head, n_head, n_past + N).permute(1, 2, 0, 3).contiguous()
             // [n_past + N, 64, 12]
@@ -570,7 +570,7 @@ struct ggml::graph gpt2_graph(
 
             // KQV = transpose(V) * KQ_soft_max
             // [64, N, 12]
-            ggml::tensor KQV = ggml::mul_mat(V_trans, KQ_soft_max);
+            ggml::tensor KQV = mul_mat(V_trans, KQ_soft_max);
 
             // KQV_merged = KQV.permute(0, 2, 1, 3)
             // [64, 12, N]
@@ -590,7 +590,7 @@ struct ggml::graph gpt2_graph(
         // cur = proj_w*cur + proj_b
         // [768, N]
         {
-            cur = ggml::mul_mat(model.layers[il].c_attn_proj_w, cur) + model.layers[il].c_attn_proj_b;
+            cur = mul_mat(model.layers[il].c_attn_proj_w, cur) + model.layers[il].c_attn_proj_b;
         }
 
         // add the input
@@ -602,7 +602,7 @@ struct ggml::graph gpt2_graph(
         {
             // norm
             {
-                cur = ggml::norm(inpFF, hparams.eps);
+                cur = norm(inpFF, hparams.eps);
 
                 // cur = ln_2_g*cur + ln_2_b
                 // [ 768, N]
@@ -617,11 +617,11 @@ struct ggml::graph gpt2_graph(
             //
             // cur = fc_w*cur + fc_b
             // [3072, N]
-            cur = ggml::mul_mat(model.layers[il].c_mlp_fc_w, cur) + model.layers[il].c_mlp_fc_b;
+            cur = mul_mat(model.layers[il].c_mlp_fc_w, cur) + model.layers[il].c_mlp_fc_b;
 
             // GELU activation
             // [3072, N]
-            cur = ggml::gelu(cur);
+            cur = gelu(cur);
 
             // projection
             // [ 768, 3072] - model.layers[il].c_mlp_proj_w
@@ -631,7 +631,7 @@ struct ggml::graph gpt2_graph(
             //
             // cur = proj_w*cur + proj_b
             // [768, N]
-            cur = ggml::mul_mat(model.layers[il].c_mlp_proj_w, cur) + model.layers[il].c_mlp_proj_b;
+            cur = mul_mat(model.layers[il].c_mlp_proj_w, cur) + model.layers[il].c_mlp_proj_b;
         }
 
         // input for next layer
@@ -641,7 +641,7 @@ struct ggml::graph gpt2_graph(
     // norm
     {
         // [ 768, N]
-        inpL = ggml::norm(inpL, hparams.eps);
+        inpL = norm(inpL, hparams.eps);
 
         // inpL = ln_f_g*inpL + ln_f_b
         // [ 768, N]
@@ -651,10 +651,10 @@ struct ggml::graph gpt2_graph(
     // inpL = WTE * inpL
     // [ 768, 50257] - model.lm_head
     // [ 768, N]     - inpL
-    inpL = ggml::mul_mat(model.lm_head, inpL);
+    inpL = mul_mat(model.lm_head, inpL);
 
     // logits -> probs
-    //inpL = ggml::soft_max(inpL);
+    //inpL = soft_max(inpL);
 
     gf.expand(inpL);
 
