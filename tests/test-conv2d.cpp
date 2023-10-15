@@ -2,7 +2,7 @@
 #include "ggml/ggml-alloc.h"
 #include "ggml/ggml-backend.h"
 
-//#define GGML_USE_CUBLAS
+#define GGML_USE_CUBLAS
 
 #ifdef GGML_USE_CUBLAS
 #include "ggml-cuda.h"
@@ -160,13 +160,7 @@ struct ggml_cgraph * build_graph(const test_model& model, struct ggml_allocr * a
     ggml_build_forward_expand(gf, im2col_0);
 
     // recalculate for avoid fragmentation
-    struct ggml_tensor* im2col_res = ggml_im2col(ctx0, model.a, model.b, s0, s1, p0, p1, d0, d1, true);
-    struct ggml_tensor* conv2d_res = ggml_reshape_4d(ctx0,
-            ggml_cont(ctx0, ggml_transpose(ctx0,
-            ggml_mul_mat(ctx0,
-            ggml_reshape_2d(ctx0, model.a, (model.a->ne[0] * model.a->ne[1] * model.a->ne[2]),  model.a->ne[3]),
-            ggml_reshape_2d(ctx0, im2col_res, im2col_res->ne[0],  (im2col_res->ne[3] * im2col_res->ne[2] * im2col_res->ne[1]))))),
-            im2col_res->ne[1], im2col_res->ne[2], model.a->ne[3], im2col_res->ne[3]);
+    struct ggml_tensor* conv2d_res = ggml_conv_2d(ctx0, model.a, model.b, s0, s1, p0, p1, d0, d1);
     ggml_set_name(conv2d_res, "conv2d_res");
     ggml_build_forward_expand(gf, conv2d_res);
 
