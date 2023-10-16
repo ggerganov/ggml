@@ -41,8 +41,8 @@ void load_model(test_model & model, bool use_gpu = false) {
     }
 
     // Convert adata to fp16 format
-    uint16_t* hadata = new uint16_t[K * IC * OC];
-    ggml_fp32_to_fp16_row(adata, hadata, K * IC * OC);
+    std::vector<ggml_fp16_t> hadata(K * IC * OC);
+    ggml_fp32_to_fp16_row(adata, hadata.data(), K * IC * OC);
 
     // Initialize bdata
     float* bdata =  new float[IL * IC * N];
@@ -111,9 +111,9 @@ void load_model(test_model & model, bool use_gpu = false) {
 
     // load data to buffer
     if(ggml_backend_is_cpu(model.backend)) {
-        memcpy(model.a->data, hadata, ggml_nbytes(model.a));
+        memcpy(model.a->data, hadata.data(), ggml_nbytes(model.a));
     } else {
-        ggml_backend_tensor_set(model.a, hadata, 0, ggml_nbytes(model.a));
+        ggml_backend_tensor_set(model.a, hadata.data(), 0, ggml_nbytes(model.a));
     }
 
     // alloc memory
