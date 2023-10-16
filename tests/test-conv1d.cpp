@@ -231,7 +231,7 @@ int main(void)
         }
     }
 
-    ggml_fp16_t* im2col_data = new ggml_fp16_t[ggml_nelements(im2col_res)];
+    uint16_t* im2col_data = new uint16_t[ggml_nelements(im2col_res)];
     float* conv2d_data = new float[ggml_nelements(conv1d_res)];
 
     ggml_backend_tensor_get(im2col_res, im2col_data, 0, ggml_nbytes(im2col_res));
@@ -254,7 +254,7 @@ int main(void)
     };
     // first im2col test
 
-    ggml_fp16_t expected_im2col[n_conv1d_test] = {
+    uint16_t expected_im2col[n_conv1d_test] = {
         0, 16640, 16640, 0, 16640, 16640, 0, 16640,
         16640, 0, 16640, 16640, 0, 16640, 16640, 0,
         16640, 16640, 0, 16640, 16640, 0, 16640, 16640,
