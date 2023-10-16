@@ -246,7 +246,7 @@ if (GGML_METAL)
 endif()
 
 if (GGML_WGPU)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../webgpu ${CMAKE_CURRENT_BINARY_DIR}/webgpu)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../webgpu ${CMAKE_CURRENT_BINARY_DIR}/webgpu)
 
     set(GGML_WGPU_SOURCES ggml-wgpu.c ggml-wgpu.h)
 
