@@ -245,6 +245,25 @@ if (GGML_METAL)
         )
 endif()
 
+if (GGML_WGPU)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../webgpu ${CMAKE_CURRENT_BINARY_DIR}/webgpu)
+
+    set(GGML_WGPU_SOURCES ggml-wgpu.c ggml-wgpu.h)
+
+    add_compile_definitions(GGML_USE_WGPU)
+    #add_compile_definitions(GGML_WGPU_NDEBUG)
+
+    # get full path to the file
+    #add_compile_definitions(GGML_WGPU_DIR_KERNELS="${CMAKE_CURRENT_SOURCE_DIR}/")
+
+    # copy ggml-wgpu.wgsl to bin directory
+    configure_file(ggml-wgpu.wgsl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ggml-wgpu.wgsl COPYONLY)
+
+    set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS}
+        webgpu
+        )
+endif()
+
 if (GGML_PERF)
     set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_PERF)
 endif()
@@ -259,6 +278,7 @@ add_library(${TARGET}
     ${GGML_CUDA_SOURCES}
     ${GGML_OPENCL_SOURCES}
     ${GGML_METAL_SOURCES}
+    ${GGML_WGPU_SOURCES}
     )
 
 target_include_directories(${TARGET} PUBLIC
