@@ -7481,12 +7481,12 @@ GGML_API struct ggml_tensor * ggml_conv_1d(
         int                   s0,
         int                   p0,
         int                   d0) {
-    struct ggml_tensor * result = ggml_im2col(ctx, a, b, s0, 0, p0, 0, d0, 0, false); // [N, OH, OW, IC * KH * KW]
+    struct ggml_tensor * result = ggml_im2col(ctx, a, b, s0, 0, p0, 0, d0, 0, false); // [N, OL, IC * K]
     result = ggml_reshape_3d(ctx, ggml_cont(ctx, ggml_transpose(ctx,
             ggml_mul_mat(ctx,
-            ggml_reshape_2d(ctx, a, (a->ne[0] * a->ne[1]),  a->ne[2]),
-            ggml_reshape_2d(ctx, result, result->ne[0],  (result->ne[2] * result->ne[1]))))),
-            result->ne[1],  a->ne[2], result->ne[2]);
+            ggml_reshape_2d(ctx, a, (a->ne[0] * a->ne[1]),  a->ne[2]), // [OC，IC, K] => [OC, IC * K]
+            ggml_reshape_2d(ctx, result, result->ne[0],  (result->ne[2] * result->ne[1]))))), // [N, OL, IC * K] => [N*OL, IC * K]
+            result->ne[1],  a->ne[2], result->ne[2]); // [N, OC, OL]
     return result;
 }
 
