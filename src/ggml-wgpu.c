@@ -263,33 +263,48 @@ void ggml_metal_free(struct ggml_metal_context * ctx) {
 
     free(ctx);
 }
+#endif
 
-void * ggml_metal_host_malloc(size_t n) {
-    void * data = NULL;
-    const int result = posix_memalign((void **) &data, sysconf(_SC_PAGESIZE), n);
-    if (result != 0) {
-        GGML_METAL_LOG_ERROR("%s: error: posix_memalign failed\n", __func__);
+
+void * ggml_wgpu_host_malloc(struct ggml_wgpu_context * ctx, size_t n) {
+    // TODO: proper buffer label
+    WGPUBuffer storage_buffer = wgpuDeviceCreateBuffer(
+        ctx->device, &(const WGPUBufferDescriptor){
+                    .label = "storage_buffer",
+                    .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst |
+                            WGPUBufferUsage_CopySrc,
+                    .size = n,
+                    .mappedAtCreation = false,
+                });
+
+    if (!storage_buffer) {
+        GGML_WGPU_LOG_ERROR("%s: error: wgpuDeviceCreateBuffer failed\n", __func__);
         return NULL;
     }
 
-    return data;
+    return storage_buffer;
 }
 
-void ggml_metal_host_free(void * data) {
-    free(data);
+void ggml_wgpu_host_free(struct ggml_wgpu_context * ctx, void * data) {
+    WGPUBuffer storage_buffer = (WGPUBuffer)data;
+    wgpuBufferRelease(storage_buffer);
+    // TODO: figure out different between release/destroy and which one to use
+    // wgpuBufferDestroy(storage_buffer)
 }
 
-void ggml_metal_set_n_cb(struct ggml_metal_context * ctx, int n_cb) {
-    ctx->n_cb = MIN(n_cb, GGML_METAL_MAX_BUFFERS);
+void ggml_wgpu_set_n_cb(struct ggml_wgpu_context * ctx, int n_cb) {
+    ctx->n_cb = MIN(n_cb, GGML_WGPU_MAX_BUFFERS);
 }
 
-int ggml_metal_if_optimized(struct ggml_metal_context * ctx) {
+int ggml_wgpu_if_optimized(struct ggml_wgpu_context * ctx) {
     return ctx->concur_list_len;
 }
 
-int * ggml_metal_get_concur_list(struct ggml_metal_context * ctx) {
+int * ggml_wgpu_get_concur_list(struct ggml_wgpu_context * ctx) {
     return ctx->concur_list;
 }
+
+#if 0
 
 // finds the Metal buffer that contains the tensor data on the GPU device
 // the assumption is that there is 1-to-1 mapping between the host and device memory buffers, so we can find the
