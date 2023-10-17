@@ -1,8 +1,8 @@
 #include "ggml-wgpu.h"
-#if 0
 #include "ggml.h"
 
 #include <webgpu/webgpu.h>
+#include "framework.h"
 
 #undef MIN
 #undef MAX
@@ -31,6 +31,8 @@ struct ggml_wgpu_buffer {
 
     WGPUBuffer wgpu;
 };
+
+#if 0
 
 struct ggml_metal_context {
     int n_cb;
