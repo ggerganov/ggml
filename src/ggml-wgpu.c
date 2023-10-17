@@ -464,15 +464,40 @@ void ggml_wgpu_get_tensor(
 
     const size_t nbytes = ggml_nbytes(t);
 
-    wgpuBufferMapAsync(id_src, WGPUMapMode_Read, offs, nbytes,
+    WGPUBuffer ph = wgpuDeviceCreateBuffer(ctx->device, &(const WGPUBufferDescriptor){
+                                                            .label = "ph",
+                                                            .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
+                                                            .size = nbytes,
+                                                            .mappedAtCreation = false,
+                                                         });
+
+    WGPUCommandEncoder command_encoder = wgpuDeviceCreateCommandEncoder(
+            ctx->device, &(const WGPUCommandEncoderDescriptor){
+                        .label = "ggml_command_encoder_get_tensor",
+                    });
+    ASSERT_CHECK(command_encoder);
+
+
+    wgpuCommandEncoderCopyBufferToBuffer(command_encoder, id_src, offs,
+                                        ph, 0, nbytes);
+
+    WGPUCommandBuffer command_buffer = wgpuCommandEncoderFinish(
+        command_encoder, &(const WGPUCommandBufferDescriptor){
+                            .label = "command_buffer_get_tensor",
+                        });
+    ASSERT_CHECK(command_buffer);
+
+    wgpuQueueSubmit(ctx->queue, 1, &command_buffer);
+
+    wgpuBufferMapAsync(ph, WGPUMapMode_Read, 0, nbytes,
                      handle_buffer_map, NULL);
     wgpuDevicePoll(ctx->device, true, NULL);
 
-    void * buf = wgpuBufferGetMappedRange(id_src, offs, nbytes);
+    void * buf = wgpuBufferGetMappedRange(ph, 0, nbytes);
     GGML_ASSERT(buf);
 
     memcpy(t->data, buf, nbytes);
-    wgpuBufferUnmap(id_src);
+    wgpuBufferUnmap(ph);
 }
 
 void ggml_wgpu_graph_compute(
