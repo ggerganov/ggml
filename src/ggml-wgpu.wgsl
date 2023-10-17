@@ -53,6 +53,7 @@ var<uniform> tensor_dimension_params: TensorDimensionParams;
 @compute
 @workgroup_size(1)
 fn test_kernel(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    dst[global_id.x] = src0[global_id.x];
+    let x = src0[global_id.x + tensor_dimension_params.offs_src0/4u];
+    dst[global_id.x + tensor_dimension_params.offs_dst/4u] = x / (1.0 + exp(-x)); ;
 }
 

@@ -178,7 +178,7 @@ struct ggml_wgpu_context * ggml_wgpu_init() {
     ctx->tensor_dimension_params = wgpuDeviceCreateBuffer(ctx->device, &(const WGPUBufferDescriptor){
                                                             .label = "tensor_dimension_params",
                                                             .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
-                                                            .size = MAX(MIN_STORAGE_BUFFER_ALIGNMENT, 96+12),
+                                                            .size = 96+12,
                                                             .mappedAtCreation = false,
                                                          });
     ASSERT_CHECK(ctx->tensor_dimension_params);
@@ -195,7 +195,7 @@ struct ggml_wgpu_context * ggml_wgpu_init() {
     ctx->bind_group_entries[3].binding = 3;
     ctx->bind_group_entries[3].buffer = ctx->tensor_dimension_params;
     ctx->bind_group_entries[3].offset = 0;
-    ctx->bind_group_entries[3].size = MAX(MIN_STORAGE_BUFFER_ALIGNMENT, 96+12);
+    ctx->bind_group_entries[3].size = 96+12;
 
 
 
@@ -229,7 +229,7 @@ struct ggml_wgpu_context * ggml_wgpu_init() {
         bindGroupLayoutEntries[3].visibility = WGPUShaderStage_Compute;
         bindGroupLayoutEntries[3].buffer.type = WGPUBufferBindingType_Uniform;
         bindGroupLayoutEntries[3].buffer.hasDynamicOffset = false;
-        bindGroupLayoutEntries[3].buffer.minBindingSize = 96;
+        bindGroupLayoutEntries[3].buffer.minBindingSize = 96+12;
     }
 
 
