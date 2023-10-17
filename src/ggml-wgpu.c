@@ -6,6 +6,7 @@
 
 #include <stdarg.h>
 
+#define MIN_STORAGE_BUFFER_ALIGNMENT 256
 
 #define ASSERT_CHECK(x) \
     if (!(x)) { \
@@ -72,7 +73,8 @@ struct ggml_wgpu_context {
     WGPUPipelineLayout pipeline_layout;
 
     WGPUBuffer tensor_dimension_params;
-    int64_t tensor_dimension_params_host[24];
+    WGPUBuffer placeholder_buffer;
+    int32_t tensor_dimension_params_host[24+3];
 
     WGPUBindGroupEntry bind_group_entries[4];
 
@@ -154,7 +156,10 @@ struct ggml_wgpu_context * ggml_wgpu_init() {
     // Configure context
     struct ggml_wgpu_context * ctx = malloc(sizeof(struct ggml_wgpu_context));
 
-    ctx->instance = wgpuCreateInstance(NULL);
+    WGPUInstanceDescriptor desc;
+    desc.nextInChain = NULL;
+
+    ctx->instance = wgpuCreateInstance(&desc);
     ASSERT_CHECK(ctx->instance);
 
     wgpuInstanceRequestAdapter(ctx->instance, NULL, handle_request_adapter,
@@ -173,15 +178,24 @@ struct ggml_wgpu_context * ggml_wgpu_init() {
     ctx->tensor_dimension_params = wgpuDeviceCreateBuffer(ctx->device, &(const WGPUBufferDescriptor){
                                                             .label = "tensor_dimension_params",
                                                             .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
-                                                            .size = 192,
+                                                            .size = MAX(MIN_STORAGE_BUFFER_ALIGNMENT, 96+12),
                                                             .mappedAtCreation = false,
                                                          });
     ASSERT_CHECK(ctx->tensor_dimension_params);
 
+
+    ctx->placeholder_buffer = wgpuDeviceCreateBuffer(ctx->device, &(const WGPUBufferDescriptor){
+                                                            .label = "placeholder_buffer",
+                                                            .usage = WGPUBufferUsage_Storage,
+                                                            .size = MIN_STORAGE_BUFFER_ALIGNMENT,
+                                                            .mappedAtCreation = false,
+                                                         });
+    ASSERT_CHECK(ctx->placeholder_buffer);
+
     ctx->bind_group_entries[3].binding = 3;
     ctx->bind_group_entries[3].buffer = ctx->tensor_dimension_params;
     ctx->bind_group_entries[3].offset = 0;
-    ctx->bind_group_entries[3].size = 192;
+    ctx->bind_group_entries[3].size = MAX(MIN_STORAGE_BUFFER_ALIGNMENT, 96+12);
 
 
 
@@ -191,7 +205,7 @@ struct ggml_wgpu_context * ggml_wgpu_init() {
     ctx->shader_module = frmwrk_load_shader_module(ctx->device, "ggml-wgpu.wgsl");
     ASSERT_CHECK(ctx->shader_module);
 
-    WGPUBindGroupLayoutEntry bindGroupLayoutEntries[4];
+    WGPUBindGroupLayoutEntry bindGroupLayoutEntries[4] = {0};
     {
         bindGroupLayoutEntries[0].binding = 0;
         bindGroupLayoutEntries[0].visibility = WGPUShaderStage_Compute;
@@ -215,7 +229,7 @@ struct ggml_wgpu_context * ggml_wgpu_init() {
         bindGroupLayoutEntries[3].visibility = WGPUShaderStage_Compute;
         bindGroupLayoutEntries[3].buffer.type = WGPUBufferBindingType_Uniform;
         bindGroupLayoutEntries[3].buffer.hasDynamicOffset = false;
-        bindGroupLayoutEntries[3].buffer.minBindingSize = 192;
+        bindGroupLayoutEntries[3].buffer.minBindingSize = 96;
     }
 
 
@@ -242,10 +256,11 @@ struct ggml_wgpu_context * ggml_wgpu_init() {
         ctx->pipeline_##name = wgpuDeviceCreateComputePipeline(     \
             ctx->device, &(const WGPUComputePipelineDescriptor){    \
                         .label = "compute_pipeline_##name",         \
+                        .layout = ctx->pipeline_layout,             \
                         .compute =                                  \
                             (const WGPUProgrammableStageDescriptor){\
                                 .module = ctx->shader_module,       \
-                                .entryPoint = "kernel_##name",      \
+                                .entryPoint = "test_kernel",      \
                             },                                      \
                     });                                             \
         ASSERT_CHECK(ctx->pipeline_##name);
@@ -287,7 +302,7 @@ void ggml_wgpu_free(struct ggml_wgpu_context * ctx) {
 
 void * ggml_wgpu_host_malloc(size_t n) {
     void * data = NULL;
-    const int result = posix_memalign((void **) &data, 4, n);
+    const int result = posix_memalign((void **) &data, MIN_STORAGE_BUFFER_ALIGNMENT, n);
     if (result != 0) {
         GGML_WGPU_LOG_ERROR("%s: error: posix_memalign failed\n", __func__);
         return NULL;
@@ -350,7 +365,7 @@ bool ggml_wgpu_add_buffer(
             }
         }
 
-        const size_t size_page = 4; // TODO: figure out if this needs a real value like on metal // sysconf(_SC_PAGESIZE);
+        const size_t size_page = MIN_STORAGE_BUFFER_ALIGNMENT; // TODO: figure out if this needs a real value like on metal // sysconf(_SC_PAGESIZE);
 
         size_t size_aligned = size;
         if ((size_aligned % size_page) != 0) {
@@ -370,16 +385,14 @@ bool ggml_wgpu_add_buffer(
                                                                 .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst |
                                                                         WGPUBufferUsage_CopySrc,
                                                                 .size = size_aligned,
-                                                                .mappedAtCreation = true,
+                                                                .mappedAtCreation = false,
                                                 });
 
             if (ctx->buffers[ctx->n_buffers].wgpu == NULL) {
                 GGML_WGPU_LOG_ERROR("%s: error: failed to allocate '%-16s' buffer, size = %8.2f MB\n", __func__, name, size_aligned / 1024.0 / 1024.0);
                 return false;
             }
-            void *buf = wgpuBufferGetMappedRange(ctx->buffers[ctx->n_buffers].wgpu, 0, size);
-            memcpy(buf, data, size);
-            wgpuBufferUnmap(ctx->buffers[ctx->n_buffers].wgpu);
+            wgpuQueueWriteBuffer(ctx->queue, ctx->buffers[ctx->n_buffers].wgpu, 0, data, size);
 
             GGML_WGPU_LOG_INFO("%s: allocated '%-16s' buffer, size = %8.2f MB", __func__, name, size_aligned / 1024.0 / 1024.0);
 
@@ -405,7 +418,7 @@ bool ggml_wgpu_add_buffer(
                                                                     .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst |
                                                                             WGPUBufferUsage_CopySrc,
                                                                     .size = size_step_aligned,
-                                                                    .mappedAtCreation = true,
+                                                                    .mappedAtCreation = false,
                                                     });
 
 
@@ -414,9 +427,8 @@ bool ggml_wgpu_add_buffer(
                     GGML_WGPU_LOG_ERROR("%s: error: failed to allocate '%-16s' buffer, size = %8.2f MB\n", __func__, name, size_step_aligned / 1024.0 / 1024.0);
                     return false;
                 }
-                void *buf = wgpuBufferGetMappedRange(ctx->buffers[ctx->n_buffers].wgpu, 0, size_step_aligned);
-                memcpy(buf, (void *) ((uint8_t *) data + i), size_step_aligned); // TODO: might be copying bytes out of range if the original alignment is not at 4bytes
-                wgpuBufferUnmap(ctx->buffers[ctx->n_buffers].wgpu);
+                // TODO: might be copying bytes out of range if the original alignment is not at 4bytes
+                wgpuQueueWriteBuffer(ctx->queue, ctx->buffers[ctx->n_buffers].wgpu, 0, (void *) ((uint8_t *) data + i), size_step_aligned);
 
                 GGML_WGPU_LOG_INFO("%s: allocated '%-16s' buffer, size = %8.2f MB, offs = %12ld", __func__, name, size_step_aligned / 1024.0 / 1024.0, i);
                 if (i + size_step < size) {
@@ -481,6 +493,19 @@ void ggml_wgpu_graph_compute(
         struct ggml_tensor * src1 = gf->nodes[i]->src[1];
         struct ggml_tensor * dst  = gf->nodes[i];
 
+
+        const enum ggml_type src0t = src0 ? src0->type : GGML_TYPE_COUNT;
+        const enum ggml_type src1t = src1 ? src1->type : GGML_TYPE_COUNT;
+        const enum ggml_type dstt  = dst  ? dst->type  : GGML_TYPE_COUNT;
+
+        size_t offs_src0 = 0;
+        size_t offs_src1 = 0;
+        size_t offs_dst  = 0;
+        WGPUBuffer id_src0 = src0 ? ggml_wgpu_get_buffer(ctx, src0, &offs_src0) : NULL;
+        WGPUBuffer id_src1 = src1 ? ggml_wgpu_get_buffer(ctx, src1, &offs_src1) : NULL;
+        WGPUBuffer id_dst  = dst  ? ggml_wgpu_get_buffer(ctx, dst,  &offs_dst)  : NULL;
+
+
         ctx->tensor_dimension_params_host[0]  = src0 ? src0->ne[0] : 0;
         ctx->tensor_dimension_params_host[1]  = src0 ? src0->ne[1] : 0;
         ctx->tensor_dimension_params_host[2]  = src0 ? src0->ne[2] : 0;
@@ -511,34 +536,28 @@ void ggml_wgpu_graph_compute(
         ctx->tensor_dimension_params_host[22] = dst ? dst->nb[2] : 0;
         ctx->tensor_dimension_params_host[23] = dst ? dst->nb[3] : 0;
 
-        wgpuQueueWriteBuffer(ctx->queue, ctx->tensor_dimension_params, 0, ctx->tensor_dimension_params_host, 192);
+        ctx->tensor_dimension_params_host[24] = offs_src0;
+        ctx->tensor_dimension_params_host[25] = offs_src1;
+        ctx->tensor_dimension_params_host[26] = offs_dst;
 
-        const enum ggml_type src0t = src0 ? src0->type : GGML_TYPE_COUNT;
-        const enum ggml_type src1t = src1 ? src1->type : GGML_TYPE_COUNT;
-        const enum ggml_type dstt  = dst  ? dst->type  : GGML_TYPE_COUNT;
+        wgpuQueueWriteBuffer(ctx->queue, ctx->tensor_dimension_params, 0, ctx->tensor_dimension_params_host, 96+12);
 
-        size_t offs_src0 = 0;
-        size_t offs_src1 = 0;
-        size_t offs_dst  = 0;
-        WGPUBuffer id_src0 = src0 ? ggml_wgpu_get_buffer(ctx, src0, &offs_src0) : NULL;
-        WGPUBuffer id_src1 = src1 ? ggml_wgpu_get_buffer(ctx, src1, &offs_src1) : NULL;
-        WGPUBuffer id_dst  = dst  ? ggml_wgpu_get_buffer(ctx, dst,  &offs_dst)  : NULL;
 
 
         ctx->bind_group_entries[0].binding = 0;
-        ctx->bind_group_entries[0].buffer = id_src0;
-        ctx->bind_group_entries[0].offset = offs_src0;
-        ctx->bind_group_entries[0].size = id_src0 ? (wgpuBufferGetSize(id_src0) - offs_src0) : 0;
+        ctx->bind_group_entries[0].buffer = id_src0 ? id_src0 : ctx->placeholder_buffer;
+        ctx->bind_group_entries[0].offset = id_src0 ? 0*offs_src0 : 0;
+        ctx->bind_group_entries[0].size = id_src0 ? (wgpuBufferGetSize(id_src0) - 0*offs_src0) : MIN_STORAGE_BUFFER_ALIGNMENT;
 
         ctx->bind_group_entries[1].binding = 1;
-        ctx->bind_group_entries[1].buffer = id_src1;
-        ctx->bind_group_entries[1].offset = offs_src1;
-        ctx->bind_group_entries[1].size = id_src1 ? (wgpuBufferGetSize(id_src1) - offs_src1) : 0;
+        ctx->bind_group_entries[1].buffer = id_src1 ? id_src1 : ctx->placeholder_buffer;
+        ctx->bind_group_entries[1].offset = id_src1 ? 0*offs_src1 : 0;;
+        ctx->bind_group_entries[1].size = id_src1 ? (wgpuBufferGetSize(id_src1) - 0*offs_src1) : MIN_STORAGE_BUFFER_ALIGNMENT;
 
         ctx->bind_group_entries[2].binding = 2;
-        ctx->bind_group_entries[2].buffer = id_dst;
-        ctx->bind_group_entries[2].offset = offs_dst;
-        ctx->bind_group_entries[2].size = id_dst ? (wgpuBufferGetSize(id_dst) - offs_dst) : 0;
+        ctx->bind_group_entries[2].buffer = id_dst ? id_dst : ctx->placeholder_buffer;
+        ctx->bind_group_entries[2].offset = id_dst ? 0*offs_dst : 0;;
+        ctx->bind_group_entries[2].size = id_dst ? (wgpuBufferGetSize(id_dst) - 0*offs_dst) : MIN_STORAGE_BUFFER_ALIGNMENT;
 
 
         WGPUBindGroup bind_group = wgpuDeviceCreateBindGroup(
