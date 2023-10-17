@@ -429,26 +429,38 @@ bool ggml_wgpu_add_buffer(
 
     return true;
 }
+
+void ggml_wgpu_set_tensor(
+        struct ggml_wgpu_context * ctx,
+        struct ggml_tensor * t) {
+    size_t offs;
+    WGPUBuffer id_dst = ggml_wgpu_get_buffer(ctx, t, &offs);
+
+    GGML_ASSERT(ggml_is_contiguous(t));
+    wgpuQueueWriteBuffer(ctx->queue, id_dst, offs, t->data, ggml_nbytes(t));
+}
+
+void ggml_wgpu_get_tensor(
+        struct ggml_wgpu_context * ctx,
+        struct ggml_tensor * t) {
+    GGML_ASSERT(ggml_is_contiguous(t));
+    size_t offs;
+    WGPUBuffer id_src = ggml_wgpu_get_buffer(ctx, t, &offs);
+
+    const size_t nbytes = ggml_nbytes(t);
+
+    wgpuBufferMapAsync(id_src, WGPUMapMode_Read, offs, nbytes,
+                     handle_buffer_map, NULL);
+    wgpuDevicePoll(ctx->device, true, NULL);
+
+    void * buf = wgpuBufferGetMappedRange(id_src, offs, nbytes);
+    GGML_ASSERT(buf);
+
+    memcpy(t->data, buf, nbytes);
+    wgpuBufferUnmap(id_src);
+}
+
 #if 0
-
-void ggml_metal_set_tensor(
-        struct ggml_metal_context * ctx,
-        struct ggml_tensor * t) {
-    size_t offs;
-    id<MTLBuffer> id_dst = ggml_metal_get_buffer(ctx, t, &offs);
-
-    memcpy((void *) ((uint8_t *) id_dst.contents + offs), t->data, ggml_nbytes(t));
-}
-
-void ggml_metal_get_tensor(
-        struct ggml_metal_context * ctx,
-        struct ggml_tensor * t) {
-    size_t offs;
-    id<MTLBuffer> id_src = ggml_metal_get_buffer(ctx, t, &offs);
-
-    memcpy(t->data, (void *) ((uint8_t *) id_src.contents + offs), ggml_nbytes(t));
-}
-
 void ggml_metal_graph_find_concurrency(
         struct ggml_metal_context * ctx,
         struct ggml_cgraph * gf, bool check_mem) {
