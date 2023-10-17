@@ -1,7 +1,7 @@
 #ifndef FRAMEWORK_H
 #define FRAMEWORK_H
 
-#include "wgpu.h"
+#include "webgpu/wgpu.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>

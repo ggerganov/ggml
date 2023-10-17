@@ -248,7 +248,7 @@ endif()
 if (GGML_WGPU)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../webgpu ${CMAKE_CURRENT_BINARY_DIR}/webgpu)
 
-    set(GGML_WGPU_SOURCES ggml-wgpu.c ggml-wgpu.h wgpu.h framework.h framework.c)
+    set(GGML_WGPU_SOURCES ggml-wgpu.c ggml-wgpu.h framework.h framework.c)
 
     add_compile_definitions(GGML_USE_WGPU)
     #add_compile_definitions(GGML_WGPU_NDEBUG)
