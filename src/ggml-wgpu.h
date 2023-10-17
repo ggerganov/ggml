@@ -49,8 +49,8 @@ void ggml_wgpu_log_set_callback(ggml_log_callback log_callback, void * user_data
 struct ggml_wgpu_context * ggml_wgpu_init(int n_cb);
 void ggml_wgpu_free(struct ggml_wgpu_context * ctx);
 
-void * ggml_wgpu_host_malloc(struct ggml_wgpu_context * ctx, size_t n);
-void   ggml_wgpu_host_free  (struct ggml_wgpu_context * ctx, void * data);
+void * ggml_wgpu_host_malloc(size_t n);
+void   ggml_wgpu_host_free  (void * data);
 
 // set the number of command buffers to use
 void ggml_wgpu_set_n_cb(struct ggml_wgpu_context * ctx, int n_cb);

@@ -69,6 +69,7 @@ struct ggml_wgpu_context {
     WGPUInstance instance;
     WGPUAdapter adapter;
     WGPUDevice device;
+    WGPUSupportedLimits limits;
     WGPUQueue queue;
     WGPUShaderModule shader_module;
     WGPUBindGroupLayout bind_group_layout;
@@ -177,6 +178,8 @@ struct ggml_wgpu_context * ggml_wgpu_init(int n_cb) {
                             (void *)&(ctx->device));
     ASSERT_CHECK(ctx->device);
 
+    ASSERT_CHECK(wgpuDeviceGetLimits(ctx->device, &(ctx->limits)));
+
     ctx->queue = wgpuDeviceGetQueue(ctx->device);
     ASSERT_CHECK(ctx->queue);
 
@@ -266,30 +269,19 @@ void ggml_metal_free(struct ggml_metal_context * ctx) {
 #endif
 
 
-void * ggml_wgpu_host_malloc(struct ggml_wgpu_context * ctx, size_t n) {
-    // TODO: proper buffer label
-    WGPUBuffer storage_buffer = wgpuDeviceCreateBuffer(
-        ctx->device, &(const WGPUBufferDescriptor){
-                    .label = "storage_buffer",
-                    .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst |
-                            WGPUBufferUsage_CopySrc,
-                    .size = n,
-                    .mappedAtCreation = false,
-                });
-
-    if (!storage_buffer) {
-        GGML_WGPU_LOG_ERROR("%s: error: wgpuDeviceCreateBuffer failed\n", __func__);
+void * ggml_wgpu_host_malloc(size_t n) {
+    void * data = NULL;
+    const int result = posix_memalign((void **) &data, 4, n);
+    if (result != 0) {
+        GGML_WGPU_LOG_ERROR("%s: error: posix_memalign failed\n", __func__);
         return NULL;
     }
 
-    return storage_buffer;
+    return data;
 }
 
-void ggml_wgpu_host_free(struct ggml_wgpu_context * ctx, void * data) {
-    WGPUBuffer storage_buffer = (WGPUBuffer)data;
-    wgpuBufferRelease(storage_buffer);
-    // TODO: figure out different between release/destroy and which one to use
-    // wgpuBufferDestroy(storage_buffer)
+void ggml_wgpu_host_free(void * data) {
+    free(data);
 }
 
 void ggml_wgpu_set_n_cb(struct ggml_wgpu_context * ctx, int n_cb) {
@@ -333,16 +325,14 @@ static WGPUBuffer ggml_wgpu_get_buffer(struct ggml_wgpu_context * ctx, struct gg
     return NULL;
 }
 
-#if 0
-
-bool ggml_metal_add_buffer(
-        struct ggml_metal_context * ctx,
+bool ggml_wgpu_add_buffer(
+        struct ggml_wgpu_context * ctx,
                      const char * name,
                            void * data,
                          size_t   size,
                          size_t   max_size) {
-    if (ctx->n_buffers >= GGML_METAL_MAX_BUFFERS) {
-        GGML_METAL_LOG_ERROR("%s: error: too many buffers\n", __func__);
+    if (ctx->n_buffers >= GGML_WGPU_MAX_BUFFERS) {
+        GGML_WGPU_LOG_ERROR("%s: error: too many buffers\n", __func__);
         return false;
     }
 
@@ -352,12 +342,12 @@ bool ggml_metal_add_buffer(
             const int64_t ioffs = (int64_t) data - (int64_t) ctx->buffers[i].data;
 
             if (ioffs >= 0 && ioffs < (int64_t) ctx->buffers[i].size) {
-                GGML_METAL_LOG_ERROR("%s: error: buffer '%s' overlaps with '%s'\n", __func__, name, ctx->buffers[i].name);
+                GGML_WGPU_LOG_ERROR("%s: error: buffer '%s' overlaps with '%s'\n", __func__, name, ctx->buffers[i].name);
                 return false;
             }
         }
 
-        const size_t size_page = sysconf(_SC_PAGESIZE);
+        const size_t size_page = 4; // TODO: figure out if this needs a real value like on metal // sysconf(_SC_PAGESIZE);
 
         size_t size_aligned = size;
         if ((size_aligned % size_page) != 0) {
@@ -365,27 +355,38 @@ bool ggml_metal_add_buffer(
         }
 
         // the buffer fits into the max buffer size allowed by the device
-        if (size_aligned <= ctx->device.maxBufferLength) {
+        if (size_aligned <= ctx->limits.limits.maxBufferSize) {
             ctx->buffers[ctx->n_buffers].name = name;
             ctx->buffers[ctx->n_buffers].data = data;
             ctx->buffers[ctx->n_buffers].size = size;
 
-            ctx->buffers[ctx->n_buffers].metal = [ctx->device newBufferWithBytesNoCopy:data length:size_aligned options:MTLResourceStorageModeShared deallocator:nil];
+            // TODO: proper buffer label
+            ctx->buffers[ctx->n_buffers].wgpu = wgpuDeviceCreateBuffer(
+                                                    ctx->device, &(const WGPUBufferDescriptor){
+                                                                .label = "storage_buffer",
+                                                                .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst |
+                                                                        WGPUBufferUsage_CopySrc,
+                                                                .size = size_aligned,
+                                                                .mappedAtCreation = true,
+                                                });
 
-            if (ctx->buffers[ctx->n_buffers].metal == nil) {
-                GGML_METAL_LOG_ERROR("%s: error: failed to allocate '%-16s' buffer, size = %8.2f MB\n", __func__, name, size_aligned / 1024.0 / 1024.0);
+            if (ctx->buffers[ctx->n_buffers].wgpu == NULL) {
+                GGML_WGPU_LOG_ERROR("%s: error: failed to allocate '%-16s' buffer, size = %8.2f MB\n", __func__, name, size_aligned / 1024.0 / 1024.0);
                 return false;
             }
+            void *buf = wgpuBufferGetMappedRange(ctx->buffers[ctx->n_buffers].wgpu, 0, size);
+            memcpy(buf, data, size);
+            wgpuBufferUnmap(ctx->buffers[ctx->n_buffers].wgpu);
 
-            GGML_METAL_LOG_INFO("%s: allocated '%-16s' buffer, size = %8.2f MB", __func__, name, size_aligned / 1024.0 / 1024.0);
+            GGML_WGPU_LOG_INFO("%s: allocated '%-16s' buffer, size = %8.2f MB", __func__, name, size_aligned / 1024.0 / 1024.0);
 
             ++ctx->n_buffers;
         } else {
             // this overlap between the views will guarantee that the tensor with the maximum size will fully fit into
             // one of the views
             const size_t size_ovlp = ((max_size + size_page - 1) / size_page + 1) * size_page; // round-up 2 pages just in case
-            const size_t size_step = ctx->device.maxBufferLength - size_ovlp;
-            const size_t size_view = ctx->device.maxBufferLength;
+            const size_t size_step = ctx->limits.limits.maxBufferSize - size_ovlp;
+            const size_t size_view = ctx->limits.limits.maxBufferSize;
 
             for (size_t i = 0; i < size; i += size_step) {
                 const size_t size_step_aligned = (i + size_view <= size) ? size_view : (size_aligned - i);
@@ -394,27 +395,41 @@ bool ggml_metal_add_buffer(
                 ctx->buffers[ctx->n_buffers].data = (void *) ((uint8_t *) data + i);
                 ctx->buffers[ctx->n_buffers].size = size_step_aligned;
 
-                ctx->buffers[ctx->n_buffers].metal = [ctx->device newBufferWithBytesNoCopy:(void *) ((uint8_t *) data + i) length:size_step_aligned options:MTLResourceStorageModeShared deallocator:nil];
+                // TODO: proper buffer label
+                ctx->buffers[ctx->n_buffers].wgpu = wgpuDeviceCreateBuffer(
+                                                        ctx->device, &(const WGPUBufferDescriptor){
+                                                                    .label = "storage_buffer",
+                                                                    .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst |
+                                                                            WGPUBufferUsage_CopySrc,
+                                                                    .size = size_step_aligned,
+                                                                    .mappedAtCreation = true,
+                                                    });
 
-                if (ctx->buffers[ctx->n_buffers].metal == nil) {
-                    GGML_METAL_LOG_ERROR("%s: error: failed to allocate '%-16s' buffer, size = %8.2f MB\n", __func__, name, size_step_aligned / 1024.0 / 1024.0);
+
+
+                if (ctx->buffers[ctx->n_buffers].wgpu == NULL) {
+                    GGML_WGPU_LOG_ERROR("%s: error: failed to allocate '%-16s' buffer, size = %8.2f MB\n", __func__, name, size_step_aligned / 1024.0 / 1024.0);
                     return false;
                 }
+                void *buf = wgpuBufferGetMappedRange(ctx->buffers[ctx->n_buffers].wgpu, 0, size_step_aligned);
+                memcpy(buf, (void *) ((uint8_t *) data + i), size_step_aligned); // TODO: might be copying bytes out of range if the original alignment is not at 4bytes
+                wgpuBufferUnmap(ctx->buffers[ctx->n_buffers].wgpu);
 
-                GGML_METAL_LOG_INFO("%s: allocated '%-16s' buffer, size = %8.2f MB, offs = %12ld", __func__, name, size_step_aligned / 1024.0 / 1024.0, i);
+                GGML_WGPU_LOG_INFO("%s: allocated '%-16s' buffer, size = %8.2f MB, offs = %12ld", __func__, name, size_step_aligned / 1024.0 / 1024.0, i);
                 if (i + size_step < size) {
-                    GGML_METAL_LOG_INFO("\n");
+                    GGML_WGPU_LOG_INFO("\n");
                 }
 
                 ++ctx->n_buffers;
             }
         }
 
-        GGML_METAL_LOG_INFO(", (%8.2f)\n", ctx->device.currentAllocatedSize / 1024.0 / 1024.0);
+        // GGML_WGPU_LOG_INFO(", (%8.2f)\n", ctx->device.currentAllocatedSize / 1024.0 / 1024.0);
     }
 
     return true;
 }
+#if 0
 
 void ggml_metal_set_tensor(
         struct ggml_metal_context * ctx,
