@@ -51,8 +51,6 @@ static void handle_buffer_map(WGPUBufferMapAsyncStatus status, void *userdata) {
 
 #define UNUSED(x) (void)(x)
 
-#define GGML_MAX_CONCUR (2*GGML_MAX_NODES)
-
 struct ggml_wgpu_buffer {
     const char * name;
 
@@ -64,8 +62,6 @@ struct ggml_wgpu_buffer {
 
 
 struct ggml_wgpu_context {
-    int n_cb;
-
     WGPUInstance instance;
     WGPUAdapter adapter;
     WGPUDevice device;
@@ -75,28 +71,19 @@ struct ggml_wgpu_context {
     WGPUBindGroupLayout bind_group_layout;
     WGPUPipelineLayout pipeline_layout;
 
-    // id<MTLCommandBuffer>         command_buffers [GGML_WGPU_MAX_COMMAND_BUFFERS];
-    // id<MTLComputeCommandEncoder> command_encoders[GGML_WGPU_MAX_COMMAND_BUFFERS];
+    WGPUBuffer tensor_dimension_params;
+    int64_t tensor_dimension_params_host[24];
 
-    // dispatch_queue_t d_queue;
+    WGPUBindGroupEntry bind_group_entries[4];
 
     int n_buffers;
     struct ggml_wgpu_buffer buffers[GGML_WGPU_MAX_BUFFERS];
-
-    int concur_list[GGML_MAX_CONCUR];
-    int concur_list_len;
 
     // custom kernels
 #define GGML_WGPU_DECL_KERNEL(name) \
     WGPUComputePipeline pipeline_##name
 
-    GGML_WGPU_DECL_KERNEL(add);
-    GGML_WGPU_DECL_KERNEL(scale);
     GGML_WGPU_DECL_KERNEL(silu);
-    GGML_WGPU_DECL_KERNEL(relu);
-    GGML_WGPU_DECL_KERNEL(gelu);
-    GGML_WGPU_DECL_KERNEL(soft_max);
-    GGML_WGPU_DECL_KERNEL(sqr);
 
 #undef GGML_WGPU_DECL_KERNEL
 };
@@ -157,7 +144,7 @@ static void ggml_wgpu_log(enum ggml_log_level level, const char* format, ...){
 
 
 
-struct ggml_wgpu_context * ggml_wgpu_init(int n_cb) {
+struct ggml_wgpu_context * ggml_wgpu_init() {
     GGML_WGPU_LOG_INFO("%s: allocating\n", __func__);
 
     wgpuSetLogCallback(wgpu_log_callback, NULL);
@@ -183,18 +170,59 @@ struct ggml_wgpu_context * ggml_wgpu_init(int n_cb) {
     ctx->queue = wgpuDeviceGetQueue(ctx->device);
     ASSERT_CHECK(ctx->queue);
 
-    ctx->n_cb   = MIN(n_cb, GGML_WGPU_MAX_BUFFERS);
+    ctx->tensor_dimension_params = wgpuDeviceCreateBuffer(ctx->device, &(const WGPUBufferDescriptor){
+                                                            .label = "tensor_dimension_params",
+                                                            .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
+                                                            .size = 192,
+                                                            .mappedAtCreation = false,
+                                                         });
+    ASSERT_CHECK(ctx->tensor_dimension_params);
+
+    ctx->bind_group_entries[3].binding = 3;
+    ctx->bind_group_entries[3].buffer = ctx->tensor_dimension_params;
+    ctx->bind_group_entries[3].offset = 0;
+    ctx->bind_group_entries[3].size = 192;
+
+
+
     ctx->n_buffers = 0;
-    ctx->concur_list_len = 0;
 
     // load library
     ctx->shader_module = frmwrk_load_shader_module(ctx->device, "ggml-wgpu.wgsl");
     ASSERT_CHECK(ctx->shader_module);
 
+    WGPUBindGroupLayoutEntry bindGroupLayoutEntries[4];
+    {
+        bindGroupLayoutEntries[0].binding = 0;
+        bindGroupLayoutEntries[0].visibility = WGPUShaderStage_Compute;
+        bindGroupLayoutEntries[0].buffer.type = WGPUBufferBindingType_Storage;
+        bindGroupLayoutEntries[0].buffer.hasDynamicOffset = false;
+        bindGroupLayoutEntries[0].buffer.minBindingSize = 0;
+
+        bindGroupLayoutEntries[1].binding = 1;
+        bindGroupLayoutEntries[1].visibility = WGPUShaderStage_Compute;
+        bindGroupLayoutEntries[1].buffer.type = WGPUBufferBindingType_Storage;
+        bindGroupLayoutEntries[1].buffer.hasDynamicOffset = false;
+        bindGroupLayoutEntries[1].buffer.minBindingSize = 0;
+
+        bindGroupLayoutEntries[2].binding = 2;
+        bindGroupLayoutEntries[2].visibility = WGPUShaderStage_Compute;
+        bindGroupLayoutEntries[2].buffer.type = WGPUBufferBindingType_Storage;
+        bindGroupLayoutEntries[2].buffer.hasDynamicOffset = false;
+        bindGroupLayoutEntries[2].buffer.minBindingSize = 0;
+
+        bindGroupLayoutEntries[3].binding = 3;
+        bindGroupLayoutEntries[3].visibility = WGPUShaderStage_Compute;
+        bindGroupLayoutEntries[3].buffer.type = WGPUBufferBindingType_Uniform;
+        bindGroupLayoutEntries[3].buffer.hasDynamicOffset = false;
+        bindGroupLayoutEntries[3].buffer.minBindingSize = 192;
+    }
+
 
     ctx->bind_group_layout = wgpuDeviceCreateBindGroupLayout(ctx->device, &(const WGPUBindGroupLayoutDescriptor){
                            .label = "ggml-wgpu-bind-group-layout",
-                           .entryCount = 0,
+                           .entries = bindGroupLayoutEntries,
+                           .entryCount = 4,
                        });
     ASSERT_CHECK(ctx->bind_group_layout);
 
@@ -223,39 +251,27 @@ struct ggml_wgpu_context * ggml_wgpu_init(int n_cb) {
         ASSERT_CHECK(ctx->pipeline_##name);
 
 
-        GGML_WGPU_ADD_KERNEL(add);
-        GGML_WGPU_ADD_KERNEL(scale);
         GGML_WGPU_ADD_KERNEL(silu);
-        GGML_WGPU_ADD_KERNEL(relu);
-        GGML_WGPU_ADD_KERNEL(gelu);
-        GGML_WGPU_ADD_KERNEL(soft_max);
-        GGML_WGPU_ADD_KERNEL(sqr);
 
 #undef GGML_WGPU_ADD_KERNEL
     }
 
     return ctx;
 }
-#if 0
 
-void ggml_metal_free(struct ggml_metal_context * ctx) {
-    GGML_METAL_LOG_INFO("%s: deallocating\n", __func__);
-#define GGML_METAL_DEL_KERNEL(name) \
+void ggml_wgpu_free(struct ggml_wgpu_context * ctx) {
+    GGML_WGPU_LOG_INFO("%s: deallocating\n", __func__);
+#if 0
+#define GGML_WGPU_DEL_KERNEL(name) \
     [ctx->function_##name release]; \
     [ctx->pipeline_##name release];
 
-    GGML_METAL_DEL_KERNEL(add);
-    GGML_METAL_DEL_KERNEL(scale);
-    GGML_METAL_DEL_KERNEL(silu);
-    GGML_METAL_DEL_KERNEL(relu);
-    GGML_METAL_DEL_KERNEL(gelu);
-    GGML_METAL_DEL_KERNEL(soft_max);
-    GGML_METAL_DEL_KERNEL(sqr);
+    GGML_WGPU_DEL_KERNEL(silu);
 
-#undef GGML_METAL_DEL_KERNEL
+#undef GGML_WGPU_DEL_KERNEL
 
     for (int i = 0; i < ctx->n_buffers; ++i) {
-        [ctx->buffers[i].metal release];
+        [ctx->buffers[i].wgpu release];
     }
 
     [ctx->library release];
@@ -265,8 +281,8 @@ void ggml_metal_free(struct ggml_metal_context * ctx) {
     dispatch_release(ctx->d_queue);
 
     free(ctx);
-}
 #endif
+}
 
 
 void * ggml_wgpu_host_malloc(size_t n) {
@@ -283,19 +299,6 @@ void * ggml_wgpu_host_malloc(size_t n) {
 void ggml_wgpu_host_free(void * data) {
     free(data);
 }
-
-void ggml_wgpu_set_n_cb(struct ggml_wgpu_context * ctx, int n_cb) {
-    ctx->n_cb = MIN(n_cb, GGML_WGPU_MAX_BUFFERS);
-}
-
-int ggml_wgpu_if_optimized(struct ggml_wgpu_context * ctx) {
-    return ctx->concur_list_len;
-}
-
-int * ggml_wgpu_get_concur_list(struct ggml_wgpu_context * ctx) {
-    return ctx->concur_list;
-}
-
 
 // finds the WebGPU buffer that contains the tensor data on the GPU device
 // the assumption is that there is 1-to-1 mapping between the host and device memory buffers, so we can find the
@@ -460,437 +463,161 @@ void ggml_wgpu_get_tensor(
     wgpuBufferUnmap(id_src);
 }
 
-#if 0
-void ggml_metal_graph_find_concurrency(
-        struct ggml_metal_context * ctx,
-        struct ggml_cgraph * gf, bool check_mem) {
-    int search_depth = gf->n_nodes; //we only find concurrency in this range to avoid wasting too much time
-    int nodes_unused[GGML_MAX_CONCUR];
-
-    for (int i = 0; i < GGML_MAX_CONCUR; i++) { ctx->concur_list[i] = 0; }
-    for (int i = 0; i < gf->n_nodes;     i++) { nodes_unused[i]     = 1; }
-    ctx->concur_list_len = 0;
-
-    int n_left    = gf->n_nodes;
-    int n_start   = 0; // all nodes before n_start at nodes_unused array have been sorted and store back to ctx->concur_list
-    int level_pos = 0; // at ctx->concur_list, the last layer (level) ends at level_pos
-
-    while (n_left > 0) {
-        // number of nodes at a layer (that can be issued concurrently)
-        int concurrency = 0;
-        for (int i = n_start; i < ((n_start + search_depth > gf->n_nodes) ? gf->n_nodes : n_start + search_depth); i++) {
-            if (nodes_unused[i]) {
-                // if the requirements for gf->nodes[i] are satisfied
-                int exe_flag = 1;
-
-                // scan all srcs
-                for (int src_ind = 0; src_ind < GGML_MAX_SRC; src_ind++) {
-                    struct ggml_tensor * src_cur = gf->nodes[i]->src[src_ind];
-                    if (src_cur) {
-                        // if is leaf nodes it's satisfied.
-                        // TODO: ggml_is_leaf()
-                        if (src_cur->op == GGML_OP_NONE && src_cur->grad == NULL) {
-                            continue;
-                        }
-
-                        // otherwise this src should be the output from previous nodes.
-                        int is_found = 0;
-
-                        // scan 2*search_depth back because we inserted barrier.
-                        //for (int j = ((level_pos - 2*search_depth) < 0 ? 0 : (level_pos - 2*search_depth)); j < level_pos; j++) {
-                        for (int j = MAX(0, level_pos - 2*search_depth); j < level_pos; j++) {
-                            if (ctx->concur_list[j] >= 0 && gf->nodes[ctx->concur_list[j]] == src_cur) {
-                                is_found = 1;
-                                break;
-                            }
-                        }
-                        if (is_found == 0) {
-                            exe_flag = 0;
-                            break;
-                        }
-                    }
-                }
-                if (exe_flag && check_mem) {
-                    // check if nodes[i]'s data will be overwritten by a node before nodes[i].
-                    // if node[5] and node[3] write to the same memory region, then we can't issue node[5] before node[3]
-                    int64_t data_start = (int64_t) gf->nodes[i]->data;
-                    int64_t length     = (int64_t) ggml_nbytes(gf->nodes[i]);
-                    for (int j = n_start; j < i; j++) {
-                        if (nodes_unused[j] && gf->nodes[j]->op != GGML_OP_RESHAPE \
-                                            && gf->nodes[j]->op != GGML_OP_VIEW \
-                                            && gf->nodes[j]->op != GGML_OP_TRANSPOSE \
-                                            && gf->nodes[j]->op != GGML_OP_PERMUTE) {
-                            if (((int64_t)gf->nodes[j]->data) >= data_start + length || \
-                                ((int64_t)gf->nodes[j]->data) + (int64_t) ggml_nbytes(gf->nodes[j]) <= data_start) {
-                                continue;
-                            }
-
-                            exe_flag = 0;
-                        }
-                    }
-                }
-                if (exe_flag) {
-                    ctx->concur_list[level_pos + concurrency] = i;
-                    nodes_unused[i] = 0;
-                    concurrency++;
-                    ctx->concur_list_len++;
-                }
-            }
-        }
-        n_left -= concurrency;
-        // adding a barrier different layer
-        ctx->concur_list[level_pos + concurrency] = -1;
-        ctx->concur_list_len++;
-        // jump all sorted nodes at nodes_bak
-        while (!nodes_unused[n_start]) {
-            n_start++;
-        }
-        level_pos += concurrency + 1;
-    }
-
-    if (ctx->concur_list_len > GGML_MAX_CONCUR) {
-        GGML_METAL_LOG_WARN("%s: too many elements for metal ctx->concur_list!\n", __func__);
-    }
-}
-
-void ggml_metal_graph_compute(
-        struct ggml_metal_context * ctx,
+void ggml_wgpu_graph_compute(
+        struct ggml_wgpu_context * ctx,
                struct ggml_cgraph * gf) {
-    @autoreleasepool {
 
-    // if there is ctx->concur_list, dispatch concurrently
-    // else fallback to serial dispatch
-    MTLComputePassDescriptor * edesc = MTLComputePassDescriptor.computePassDescriptor;
+    WGPUCommandEncoder command_encoder = wgpuDeviceCreateCommandEncoder(
+            ctx->device, &(const WGPUCommandEncoderDescriptor){
+                        .label = "ggml_command_encoder",
+                    });
+    ASSERT_CHECK(command_encoder);
 
-    const bool has_concur = ctx->concur_list_len && ctx->concur_list_len <= GGML_MAX_CONCUR;
 
-    const int n_nodes  = has_concur ? ctx->concur_list_len      : gf->n_nodes;
-    edesc.dispatchType = has_concur ? MTLDispatchTypeConcurrent : MTLDispatchTypeSerial;
+    for (int i = 0; i < gf->n_nodes; ++i) {
+        GGML_WGPU_LOG_INFO("%s: encoding node %3d, op = %8s\n", __func__, i, ggml_op_name(gf->nodes[i]->op));
 
-    // create multiple command buffers and enqueue them
-    // then, we encode the graph into the command buffers in parallel
+        struct ggml_tensor * src0 = gf->nodes[i]->src[0];
+        struct ggml_tensor * src1 = gf->nodes[i]->src[1];
+        struct ggml_tensor * dst  = gf->nodes[i];
 
-    const int n_cb = ctx->n_cb;
+        ctx->tensor_dimension_params_host[0]  = src0 ? src0->ne[0] : 0;
+        ctx->tensor_dimension_params_host[1]  = src0 ? src0->ne[1] : 0;
+        ctx->tensor_dimension_params_host[2]  = src0 ? src0->ne[2] : 0;
+        ctx->tensor_dimension_params_host[3]  = src0 ? src0->ne[3] : 0;
 
-    for (int i = 0; i < n_cb; ++i) {
-        ctx->command_buffers[i] = [ctx->queue commandBuffer];
+        ctx->tensor_dimension_params_host[4]  = src0 ? src0->nb[0] : 0;
+        ctx->tensor_dimension_params_host[5]  = src0 ? src0->nb[1] : 0;
+        ctx->tensor_dimension_params_host[6]  = src0 ? src0->nb[2] : 0;
+        ctx->tensor_dimension_params_host[7]  = src0 ? src0->nb[3] : 0;
 
-        // enqueue the command buffers in order to specify their execution order
-        [ctx->command_buffers[i] enqueue];
+        ctx->tensor_dimension_params_host[8]  = src1 ? src1->ne[0] : 0;
+        ctx->tensor_dimension_params_host[9]  = src1 ? src1->ne[1] : 0;
+        ctx->tensor_dimension_params_host[10] = src1 ? src1->ne[2] : 0;
+        ctx->tensor_dimension_params_host[11] = src1 ? src1->ne[3] : 0;
 
-        ctx->command_encoders[i] = [ctx->command_buffers[i] computeCommandEncoderWithDescriptor: edesc];
-    }
+        ctx->tensor_dimension_params_host[12] = src1 ? src1->nb[0] : 0;
+        ctx->tensor_dimension_params_host[13] = src1 ? src1->nb[1] : 0;
+        ctx->tensor_dimension_params_host[14] = src1 ? src1->nb[2] : 0;
+        ctx->tensor_dimension_params_host[15] = src1 ? src1->nb[3] : 0;
 
-    for (int cb_idx = 0; cb_idx < n_cb; ++cb_idx) {
-        const int n_nodes_per_cb = (n_nodes + n_cb - 1) / n_cb;
+        ctx->tensor_dimension_params_host[16] = dst ? dst->ne[0] : 0;
+        ctx->tensor_dimension_params_host[17] = dst ? dst->ne[1] : 0;
+        ctx->tensor_dimension_params_host[18] = dst ? dst->ne[2] : 0;
+        ctx->tensor_dimension_params_host[19] = dst ? dst->ne[3] : 0;
 
-        dispatch_async(ctx->d_queue, ^{
-            size_t offs_src0 = 0;
-            size_t offs_src1 = 0;
-            size_t offs_dst  = 0;
+        ctx->tensor_dimension_params_host[20] = dst ? dst->nb[0] : 0;
+        ctx->tensor_dimension_params_host[21] = dst ? dst->nb[1] : 0;
+        ctx->tensor_dimension_params_host[22] = dst ? dst->nb[2] : 0;
+        ctx->tensor_dimension_params_host[23] = dst ? dst->nb[3] : 0;
 
-            id<MTLCommandBuffer> command_buffer  = ctx->command_buffers[cb_idx];
-            id<MTLComputeCommandEncoder> encoder = ctx->command_encoders[cb_idx];
+        wgpuQueueWriteBuffer(ctx->queue, ctx->tensor_dimension_params, 0, ctx->tensor_dimension_params_host, 192);
 
-            const int node_start =                                      (cb_idx + 0) * n_nodes_per_cb;
-            const int node_end   = MIN((cb_idx == n_cb - 1) ? n_nodes : (cb_idx + 1) * n_nodes_per_cb, n_nodes);
+        const enum ggml_type src0t = src0 ? src0->type : GGML_TYPE_COUNT;
+        const enum ggml_type src1t = src1 ? src1->type : GGML_TYPE_COUNT;
+        const enum ggml_type dstt  = dst  ? dst->type  : GGML_TYPE_COUNT;
 
-            for (int ind = node_start; ind < node_end; ++ind) {
-                const int i = has_concur ? ctx->concur_list[ind] : ind;
+        size_t offs_src0 = 0;
+        size_t offs_src1 = 0;
+        size_t offs_dst  = 0;
+        WGPUBuffer id_src0 = src0 ? ggml_wgpu_get_buffer(ctx, src0, &offs_src0) : NULL;
+        WGPUBuffer id_src1 = src1 ? ggml_wgpu_get_buffer(ctx, src1, &offs_src1) : NULL;
+        WGPUBuffer id_dst  = dst  ? ggml_wgpu_get_buffer(ctx, dst,  &offs_dst)  : NULL;
 
-                if (i == -1) {
-                    [encoder memoryBarrierWithScope:MTLBarrierScopeBuffers];
-                    continue;
-                }
 
-                //GGML_METAL_LOG_INFO("%s: encoding node %3d, op = %8s\n", __func__, i, ggml_op_name(gf->nodes[i]->op));
+        ctx->bind_group_entries[0].binding = 0;
+        ctx->bind_group_entries[0].buffer = id_src0;
+        ctx->bind_group_entries[0].offset = offs_src0;
+        ctx->bind_group_entries[0].size = id_src0 ? (wgpuBufferGetSize(id_src0) - offs_src0) : 0;
 
-                struct ggml_tensor * src0 = gf->nodes[i]->src[0];
-                struct ggml_tensor * src1 = gf->nodes[i]->src[1];
-                struct ggml_tensor * dst  = gf->nodes[i];
+        ctx->bind_group_entries[1].binding = 1;
+        ctx->bind_group_entries[1].buffer = id_src1;
+        ctx->bind_group_entries[1].offset = offs_src1;
+        ctx->bind_group_entries[1].size = id_src1 ? (wgpuBufferGetSize(id_src1) - offs_src1) : 0;
 
-                const int64_t  ne00 = src0 ? src0->ne[0] : 0;
-                const int64_t  ne01 = src0 ? src0->ne[1] : 0;
-                const int64_t  ne02 = src0 ? src0->ne[2] : 0;
-                const int64_t  ne03 = src0 ? src0->ne[3] : 0;
+        ctx->bind_group_entries[2].binding = 2;
+        ctx->bind_group_entries[2].buffer = id_dst;
+        ctx->bind_group_entries[2].offset = offs_dst;
+        ctx->bind_group_entries[2].size = id_dst ? (wgpuBufferGetSize(id_dst) - offs_dst) : 0;
 
-                const uint64_t nb00 = src0 ? src0->nb[0] : 0;
-                const uint64_t nb01 = src0 ? src0->nb[1] : 0;
-                const uint64_t nb02 = src0 ? src0->nb[2] : 0;
-                const uint64_t nb03 = src0 ? src0->nb[3] : 0;
 
-                const int64_t  ne10 = src1 ? src1->ne[0] : 0;
-                const int64_t  ne11 = src1 ? src1->ne[1] : 0;
-                const int64_t  ne12 = src1 ? src1->ne[2] : 0;
-                const int64_t  ne13 = src1 ? src1->ne[3] : 0; UNUSED(ne13);
+        WGPUBindGroup bind_group = wgpuDeviceCreateBindGroup(
+            ctx->device, &(const WGPUBindGroupDescriptor){
+                        .label = "bind_group",
+                        .layout = ctx->bind_group_layout,
+                        .entryCount = 4,
+                        .entries = ctx->bind_group_entries,
+                    });
+        ASSERT_CHECK(bind_group);
 
-                const uint64_t nb10 = src1 ? src1->nb[0] : 0;
-                const uint64_t nb11 = src1 ? src1->nb[1] : 0;
-                const uint64_t nb12 = src1 ? src1->nb[2] : 0;
-                const uint64_t nb13 = src1 ? src1->nb[3] : 0; UNUSED(nb13);
+        WGPUComputePassEncoder compute_pass_encoder;
 
-                const int64_t  ne0  = dst ? dst->ne[0] : 0;
-                const int64_t  ne1  = dst ? dst->ne[1] : 0;
-                const int64_t  ne2  = dst ? dst->ne[2] : 0;
-                const int64_t  ne3  = dst ? dst->ne[3] : 0;
 
-                const uint64_t nb0  = dst ? dst->nb[0] : 0;
-                const uint64_t nb1  = dst ? dst->nb[1] : 0;
-                const uint64_t nb2  = dst ? dst->nb[2] : 0;
-                const uint64_t nb3  = dst ? dst->nb[3] : 0;
+        //GGML_METAL_LOG_INFO("%s: op - %s\n", __func__, ggml_op_name(dst->op));
+        //if (src0) {
+        //    GGML_METAL_LOG_INFO("%s: src0 - %4s [%5lld, %5lld, %5lld], %d, %s\n", __func__, ggml_type_name(src0t), ne00, ne01, ne02,
+        //            ggml_is_contiguous(src0), src0->name);
+        //}
+        //if (src1) {
+        //    GGML_METAL_LOG_INFO("%s: src1 - %4s [%5lld, %5lld, %5lld], %d, %s\n", __func__, ggml_type_name(src1t), ne10, ne11, ne12,
+        //            ggml_is_contiguous(src1), src1->name);
+        //}
+        //if (dst) {
+        //    GGML_METAL_LOG_INFO("%s: dst  - %4s [%5lld, %5lld, %5lld], 1, %s\n",  __func__, ggml_type_name(dstt),  ne0,  ne1,  ne2,
+        //            dst->name);
+        //}
 
-                const enum ggml_type src0t = src0 ? src0->type : GGML_TYPE_COUNT;
-                const enum ggml_type src1t = src1 ? src1->type : GGML_TYPE_COUNT;
-                const enum ggml_type dstt  = dst  ? dst->type  : GGML_TYPE_COUNT;
-
-                id<MTLBuffer> id_src0 = src0 ? ggml_metal_get_buffer(ctx, src0, &offs_src0) : nil;
-                id<MTLBuffer> id_src1 = src1 ? ggml_metal_get_buffer(ctx, src1, &offs_src1) : nil;
-                id<MTLBuffer> id_dst  = dst  ? ggml_metal_get_buffer(ctx, dst,  &offs_dst)  : nil;
-
-                //GGML_METAL_LOG_INFO("%s: op - %s\n", __func__, ggml_op_name(dst->op));
-                //if (src0) {
-                //    GGML_METAL_LOG_INFO("%s: src0 - %4s [%5lld, %5lld, %5lld], %d, %s\n", __func__, ggml_type_name(src0t), ne00, ne01, ne02,
-                //            ggml_is_contiguous(src0), src0->name);
-                //}
-                //if (src1) {
-                //    GGML_METAL_LOG_INFO("%s: src1 - %4s [%5lld, %5lld, %5lld], %d, %s\n", __func__, ggml_type_name(src1t), ne10, ne11, ne12,
-                //            ggml_is_contiguous(src1), src1->name);
-                //}
-                //if (dst) {
-                //    GGML_METAL_LOG_INFO("%s: dst  - %4s [%5lld, %5lld, %5lld], 1, %s\n",  __func__, ggml_type_name(dstt),  ne0,  ne1,  ne2,
-                //            dst->name);
-                //}
-
-                switch (dst->op) {
-                    case GGML_OP_NONE:
-                    case GGML_OP_RESHAPE:
-                    case GGML_OP_VIEW:
-                    case GGML_OP_TRANSPOSE:
-                    case GGML_OP_PERMUTE:
+        switch (dst->op) {
+            case GGML_OP_NONE:
+            case GGML_OP_RESHAPE:
+            case GGML_OP_VIEW:
+            case GGML_OP_TRANSPOSE:
+            case GGML_OP_PERMUTE:
+                {
+                    // noop
+                } break;
+            case GGML_OP_UNARY:
+                switch (ggml_get_unary_op(gf->nodes[i])) {
+                    case GGML_UNARY_OP_SILU:
                         {
-                            // noop
-                        } break;
-                    case GGML_OP_ADD:
-                        {
-                            GGML_ASSERT(ggml_is_contiguous(src0));
-                            GGML_ASSERT(ggml_is_contiguous(src1));
+                            compute_pass_encoder = wgpuCommandEncoderBeginComputePass(
+                                command_encoder, &(const WGPUComputePassDescriptor){
+                                                    .label = "compute_pass",
+                                                });
+                            ASSERT_CHECK(compute_pass_encoder);
 
-                            bool bcast_row = false;
-
-                            int64_t nb = ne00;
-
-                            if (ggml_nelements(src1) == ne10 && ne00 % 4 == 0) {
-                                // src1 is a row
-                                GGML_ASSERT(ne11 == 1);
-
-                                nb = ne00 / 4;
-                                [encoder setComputePipelineState:ctx->pipeline_add_row];
-
-                                bcast_row = true;
-                            } else {
-                                [encoder setComputePipelineState:ctx->pipeline_add];
-                            }
-                            [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
-                            [encoder setBuffer:id_src1 offset:offs_src1 atIndex:1];
-                            [encoder setBuffer:id_dst  offset:offs_dst  atIndex:2];
-                            [encoder setBytes:&ne00 length:sizeof(ne00) atIndex:3];
-                            [encoder setBytes:&ne01 length:sizeof(ne01) atIndex:4];
-                            [encoder setBytes:&ne02 length:sizeof(ne02) atIndex:5];
-                            [encoder setBytes:&ne03 length:sizeof(ne03) atIndex:6];
-                            [encoder setBytes:&nb00 length:sizeof(nb00) atIndex:7];
-                            [encoder setBytes:&nb01 length:sizeof(nb01) atIndex:8];
-                            [encoder setBytes:&nb02 length:sizeof(nb02) atIndex:9];
-                            [encoder setBytes:&nb03 length:sizeof(nb03) atIndex:10];
-                            [encoder setBytes:&ne10 length:sizeof(ne10) atIndex:11];
-                            [encoder setBytes:&ne11 length:sizeof(ne11) atIndex:12];
-                            [encoder setBytes:&ne12 length:sizeof(ne12) atIndex:13];
-                            [encoder setBytes:&ne13 length:sizeof(ne13) atIndex:14];
-                            [encoder setBytes:&nb10 length:sizeof(nb10) atIndex:15];
-                            [encoder setBytes:&nb11 length:sizeof(nb11) atIndex:16];
-                            [encoder setBytes:&nb12 length:sizeof(nb12) atIndex:17];
-                            [encoder setBytes:&nb13 length:sizeof(nb13) atIndex:18];
-                            [encoder setBytes:&ne0  length:sizeof(ne0)  atIndex:19];
-                            [encoder setBytes:&ne1  length:sizeof(ne1)  atIndex:20];
-                            [encoder setBytes:&ne2  length:sizeof(ne2)  atIndex:21];
-                            [encoder setBytes:&ne3  length:sizeof(ne3)  atIndex:22];
-                            [encoder setBytes:&nb0  length:sizeof(nb0)  atIndex:23];
-                            [encoder setBytes:&nb1  length:sizeof(nb1)  atIndex:24];
-                            [encoder setBytes:&nb2  length:sizeof(nb2)  atIndex:25];
-                            [encoder setBytes:&nb3  length:sizeof(nb3)  atIndex:26];
-                            [encoder setBytes:&nb   length:sizeof(nb)   atIndex:27];
-
-                            if (bcast_row) {
-                                const int64_t n = ggml_nelements(dst)/4;
-
-                                [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
-                            } else {
-                                const int nth = MIN(1024, ne0);
-
-                                [encoder dispatchThreadgroups:MTLSizeMake(ne01, ne02, ne03) threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
-                            }
-                        } break;
-                    case GGML_OP_SCALE:
-                        {
-                            GGML_ASSERT(ggml_is_contiguous(src0));
-
-                            const float scale = *(const float *) src1->data;
-
-                            [encoder setComputePipelineState:ctx->pipeline_scale];
-                            [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
-                            [encoder setBuffer:id_dst  offset:offs_dst  atIndex:1];
-                            [encoder setBytes:&scale length:sizeof(scale) atIndex:2];
-
-                            const int64_t n = ggml_nelements(dst)/4;
-
-                            [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
-                        } break;
-                    case GGML_OP_UNARY:
-                        switch (ggml_get_unary_op(gf->nodes[i])) {
-                            case GGML_UNARY_OP_SILU:
-                                {
-                                    [encoder setComputePipelineState:ctx->pipeline_silu];
-                                    [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
-                                    [encoder setBuffer:id_dst  offset:offs_dst  atIndex:1];
-
-                                    const int64_t n = ggml_nelements(dst)/4;
-
-                                    [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
-                                } break;
-                            case GGML_UNARY_OP_RELU:
-                                {
-                                    [encoder setComputePipelineState:ctx->pipeline_relu];
-                                    [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
-                                    [encoder setBuffer:id_dst  offset:offs_dst  atIndex:1];
-
-                                    const int64_t n = ggml_nelements(dst);
-
-                                    [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
-                                } break;
-                            case GGML_UNARY_OP_GELU:
-                                {
-                                    [encoder setComputePipelineState:ctx->pipeline_gelu];
-                                    [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
-                                    [encoder setBuffer:id_dst  offset:offs_dst  atIndex:1];
-
-                                    const int64_t n = ggml_nelements(dst)/4;
-
-                                    [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
-                                } break;
-                            default:
-                                {
-                                    GGML_METAL_LOG_WARN("%s: node %3d, op = %8s not implemented\n", __func__, i, ggml_op_name(dst->op));
-                                    GGML_ASSERT(false);
-                                }
-                        } break;
-                    case GGML_OP_SQR:
-                        {
-                            GGML_ASSERT(ggml_is_contiguous(src0));
-
-                            [encoder setComputePipelineState:ctx->pipeline_sqr];
-                            [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
-                            [encoder setBuffer:id_dst  offset:offs_dst atIndex:1];
-
-                            const int64_t n = ggml_nelements(dst);
-                            [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
-                        } break;
-                    case GGML_OP_SOFT_MAX:
-                        {
-                            const int nth = MIN(32, ne00);
-
-                            if (ne00%4 == 0) {
-                                [encoder setComputePipelineState:ctx->pipeline_soft_max_4];
-                            } else {
-                                [encoder setComputePipelineState:ctx->pipeline_soft_max];
-                            }
-                            [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
-                            [encoder setBuffer:id_dst  offset:offs_dst  atIndex:1];
-                            [encoder setBytes:&ne00 length:sizeof(ne00) atIndex:2];
-                            [encoder setBytes:&ne01 length:sizeof(ne01) atIndex:3];
-                            [encoder setBytes:&ne02 length:sizeof(ne02) atIndex:4];
-
-                            [encoder dispatchThreadgroups:MTLSizeMake(ne01, ne02, ne03) threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
-                        } break;
-                    case GGML_OP_DUP:
-                    case GGML_OP_CPY:
-                    case GGML_OP_CONT:
-                        {
-                            const int nth = MIN(1024, ne00);
-
-                            switch (src0t) {
-                                case GGML_TYPE_F32:
-                                    {
-                                        switch (dstt) {
-                                            case GGML_TYPE_F16: [encoder setComputePipelineState:ctx->pipeline_cpy_f32_f16]; break;
-                                            case GGML_TYPE_F32: [encoder setComputePipelineState:ctx->pipeline_cpy_f32_f32]; break;
-                                            default: GGML_ASSERT(false && "not implemented");
-                                        };
-                                    } break;
-                                case GGML_TYPE_F16:
-                                    {
-                                        switch (dstt) {
-                                            case GGML_TYPE_F16: [encoder setComputePipelineState:ctx->pipeline_cpy_f16_f16]; break;
-                                            case GGML_TYPE_F32: GGML_ASSERT(false && "cpy_f16_f32 not implemented"); break;
-                                            default: GGML_ASSERT(false && "not implemented");
-                                        };
-                                    } break;
-                                default: GGML_ASSERT(false && "not implemented");
-                            }
-
-                            [encoder setBuffer:id_src0 offset:offs_src0        atIndex:0];
-                            [encoder setBuffer:id_dst  offset:offs_dst         atIndex:1];
-                            [encoder setBytes:&ne00    length:sizeof( int64_t) atIndex:2];
-                            [encoder setBytes:&ne01    length:sizeof( int64_t) atIndex:3];
-                            [encoder setBytes:&ne02    length:sizeof( int64_t) atIndex:4];
-                            [encoder setBytes:&ne03    length:sizeof( int64_t) atIndex:5];
-                            [encoder setBytes:&nb00    length:sizeof(uint64_t) atIndex:6];
-                            [encoder setBytes:&nb01    length:sizeof(uint64_t) atIndex:7];
-                            [encoder setBytes:&nb02    length:sizeof(uint64_t) atIndex:8];
-                            [encoder setBytes:&nb03    length:sizeof(uint64_t) atIndex:9];
-                            [encoder setBytes:&ne0     length:sizeof( int64_t) atIndex:10];
-                            [encoder setBytes:&ne1     length:sizeof( int64_t) atIndex:11];
-                            [encoder setBytes:&ne2     length:sizeof( int64_t) atIndex:12];
-                            [encoder setBytes:&ne3     length:sizeof( int64_t) atIndex:13];
-                            [encoder setBytes:&nb0     length:sizeof(uint64_t) atIndex:14];
-                            [encoder setBytes:&nb1     length:sizeof(uint64_t) atIndex:15];
-                            [encoder setBytes:&nb2     length:sizeof(uint64_t) atIndex:16];
-                            [encoder setBytes:&nb3     length:sizeof(uint64_t) atIndex:17];
-
-                            [encoder dispatchThreadgroups:MTLSizeMake(ne01, ne02, ne03) threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
+                            wgpuComputePassEncoderSetPipeline(compute_pass_encoder, ctx->pipeline_silu);
+                            wgpuComputePassEncoderSetBindGroup(compute_pass_encoder, 0, bind_group, 0, NULL);
+                            wgpuComputePassEncoderDispatchWorkgroups(compute_pass_encoder, ggml_nelements(dst), 1, 1);
+                            wgpuComputePassEncoderEnd(compute_pass_encoder);
                         } break;
                     default:
                         {
-                            GGML_METAL_LOG_ERROR("%s: error: node %3d, op = %8s not implemented\n", __func__, i, ggml_op_name(dst->op));
+                            GGML_WGPU_LOG_WARN("%s: node %3d, op = %8s not implemented\n", __func__, i, ggml_op_name(dst->op));
                             GGML_ASSERT(false);
                         }
+                } break;
+            default:
+                {
+                    GGML_WGPU_LOG_ERROR("%s: error: node %3d, op = %8s not implemented\n", __func__, i, ggml_op_name(dst->op));
+                    GGML_ASSERT(false);
                 }
-            }
-
-            if (encoder != nil) {
-                [encoder endEncoding];
-                encoder = nil;
-            }
-
-            [command_buffer commit];
-        });
-    }
-
-    // wait for all threads to finish
-    dispatch_barrier_sync(ctx->d_queue, ^{});
-
-    // check status of command buffers
-    // needed to detect if the device ran out-of-memory for example (#1881)
-    for (int i = 0; i < n_cb; i++) {
-        [ctx->command_buffers[i] waitUntilCompleted];
-
-        MTLCommandBufferStatus status = (MTLCommandBufferStatus) [ctx->command_buffers[i] status];
-        if (status != MTLCommandBufferStatusCompleted) {
-            GGML_METAL_LOG_INFO("%s: command buffer %d failed with status %lu\n", __func__, i, status);
-            GGML_ASSERT(false);
         }
+
+        if (bind_group) wgpuBindGroupRelease(bind_group);
+        if (compute_pass_encoder) wgpuComputePassEncoderRelease(compute_pass_encoder);
     }
 
-    }
+    WGPUCommandBuffer command_buffer = wgpuCommandEncoderFinish(
+                                        command_encoder, &(const WGPUCommandBufferDescriptor){
+                                                            .label = "command_buffer",
+                       });
+    ASSERT_CHECK(command_buffer);
+
+    wgpuQueueSubmit(ctx->queue, 1, &command_buffer);
+
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1023,9 +750,3 @@ bool ggml_backend_is_wgpu(ggml_backend_t backend) {
     return backend->iface.get_name == ggml_backend_wgpu_name;
 }
 
-void ggml_backend_wgpu_set_n_cb(ggml_backend_t backend, int n_cb) {
-    struct ggml_wgpu_context * ctx = (struct ggml_wgpu_context *)backend->context;
-
-    ggml_wgpu_set_n_cb(ctx, n_cb);
-}
-#endif
