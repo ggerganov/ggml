@@ -4,6 +4,36 @@
 #include <webgpu/webgpu.h>
 #include "framework.h"
 
+#include <stdarg.h>
+
+
+#define ASSERT_CHECK(x) \
+    if (!(x)) { \
+        GGML_WGPU_LOG_ERROR("%s: error: assertion failed: %s\n", __func__, #x); \
+        return NULL; \
+    }
+
+#define LOG_PREFIX "[compute]"
+static void handle_request_adapter(WGPURequestAdapterStatus status,
+                                   WGPUAdapter adapter, char const *message,
+                                   void *userdata) {
+  UNUSED(status)
+  UNUSED(message)
+  *(WGPUAdapter *)userdata = adapter;
+}
+static void handle_request_device(WGPURequestDeviceStatus status,
+                                  WGPUDevice device, char const *message,
+                                  void *userdata) {
+  UNUSED(status)
+  UNUSED(message)
+  *(WGPUDevice *)userdata = device;
+}
+static void handle_buffer_map(WGPUBufferMapAsyncStatus status, void *userdata) {
+  UNUSED(userdata)
+  printf(LOG_PREFIX " buffer_map status=%#.8x\n", status);
+}
+
+
 #undef MIN
 #undef MAX
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -32,19 +62,22 @@ struct ggml_wgpu_buffer {
     WGPUBuffer wgpu;
 };
 
-#if 0
 
-struct ggml_metal_context {
+struct ggml_wgpu_context {
     int n_cb;
 
-    id<MTLDevice>       device;
-    id<MTLCommandQueue> queue;
-    id<MTLLibrary>      library;
+    WGPUInstance instance;
+    WGPUAdapter adapter;
+    WGPUDevice device;
+    WGPUQueue queue;
+    WGPUShaderModule shader_module;
+    WGPUBindGroupLayout bind_group_layout;
+    WGPUPipelineLayout pipeline_layout;
 
-    id<MTLCommandBuffer>         command_buffers [GGML_WGPU_MAX_COMMAND_BUFFERS];
-    id<MTLComputeCommandEncoder> command_encoders[GGML_WGPU_MAX_COMMAND_BUFFERS];
+    // id<MTLCommandBuffer>         command_buffers [GGML_WGPU_MAX_COMMAND_BUFFERS];
+    // id<MTLComputeCommandEncoder> command_encoders[GGML_WGPU_MAX_COMMAND_BUFFERS];
 
-    dispatch_queue_t d_queue;
+    // dispatch_queue_t d_queue;
 
     int n_buffers;
     struct ggml_wgpu_buffer buffers[GGML_WGPU_MAX_BUFFERS];
@@ -53,19 +86,18 @@ struct ggml_metal_context {
     int concur_list_len;
 
     // custom kernels
-#define GGML_METAL_DECL_KERNEL(name) \
-    id<MTLFunction>             function_##name; \
-    id<MTLComputePipelineState> pipeline_##name
+#define GGML_WGPU_DECL_KERNEL(name) \
+    WGPUComputePipeline pipeline_##name
 
-    GGML_METAL_DECL_KERNEL(add);
-    GGML_METAL_DECL_KERNEL(scale);
-    GGML_METAL_DECL_KERNEL(silu);
-    GGML_METAL_DECL_KERNEL(relu);
-    GGML_METAL_DECL_KERNEL(gelu);
-    GGML_METAL_DECL_KERNEL(soft_max);
-    GGML_METAL_DECL_KERNEL(sqr);
+    GGML_WGPU_DECL_KERNEL(add);
+    GGML_WGPU_DECL_KERNEL(scale);
+    GGML_WGPU_DECL_KERNEL(silu);
+    GGML_WGPU_DECL_KERNEL(relu);
+    GGML_WGPU_DECL_KERNEL(gelu);
+    GGML_WGPU_DECL_KERNEL(soft_max);
+    GGML_WGPU_DECL_KERNEL(sqr);
 
-#undef GGML_METAL_DECL_KERNEL
+#undef GGML_WGPU_DECL_KERNEL
 };
 
 
@@ -75,6 +107,32 @@ void * ggml_wgpu_log_user_data = NULL;
 void ggml_wgpu_log_set_callback(ggml_log_callback log_callback, void * user_data) {
     ggml_wgpu_log_callback  = log_callback;
     ggml_wgpu_log_user_data = user_data;
+}
+
+static void wgpu_log_callback(WGPULogLevel level, char const *message,
+                         void *userdata) {
+  UNUSED(userdata);
+  char *level_str;
+  switch (level) {
+  case WGPULogLevel_Error:
+    level_str = "error";
+    break;
+  case WGPULogLevel_Warn:
+    level_str = "warn";
+    break;
+  case WGPULogLevel_Info:
+    level_str = "info";
+    break;
+  case WGPULogLevel_Debug:
+    level_str = "debug";
+    break;
+  case WGPULogLevel_Trace:
+    level_str = "trace";
+    break;
+  default:
+    level_str = "unknown_level";
+  }
+  fprintf(stderr, "[wgpu] [%s] %s\n", level_str, message);
 }
 
 static void ggml_wgpu_log(enum ggml_log_level level, const char* format, ...){
@@ -98,93 +156,84 @@ static void ggml_wgpu_log(enum ggml_log_level level, const char* format, ...){
 
 
 
-struct ggml_metal_context * ggml_metal_init(int n_cb) {
-    GGML_METAL_LOG_INFO("%s: allocating\n", __func__);
+struct ggml_wgpu_context * ggml_wgpu_init(int n_cb) {
+    GGML_WGPU_LOG_INFO("%s: allocating\n", __func__);
 
-    id <MTLDevice> device;
-    NSString * s;
+    wgpuSetLogCallback(wgpu_log_callback, NULL);
+    wgpuSetLogLevel(WGPULogLevel_Info);
 
-    // Pick and show default Metal device
-    device = MTLCreateSystemDefaultDevice();
-    s = [device name];
-    GGML_METAL_LOG_INFO("%s: picking default device: %s\n", __func__, [s UTF8String]);
 
     // Configure context
-    struct ggml_metal_context * ctx = malloc(sizeof(struct ggml_metal_context));
-    ctx->device = device;
-    ctx->n_cb   = MIN(n_cb, GGML_METAL_MAX_BUFFERS);
-    ctx->queue  = [ctx->device newCommandQueue];
+    struct ggml_wgpu_context * ctx = malloc(sizeof(struct ggml_wgpu_context));
+
+    ctx->instance = wgpuCreateInstance(NULL);
+    ASSERT_CHECK(ctx->instance);
+
+    wgpuInstanceRequestAdapter(ctx->instance, NULL, handle_request_adapter,
+                                (void *)&(ctx->adapter));
+    ASSERT_CHECK(ctx->adapter);
+
+    wgpuAdapterRequestDevice(ctx->adapter, NULL, handle_request_device,
+                            (void *)&(ctx->device));
+    ASSERT_CHECK(ctx->device);
+
+    ctx->queue = wgpuDeviceGetQueue(ctx->device);
+    ASSERT_CHECK(ctx->queue);
+
+    ctx->n_cb   = MIN(n_cb, GGML_WGPU_MAX_BUFFERS);
     ctx->n_buffers = 0;
     ctx->concur_list_len = 0;
 
-    ctx->d_queue = dispatch_queue_create("ggml-metal", DISPATCH_QUEUE_CONCURRENT);
-
     // load library
-    {
-        NSBundle * bundle = nil;
-#ifdef SWIFT_PACKAGE
-        bundle = SWIFTPM_MODULE_BUNDLE;
-#else
-        bundle = [NSBundle bundleForClass:[GGMLMetalClass class]];
-#endif
-        NSError * error = nil;
-        NSString * libPath = [bundle pathForResource:@"default" ofType:@"metallib"];
-        if (libPath != nil) {
-            NSURL * libURL = [NSURL fileURLWithPath:libPath];
-            GGML_METAL_LOG_INFO("%s: loading '%s'\n", __func__, [libPath UTF8String]);
-            ctx->library = [ctx->device newLibraryWithURL:libURL error:&error];
-        } else {
-            GGML_METAL_LOG_INFO("%s: default.metallib not found, loading from source\n", __func__);
+    ctx->shader_module = frmwrk_load_shader_module(ctx->device, "ggml-wgpu.wgsl");
+    ASSERT_CHECK(ctx->shader_module);
 
-            NSString * sourcePath = [bundle pathForResource:@"ggml-metal" ofType:@"metal"];
-            GGML_METAL_LOG_INFO("%s: loading '%s'\n", __func__, [sourcePath UTF8String]);
-            NSString * src = [NSString stringWithContentsOfFile:sourcePath encoding:NSUTF8StringEncoding error:&error];
-            if (error) {
-                GGML_METAL_LOG_ERROR("%s: error: %s\n", __func__, [[error description] UTF8String]);
-                return NULL;
-            }
 
-            MTLCompileOptions* options = nil;
-#ifdef GGML_QKK_64
-            options = [MTLCompileOptions new];
-            options.preprocessorMacros = @{ @"QK_K" : @(64) };
-#endif
-            ctx->library = [ctx->device newLibraryWithSource:src options:options error:&error];
-        }
+    ctx->bind_group_layout = wgpuDeviceCreateBindGroupLayout(ctx->device, &(const WGPUBindGroupLayoutDescriptor){
+                           .label = "ggml-wgpu-bind-group-layout",
+                           .entryCount = 0,
+                       });
+    ASSERT_CHECK(ctx->bind_group_layout);
 
-        if (error) {
-            GGML_METAL_LOG_ERROR("%s: error: %s\n", __func__, [[error description] UTF8String]);
-            return NULL;
-        }
-    }
+    ctx->pipeline_layout = wgpuDeviceCreatePipelineLayout(ctx->device, &(const WGPUPipelineLayoutDescriptor){
+                           .label = "ggml-wgpu-pipeline-layout",
+                           .bindGroupLayoutCount = 1,
+                           .bindGroupLayouts = &(ctx->bind_group_layout),
+                       });
+    ASSERT_CHECK(ctx->pipeline_layout);
+
+
+
 
     // load kernels
     {
-        NSError * error = nil;
-#define GGML_METAL_ADD_KERNEL(name) \
-        ctx->function_##name = [ctx->library newFunctionWithName:@"kernel_"#name]; \
-        ctx->pipeline_##name = [ctx->device newComputePipelineStateWithFunction:ctx->function_##name error:&error]; \
-        GGML_METAL_LOG_INFO("%s: loaded %-32s %16p | th_max = %4d | th_width = %4d\n", __func__, "kernel_"#name, (void *) ctx->pipeline_##name, \
-                (int) ctx->pipeline_##name.maxTotalThreadsPerThreadgroup, \
-                (int) ctx->pipeline_##name.threadExecutionWidth); \
-        if (error) { \
-          GGML_METAL_LOG_ERROR("%s: error: load pipeline error: %s\n", __func__, [[error description] UTF8String]); \
-            return NULL; \
-        }
+#define GGML_WGPU_ADD_KERNEL(name) \
+        ctx->pipeline_##name = wgpuDeviceCreateComputePipeline(     \
+            ctx->device, &(const WGPUComputePipelineDescriptor){    \
+                        .label = "compute_pipeline_##name",         \
+                        .compute =                                  \
+                            (const WGPUProgrammableStageDescriptor){\
+                                .module = ctx->shader_module,       \
+                                .entryPoint = "kernel_##name",      \
+                            },                                      \
+                    });                                             \
+        ASSERT_CHECK(ctx->pipeline_##name);
 
-        GGML_METAL_ADD_KERNEL(add);
-        GGML_METAL_ADD_KERNEL(scale);
-        GGML_METAL_ADD_KERNEL(silu);
-        GGML_METAL_ADD_KERNEL(relu);
-        GGML_METAL_ADD_KERNEL(gelu);
-        GGML_METAL_ADD_KERNEL(soft_max);
-        GGML_METAL_ADD_KERNEL(sqr);
 
-#undef GGML_METAL_ADD_KERNEL
+        GGML_WGPU_ADD_KERNEL(add);
+        GGML_WGPU_ADD_KERNEL(scale);
+        GGML_WGPU_ADD_KERNEL(silu);
+        GGML_WGPU_ADD_KERNEL(relu);
+        GGML_WGPU_ADD_KERNEL(gelu);
+        GGML_WGPU_ADD_KERNEL(soft_max);
+        GGML_WGPU_ADD_KERNEL(sqr);
+
+#undef GGML_WGPU_ADD_KERNEL
     }
 
     return ctx;
 }
+#if 0
 
 void ggml_metal_free(struct ggml_metal_context * ctx) {
     GGML_METAL_LOG_INFO("%s: deallocating\n", __func__);
