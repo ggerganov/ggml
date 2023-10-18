@@ -418,7 +418,7 @@ ggml_backend_buffer_t ggml_backend_cpu_buffer_from_ptr(ggml_backend_t backend_cp
 // scheduler
 
 #define GGML_MAX_BACKENDS 4
-#define GGML_MAX_SPLITS 64
+#define GGML_MAX_SPLITS 256
 #define GGML_MAX_SPLIT_INPUTS 16
 
 struct ggml_backend_sched_split {
@@ -733,7 +733,7 @@ static void sched_split_graph(ggml_backend_sched_t sched) {
     sched->splits[cur_split].i_end = graph->n_nodes;
     sched->n_splits = cur_split + 1;
 
-    fprintf(stderr, "PASS 4 ASSIGNMENTS\n"); sched_print_assignments(sched, graph); fflush(stdout);
+    //fprintf(stderr, "PASS 4 ASSIGNMENTS\n"); sched_print_assignments(sched, graph); fflush(stdout);
 
 #if 1
     // sanity check: all sources should have the same backend as the node

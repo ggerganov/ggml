@@ -119,18 +119,21 @@ void init_backends(gpt2_model & model, const gpt_params & params) {
         fprintf(stderr, "%s: using Metal backend\n", __func__);
         ggml_metal_log_set_callback(ggml_log_callback_default, nullptr);
         gpu_backend = ggml_backend_metal_init();
-        if (gpu_backend) {
+        if (!gpu_backend) {
             fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
+        } else {
+            ggml_backend_metal_set_n_cb(gpu_backend, params.n_threads);
         }
     }
 #endif
-
     if (gpu_backend) {
         model.backends.push_back(gpu_backend);
     }
 
     // always add the CPU backend as a fallback
-    model.backends.push_back(ggml_backend_cpu_init());
+    ggml_backend_t cpu_backend = ggml_backend_cpu_init();
+    ggml_backend_cpu_set_n_threads(cpu_backend, params.n_threads);
+    model.backends.push_back(cpu_backend);
 }
 
 // load the model's weights from a file
@@ -874,7 +877,6 @@ struct ggml_cgraph * gpt2_graph(
 bool gpt2_eval(
         const gpt2_model & model,
         ggml_backend_sched_t sched,
-        const int n_threads,
         const int n_past,
         const std::vector<gpt_vocab::id> & embd_inp,
               std::vector<float>         & embd_w) {
@@ -889,17 +891,6 @@ bool gpt2_eval(
     // allocate tensors
 
     // run the computation
-#if 0
-    ggml_backend_t backend = model.backends.front();
-    if (ggml_backend_is_cpu(backend)) {
-        ggml_backend_cpu_set_n_threads(backend, n_threads);
-    }
-#ifdef GGML_USE_METAL
-    if (ggml_backend_is_metal(backend)) {
-        ggml_backend_metal_set_n_cb(backend, n_threads);
-    }
-#endif
-#endif
     ggml_backend_sched_graph_compute(sched, gf);
 
     //if (n_past%100 == 0) {
@@ -1020,7 +1011,7 @@ int main(int argc, char ** argv) {
         if (embd.size() > 0) {
             const int64_t t_start_us = ggml_time_us();
 
-            if (!gpt2_eval(model, sched, params.n_threads, n_past, embd, logits)) {
+            if (!gpt2_eval(model, sched, n_past, embd, logits)) {
                 printf("Failed to predict\n");
                 return 1;
             }

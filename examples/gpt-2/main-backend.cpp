@@ -87,7 +87,7 @@ struct gpt2_model {
     //
     struct ggml_context * ctx;
 
-    ggml_backend_t backends = NULL;
+    ggml_backend_t backend = NULL;
 
     ggml_backend_buffer_t buffer_w;
     ggml_backend_buffer_t buffer_kv;
@@ -238,8 +238,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 #ifdef GGML_USE_CUBLAS
     if (n_gpu_layers > 0) {
         fprintf(stderr, "%s: using CUDA backend\n", __func__);
-        model.backends = ggml_backend_cuda_init();
-        if (!model.backends) {
+        model.backend = ggml_backend_cuda_init();
+        if (!model.backend) {
             fprintf(stderr, "%s: ggml_backend_cuda_init() failed\n", __func__);
         }
     }
@@ -256,19 +256,19 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
     }
 #endif
 
-    if (!model.backends) {
+    if (!model.backend) {
         // fallback to CPU backend
         fprintf(stderr, "%s: using CPU backend\n", __func__);
-        model.backends = ggml_backend_cpu_init();
+        model.backend = ggml_backend_cpu_init();
     }
 
-    if (!model.backends) {
+    if (!model.backend) {
         fprintf(stderr, "%s: ggml_backend_cpu_init() failed\n", __func__);
         return false;
     }
 
     // allocate weights buffer
-    model.buffer_w = ggml_backend_alloc_buffer(model.backends, buffer_size);
+    model.buffer_w = ggml_backend_alloc_buffer(model.backend, buffer_size);
 
     // prepare memory for the weights
     {
@@ -357,7 +357,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         printf("%s: memory size = %8.2f MB, n_mem = %d\n", __func__, memory_size/1024.0/1024.0, n_mem);
 
         // create a backend buffer (can be in host or device memory)
-        model.buffer_kv = ggml_backend_alloc_buffer(model.backends, memory_size + 256);
+        model.buffer_kv = ggml_backend_alloc_buffer(model.backend, memory_size + 256);
 
         // allocate the tensors into the backend buffer
         {
@@ -439,7 +439,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
             ggml_allocr_alloc(alloc, tensor);
 
-            if (ggml_backend_is_cpu  (model.backends)
+            if (ggml_backend_is_cpu  (model.backend)
 #ifdef GGML_USE_METAL
                 || ggml_backend_is_metal(model.backend)
 #endif
@@ -799,15 +799,15 @@ bool gpt2_eval(
     ggml_allocr_alloc_graph(allocr, gf);
 
     // run the computation
-    if (ggml_backend_is_cpu(model.backends)) {
-        ggml_backend_cpu_set_n_threads(model.backends, n_threads);
+    if (ggml_backend_is_cpu(model.backend)) {
+        ggml_backend_cpu_set_n_threads(model.backend, n_threads);
     }
 #ifdef GGML_USE_METAL
     if (ggml_backend_is_metal(model.backend)) {
         ggml_backend_metal_set_n_cb(model.backend, n_threads);
     }
 #endif
-    ggml_backend_graph_compute(model.backends, gf);
+    ggml_backend_graph_compute(model.backend, gf);
 
     //if (n_past%100 == 0) {
     //    ggml_graph_print   (&gf);
@@ -876,7 +876,7 @@ int main(int argc, char ** argv) {
     // allocate the compute buffer
     {
          // alignment required by the backend
-        size_t align = ggml_backend_get_alignment(model.backends);
+        size_t align = ggml_backend_get_alignment(model.backend);
         allocr = ggml_allocr_new_measure(align);
 
         // create the worst case graph for memory usage estimation
@@ -889,7 +889,7 @@ int main(int argc, char ** argv) {
 
         // recreate the allocator with the required memory
         ggml_allocr_free(allocr);
-        buf_compute = ggml_backend_alloc_buffer(model.backends, mem_size);
+        buf_compute = ggml_backend_alloc_buffer(model.backend, mem_size);
         allocr = ggml_allocr_new_from_buffer(buf_compute);
 
         fprintf(stderr, "%s: compute buffer size: %.2f MB\n", __func__, mem_size/1024.0/1024.0);
@@ -993,7 +993,7 @@ int main(int argc, char ** argv) {
     ggml_backend_buffer_free(model.buffer_w);
     ggml_backend_buffer_free(model.buffer_kv);
     ggml_backend_buffer_free(buf_compute);
-    ggml_backend_free(model.backends);
+    ggml_backend_free(model.backend);
 
     return 0;
 }

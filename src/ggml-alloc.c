@@ -17,8 +17,8 @@
 
 //#define GGML_ALLOCATOR_DEBUG
 
-#define AT_PRINTF(...) fprintf(stderr, __VA_ARGS__)
-//#define AT_PRINTF(...) ((void)0)
+//#define AT_PRINTF(...) fprintf(stderr, __VA_ARGS__)
+#define AT_PRINTF(...)
 
 // TODO: GGML_PAD ?
 static size_t aligned_offset(const void * buffer, size_t offset, size_t alignment) {
