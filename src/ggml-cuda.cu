@@ -203,6 +203,7 @@ static_assert(sizeof(half) == sizeof(ggml_fp16_t), "wrong fp16 size");
 #define GGML_CUDA_ASSUME(x)
 #endif // CUDART_VERSION >= 11100
 
+//#define GGML_CUDA_F16
 #ifdef GGML_CUDA_F16
 typedef half dfloat; // dequantize float
 typedef half2 dfloat2;
@@ -427,7 +428,12 @@ static_assert(sizeof(block_q6_K) == sizeof(ggml_fp16_t) + 13*QK_K/16, "wrong q6_
 #define GGML_CUDA_DMMV_X 32
 #endif
 #ifndef GGML_CUDA_MMV_Y
-#define GGML_CUDA_MMV_Y 1
+#define GGML_CUDA_MMV_Y 4
+#endif
+
+// if src1 rows are less or equal to this, we can use the MMV kernel
+#ifndef GGML_CUDA_MMV_SRC1_ROWS_MAX
+#define GGML_CUDA_MMV_SRC1_ROWS_MAX 16
 #endif
 
 #ifndef K_QUANTS_PER_ITERATION
@@ -4202,10 +4208,13 @@ static __global__ void mul_mat_vec_q(const void * __restrict__ vx, const void * 
 }
 
 template <int qk, int qr, dequantize_kernel_t dequantize_kernel>
-static __global__ void dequantize_mul_mat_vec(const void * __restrict__ vx, const dfloat * __restrict__ y, float * __restrict__ dst, const int ncols, const int nrows) {
+static __global__ void dequantize_mul_mat_vec(const void * __restrict__ vx, const dfloat * __restrict__ y0, float * __restrict__ dst0, const int ncols, const int nrows) {
     // qk = quantized weights per x block
     // qr = number of quantized weights per data value in x block
     const int row = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const dfloat * y = y0 + blockIdx.x*ncols;
+    float * dst = dst0 + blockIdx.x*nrows;
 
     if (row >= nrows) {
         return;
@@ -4911,10 +4920,10 @@ static void convert_fp32_to_fp16_cuda(const void * vx, half * y, const int k, cu
     dequantize_block<1, 1, convert_f32><<<num_blocks, CUDA_DEQUANTIZE_BLOCK_SIZE, 0, stream>>>(vx, y, k);
 }
 
-static void convert_mul_mat_vec_f16_cuda(const void * vx, const dfloat * y, float * dst, const int ncols, const int nrows, cudaStream_t stream) {
+static void convert_mul_mat_vec_f16_cuda(const void * vx, const dfloat * y, float * dst, const int ncols, const int nrows1, const int nrows, cudaStream_t stream) {
     GGML_ASSERT(ncols % GGML_CUDA_DMMV_X == 0);
     const int block_num_y = (nrows + GGML_CUDA_MMV_Y - 1) / GGML_CUDA_MMV_Y;
-    const dim3 block_nums(1, block_num_y, 1);
+    const dim3 block_nums(nrows1, block_num_y, 1);
     const dim3 block_dims(WARP_SIZE, GGML_CUDA_MMV_Y, 1);
     dequantize_mul_mat_vec<1, 1, convert_f16>
         <<<block_nums, block_dims, 0, stream>>>(vx, y, dst, ncols, nrows);
@@ -6159,6 +6168,7 @@ inline void ggml_cuda_op_dequantize_mul_mat_vec(
     const int64_t src1_padded_row_size, const cudaStream_t & stream) {
 
     const int64_t ne00 = src0->ne[0];
+    const int64_t ne11 = src1->ne[1];
     const int64_t row_diff = row_high - row_low;
 
     // on some GPUs it is faster to convert src1 to half and to use half precision intrinsics
@@ -6171,10 +6181,10 @@ inline void ggml_cuda_op_dequantize_mul_mat_vec(
         src0->type == GGML_TYPE_Q8_0 || src0->type == GGML_TYPE_F16;
 
     if (src1_convert_f16) {
-        src1_dfloat = (half *) ggml_cuda_pool_malloc(ne00*sizeof(half), &ash);
-        ggml_cpy_f32_f16_cuda((const char *) src1_ddf_i, (char *) src1_dfloat, ne00,
-                                ne00, 1, sizeof(float), 0, 0,
-                                ne00, 1, sizeof(half),  0, 0, stream);
+        src1_dfloat = (half *) ggml_cuda_pool_malloc(ne00*ne11*sizeof(half), &ash);
+        ggml_cpy_f32_f16_cuda((const char *) src1_ddf_i, (char *) src1_dfloat, ne00*ne11,
+                                ne00, ne11, sizeof(float), src1->nb[1], 0,
+                                ne00, ne11, sizeof(half),  ne00*sizeof(half), 0, stream);
     }
 #else
     const dfloat * src1_dfloat = (const dfloat *) src1_ddf_i; // dfloat == float, no conversion
@@ -6212,7 +6222,7 @@ inline void ggml_cuda_op_dequantize_mul_mat_vec(
             dequantize_mul_mat_vec_q6_K_cuda(src0_dd_i, src1_ddf_i, dst_dd_i, ne00, row_diff, stream);
             break;
         case GGML_TYPE_F16:
-            convert_mul_mat_vec_f16_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, row_diff, stream);
+            convert_mul_mat_vec_f16_cuda(src0_dd_i, src1_dfloat, dst_dd_i, ne00, ne11, row_diff, stream);
             break;
         default:
             GGML_ASSERT(false);
@@ -7027,13 +7037,13 @@ static void ggml_cuda_mul_mat(const ggml_tensor * src0, const ggml_tensor * src1
 
     if (all_on_device && src0->type == GGML_TYPE_F16 && ggml_is_permuted(src0) && ggml_is_permuted(src1) && src1->ne[1] == 1) {
         ggml_cuda_mul_mat_vec_p021(src0, src1, dst);
-    } else if (all_on_device && !ggml_is_contiguous(src0) && ggml_is_contiguous(src1) && src1->ne[1] == 1) {
+    } else if (all_on_device && !ggml_is_contiguous(src0) && ggml_is_contiguous(src1) && src1->ne[1] == 1 && src0->type == GGML_TYPE_F16) {
         ggml_cuda_mul_mat_vec_nc(src0, src1, dst);
     } else if (src0->type == GGML_TYPE_F32) {
         ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_cublas, false);
     } else if (ggml_is_quantized(src0->type) || src0->type == GGML_TYPE_F16) {
-        if (src1->ne[1] == 1 && src0->ne[0] % GGML_CUDA_DMMV_X == 0) {
-
+        if ((src1->ne[1] == 1 && src0->ne[0] % GGML_CUDA_DMMV_X == 0) ||
+            (src1->ne[1] <= GGML_CUDA_MMV_SRC1_ROWS_MAX && src0->ne[0] % MATRIX_ROW_PADDING == 0)) {
 #ifdef GGML_CUDA_FORCE_DMMV
             const bool use_mul_mat_vec_q = false;
 #else
@@ -7043,12 +7053,16 @@ static void ggml_cuda_mul_mat(const ggml_tensor * src0, const ggml_tensor * src1
             if (use_mul_mat_vec_q) {
                 ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_vec_q, true);
             } else {
+                //printf("src0: %6d %6d %6d\n", (int) src0->ne[0], (int) src0->ne[1], (int) src0->ne[2]);
+                //printf("src1: %6d %6d %6d\n", (int) src1->ne[0], (int) src1->ne[1], (int) src1->ne[2]);
                 ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_dequantize_mul_mat_vec, false);
             }
         } else {
             if (g_mul_mat_q && ggml_is_quantized(src0->type) && min_compute_capability >= MIN_CC_DP4A) {
                 ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_q, true);
             } else {
+                //printf("src0: %6d %6d %6d\n", (int) src0->ne[0], (int) src0->ne[1], (int) src0->ne[2]);
+                //printf("src1: %6d %6d %6d\n", (int) src1->ne[0], (int) src1->ne[1], (int) src1->ne[2]);
                 ggml_cuda_op_mul_mat(src0, src1, dst, ggml_cuda_op_mul_mat_cublas, false);
             }
         }

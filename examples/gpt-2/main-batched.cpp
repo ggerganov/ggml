@@ -400,11 +400,11 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         const int n_mem      = n_layer*n_ctx;
         const int n_elements = n_embd*n_mem;
 
-        model.kv_cache.k = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_elements);
-        model.kv_cache.v = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_elements);
+        model.kv_cache.k = ggml_new_tensor_1d(ctx, GGML_TYPE_F16, n_elements);
+        model.kv_cache.v = ggml_new_tensor_1d(ctx, GGML_TYPE_F16, n_elements);
 
-        model.kv_cache.head      = 0;
-        model.kv_cache.size      = n_ctx;
+        model.kv_cache.head = 0;
+        model.kv_cache.size = n_ctx;
 
         model.kv_cache.cells.resize(n_ctx);
 
@@ -666,14 +666,18 @@ struct ggml_cgraph * gpt2_graph(
 
         // self-attention
         {
-            struct ggml_tensor * Qcur = ggml_view_2d(ctx0, cur, n_embd, n_tokens, cur->nb[1], 0*sizeof(float)*n_embd);
+            struct ggml_tensor * Qcur = ggml_cont(ctx0, ggml_view_2d(ctx0, cur, n_embd, n_tokens, cur->nb[1], 0*sizeof(float)*n_embd));
             struct ggml_tensor * Kcur = ggml_view_2d(ctx0, cur, n_embd, n_tokens, cur->nb[1], 1*sizeof(float)*n_embd);
             struct ggml_tensor * Vcur = ggml_view_2d(ctx0, cur, n_embd, n_tokens, cur->nb[1], 2*sizeof(float)*n_embd);
 
             // store key and value to memory
             if (n_tokens >= 1) {
+                Vcur = ggml_transpose(ctx0, Vcur);
+
                 struct ggml_tensor * k = ggml_view_1d(ctx0, model.kv_cache.k, n_tokens*n_embd, (ggml_element_size(model.kv_cache.k)*n_embd)*(il*n_ctx + kv_head));
-                struct ggml_tensor * v = ggml_view_1d(ctx0, model.kv_cache.v, n_tokens*n_embd, (ggml_element_size(model.kv_cache.v)*n_embd)*(il*n_ctx + kv_head));
+                struct ggml_tensor * v = ggml_view_2d(ctx0, model.kv_cache.v, n_tokens, n_embd,
+                        (   n_ctx)*ggml_element_size(model.kv_cache.v),
+                        (il*n_ctx)*ggml_element_size(model.kv_cache.v)*n_embd + kv_head*ggml_element_size(model.kv_cache.v));
 
                 ggml_build_forward_expand(gf, ggml_cpy(ctx0, Kcur, k));
                 ggml_build_forward_expand(gf, ggml_cpy(ctx0, Vcur, v));
@@ -683,19 +687,17 @@ struct ggml_cgraph * gpt2_graph(
             // [64, N, 12]
             struct ggml_tensor * Q =
                 ggml_permute(ctx0,
-                        ggml_cpy(ctx0,
-                            Qcur,
-                            ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_embd/n_head, n_head, n_tokens)),
-                        0, 2, 1, 3);
+                    ggml_reshape_3d(ctx0, Qcur, n_embd/n_head, n_head, n_tokens),
+                    0, 2, 1, 3);
 
             // K = Kmem.view(n_embd/n_head, n_head, n_kv).permute(0, 2, 1, 3)
             // [64, n_kv, 12]
             struct ggml_tensor * K =
-                ggml_permute(ctx0,
-                        ggml_reshape_3d(ctx0,
-                            ggml_view_1d(ctx0, model.kv_cache.k, n_kv*n_embd, il*n_ctx*ggml_element_size(model.kv_cache.k)*n_embd),
-                            n_embd/n_head, n_head, n_kv),
-                        0, 2, 1, 3);
+                ggml_view_3d(ctx0, model.kv_cache.k,
+                        n_embd/n_head, n_kv, n_head,
+                        ggml_element_size(model.kv_cache.k)*n_embd,
+                        ggml_element_size(model.kv_cache.k)*n_embd/n_head,
+                        ggml_element_size(model.kv_cache.k)*n_embd*n_ctx*il);
 
             // GG: flash attention
             //struct ggml_tensor * V =
@@ -730,18 +732,16 @@ struct ggml_cgraph * gpt2_graph(
 
             // V_trans = Vmem.view(n_embd/n_head, n_head, n_kv).permute(1, 2, 0, 3).contiguous()
             // [n_kv, 64, 12]
-            struct ggml_tensor * V_trans =
-                ggml_cpy(ctx0,
-                        ggml_permute(ctx0,
-                            ggml_reshape_3d(ctx0,
-                                ggml_view_1d(ctx0, model.kv_cache.v, n_kv*n_embd, il*n_ctx*ggml_element_size(model.kv_cache.v)*n_embd),
-                                n_embd/n_head, n_head, n_kv),
-                            1, 2, 0, 3),
-                        ggml_new_tensor_3d(ctx0, model.kv_cache.v->type, n_kv, n_embd/n_head, n_head));
+            struct ggml_tensor * V =
+                ggml_view_3d(ctx0, model.kv_cache.v,
+                        n_kv, n_embd/n_head, n_head,
+                        ggml_element_size(model.kv_cache.v)*n_ctx,
+                        ggml_element_size(model.kv_cache.v)*n_ctx*n_embd/n_head,
+                        ggml_element_size(model.kv_cache.v)*n_ctx*n_embd*il);
 
             // KQV = transpose(V) * KQ_soft_max
             // [64, n_tokens, 12]
-            struct ggml_tensor * KQV = ggml_mul_mat(ctx0, V_trans, KQ_soft_max);
+            struct ggml_tensor * KQV = ggml_mul_mat(ctx0, V, KQ_soft_max);
 
             // KQV_merged = KQV.permute(0, 2, 1, 3)
             // [64, 12, n_tokens]
@@ -1144,7 +1144,7 @@ int main(int argc, char ** argv) {
                 i_batch[i] = -1;
                 printf("\n");
                 if (n_parallel > 1) {
-                    printf("%s: stream %d finished at n_cur = %d", __func__, i, n_cur);
+                    printf("%s: stream %d finished at n_cur = %d\n", __func__, i, n_cur);
                 }
 
                 continue;
