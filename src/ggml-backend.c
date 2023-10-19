@@ -455,8 +455,7 @@ struct ggml_backend_sched {
 #define node_allocr(node) sched->node_allocr[hash_id(node)]
 
 static bool ggml_is_view_op(enum ggml_op op) {
-    return false;
-    //return op == GGML_OP_VIEW || op == GGML_OP_RESHAPE || op == GGML_OP_PERMUTE || op == GGML_OP_TRANSPOSE;
+    return op == GGML_OP_VIEW || op == GGML_OP_RESHAPE || op == GGML_OP_PERMUTE || op == GGML_OP_TRANSPOSE;
 }
 
 // returns the priority of the backend, lower is better
@@ -773,12 +772,15 @@ static void sched_split_graph(ggml_backend_sched_t sched) {
             graph_copy->nodes[graph_copy->n_nodes++] = input_cpy;
         }
 
+        //if (i == 0 && split->i_start !=0) printf("WARNING: split 0: skips first %d nodes\n", split->i_start);
+        //if (i != 0 && split->i_start != sched->splits[i-1].i_end) printf("WARNING: split %d skips %d nodes\n", i, split->i_start - sched->splits[i-1].i_end);
+
         for (int j = split->i_start; j < split->i_end; j++) {
             struct ggml_tensor * node = graph->nodes[j];
-            if (ggml_is_view_op(node->op)) {
-                continue; // views are removed from the final graphs
+            if (!ggml_is_view_op(node->op)) {
+                split->graph->nodes[split->graph->n_nodes++] = node;
             }
-            split->graph->nodes[split->graph->n_nodes++] = node;
+            // views are still required for ggml-alloc dependency tracking
             graph_copy->nodes[graph_copy->n_nodes++] = node;
         }
     }
