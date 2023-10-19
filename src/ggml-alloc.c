@@ -137,7 +137,9 @@ void ggml_allocr_alloc(ggml_allocr_t alloc, struct ggml_tensor * tensor) {
 
     tensor->data = addr;
     tensor->buffer = alloc->buffer;
-    ggml_backend_buffer_init_tensor(alloc->buffer, tensor);
+    if (!alloc->measure) {
+        ggml_backend_buffer_init_tensor(alloc->buffer, tensor);
+    }
 
 #ifdef GGML_ALLOCATOR_DEBUG
     add_allocated_tensor(alloc, tensor);
@@ -172,7 +174,9 @@ static void ggml_allocr_free_tensor(ggml_allocr_t alloc, struct ggml_tensor * te
     size = aligned_offset(NULL, size, alloc->alignment);
     AT_PRINTF("%s: freeing %s at %p (%zu bytes) - n_free_blocks = %d\n", __func__, tensor->name, ptr, size, alloc->n_free_blocks);
 
-    ggml_backend_buffer_free_tensor(alloc->buffer, tensor);
+    if (!alloc->measure) {
+        ggml_backend_buffer_free_tensor(alloc->buffer, tensor);
+    }
 
 #ifdef GGML_ALLOCATOR_DEBUG
     remove_allocated_tensor(alloc, tensor);
@@ -237,7 +241,12 @@ void ggml_allocr_reset(ggml_allocr_t alloc) {
     alloc->n_free_blocks = 1;
     size_t align_offset = aligned_offset(alloc->base, 0, alloc->alignment);
     alloc->free_blocks[0].addr = (char *)alloc->base + align_offset;
-    alloc->free_blocks[0].size = ggml_backend_buffer_get_size(alloc->buffer) - align_offset;
+
+    if (alloc->measure) {
+        alloc->free_blocks[0].size = SIZE_MAX/2; // restrict maximum size of a measure allocator to half size_t max to avoid overflows
+    } else {
+        alloc->free_blocks[0].size = ggml_backend_buffer_get_size(alloc->buffer) - align_offset;
+    }
 }
 
 ggml_allocr_t ggml_allocr_new(void * data, size_t size, size_t alignment) {
@@ -274,10 +283,15 @@ ggml_allocr_t ggml_allocr_new_measure(size_t alignment) {
 }
 
 ggml_allocr_t ggml_allocr_new_measure_from_backend(struct ggml_backend * backend) {
-    // FIXME: also needs to use the backend's buffer get_alloc_size() function, but this is buffer only
-    // get_alloc_size() needs to be in the buffer interface to support different types of buffers per backend
-    // however, it is probably ok to restrict ggml-alloc use to only the main type of buffer for each backend
-    return ggml_allocr_new_measure(ggml_backend_get_alignment(backend));
+    // create a backend buffer to get the correct tensor allocation sizes
+    ggml_backend_buffer_t buffer = ggml_backend_alloc_buffer(backend, 1);
+
+    // TODO: move alloc initialization to a common ggml_allocr_new_impl function
+    ggml_allocr_t alloc = ggml_allocr_new_from_buffer(buffer);
+    alloc->buffer_owned = true;
+    alloc->measure = true;
+    ggml_allocr_reset(alloc);
+    return alloc;
 }
 
 ggml_allocr_t ggml_allocr_new_from_backend(struct ggml_backend * backend, size_t size) {
@@ -418,7 +432,10 @@ static void init_view(struct graph_allocr * galloc, struct ggml_tensor * view) {
     // FIXME: the view should be initialized by the owning buffer, but currently this breaks the CUDA backend
     // due to the ggml_tensor_extra_gpu ring buffer overwriting the KV cache extras
     assert(ggml_allocr_is_measure(alloc) || !view->buffer || view->buffer->backend == alloc->buffer->backend);
-    ggml_backend_buffer_init_tensor(alloc->buffer, view);
+
+    if (!alloc->measure) {
+        ggml_backend_buffer_init_tensor(alloc->buffer, view);
+    }
 }
 
 static void allocate_node(struct graph_allocr * galloc, struct ggml_tensor * node) {
