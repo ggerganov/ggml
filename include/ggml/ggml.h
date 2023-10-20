@@ -532,9 +532,6 @@ extern "C" {
 
         int n_threads;
 
-        // the `n_tasks` of nodes, 1:1 mapping to cgraph nodes
-        int n_tasks[GGML_DEFAULT_GRAPH_SIZE]; // FIXME: need to allocate ggml_cplan dynamically?
-
         // abort ggml_graph_compute when true
         bool (*abort_callback)(void * data);
         void * abort_callback_data;
