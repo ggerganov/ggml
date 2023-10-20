@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ggml.h"
+#include "ggml-alloc.h"
 
 #ifdef  __cplusplus
 extern "C" {
@@ -109,8 +110,6 @@ extern "C" {
         ggml_backend_sched_graph_compute(sched, graph);
     */
 
-    struct ggml_allocr;
-
     struct ggml_backend_sched;
     typedef struct ggml_backend_sched * ggml_backend_sched_t;
 
@@ -122,8 +121,8 @@ extern "C" {
     // Initialize backend buffers from a measure graph
     GGML_API void ggml_backend_sched_init_measure(ggml_backend_sched_t sched, struct ggml_cgraph * measure_graph);
 
-    GGML_API struct ggml_allocr * ggml_backend_sched_get_allocr(ggml_backend_sched_t sched, ggml_backend_t backend);
-    GGML_API ggml_backend_buffer_t ggml_backend_sched_get_buffer(ggml_backend_sched_t sched, ggml_backend_t backend);
+    GGML_API ggml_tallocr_t        ggml_backend_sched_get_tallocr(ggml_backend_sched_t sched, ggml_backend_t backend);
+    GGML_API ggml_backend_buffer_t ggml_backend_sched_get_buffer (ggml_backend_sched_t sched, ggml_backend_t backend);
 
     // Allocate a graph on the backend scheduler
     GGML_API void ggml_backend_sched_graph_compute(

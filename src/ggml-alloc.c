@@ -9,10 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-
-#define UNUSED(x) (void)(x)
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
-#define GGML_MAX_CONCUR (2*GGML_DEFAULT_GRAPH_SIZE)
 #define MAX_FREE_BLOCKS 256
 
 //#define GGML_ALLOCATOR_DEBUG
@@ -32,7 +29,7 @@ struct free_block {
     size_t size;
 };
 
-struct ggml_allocr {
+struct ggml_tallocr {
     struct ggml_backend_buffer * buffer;
     bool buffer_owned;
     void * base;
@@ -44,9 +41,6 @@ struct ggml_allocr {
     size_t max_size;
 
     bool measure;
-    // FIXME: move to graph allocator
-    int parse_seq[GGML_MAX_CONCUR];
-    int parse_seq_len;
 
 #ifdef GGML_ALLOCATOR_DEBUG
     struct ggml_tensor * allocated_tensors[1024];
@@ -54,7 +48,7 @@ struct ggml_allocr {
 };
 
 #ifdef GGML_ALLOCATOR_DEBUG
-static void add_allocated_tensor(ggml_allocr_t alloc, struct ggml_tensor * tensor) {
+static void add_allocated_tensor(ggml_tallocr_t alloc, struct ggml_tensor * tensor) {
     for (int i = 0; i < 1024; i++) {
         if (alloc->allocated_tensors[i] == NULL) {
             alloc->allocated_tensors[i] = tensor;
@@ -63,7 +57,7 @@ static void add_allocated_tensor(ggml_allocr_t alloc, struct ggml_tensor * tenso
     }
     GGML_ASSERT(!"out of allocated_tensors");
 }
-static void remove_allocated_tensor(ggml_allocr_t alloc, struct ggml_tensor * tensor) {
+static void remove_allocated_tensor(ggml_tallocr_t alloc, struct ggml_tensor * tensor) {
     for (int i = 0; i < 1024; i++) {
         if (alloc->allocated_tensors[i] == tensor ||
             (alloc->allocated_tensors[i] != NULL && alloc->allocated_tensors[i]->data == tensor->data)) {
@@ -77,7 +71,7 @@ static void remove_allocated_tensor(ggml_allocr_t alloc, struct ggml_tensor * te
 #endif
 
 // check if a tensor is allocated by this buffer
-static bool ggml_allocr_is_own(ggml_allocr_t alloc, const struct ggml_tensor * tensor) {
+static bool ggml_tallocr_is_own(ggml_tallocr_t alloc, const struct ggml_tensor * tensor) {
     return tensor->buffer == alloc->buffer;
 }
 
@@ -85,7 +79,7 @@ static bool ggml_is_view(struct ggml_tensor * t) {
     return t->view_src != NULL;
 }
 
-void ggml_allocr_alloc(ggml_allocr_t alloc, struct ggml_tensor * tensor) {
+void ggml_tallocr_alloc(ggml_tallocr_t alloc, struct ggml_tensor * tensor) {
     GGML_ASSERT(!ggml_is_view(tensor)); // views generally get data pointer from one of their sources
     GGML_ASSERT(tensor->data == NULL); // avoid allocating tensor which already has memory allocated
 
@@ -159,8 +153,8 @@ void ggml_allocr_alloc(ggml_allocr_t alloc, struct ggml_tensor * tensor) {
 }
 
 // this is a very naive implementation, but for our case the number of free blocks should be very small
-static void ggml_allocr_free_tensor(ggml_allocr_t alloc, struct ggml_tensor * tensor) {
-    if (ggml_allocr_is_own(alloc, tensor) == false) {
+static void ggml_tallocr_free_tensor(ggml_tallocr_t alloc, struct ggml_tensor * tensor) {
+    if (ggml_tallocr_is_own(alloc, tensor) == false) {
         // the tensor was not allocated in this buffer
         // this can happen because the graph allocator will try to free weights and other tensors from different buffers
         // the easiest way to deal with this is just to ignore it
@@ -230,15 +224,7 @@ static void ggml_allocr_free_tensor(ggml_allocr_t alloc, struct ggml_tensor * te
     alloc->n_free_blocks++;
 }
 
-void ggml_allocr_set_parse_seq(ggml_allocr_t alloc, const int * list, int n) {
-    GGML_ASSERT(n <= GGML_MAX_CONCUR);
-    for (int i = 0; i < n; i++) {
-        alloc->parse_seq[i] = list[i];
-    }
-    alloc->parse_seq_len = n;
-}
-
-void ggml_allocr_reset(ggml_allocr_t alloc) {
+void ggml_tallocr_reset(ggml_tallocr_t alloc) {
     alloc->n_free_blocks = 1;
     size_t align_offset = aligned_offset(alloc->base, 0, alloc->alignment);
     alloc->free_blocks[0].addr = (char *)alloc->base + align_offset;
@@ -250,12 +236,12 @@ void ggml_allocr_reset(ggml_allocr_t alloc) {
     }
 }
 
-ggml_allocr_t ggml_allocr_new(void * data, size_t size, size_t alignment) {
+ggml_tallocr_t ggml_tallocr_new(void * data, size_t size, size_t alignment) {
     struct ggml_backend_buffer * buffer = ggml_backend_cpu_buffer_from_ptr(NULL, data, size);
 
-    ggml_allocr_t alloc = (ggml_allocr_t)malloc(sizeof(struct ggml_allocr));
+    ggml_tallocr_t alloc = (ggml_tallocr_t)malloc(sizeof(struct ggml_tallocr));
 
-    *alloc = (struct ggml_allocr){
+    *alloc = (struct ggml_tallocr) {
         /*.buffer        = */ buffer,
         /*.buffer_owned  = */ true,
         /*.base          = */ ggml_backend_buffer_get_base(buffer),
@@ -264,48 +250,46 @@ ggml_allocr_t ggml_allocr_new(void * data, size_t size, size_t alignment) {
         /*.free_blocks   = */ {{0}},
         /*.max_size      = */ 0,
         /*.measure       = */ false,
-        /*.parse_seq     = */ {0},
-        /*.parse_seq_len = */ 0,
 #ifdef GGML_ALLOCATOR_DEBUG
         /*.allocated_tensors = */ {0},
 #endif
     };
 
-    ggml_allocr_reset(alloc);
+    ggml_tallocr_reset(alloc);
 
     return alloc;
 }
 
-ggml_allocr_t ggml_allocr_new_measure(size_t alignment) {
-    ggml_allocr_t alloc = ggml_allocr_new((void *)0x1000, SIZE_MAX/2, alignment);
+ggml_tallocr_t ggml_tallocr_new_measure(size_t alignment) {
+    ggml_tallocr_t alloc = ggml_tallocr_new((void *)0x1000, SIZE_MAX/2, alignment);
     alloc->measure = true;
 
     return alloc;
 }
 
-ggml_allocr_t ggml_allocr_new_measure_from_backend(struct ggml_backend * backend) {
+ggml_tallocr_t ggml_tallocr_new_measure_from_backend(struct ggml_backend * backend) {
     // create a backend buffer to get the correct tensor allocation sizes
     ggml_backend_buffer_t buffer = ggml_backend_alloc_buffer(backend, 1);
 
-    // TODO: move alloc initialization to a common ggml_allocr_new_impl function
-    ggml_allocr_t alloc = ggml_allocr_new_from_buffer(buffer);
+    // TODO: move alloc initialization to a common ggml_tallocr_new_impl function
+    ggml_tallocr_t alloc = ggml_tallocr_new_from_buffer(buffer);
     alloc->buffer_owned = true;
     alloc->measure = true;
-    ggml_allocr_reset(alloc);
+    ggml_tallocr_reset(alloc);
     return alloc;
 }
 
-ggml_allocr_t ggml_allocr_new_from_backend(struct ggml_backend * backend, size_t size) {
+ggml_tallocr_t ggml_tallocr_new_from_backend(struct ggml_backend * backend, size_t size) {
     ggml_backend_buffer_t buffer = ggml_backend_alloc_buffer(backend, size);
-    ggml_allocr_t alloc = ggml_allocr_new_from_buffer(buffer);
+    ggml_tallocr_t alloc = ggml_tallocr_new_from_buffer(buffer);
     alloc->buffer_owned = true;
     return alloc;
 }
 
-ggml_allocr_t ggml_allocr_new_from_buffer(struct ggml_backend_buffer * buffer) {
-    ggml_allocr_t alloc = (ggml_allocr_t)malloc(sizeof(struct ggml_allocr));
+ggml_tallocr_t ggml_tallocr_new_from_buffer(struct ggml_backend_buffer * buffer) {
+    ggml_tallocr_t alloc = (ggml_tallocr_t)malloc(sizeof(struct ggml_tallocr));
 
-    *alloc = (struct ggml_allocr){
+    *alloc = (struct ggml_tallocr) {
         /*.buffer        = */ buffer,
         /*.buffer_owned  = */ false,
         /*.base          = */ ggml_backend_buffer_get_base(buffer),
@@ -314,23 +298,21 @@ ggml_allocr_t ggml_allocr_new_from_buffer(struct ggml_backend_buffer * buffer) {
         /*.free_blocks   = */ {{0}},
         /*.max_size      = */ 0,
         /*.measure       = */ false,
-        /*.parse_seq     = */ {0},
-        /*.parse_seq_len = */ 0,
 #ifdef GGML_ALLOCATOR_DEBUG
         /*.allocated_tensors = */ {0},
 #endif
     };
 
-    ggml_allocr_reset(alloc);
+    ggml_tallocr_reset(alloc);
 
     return alloc;
 }
 
-struct ggml_backend_buffer * ggml_allocr_get_buffer(ggml_allocr_t alloc) {
+struct ggml_backend_buffer * ggml_tallocr_get_buffer(ggml_tallocr_t alloc) {
     return alloc->buffer;
 }
 
-void ggml_allocr_free(ggml_allocr_t alloc) {
+void ggml_tallocr_free(ggml_tallocr_t alloc) {
     if (alloc == NULL) {
         return;
     }
@@ -341,11 +323,11 @@ void ggml_allocr_free(ggml_allocr_t alloc) {
     free(alloc);
 }
 
-bool ggml_allocr_is_measure(ggml_allocr_t alloc) {
+bool ggml_tallocr_is_measure(ggml_tallocr_t alloc) {
     return alloc->measure;
 }
 
-size_t ggml_allocr_max_size(ggml_allocr_t alloc) {
+size_t ggml_tallocr_max_size(ggml_tallocr_t alloc) {
     return alloc->max_size;
 }
 
@@ -356,16 +338,65 @@ struct hash_node {
     int n_views;
 };
 
-struct graph_allocr {
-    ggml_allocr_t alloc;
+struct ggml_gallocr {
+    ggml_tallocr_t talloc;
     struct ggml_hash_set hash_set;
     struct hash_node * hash_values;
-    ggml_allocr_t * hash_allocs;
+    size_t hash_values_size;
+    ggml_tallocr_t * hash_allocs;
+    int * parse_seq;
+    int parse_seq_len;
 };
 
-static struct hash_node * hash_get(struct graph_allocr * alloc, struct ggml_tensor * t) {
-    size_t i = ggml_hash_find_or_insert(alloc->hash_set, t);
-    return &alloc->hash_values[i];
+ggml_gallocr_t ggml_gallocr_new(void) {
+    ggml_gallocr_t galloc = (ggml_gallocr_t)malloc(sizeof(struct ggml_gallocr));
+
+    *galloc = (struct ggml_gallocr) {
+        /*.talloc           = */ NULL,
+        /*.hash_set         = */ {0},
+        /*.hash_values      = */ NULL,
+        /*.hash_values_size = */ 0,
+        /*.hash_allocs      = */ NULL,
+        /*.parse_seq        = */ NULL,
+        /*.parse_seq_len    = */ 0,
+    };
+
+    return galloc;
+}
+
+void ggml_gallocr_free(ggml_gallocr_t galloc) {
+    if (galloc == NULL) {
+        return;
+    }
+
+    if (galloc->hash_set.keys != NULL) {
+        free(galloc->hash_set.keys);
+    }
+    if (galloc->hash_values != NULL) {
+        free(galloc->hash_values);
+    }
+    if (galloc->hash_allocs != NULL) {
+        free(galloc->hash_allocs);
+    }
+    if (galloc->parse_seq != NULL) {
+        free(galloc->parse_seq);
+    }
+    free(galloc);
+}
+
+void ggml_gallocr_set_parse_seq(ggml_gallocr_t galloc, const int * list, int n) {
+    free(galloc->parse_seq);
+    galloc->parse_seq = malloc(sizeof(int) * n);
+
+    for (int i = 0; i < n; i++) {
+        galloc->parse_seq[i] = list[i];
+    }
+    galloc->parse_seq_len = n;
+}
+
+static struct hash_node * hash_get(ggml_gallocr_t galloc, struct ggml_tensor * t) {
+    size_t i = ggml_hash_find_or_insert(galloc->hash_set, t);
+    return &galloc->hash_values[i];
 }
 
 static bool ggml_are_same_layout(const struct ggml_tensor * a, const struct ggml_tensor * b) {
@@ -407,22 +438,16 @@ static bool ggml_op_can_inplace(enum ggml_op op) {
     }
 }
 
-static ggml_allocr_t node_allocr(struct graph_allocr * galloc, struct ggml_tensor * node) {
-    ggml_allocr_t alloc = NULL;
-
-    if (galloc->hash_allocs) {
-        alloc = galloc->hash_allocs[ggml_hash_find_or_insert(galloc->hash_set, node)];
+static ggml_tallocr_t node_tallocr(ggml_gallocr_t galloc, struct ggml_tensor * node) {
+    if (galloc->talloc != NULL) {
+        return galloc->talloc;
     }
 
-    if (alloc == NULL) {
-        alloc = galloc->alloc;
-    }
-
-    return alloc;
+    return galloc->hash_allocs[ggml_hash_find_or_insert(galloc->hash_set, node)];
 }
 
-static void init_view(struct graph_allocr * galloc, struct ggml_tensor * view) {
-    ggml_allocr_t alloc = node_allocr(galloc, view);
+static void init_view(ggml_gallocr_t galloc, struct ggml_tensor * view) {
+    ggml_tallocr_t alloc = node_tallocr(galloc, view);
 
     //printf("init_view: %s from src %s\n", view->name, view->view_src->name);
     GGML_ASSERT(view->view_src != NULL && view->view_src->data != NULL);
@@ -432,15 +457,15 @@ static void init_view(struct graph_allocr * galloc, struct ggml_tensor * view) {
 
     // FIXME: the view should be initialized by the owning buffer, but currently this breaks the CUDA backend
     // due to the ggml_tensor_extra_gpu ring buffer overwriting the KV cache extras
-    assert(ggml_allocr_is_measure(alloc) || !view->buffer || view->buffer->backend == alloc->buffer->backend);
+    assert(ggml_tallocr_is_measure(alloc) || !view->buffer || view->buffer->backend == alloc->buffer->backend);
 
     if (!alloc->measure) {
         ggml_backend_buffer_init_tensor(alloc->buffer, view);
     }
 }
 
-static void allocate_node(struct graph_allocr * galloc, struct ggml_tensor * node) {
-    ggml_allocr_t alloc = node_allocr(galloc, node);
+static void allocate_node(ggml_gallocr_t galloc, struct ggml_tensor * node) {
+    ggml_tallocr_t alloc = node_tallocr(galloc, node);
 
     if (node->data == NULL) {
         if (ggml_is_view(node)) {
@@ -455,7 +480,7 @@ static void allocate_node(struct graph_allocr * galloc, struct ggml_tensor * nod
                     }
 
                     // if the node's data is external, then we cannot re-use it
-                    if (ggml_allocr_is_own(alloc, parent) == false) {
+                    if (ggml_tallocr_is_own(alloc, parent) == false) {
                         AT_PRINTF("not reusing parent %s for %s as %p is external\n", parent->name, node->name, parent->data);
                         continue;
                     }
@@ -488,20 +513,20 @@ static void allocate_node(struct graph_allocr * galloc, struct ggml_tensor * nod
                     }
                 }
             }
-            ggml_allocr_alloc(alloc, node);
+            ggml_tallocr_alloc(alloc, node);
         }
     }
 }
 
-static void free_node(struct graph_allocr * galloc, struct ggml_tensor * node) {
-    ggml_allocr_t alloc = node_allocr(galloc, node);
+static void free_node(ggml_gallocr_t galloc, struct ggml_tensor * node) {
+    ggml_tallocr_t alloc = node_tallocr(galloc, node);
 
-    ggml_allocr_free_tensor(alloc, node);
+    ggml_tallocr_free_tensor(alloc, node);
 }
 
-static void ggml_allocr_alloc_graph_impl(struct graph_allocr * galloc, struct ggml_cgraph * gf) {
-    const int * parse_seq     = galloc->alloc ? galloc->alloc->parse_seq     : NULL;
-    int         parse_seq_len = galloc->alloc ? galloc->alloc->parse_seq_len : 0;
+static void ggml_tallocr_alloc_graph_impl(ggml_gallocr_t galloc, struct ggml_cgraph * gf) {
+    const int * parse_seq     = galloc->parse_seq;
+    int         parse_seq_len = galloc->parse_seq_len;
 
     // count number of children and views
     for (int i = 0; i < gf->n_nodes; i++) {
@@ -529,15 +554,6 @@ static void ggml_allocr_alloc_graph_impl(struct graph_allocr * galloc, struct gg
    }
 
     // allocate tensors
-    // graph inputs are allocated first to ensure that they are not overwritten by each other
-    // if (inputs != NULL && inputs[g] != NULL) {
-    //     for (int i = 0; inputs[g][i] != NULL; i++) {
-    //         struct ggml_tensor * input = inputs[g][i];
-    //         AT_PRINTF("input: %s\n", input->name);
-    //         allocate_node(alloc, input);
-    //     }
-    // }
-
     // if we have parse_seq then we allocate nodes following the list, and we only free nodes at barriers
     int last_barrier_pos = 0;
     int n_nodes = parse_seq_len ? parse_seq_len : gf->n_nodes;
@@ -616,63 +632,133 @@ static void ggml_allocr_alloc_graph_impl(struct graph_allocr * galloc, struct gg
             }
         }
     }
-    // free graph outputs here that wouldn't be freed otherwise because they have no children
-    // if (outputs != NULL && outputs[g] != NULL) {
-    //     for (int i = 0; outputs[g][i] != NULL; i++) {
-    //         struct ggml_tensor * output = outputs[g][i];
-    //         AT_PRINTF("output: %s\n", output->name);
-    //         ggml_allocr_free_tensor(alloc, output);
-    //     }
-    // }
 }
 
-size_t ggml_allocr_alloc_graph(ggml_allocr_t alloc, struct ggml_cgraph * graph) {
+size_t ggml_gallocr_alloc_graph(ggml_gallocr_t galloc, ggml_tallocr_t talloc, struct ggml_cgraph * graph) {
     size_t hash_size = graph->visited_hash_table.size;
-    //static _Thread_local const struct ggml_tensor * hash_keys[hash_size];
-    //static _Thread_local struct hash_node hash_values[hash_size];
-    struct ggml_tensor ** hash_keys = malloc(sizeof(struct ggml_tensor *) * hash_size); // FIXME
-    struct hash_node * hash_values = malloc(sizeof(struct hash_node) * hash_size); // FIXME
 
-    struct graph_allocr galloc = {
-        /*.alloc       = */ alloc,
-        /*.hash_set    = */ {
-            /*.size = */ hash_size,
-            /*.keys = */ hash_keys,
-        },
-        /*.hash_values = */ hash_values,
-        /*.hash_allocs = */ NULL,
-    };
+    // check if the hash table is initialized and large enough
+    if (galloc->hash_set.size < hash_size) {
+        if (galloc->hash_set.keys != NULL) {
+            free(galloc->hash_set.keys);
+        }
+        if (galloc->hash_values != NULL) {
+            free(galloc->hash_values);
+        }
+        galloc->hash_set.keys = malloc(sizeof(struct ggml_tensor *) * hash_size);
+        galloc->hash_set.size = hash_size;
+        galloc->hash_values = malloc(sizeof(struct hash_node) * hash_size);
+    }
 
-    memset(hash_keys,   0, sizeof(struct ggml_tensor *) * hash_size);
-    memset(hash_values, 0, sizeof(struct hash_node) * hash_size);
+    // reset hash table
+    memset(galloc->hash_set.keys, 0, sizeof(struct ggml_tensor *) * hash_size);
+    memset(galloc->hash_values,   0, sizeof(struct hash_node) * hash_size);
 
-    ggml_allocr_alloc_graph_impl(&galloc, graph);
+    galloc->talloc = talloc;
+    ggml_tallocr_alloc_graph_impl(galloc, graph);
+    galloc->talloc = NULL;
 
-    size_t max_size = ggml_allocr_max_size(alloc);
-
-    free(hash_keys); // FIXME
-    free(hash_values); // FIXME
+    size_t max_size = ggml_tallocr_max_size(talloc);
 
     return max_size;
 }
 
-void ggml_allocr_alloc_graph_n(struct ggml_cgraph * graph, struct ggml_hash_set hash_set, ggml_allocr_t hash_node_alloct[]) {
+void ggml_gallocr_alloc_graph_n(ggml_gallocr_t galloc, struct ggml_cgraph * graph, struct ggml_hash_set hash_set, ggml_tallocr_t * hash_node_alloct) {
     const size_t hash_size = graph->visited_hash_table.size;
 
+    galloc->talloc = NULL;
 
-    //_Thread_local struct hash_node hash_values[hash_size];
-    struct hash_node * hash_values = malloc(sizeof(struct hash_node) * hash_size); // FIXME
+    // alloc hash_values if needed
+    if (galloc->hash_values == NULL || galloc->hash_values_size < hash_size) {
+        free(galloc->hash_values);
+        galloc->hash_values      = malloc(sizeof(struct hash_node) * hash_size);
+        galloc->hash_values_size = hash_size;
+    }
 
-    struct graph_allocr galloc = {
-        /*.alloc       = */ NULL,
-        /*.hash_set    = */ hash_set,
-        /*.hash_values = */ hash_values,
-        /*.hash_allocs = */ hash_node_alloct,
+    // free hash_set.keys if needed
+    if (galloc->hash_set.keys != NULL) {
+        free(galloc->hash_set.keys);
+    }
+    galloc->hash_set = hash_set;
+
+    // reset hash values
+    memset(galloc->hash_values, 0, sizeof(struct hash_node) * hash_size);
+
+    galloc->hash_allocs = hash_node_alloct;
+
+    ggml_tallocr_alloc_graph_impl(galloc, graph);
+
+    // remove unowned resources
+    galloc->hash_set.keys = NULL;
+    galloc->hash_allocs = NULL;
+}
+
+// legacy API wrapper
+
+struct ggml_allocr {
+    ggml_tallocr_t talloc;
+    ggml_gallocr_t galloc;
+};
+
+static ggml_allocr_t ggml_allocr_new_impl(ggml_tallocr_t talloc) {
+    ggml_allocr_t alloc = (ggml_allocr_t)malloc(sizeof(struct ggml_allocr));
+    *alloc = (struct ggml_allocr) {
+        /*.talloc = */ talloc,
+        /*.galloc = */ ggml_gallocr_new(),
     };
+    return alloc;
+}
 
-    memset(hash_values, 0, sizeof(struct hash_node) * hash_size);
+ggml_allocr_t ggml_allocr_new(void * data, size_t size, size_t alignment) {
+    return ggml_allocr_new_impl(ggml_tallocr_new(data, size, alignment));
+}
 
-    ggml_allocr_alloc_graph_impl(&galloc, graph);
+ggml_allocr_t ggml_allocr_new_measure(size_t alignment) {
+    return ggml_allocr_new_impl(ggml_tallocr_new_measure(alignment));
+}
 
-    free(hash_values); // FIXME
+ggml_allocr_t ggml_allocr_new_from_buffer(struct ggml_backend_buffer * buffer) {
+    return ggml_allocr_new_impl(ggml_tallocr_new_from_buffer(buffer));
+}
+
+ggml_allocr_t ggml_allocr_new_from_backend(struct ggml_backend * backend, size_t size) {
+    return ggml_allocr_new_impl(ggml_tallocr_new_from_backend(backend, size));
+}
+
+ggml_allocr_t ggml_allocr_new_measure_from_backend(struct ggml_backend * backend) {
+    return ggml_allocr_new_impl(ggml_tallocr_new_measure_from_backend(backend));
+}
+
+struct ggml_backend_buffer * ggml_allocr_get_buffer(ggml_allocr_t alloc) {
+    return ggml_tallocr_get_buffer(alloc->talloc);
+}
+
+void ggml_allocr_set_parse_seq(ggml_allocr_t alloc, const int * list, int n) {
+    ggml_gallocr_set_parse_seq(alloc->galloc, list, n);
+}
+
+void ggml_allocr_free(ggml_allocr_t alloc) {
+    ggml_gallocr_free(alloc->galloc);
+    ggml_tallocr_free(alloc->talloc);
+    free(alloc);
+}
+
+bool ggml_allocr_is_measure(ggml_allocr_t alloc) {
+    return ggml_tallocr_is_measure(alloc->talloc);
+}
+
+void ggml_allocr_reset(ggml_allocr_t alloc) {
+    ggml_tallocr_reset(alloc->talloc);
+}
+
+void ggml_allocr_alloc(ggml_allocr_t alloc, struct ggml_tensor * tensor) {
+    ggml_tallocr_alloc(alloc->talloc, tensor);
+}
+
+size_t ggml_allocr_max_size(ggml_allocr_t alloc) {
+    return ggml_tallocr_max_size(alloc->talloc);
+}
+
+size_t ggml_allocr_alloc_graph(ggml_allocr_t alloc, struct ggml_cgraph * graph) {
+    return ggml_gallocr_alloc_graph(alloc->galloc, alloc->talloc, graph);
 }
