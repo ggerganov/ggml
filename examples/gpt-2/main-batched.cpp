@@ -1136,7 +1136,7 @@ int main(int argc, char ** argv) {
             }
 
             // is it an end of stream? -> mark the stream as finished
-            if (id == 50256 || n_cur == n_len - 1) {
+            if ((!params.ignore_eos && id == 50256) || n_cur == n_len - 1) {
                 i_batch[i] = -1;
                 printf("\n");
                 if (n_parallel > 1) {

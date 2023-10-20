@@ -975,7 +975,7 @@ int main(int argc, char ** argv) {
         fflush(stdout);
 
         // end of text token
-        if (embd.back() == 50256) {
+        if (!params.ignore_eos && embd.back() == 50256) {
             break;
         }
     }
