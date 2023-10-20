@@ -18639,8 +18639,9 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
         case GGML_OP_ADD:
         case GGML_OP_ADD1:
         case GGML_OP_ACC:
-            n_tasks = n_threads;
-            break;
+            {
+                n_tasks = n_threads;
+            } break;
         case GGML_OP_SUB:
         case GGML_OP_DIV:
         case GGML_OP_SQR:
@@ -18652,9 +18653,9 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
         case GGML_OP_ARGMAX:
         case GGML_OP_REPEAT:
         case GGML_OP_REPEAT_BACK:
-            n_tasks = 1;
-            break;
-
+            {
+                n_tasks = 1;
+            } break;
         case GGML_OP_UNARY:
             switch (ggml_get_unary_op(node)) {
                 case GGML_UNARY_OP_ABS:
@@ -18681,8 +18682,9 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
         case GGML_OP_RMS_NORM_BACK:
         case GGML_OP_GROUP_NORM:
         case GGML_OP_CONCAT:
-            n_tasks = n_threads;
-            break;
+            {
+                n_tasks = n_threads;
+            } break;
         case GGML_OP_MUL_MAT:
             {
                 n_tasks = n_threads;
@@ -19446,12 +19448,12 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
             const uint32_t magic   = GGML_FILE_MAGIC;
             const uint32_t version = GGML_FILE_VERSION;
             const uint32_t n_leafs = cgraph->n_leafs;
-            const uint32_t nodes   = cgraph->n_nodes;
+            const uint32_t n_nodes = cgraph->n_nodes;
 
             fwrite(&magic,     sizeof(uint32_t), 1, fout);
             fwrite(&version,   sizeof(uint32_t), 1, fout);
             fwrite(&n_leafs,   sizeof(uint32_t), 1, fout);
-            fwrite(&nodes,     sizeof(uint32_t), 1, fout);
+            fwrite(&n_nodes,   sizeof(uint32_t), 1, fout);
             fwrite(&size_eval, sizeof(uint64_t), 1, fout);
         }
 
@@ -19565,12 +19567,11 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
     }
 }
 
-#if 0
-struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** ctx_data, struct ggml_context ** ctx_eval) {
+struct ggml_cgraph * ggml_graph_import(const char * fname, struct ggml_context ** ctx_data, struct ggml_context ** ctx_eval) {
     assert(*ctx_data == NULL);
     assert(*ctx_eval == NULL);
 
-    struct ggml_cgraph result = { 0 };
+    struct ggml_cgraph * result = NULL;
 
     struct ggml_tensor * data = NULL;
 
@@ -19642,13 +19643,11 @@ struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** 
         const uint32_t n_leafs   = *(const uint32_t *) ptr; ptr += sizeof(n_leafs);
         const uint32_t n_nodes   = *(const uint32_t *) ptr; ptr += sizeof(n_nodes);
         const uint64_t size_eval = *(const uint64_t *) ptr; ptr += sizeof(size_eval);
-
-        result.n_leafs = n_leafs;
-        result.n_nodes = n_nodes;
+        const int     graph_size = MAX(n_leafs, n_nodes);
 
         // create the data context
         {
-            const size_t overhead = (n_leafs + n_nodes)*ggml_tensor_overhead();
+            const size_t overhead = (n_leafs + n_nodes)*ggml_tensor_overhead() + ggml_graph_overhead(graph_size);
 
             struct ggml_init_params params = {
                 .mem_size   = size_eval + overhead,
@@ -19663,6 +19662,12 @@ struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** 
                 return result;
             }
         }
+
+        result = ggml_new_graph(*ctx_eval, graph_size);
+
+        result->n_leafs = n_leafs;
+        result->n_nodes = n_nodes;
+
 
         // leafs
         {
@@ -19702,7 +19707,7 @@ struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** 
                     tensor->nb[j] = nb[j];
                 }
 
-                result.leafs[i] = tensor;
+                result->leafs[i] = tensor;
 
                 ptr += ggml_nbytes(tensor);
 
@@ -19754,10 +19759,10 @@ struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** 
                         continue;
                     }
 
-                    if (arg_idx < result.n_leafs) {
-                        args[j] = result.leafs[arg_idx];
+                    if (arg_idx < result->n_leafs) {
+                        args[j] = result->leafs[arg_idx];
                     } else {
-                        args[j] = result.nodes[arg_idx - result.n_leafs];
+                        args[j] = result->nodes[arg_idx - result->n_leafs];
                     }
                 }
 
@@ -19809,7 +19814,7 @@ struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** 
                     tensor->src[j] = args[j];
                 }
 
-                result.nodes[i] = tensor;
+                result->nodes[i] = tensor;
 
                 fprintf(stderr, "%s: loaded node %d: '%16s', %3d dims, %9zu bytes\n", __func__, i, tensor->name, n_dims, ggml_nbytes(tensor));
             }
@@ -19818,7 +19823,6 @@ struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** 
 
     return result;
 }
-#endif
 
 void ggml_graph_print(const struct ggml_cgraph * cgraph) {
     int64_t perf_total_per_op_us[GGML_OP_COUNT] = {0};
