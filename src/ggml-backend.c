@@ -479,7 +479,7 @@ static int sched_allocr_prio(ggml_backend_sched_t sched, ggml_tallocr_t allocr) 
 }
 
 // returns the backend that should be used for the node based on the current locations
-char causes[GGML_DEFAULT_GRAPH_SIZE*4][128]; // debug
+char causes[GGML_DEFAULT_GRAPH_SIZE*4 + GGML_MAX_SPLITS*GGML_MAX_SPLIT_INPUTS][128]; // debug, remove
 static ggml_backend_t sched_backend_from_cur(ggml_backend_sched_t sched, struct ggml_tensor * node) {
     // if the dst tensor is already allocated in a buffer, we must assume that it is critical to keep it there
     // ie. kv cache updates
@@ -597,6 +597,10 @@ static void sched_split_graph(ggml_backend_sched_t sched, struct ggml_cgraph * g
     // pass 1: assign backends to ops with allocated inputs
     for (int i = 0; i < graph->n_leafs; i++) {
         struct ggml_tensor * leaf = graph->leafs[i];
+        if (node_allocr(leaf) != NULL) {
+            // do not overwrite user assignments
+            continue;
+        }
         ggml_backend_t leaf_backend = ggml_get_backend(leaf);
         if (leaf_backend == NULL && leaf->view_src != NULL) {
             leaf_backend = ggml_get_backend(leaf->view_src);
@@ -608,6 +612,10 @@ static void sched_split_graph(ggml_backend_sched_t sched, struct ggml_cgraph * g
 
     for (int i = 0; i < graph->n_nodes; i++) {
         struct ggml_tensor * node = graph->nodes[i];
+        if (node_allocr(node) != NULL) {
+            // do not overwrite user assignments
+            continue;
+        }
         ggml_backend_t node_backend = sched_backend_from_cur(sched, node);
         if (node_backend != NULL) {
             node_allocr(node) = ggml_backend_sched_get_tallocr(sched, node_backend);
@@ -720,8 +728,6 @@ static void sched_split_graph(ggml_backend_sched_t sched, struct ggml_cgraph * g
                 if (sched->node_copies[id][cur_backend_id] == NULL) {
                     struct ggml_tensor * tensor_copy = ggml_dup_tensor_layout(sched->ctx, src);
                     sched->node_copies[id][cur_backend_id] = tensor_copy;
-                    // FIXME: there is a small chance that this will cause the hash table to overflow
-                    // it is not necessary to set the backend of the input copies, but for now it makes debugging easier
                     node_allocr(tensor_copy) = cur_allocr;
                     ggml_backend_t backend = ggml_tallocr_get_buffer(cur_allocr)->backend;
                     ggml_format_name(tensor_copy, "%s#%s", ggml_backend_name(backend), src->name);
@@ -895,7 +901,7 @@ void ggml_backend_sched_free(ggml_backend_sched_t sched) {
 
 void ggml_backend_sched_init_measure(ggml_backend_sched_t sched, struct ggml_cgraph * measure_graph) {
     // initialize hash tables
-    size_t hash_size = measure_graph->visited_hash_table.size;
+    size_t hash_size = measure_graph->visited_hash_table.size + GGML_MAX_SPLITS*GGML_MAX_SPLIT_INPUTS;
     sched->hash_set.size = hash_size;
     sched->hash_set.keys = malloc(sizeof(sched->hash_set.keys[0]) * hash_size);
     sched->node_talloc   = malloc(sizeof(sched->node_talloc[0])   * hash_size);
@@ -915,7 +921,7 @@ void ggml_backend_sched_init_measure(ggml_backend_sched_t sched, struct ggml_cgr
 }
 
 void ggml_backend_sched_graph_compute(ggml_backend_sched_t sched, struct ggml_cgraph * graph) {
-    GGML_ASSERT(sched->hash_set.size >= graph->visited_hash_table.size);
+    GGML_ASSERT(sched->hash_set.size >= graph->visited_hash_table.size + GGML_MAX_SPLITS*GGML_MAX_SPLIT_INPUTS);
 
     sched_split_graph(sched, graph);
     sched_alloc_splits(sched);
@@ -931,4 +937,10 @@ ggml_tallocr_t ggml_backend_sched_get_tallocr(ggml_backend_sched_t sched, ggml_b
 ggml_backend_buffer_t ggml_backend_sched_get_buffer(ggml_backend_sched_t sched, ggml_backend_t backend) {
     int backend_index = sched_backend_prio(sched, backend);
     return ggml_tallocr_get_buffer(sched->tallocs[backend_index]);
+}
+
+void ggml_backend_sched_set_node_backend(ggml_backend_sched_t sched, struct ggml_tensor * node, ggml_backend_t backend) {
+    int backend_index = sched_backend_prio(sched, backend);
+    GGML_ASSERT(backend_index >= 0 && backend_index < sched->n_backends);
+    node_allocr(node) = sched->tallocs[backend_index];
 }

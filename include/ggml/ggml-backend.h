@@ -124,6 +124,8 @@ extern "C" {
     GGML_API ggml_tallocr_t        ggml_backend_sched_get_tallocr(ggml_backend_sched_t sched, ggml_backend_t backend);
     GGML_API ggml_backend_buffer_t ggml_backend_sched_get_buffer (ggml_backend_sched_t sched, ggml_backend_t backend);
 
+    GGML_API void ggml_backend_sched_set_node_backend(ggml_backend_sched_t sched, struct ggml_tensor * node, ggml_backend_t backend);
+
     // Allocate a graph on the backend scheduler
     GGML_API void ggml_backend_sched_graph_compute(
             ggml_backend_sched_t sched,
