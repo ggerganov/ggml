@@ -9297,25 +9297,25 @@ static void ggml_compute_forward_add_f32(
     const int ith = params->ith;
     const int nth = params->nth;
 
-    const int nr  = ggml_nrows(src0);
-    const int nelem = ggml_nelements(src0);
+    const int nr = ggml_nrows(src0);
+    const int ne = ggml_nelements(src0);
 
     GGML_TENSOR_BINARY_OP_LOCALS
 
     // GGML_ASSERT( nb0 == sizeof(float));
     // GGML_ASSERT(nb00 == sizeof(float));
 
-    // rows per thread
+    // rows and elements per thread
     const int dr = (nr + nth - 1)/nth;
-    const int dre = (nelem + nth - 1)/nth;
+    const int de = (ne + nth - 1)/nth;
 
     // row range for this thread
     const int ir0 = dr*ith;
     const int ir1 = MIN(ir0 + dr, nr);
 
-    // elem range for this thread
-    const int ir0e = dre*ith;
-    const int ir1e = MIN(ir0e + dre, nelem);
+    // element range for this thread
+    const int ie0 = de*ith;
+    const int ie1 = MIN(ie0 + de, ne);
 
     if (nb00 == sizeof(float) && nb0 == sizeof(float) && ggml_can_repeat_rows(src1, src0)) {
         if (nb10 == sizeof(float)) {
@@ -9382,12 +9382,12 @@ static void ggml_compute_forward_add_f32(
             }
         } else {
             // all are not contiguous
-            for (int ir = ir0e; ir < ir1e; ++ir) {
+            for (int ie = ie0; ie < ie1; ++ie) {
                 // src1 is broadcastable across src0 and dst in i1, i2, i3
-                const int64_t i03 = ir/(ne02*ne01*ne00);
-                const int64_t i02 = (ir - i03*ne02*ne01*ne00)/(ne01*ne00);
-                const int64_t i01 = (ir - i03*ne02*ne01*ne00 - i02*ne01*ne00);
-                const int64_t i00 = (ir - i03*ne02*ne01*ne00 - i02*ne01*ne00 - i01*ne00);
+                const int64_t i03 = ie/(ne02*ne01*ne00);
+                const int64_t i02 = (ie - i03*ne02*ne01*ne00)/(ne01*ne00);
+                const int64_t i01 = (ie - i03*ne02*ne01*ne00 - i02*ne01*ne00);
+                const int64_t i00 = (ie - i03*ne02*ne01*ne00 - i02*ne01*ne00 - i01*ne00);
 
                 const int64_t i13 = i03 % ne13;
                 const int64_t i12 = i02 % ne12;
@@ -9395,11 +9395,11 @@ static void ggml_compute_forward_add_f32(
                 const int64_t i10 = i00 % ne10;
 
                 float * dst_ptr  = (float *) ((char *) dst->data  + i03*nb3  + i02*nb2  + i01*nb1  + i00*nb0 );
-                float * src0_ptr = (float *) ((char *) src0->data + i03*nb03 + i02*nb02 + i01*nb01 + i00*nb00 );
+                float * src0_ptr = (float *) ((char *) src0->data + i03*nb03 + i02*nb02 + i01*nb01 + i00*nb00);
                 float * src1_ptr = (float *) ((char *) src1->data + i13*nb13 + i12*nb12 + i11*nb11 + i10*nb10);
 
                 *dst_ptr = *src0_ptr + *src1_ptr;
-                }
+            }
         }
     }
 }
@@ -11083,10 +11083,10 @@ static void ggml_compute_forward_tanh_f32(
     const int ir0 = dr*ith;
     const int ir1 = MIN(ir0 + dr, nr);
 
-    for (int i1 = ir0; i1 < ir1; i1++) {
+    for (int ir = ir0; ir < ir1; ir++) {
         ggml_vec_tanh_f32(nc,
-                (float *) ((char *) dst->data  + i1*( dst->nb[1])),
-                (float *) ((char *) src0->data + i1*(src0->nb[1])));
+                (float *) ((char *) dst->data  + ir*( dst->nb[1])),
+                (float *) ((char *) src0->data + ir*(src0->nb[1])));
     }
 }
 
