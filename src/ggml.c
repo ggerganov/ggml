@@ -17188,19 +17188,43 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static_assert(GGML_GRAPH_HASHTABLE_SIZE > GGML_MAX_NODES * 2, "GGML_GRAPH_HT_SIZE is too small");
+static size_t ggml_hash_size(size_t min_sz) {
+    // next primes after powers of two
+    static const size_t primes[] = {
+        2, 3, 5, 11, 17, 37, 67, 131, 257, 521, 1031,
+        2053, 4099, 8209, 16411, 32771, 65537, 131101,
+        262147, 524309, 1048583, 2097169, 4194319, 8388617,
+        16777259, 33554467, 67108879, 134217757, 268435459,
+        536870923, 1073741827, 2147483659
+    };
+    static const size_t n_primes = sizeof(primes)/sizeof(primes[0]);
 
-static size_t hash(const void * p) {
-    return (size_t)p % GGML_GRAPH_HASHTABLE_SIZE;
+    // find the smallest prime that is larger or equal to min_sz
+    size_t l = 0;
+    size_t r = n_primes;
+    while (l < r) {
+        size_t m = (l + r)/2;
+        if (primes[m] < min_sz) {
+            l = m + 1;
+        } else {
+            r = m;
+        }
+    }
+    size_t sz = l < n_primes ? primes[l] : min_sz | 1;
+    return sz;
 }
 
-size_t ggml_hash_find(const struct ggml_tensor * const hash_table[], const struct ggml_tensor * key) {
-    size_t h = hash(key);
+static size_t ggml_hash(const void * p) {
+    return (size_t)p;
+}
+
+size_t ggml_hash_find(const struct ggml_hash_set hash_set, struct ggml_tensor * key) {
+    size_t h = ggml_hash(key) % hash_set.size;
 
     // linear probing
     size_t i = h;
-    while (hash_table[i] != NULL && hash_table[i] != key) {
-        i = (i + 1) % GGML_GRAPH_HASHTABLE_SIZE;
+    while (hash_set.keys[i] != NULL && hash_set.keys[i] != key) {
+        i = (i + 1) % hash_set.size;
         if (i == h) {
             // visited all hash table entries -> not found
             return GGML_HASHTABLE_FULL;
@@ -17209,50 +17233,64 @@ size_t ggml_hash_find(const struct ggml_tensor * const hash_table[], const struc
     return i;
 }
 
-bool ggml_hash_contains(const struct ggml_tensor * const hash_table[], const struct ggml_tensor * key) {
-    size_t i = ggml_hash_find(hash_table, key);
-    return i != GGML_HASHTABLE_FULL && hash_table[i] == key;
+bool ggml_hash_contains(struct ggml_hash_set hash_set, struct ggml_tensor * key) {
+    size_t i = ggml_hash_find(hash_set, key);
+    return i != GGML_HASHTABLE_FULL && hash_set.keys[i] == key;
 }
 
-size_t ggml_hash_insert(const struct ggml_tensor * hash_table[], const struct ggml_tensor * key) {
-    size_t i = ggml_hash_find(hash_table, key);
+size_t ggml_hash_insert(struct ggml_hash_set hash_set, struct ggml_tensor * key) {
+    size_t i = ggml_hash_find(hash_set, key);
 
     GGML_ASSERT(i != GGML_HASHTABLE_FULL);
 
-    if (hash_table[i] == key) {
+    if (hash_set.keys[i] == key) {
         return GGML_HASHTABLE_ALREADY_EXISTS;
     }
 
     // insert
-    GGML_ASSERT(hash_table[i] == NULL);
-    hash_table[i] = key;
+    GGML_ASSERT(hash_set.keys[i] == NULL);
+    hash_set.keys[i] = key;
     return i;
 }
 
-size_t ggml_hash_find_or_insert(const struct ggml_tensor * hash_table[], const struct ggml_tensor * key) {
-    size_t i = ggml_hash_find(hash_table, key);
+size_t ggml_hash_find_or_insert(struct ggml_hash_set hash_set, struct ggml_tensor * key) {
+    size_t i = ggml_hash_find(hash_set, key);
 
     GGML_ASSERT(i != GGML_HASHTABLE_FULL);
 
-    hash_table[i] = key;
+    hash_set.keys[i] = key;
     return i;
 }
 
-struct hash_map {
-    const struct ggml_tensor * keys[GGML_GRAPH_HASHTABLE_SIZE];
-          struct ggml_tensor * vals[GGML_GRAPH_HASHTABLE_SIZE];
-};
-
-static struct hash_map * new_hash_map(void) {
-    struct hash_map * result = malloc(sizeof(struct hash_map));
-    for (int i = 0; i < GGML_GRAPH_HASHTABLE_SIZE; ++i) {
-        result->keys[i] = NULL;
-        result->vals[i] = NULL;
-    }
+static struct ggml_hash_set ggml_hash_set_new(size_t size) {
+    size = ggml_hash_size(size);
+    struct ggml_hash_set result;
+    result.size = size;
+    result.keys = malloc(sizeof(struct ggml_tensor *) * size);
+    memset(result.keys, 0, sizeof(struct ggml_tensor *) * size);
     return result;
 }
 
-static void free_hash_map(struct hash_map * map) {
+static void ggml_hash_set_free(struct ggml_hash_set hash_set) {
+    free(hash_set.keys);
+}
+
+struct hash_map {
+    struct ggml_hash_set set;
+    struct ggml_tensor ** vals;
+};
+
+static struct hash_map * ggml_new_hash_map(size_t size) {
+    struct hash_map * result = malloc(sizeof(struct hash_map));
+    result->set = ggml_hash_set_new(size);
+    result->vals = malloc(sizeof(struct ggml_tensor *) * result->set.size);
+    memset(result->vals, 0, sizeof(struct ggml_tensor *) * result->set.size);
+    return result;
+}
+
+static void ggml_hash_map_free(struct hash_map * map) {
+    ggml_hash_set_free(map->set);
+    free(map->vals);
     free(map);
 }
 
@@ -17287,17 +17325,17 @@ static struct ggml_tensor * ggml_recompute_graph_node(
         return node;
     }
 
-    size_t i = ggml_hash_find(replacements->keys, node);
-    GGML_ASSERT(i < GGML_GRAPH_HASHTABLE_SIZE); // assert that not full
-    if (replacements->keys[i] == node) {
+    size_t i = ggml_hash_find(replacements->set, node);
+    GGML_ASSERT(i != GGML_HASHTABLE_FULL); // assert that not full
+    if (replacements->set.keys[i] == node) {
         return replacements->vals[i];
     }
 
     struct ggml_tensor * clone = ggml_new_tensor(ctx, node->type, node->n_dims, node->ne);
 
     // insert clone into replacements
-    GGML_ASSERT(replacements->keys[i] == NULL); // assert that we don't overwrite
-    replacements->keys[i] = node;
+    GGML_ASSERT(replacements->set.keys[i] == NULL); // assert that we don't overwrite
+    replacements->set.keys[i] = node;
     replacements->vals[i] = clone;
 
     clone->op       = node->op;
@@ -17334,7 +17372,7 @@ void ggml_build_backward_gradient_checkpointing(
         struct ggml_cgraph    * gb_tmp,
         struct ggml_tensor  * * checkpoints,
         int                     n_checkpoints) {
-    *gb_tmp = *gf;
+    *gb_tmp = *gf; // FIXME: this doesn't copy the lists, only the pointers
     ggml_build_backward_expand(ctx, gf, gb_tmp, true);
 
     if (n_checkpoints <= 0) {
@@ -17342,15 +17380,15 @@ void ggml_build_backward_gradient_checkpointing(
         return;
     }
 
-    struct hash_map * replacements = new_hash_map();
+    struct hash_map * replacements = ggml_new_hash_map(gf->n_nodes + gf->n_leafs + n_checkpoints);
 
     // insert checkpoints in replacements
     for (int i = 0; i < n_checkpoints; ++i) {
-        size_t k = ggml_hash_find(replacements->keys, checkpoints[i]);
-        GGML_ASSERT(k < GGML_GRAPH_HASHTABLE_SIZE); // assert that not full
-        GGML_ASSERT(replacements->keys[k] == NULL); // assert that we don't overwrite
-        replacements->keys[k] = checkpoints[i];
-        replacements->vals[k] = checkpoints[i];
+        size_t k = ggml_hash_find(replacements->set, checkpoints[i]);
+        GGML_ASSERT(k != GGML_HASHTABLE_FULL); // assert that not full
+        GGML_ASSERT(replacements->set.keys[k] == NULL); // assert that we don't overwrite
+        replacements->set.keys[k] = checkpoints[i];
+        replacements->vals[k]     = checkpoints[i];
     }
 
     *gb = *gf;
@@ -17370,12 +17408,12 @@ void ggml_build_backward_gradient_checkpointing(
         ggml_build_forward_expand(gb, node);
     }
 
-    free_hash_map(replacements);
+    ggml_hash_map_free(replacements);
 }
 
 // functions to change gradients considering the case that input a might be initial gradient with zero value
 
-static struct ggml_tensor * ggml_add_or_set(struct ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * b, const struct ggml_tensor * zero_table[]) {
+static struct ggml_tensor * ggml_add_or_set(struct ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * b, struct ggml_hash_set zero_table) {
     if (ggml_hash_contains(zero_table, a)) {
         return b;
     } else {
@@ -17383,7 +17421,7 @@ static struct ggml_tensor * ggml_add_or_set(struct ggml_context * ctx, struct gg
     }
 }
 
-static struct ggml_tensor * ggml_acc_or_set(struct ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * b, size_t nb1, size_t nb2, size_t nb3, size_t offset, const struct ggml_tensor * zero_table[]) {
+static struct ggml_tensor * ggml_acc_or_set(struct ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * b, size_t nb1, size_t nb2, size_t nb3, size_t offset, struct ggml_hash_set zero_table) {
     if (ggml_hash_contains(zero_table, a)) {
         struct ggml_tensor * a_zero = ggml_scale(ctx, a, ggml_new_f32(ctx, 0));
         return ggml_acc_impl(ctx, a_zero, b, nb1, nb2, nb3, offset, false);
@@ -17392,7 +17430,7 @@ static struct ggml_tensor * ggml_acc_or_set(struct ggml_context * ctx, struct gg
     }
 }
 
-static struct ggml_tensor * ggml_add1_or_set(struct ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * b, const struct ggml_tensor * zero_table[]) {
+static struct ggml_tensor * ggml_add1_or_set(struct ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * b, struct ggml_hash_set zero_table) {
     if (ggml_hash_contains(zero_table, a)) {
         return ggml_repeat(ctx, b, a);
     } else {
@@ -17400,7 +17438,7 @@ static struct ggml_tensor * ggml_add1_or_set(struct ggml_context * ctx, struct g
     }
 }
 
-static struct ggml_tensor * ggml_sub_or_set(struct ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * b, const struct ggml_tensor * zero_table[]) {
+static struct ggml_tensor * ggml_sub_or_set(struct ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * b, struct ggml_hash_set zero_table) {
     if (ggml_hash_contains(zero_table, a)) {
         return ggml_neg(ctx, b);
     } else {
@@ -17408,7 +17446,7 @@ static struct ggml_tensor * ggml_sub_or_set(struct ggml_context * ctx, struct gg
     }
 }
 
-static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor * tensor, const struct ggml_tensor * zero_table[]) {
+static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor * tensor, struct ggml_hash_set zero_table) {
     struct ggml_tensor * src0 = tensor->src[0];
     struct ggml_tensor * src1 = tensor->src[1];
 
@@ -18241,7 +18279,7 @@ static void ggml_visit_parents(struct ggml_cgraph * cgraph, struct ggml_tensor *
 
     if (node->op == GGML_OP_NONE && node->grad == NULL) {
         // reached a leaf node, not part of the gradient graph (e.g. a constant)
-        GGML_ASSERT(cgraph->n_leafs < GGML_MAX_NODES);
+        GGML_ASSERT(cgraph->n_leafs < cgraph->size);
 
         if (strlen(node->name) == 0) {
             ggml_format_name(node, "leaf_%d", cgraph->n_leafs);
@@ -18250,7 +18288,7 @@ static void ggml_visit_parents(struct ggml_cgraph * cgraph, struct ggml_tensor *
         cgraph->leafs[cgraph->n_leafs] = node;
         cgraph->n_leafs++;
     } else {
-        GGML_ASSERT(cgraph->n_nodes < GGML_MAX_NODES);
+        GGML_ASSERT(cgraph->n_nodes < cgraph->size);
 
         if (strlen(node->name) == 0) {
             ggml_format_name(node, "node_%d", cgraph->n_nodes);
@@ -18286,25 +18324,6 @@ void ggml_build_forward_expand(struct ggml_cgraph * cgraph, struct ggml_tensor *
     ggml_build_forward_impl(cgraph, tensor, true);
 }
 
-struct ggml_cgraph ggml_build_forward(struct ggml_tensor * tensor) {
-    struct ggml_cgraph result = {
-        /*.n_nodes      =*/ 0,
-        /*.n_leafs      =*/ 0,
-        /*.nodes        =*/ { NULL },
-        /*.grads        =*/ { NULL },
-        /*.leafs        =*/ { NULL },
-        /*.hash_table   =*/ { NULL },
-        /*.order        =*/ GGML_CGRAPH_EVAL_ORDER_LEFT_TO_RIGHT,
-        /*.perf_runs    =*/ 0,
-        /*.perf_cycles  =*/ 0,
-        /*.perf_time_us =*/ 0,
-    };
-
-    ggml_build_forward_impl(&result, tensor, false);
-
-    return result;
-}
-
 void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * gf, struct ggml_cgraph * gb, bool keep) {
     GGML_ASSERT(gf->n_nodes > 0);
 
@@ -18321,8 +18340,7 @@ void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * 
     }
 
     // remember original gradients which start with zero values
-    const struct ggml_tensor ** zero_table = malloc(sizeof(void *) * GGML_GRAPH_HASHTABLE_SIZE);
-    memset(zero_table, 0, sizeof(void*) * GGML_GRAPH_HASHTABLE_SIZE);
+    struct ggml_hash_set zero_table = ggml_hash_set_new(gf->size);
     for (int i = 0; i < gf->n_nodes; i++) {
         if (gf->grads[i]) {
             ggml_hash_insert(zero_table, gf->grads[i]);
@@ -18348,26 +18366,44 @@ void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * 
         }
     }
 
-    free(zero_table);
+    ggml_hash_set_free(zero_table);
 }
 
-struct ggml_cgraph ggml_build_backward(struct ggml_context * ctx, struct ggml_cgraph * gf, bool keep) {
-    struct ggml_cgraph result = *gf;
-    ggml_build_backward_expand(ctx, gf, &result, keep);
-    return result;
+static size_t ggml_graph_size(size_t size) {
+    return sizeof(struct ggml_cgraph) +
+            size * sizeof(struct ggml_tensor *) * 3 +                   // nodes + grads + leafs
+            ggml_hash_size(size * 2) * sizeof(struct ggml_tensor *);    // hash table
 }
 
-struct ggml_cgraph * ggml_new_graph(struct ggml_context * ctx) {
-    struct ggml_object * obj = ggml_new_object(ctx, GGML_OBJECT_GRAPH, GGML_GRAPH_SIZE);
+size_t ggml_graph_overhead(size_t size) {
+    return GGML_OBJECT_SIZE + GGML_PAD(ggml_graph_size(size), GGML_MEM_ALIGN);
+}
+
+struct ggml_cgraph * ggml_new_graph(struct ggml_context * ctx, size_t size) {
+    const size_t obj_size = ggml_graph_size(size);
+    struct ggml_object * obj = ggml_new_object(ctx, GGML_OBJECT_GRAPH, obj_size);
     struct ggml_cgraph * cgraph = (struct ggml_cgraph *) ((char *) ctx->mem_buffer + obj->offs);
 
+    struct ggml_tensor ** data_start = (struct ggml_tensor **) (cgraph + 1);
+
+    size_t hash_size = ggml_hash_size(size * 2);
+    struct ggml_tensor ** nodes = data_start;
+    struct ggml_tensor ** grads = nodes + size;
+    struct ggml_tensor ** leafs = grads + size;
+    struct ggml_tensor ** hash_keys = leafs + size;
+
+    memset(hash_keys, 0, hash_size * sizeof(struct ggml_tensor *));
+
+    assert(obj_size == (size_t)(((char *)(hash_keys + hash_size)) - (char *)cgraph));
+
     *cgraph = (struct ggml_cgraph) {
+        /*.size         =*/ size,
         /*.n_nodes      =*/ 0,
         /*.n_leafs      =*/ 0,
-        /*.nodes        =*/ { NULL },
-        /*.grads        =*/ { NULL },
-        /*.leafs        =*/ { NULL },
-        /*.hash_table   =*/ { NULL },
+        /*.nodes        =*/ nodes,
+        /*.grads        =*/ grads,
+        /*.leafs        =*/ leafs,
+        /*.hash_table   =*/ { hash_size, hash_keys },
         /*.order        =*/ GGML_CGRAPH_EVAL_ORDER_LEFT_TO_RIGHT,
         /*.perf_runs    =*/ 0,
         /*.perf_cycles  =*/ 0,
@@ -18377,14 +18413,64 @@ struct ggml_cgraph * ggml_new_graph(struct ggml_context * ctx) {
     return cgraph;
 }
 
-struct ggml_cgraph * ggml_build_forward_ctx(struct ggml_context * ctx, struct ggml_tensor * tensor) {
-    struct ggml_cgraph * cgraph = ggml_new_graph(ctx);
+struct ggml_cgraph * ggml_graph_view(struct ggml_context * ctx, struct ggml_cgraph * cgraph0, int i0, int i1) {
+    const size_t obj_size = sizeof(struct ggml_cgraph);
+    struct ggml_object * obj = ggml_new_object(ctx, GGML_OBJECT_GRAPH, obj_size);
+    struct ggml_cgraph * cgraph = (struct ggml_cgraph *) ((char *) ctx->mem_buffer + obj->offs);
+
+    *cgraph = (struct ggml_cgraph) {
+        /*.size         =*/ 0,
+        /*.n_nodes      =*/ i1 - i0,
+        /*.n_leafs      =*/ 0,
+        /*.nodes        =*/ cgraph0->nodes + i0,
+        /*.grads        =*/ NULL,
+        /*.leafs        =*/ NULL,
+        /*.hash_table   =*/ { 0, NULL },
+        /*.order        =*/ GGML_CGRAPH_EVAL_ORDER_LEFT_TO_RIGHT,
+        /*.perf_runs    =*/ 0,
+        /*.perf_cycles  =*/ 0,
+        /*.perf_time_us =*/ 0,
+    };
+
+    return cgraph;
+}
+
+struct ggml_cgraph * ggml_build_forward_ctx(struct ggml_context * ctx, struct ggml_tensor * tensor, size_t size) {
+    struct ggml_cgraph * cgraph = ggml_new_graph(ctx, size);
     ggml_build_forward_impl(cgraph, tensor, false);
     return cgraph;
 }
 
-size_t ggml_graph_overhead(void) {
-    return GGML_OBJECT_SIZE + GGML_PAD(GGML_GRAPH_SIZE, GGML_MEM_ALIGN);
+struct ggml_cgraph * ggml_build_backward_ctx(struct ggml_context * ctx, struct ggml_cgraph * gf, bool keep) {
+    struct ggml_cgraph * result = ggml_graph_dup(ctx, gf);
+    ggml_build_backward_expand(ctx, gf, result, keep);
+    return result;
+}
+
+void ggml_graph_cpy(struct ggml_cgraph * src, struct ggml_cgraph * dst) {
+    GGML_ASSERT(dst->size >= src->n_leafs);
+    GGML_ASSERT(dst->size >= src->n_nodes);
+
+    dst->n_leafs = src->n_leafs;
+    dst->n_nodes = src->n_nodes;
+    dst->order   = src->order;
+
+    for (int i = 0; i < src->n_leafs; ++i) {
+        dst->leafs[i] = src->leafs[i];
+    }
+
+    for (int i = 0; i < src->n_nodes; ++i) {
+        dst->nodes[i] = src->nodes[i];
+        if (src->grads) {
+            dst->grads[i] = src->grads[i];
+        }
+    }
+}
+
+struct ggml_cgraph * ggml_graph_dup(struct ggml_context * ctx, struct ggml_cgraph * cgraph) {
+    struct ggml_cgraph * result = ggml_new_graph(ctx, cgraph->size);
+    ggml_graph_cpy(cgraph, result);
+    return result;
 }
 
 //
@@ -19446,7 +19532,7 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
                             if (idx == -1) {
                                 for (int k = 0; k < cgraph->n_nodes; ++k) {
                                     if (args[j] == cgraph->nodes[k]) {
-                                        idx = GGML_MAX_NODES + k;
+                                        idx = cgraph->n_leafs + k;
                                         break;
                                     }
                                 }
@@ -19472,6 +19558,7 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
     }
 }
 
+#if 0
 struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** ctx_data, struct ggml_context ** ctx_eval) {
     assert(*ctx_data == NULL);
     assert(*ctx_eval == NULL);
@@ -19660,10 +19747,10 @@ struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** 
                         continue;
                     }
 
-                    if (arg_idx < GGML_MAX_NODES) {
+                    if (arg_idx < result.n_leafs) {
                         args[j] = result.leafs[arg_idx];
                     } else {
-                        args[j] = result.nodes[arg_idx - GGML_MAX_NODES];
+                        args[j] = result.nodes[arg_idx - result.n_leafs];
                     }
                 }
 
@@ -19724,6 +19811,7 @@ struct ggml_cgraph ggml_graph_import(const char * fname, struct ggml_context ** 
 
     return result;
 }
+#endif
 
 void ggml_graph_print(const struct ggml_cgraph * cgraph) {
     int64_t perf_total_per_op_us[GGML_OP_COUNT] = {0};
@@ -20795,14 +20883,11 @@ enum ggml_opt_result ggml_opt_resume(
         struct ggml_tensor * f) {
 
     // build forward + backward compute graphs
-    struct ggml_tensor * gfbuf = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, sizeof(struct ggml_cgraph) / ggml_type_size(GGML_TYPE_I32)+ (sizeof(struct ggml_cgraph) % ggml_type_size(GGML_TYPE_I32) ? 1 : 0));
-    struct ggml_tensor * gbbuf = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, sizeof(struct ggml_cgraph) / ggml_type_size(GGML_TYPE_I32)+ (sizeof(struct ggml_cgraph) % ggml_type_size(GGML_TYPE_I32) ? 1 : 0));
+    struct ggml_cgraph * gf;
+    struct ggml_cgraph * gb;
 
-    struct ggml_cgraph * gf = (struct ggml_cgraph *) gfbuf->data;
-    struct ggml_cgraph * gb = (struct ggml_cgraph *) gbbuf->data;
-
-    *gf = ggml_build_forward (f);
-    *gb = ggml_build_backward(ctx, gf, true);
+    gf = ggml_build_forward_ctx (ctx, f, GGML_DEFAULT_GRAPH_SIZE); // TODO: make graph size configurable
+    gb = ggml_build_backward_ctx(ctx, gf, true);
 
     return ggml_opt_resume_g(ctx, opt, f, gf, gb, NULL, NULL);
 }

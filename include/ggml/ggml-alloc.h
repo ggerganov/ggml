@@ -36,8 +36,8 @@ GGML_API size_t ggml_allocr_alloc_graph(ggml_allocr_t alloc, struct ggml_cgraph 
 // Allocate tensors from the allocators given by the hash table
 GGML_API void ggml_allocr_alloc_graph_n(
                     struct ggml_cgraph * graph,
-                    const struct ggml_tensor * hash_keys[GGML_GRAPH_HASHTABLE_SIZE],
-                    ggml_allocr_t hash_node_alloct[GGML_GRAPH_HASHTABLE_SIZE]);
+                    struct ggml_hash_set hash_set,
+                    ggml_allocr_t hash_node_alloct[]);
 
 
 #ifdef  __cplusplus

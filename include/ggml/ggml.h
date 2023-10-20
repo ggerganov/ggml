@@ -213,15 +213,14 @@
 #define GGML_QNT_VERSION        2    // bump this on quantization format changes
 #define GGML_QNT_VERSION_FACTOR 1000 // do not change this
 
-#define GGML_MAX_DIMS          4
-#define GGML_MAX_NODES         16384
-#define GGML_MAX_PARAMS        1024
-#define GGML_MAX_CONTEXTS      64
-#define GGML_MAX_SRC           6
-#define GGML_MAX_NAME          64
-#define GGML_MAX_OP_PARAMS     32
-#define GGML_DEFAULT_N_THREADS 4
-
+#define GGML_MAX_DIMS           4
+#define GGML_MAX_PARAMS         1024
+#define GGML_MAX_CONTEXTS       64
+#define GGML_MAX_SRC            6
+#define GGML_MAX_NAME           64
+#define GGML_MAX_OP_PARAMS      32
+#define GGML_DEFAULT_N_THREADS  4
+#define GGML_DEFAULT_GRAPH_SIZE 2048
 #if UINTPTR_MAX == 0xFFFFFFFF
     #define GGML_MEM_ALIGN 4
 #else
@@ -534,19 +533,12 @@ extern "C" {
         int n_threads;
 
         // the `n_tasks` of nodes, 1:1 mapping to cgraph nodes
-        int n_tasks[GGML_MAX_NODES];
+        int n_tasks[GGML_DEFAULT_GRAPH_SIZE]; // FIXME: need to allocate ggml_cplan dynamically?
 
         // abort ggml_graph_compute when true
         bool (*abort_callback)(void * data);
         void * abort_callback_data;
     };
-
-    // next prime after GGML_MAX_NODES
-    // #define GGML_GRAPH_HASHTABLE_SIZE 4099
-    // next prime after GGML_MAX_NODES * 2 (nodes + leafs)
-    // #define GGML_GRAPH_HASHTABLE_SIZE 8273
-    // #define GGML_GRAPH_HASHTABLE_SIZE 16411
-    #define GGML_GRAPH_HASHTABLE_SIZE 32771
 
     enum ggml_cgraph_eval_order {
         GGML_CGRAPH_EVAL_ORDER_LEFT_TO_RIGHT = 0,
@@ -554,16 +546,22 @@ extern "C" {
         GGML_CGRAPH_EVAL_ORDER_COUNT
     };
 
+    struct ggml_hash_set {
+        size_t size;
+        struct ggml_tensor ** keys;
+    };
+
     // computation graph
     struct ggml_cgraph {
+        int size;
         int n_nodes;
         int n_leafs;
 
-        struct ggml_tensor * nodes[GGML_MAX_NODES];
-        struct ggml_tensor * grads[GGML_MAX_NODES];
-        struct ggml_tensor * leafs[GGML_MAX_NODES];
+        struct ggml_tensor ** nodes;
+        struct ggml_tensor ** grads;
+        struct ggml_tensor ** leafs;
 
-        const struct ggml_tensor * visited_hash_table[GGML_GRAPH_HASHTABLE_SIZE];
+        struct ggml_hash_set visited_hash_table;
 
         enum ggml_cgraph_eval_order order;
 
@@ -572,8 +570,6 @@ extern "C" {
         int64_t perf_cycles;
         int64_t perf_time_us;
     };
-
-    static const size_t GGML_GRAPH_SIZE = sizeof(struct ggml_cgraph);
 
     // scratch buffer
     struct ggml_scratch {
@@ -1714,13 +1710,15 @@ extern "C" {
     GGML_API void ggml_build_forward_expand (struct ggml_cgraph * cgraph, struct ggml_tensor * tensor);
     GGML_API void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * gf, struct ggml_cgraph * gb, bool keep);
 
-    GGML_API struct ggml_cgraph ggml_build_forward (struct ggml_tensor * tensor);
-    GGML_API struct ggml_cgraph ggml_build_backward(struct ggml_context * ctx, struct ggml_cgraph * gf, bool keep);
-
     // graph allocation in a context
-    GGML_API struct ggml_cgraph * ggml_new_graph        (struct ggml_context * ctx);
-    GGML_API struct ggml_cgraph * ggml_build_forward_ctx(struct ggml_context * ctx, struct ggml_tensor * tensor);
-    GGML_API size_t ggml_graph_overhead(void);
+    GGML_API struct ggml_cgraph * ggml_new_graph         (struct ggml_context * ctx, size_t size);
+    GGML_API struct ggml_cgraph * ggml_build_forward_ctx (struct ggml_context * ctx, struct ggml_tensor * tensor, size_t size);
+    GGML_API struct ggml_cgraph * ggml_build_backward_ctx(struct ggml_context * ctx, struct ggml_cgraph * gf, bool keep);
+    GGML_API struct ggml_cgraph * ggml_graph_dup         (struct ggml_context * ctx, struct ggml_cgraph * cgraph);
+    GGML_API struct ggml_cgraph * ggml_graph_view        (struct ggml_context * ctx, struct ggml_cgraph * cgraph, int i0, int i1);
+    GGML_API void                 ggml_graph_cpy         (struct ggml_cgraph * src, struct ggml_cgraph * dst);
+
+    GGML_API size_t ggml_graph_overhead(size_t size);
 
     // ggml_graph_plan() has to be called before ggml_graph_compute()
     // when plan.work_size > 0, caller must allocate memory for plan.work_data

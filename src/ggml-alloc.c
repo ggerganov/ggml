@@ -12,7 +12,7 @@
 
 #define UNUSED(x) (void)(x)
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
-#define GGML_MAX_CONCUR (2*GGML_MAX_NODES)
+#define GGML_MAX_CONCUR (2*GGML_DEFAULT_GRAPH_SIZE)
 #define MAX_FREE_BLOCKS 256
 
 //#define GGML_ALLOCATOR_DEBUG
@@ -231,6 +231,7 @@ static void ggml_allocr_free_tensor(ggml_allocr_t alloc, struct ggml_tensor * te
 }
 
 void ggml_allocr_set_parse_seq(ggml_allocr_t alloc, const int * list, int n) {
+    GGML_ASSERT(n <= GGML_MAX_CONCUR);
     for (int i = 0; i < n; i++) {
         alloc->parse_seq[i] = list[i];
     }
@@ -357,13 +358,13 @@ struct hash_node {
 
 struct graph_allocr {
     ggml_allocr_t alloc;
-    const struct ggml_tensor ** hash_keys;
+    struct ggml_hash_set hash_set;
     struct hash_node * hash_values;
     ggml_allocr_t * hash_allocs;
 };
 
-static struct hash_node * hash_get(struct graph_allocr * alloc, const struct ggml_tensor * t) {
-    size_t i = ggml_hash_find_or_insert(alloc->hash_keys, t);
+static struct hash_node * hash_get(struct graph_allocr * alloc, struct ggml_tensor * t) {
+    size_t i = ggml_hash_find_or_insert(alloc->hash_set, t);
     return &alloc->hash_values[i];
 }
 
@@ -410,7 +411,7 @@ static ggml_allocr_t node_allocr(struct graph_allocr * galloc, struct ggml_tenso
     ggml_allocr_t alloc = NULL;
 
     if (galloc->hash_allocs) {
-        alloc = galloc->hash_allocs[ggml_hash_find_or_insert(galloc->hash_keys, node)];
+        alloc = galloc->hash_allocs[ggml_hash_find_or_insert(galloc->hash_set, node)];
     }
 
     if (alloc == NULL) {
@@ -626,35 +627,52 @@ static void ggml_allocr_alloc_graph_impl(struct graph_allocr * galloc, struct gg
 }
 
 size_t ggml_allocr_alloc_graph(ggml_allocr_t alloc, struct ggml_cgraph * graph) {
-    static _Thread_local const struct ggml_tensor * hash_keys[GGML_GRAPH_HASHTABLE_SIZE];
-    static _Thread_local struct hash_node hash_values[GGML_GRAPH_HASHTABLE_SIZE];
+    size_t hash_size = graph->visited_hash_table.size;
+    //static _Thread_local const struct ggml_tensor * hash_keys[hash_size];
+    //static _Thread_local struct hash_node hash_values[hash_size];
+    struct ggml_tensor ** hash_keys = malloc(sizeof(struct ggml_tensor *) * hash_size); // FIXME
+    struct hash_node * hash_values = malloc(sizeof(struct hash_node) * hash_size); // FIXME
 
     struct graph_allocr galloc = {
         /*.alloc       = */ alloc,
-        /*.hash_keys   = */ hash_keys,
+        /*.hash_set    = */ {
+            /*.size = */ hash_size,
+            /*.keys = */ hash_keys,
+        },
         /*.hash_values = */ hash_values,
         /*.hash_allocs = */ NULL,
     };
 
-    memset(hash_keys,   0, sizeof(hash_keys));
-    memset(hash_values, 0, sizeof(hash_values));
+    memset(hash_keys,   0, sizeof(struct ggml_tensor *) * hash_size);
+    memset(hash_values, 0, sizeof(struct hash_node) * hash_size);
 
     ggml_allocr_alloc_graph_impl(&galloc, graph);
 
-    return ggml_allocr_max_size(alloc);
+    size_t max_size = ggml_allocr_max_size(alloc);
+
+    free(hash_keys); // FIXME
+    free(hash_values); // FIXME
+
+    return max_size;
 }
 
-void ggml_allocr_alloc_graph_n(struct ggml_cgraph * graph, const struct ggml_tensor * hash_keys[GGML_GRAPH_HASHTABLE_SIZE], ggml_allocr_t hash_node_alloct[GGML_GRAPH_HASHTABLE_SIZE]) {
-    static _Thread_local struct hash_node hash_values[GGML_GRAPH_HASHTABLE_SIZE];
+void ggml_allocr_alloc_graph_n(struct ggml_cgraph * graph, struct ggml_hash_set hash_set, ggml_allocr_t hash_node_alloct[]) {
+    const size_t hash_size = graph->visited_hash_table.size;
+
+
+    //_Thread_local struct hash_node hash_values[hash_size];
+    struct hash_node * hash_values = malloc(sizeof(struct hash_node) * hash_size); // FIXME
 
     struct graph_allocr galloc = {
         /*.alloc       = */ NULL,
-        /*.hash_keys   = */ hash_keys,
+        /*.hash_set    = */ hash_set,
         /*.hash_values = */ hash_values,
         /*.hash_allocs = */ hash_node_alloct,
     };
 
-    memset(hash_values, 0, sizeof(hash_values));
+    memset(hash_values, 0, sizeof(struct hash_node) * hash_size);
 
     ggml_allocr_alloc_graph_impl(&galloc, graph);
+
+    free(hash_values); // FIXME
 }

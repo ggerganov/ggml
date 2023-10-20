@@ -435,9 +435,9 @@ struct ggml_backend_sched {
     ggml_backend_t backends[GGML_MAX_BACKENDS];
     ggml_allocr_t  allocs[GGML_MAX_BACKENDS];
 
-    const struct ggml_tensor *  hash_keys[GGML_GRAPH_HASHTABLE_SIZE];
-    ggml_allocr_t               node_allocr[GGML_GRAPH_HASHTABLE_SIZE];
-    struct ggml_tensor *        node_copies[GGML_GRAPH_HASHTABLE_SIZE][GGML_MAX_BACKENDS];
+    struct ggml_hash_set    hash_set;
+    ggml_allocr_t *         node_allocr;                     // [hash_set.size]
+    struct ggml_tensor * (* node_copies)[GGML_MAX_BACKENDS]; // [hash_set.size][GGML_MAX_BACKENDS]
 
     struct ggml_cgraph * graph;
     struct ggml_backend_sched_split splits[GGML_MAX_SPLITS];
@@ -446,12 +446,11 @@ struct ggml_backend_sched {
     struct ggml_context * ctx;
 
     // align context_buffer to GGML_MEM_ALIGN
-    //char padding[0];
-    // FIXME: this require too much memory due to the size of the graph, avoid duplicating the graphs, use node ranges instead
+    // char padding[0];
     char context_buffer[GGML_MAX_SPLITS*GGML_MAX_SPLIT_INPUTS*sizeof(struct ggml_tensor) + GGML_MAX_SPLITS*sizeof(struct ggml_cgraph)];
 };
 
-#define hash_id(node) ggml_hash_find_or_insert(sched->hash_keys, node)
+#define hash_id(node) ggml_hash_find_or_insert(sched->hash_set, node)
 #define node_allocr(node) sched->node_allocr[hash_id(node)]
 
 static bool ggml_is_view_op(enum ggml_op op) {
@@ -478,8 +477,8 @@ static int sched_allocr_prio(ggml_backend_sched_t sched, ggml_allocr_t allocr) {
 }
 
 // returns the backend that should be used for the node based on the current locations
-char causes[GGML_GRAPH_HASHTABLE_SIZE][128];
-static ggml_backend_t sched_backend_from_cur(ggml_backend_sched_t sched, const struct ggml_tensor * node) {
+char causes[GGML_DEFAULT_GRAPH_SIZE*4][128];
+static ggml_backend_t sched_backend_from_cur(ggml_backend_sched_t sched, struct ggml_tensor * node) {
     // if the dst tensor is already allocated in a buffer, we must assume that it is critical to keep it there
     // ie. kv cache updates
     // dst
@@ -549,7 +548,7 @@ static void sched_print_assignments(ggml_backend_sched_t sched, struct ggml_cgra
         ggml_backend_t node_backend = node_allocr ? ggml_allocr_get_buffer(node_allocr)->backend : NULL;
         fprintf(stderr, "node #%3d (%10.10s): %20.20s (%4.4s) [%4.4s %8.8s]:", i, ggml_op_name(node->op), node->name, fmt_size(ggml_nbytes(node)), node_allocr ? ggml_backend_name(node_backend) : "NULL", causes[hash_id(node)]);
         for (int j = 0; j < GGML_MAX_SRC; j++) {
-            const struct ggml_tensor * src = node->src[j];
+            struct ggml_tensor * src = node->src[j];
             if (src == NULL) {
                 break;
             }
@@ -576,9 +575,10 @@ static void sched_split_graph(ggml_backend_sched_t sched) {
     struct ggml_cgraph * graph = sched->graph;
 
     // reset state
-    memset(sched->hash_keys, 0, sizeof(sched->hash_keys));
-    memset(sched->node_allocr, 0, sizeof(sched->node_allocr));
-    memset(sched->node_copies, 0, sizeof(sched->node_copies));
+    size_t hash_size = sched->hash_set.size;
+    memset(sched->hash_set.keys, 0, sizeof(sched->hash_set.keys[0]) * hash_size);
+    memset(sched->node_allocr,   0, sizeof(sched->node_allocr[0])   * hash_size);
+    memset(sched->node_copies,   0, sizeof(sched->node_copies[0])   * hash_size);
     sched->n_splits = 0;
 
     struct ggml_init_params params = {
@@ -595,7 +595,7 @@ static void sched_split_graph(ggml_backend_sched_t sched) {
 
     // pass 1: assign backends to ops with allocated inputs
     for (int i = 0; i < graph->n_leafs; i++) {
-        const struct ggml_tensor * leaf = graph->leafs[i];
+        struct ggml_tensor * leaf = graph->leafs[i];
         ggml_backend_t leaf_backend = ggml_get_backend(leaf);
         if (leaf_backend == NULL && leaf->view_src != NULL) {
             leaf_backend = ggml_get_backend(leaf->view_src);
@@ -624,7 +624,7 @@ static void sched_split_graph(ggml_backend_sched_t sched) {
             int    cur_prio = INT_MAX;
             size_t cur_size = 0;
             for (int j = 0; j < GGML_MAX_SRC; j++) {
-                const struct ggml_tensor * src = node->src[j];
+                struct ggml_tensor * src = node->src[j];
                 if (src == NULL) {
                     break;
                 }
@@ -652,7 +652,7 @@ static void sched_split_graph(ggml_backend_sched_t sched) {
         struct ggml_tensor * node = graph->nodes[i];
         ggml_allocr_t node_allocr = node_allocr(node);
         for (int j = 0; j < GGML_MAX_SRC; j++) {
-            const struct ggml_tensor * src = node->src[j];
+            struct ggml_tensor * src = node->src[j];
             if (src == NULL) {
                 break;
             }
@@ -743,7 +743,7 @@ static void sched_split_graph(ggml_backend_sched_t sched) {
             fprintf(stderr, "!!!!!!! %s has no backend\n", node->name);
         }
         for (int j = 0; j < GGML_MAX_SRC; j++) {
-            const struct ggml_tensor * src = node->src[j];
+            struct ggml_tensor * src = node->src[j];
             if (src == NULL) {
                 break;
             }
@@ -758,13 +758,13 @@ static void sched_split_graph(ggml_backend_sched_t sched) {
 #endif
 
     // create copies of the graph for each split
-    // FIXME: this is not really necessary, we should use the range of nodes instead
-    struct ggml_cgraph * graph_copy = ggml_new_graph(sched->ctx);
+    // FIXME: avoid this copy, pass split inputs to ggml_allocr_alloc_graph_n in some other way
+    struct ggml_cgraph * graph_copy = ggml_new_graph(sched->ctx, graph->size + sched->n_splits*GGML_MAX_SPLIT_INPUTS);
     for (int i = 0; i < sched->n_splits; i++) {
         struct ggml_backend_sched_split * split = &sched->splits[i];
-        split->graph = ggml_new_graph(sched->ctx);
+        split->graph = ggml_graph_view(sched->ctx, graph, split->i_start, split->i_end);
 
-        // add inputs to the graph copy
+        // add inputs to the graph copy so that they are allocated by ggml-alloc at the start of the split
         for (int j = 0; j < split->n_inputs; j++) {
             struct ggml_tensor * input = split->inputs[j];
             struct ggml_tensor * input_cpy = sched->node_copies[hash_id(input)][sched_allocr_prio(sched, split->allocr)];
@@ -772,16 +772,8 @@ static void sched_split_graph(ggml_backend_sched_t sched) {
             graph_copy->nodes[graph_copy->n_nodes++] = input_cpy;
         }
 
-        //if (i == 0 && split->i_start !=0) printf("WARNING: split 0: skips first %d nodes\n", split->i_start);
-        //if (i != 0 && split->i_start != sched->splits[i-1].i_end) printf("WARNING: split %d skips %d nodes\n", i, split->i_start - sched->splits[i-1].i_end);
-
         for (int j = split->i_start; j < split->i_end; j++) {
-            struct ggml_tensor * node = graph->nodes[j];
-            if (!ggml_is_view_op(node->op)) {
-                split->graph->nodes[split->graph->n_nodes++] = node;
-            }
-            // views are still required for ggml-alloc dependency tracking
-            graph_copy->nodes[graph_copy->n_nodes++] = node;
+            graph_copy->nodes[graph_copy->n_nodes++] = graph->nodes[j];
         }
     }
     sched->graph = graph_copy;
@@ -790,7 +782,7 @@ static void sched_split_graph(ggml_backend_sched_t sched) {
 static void sched_alloc_splits(ggml_backend_sched_t sched) {
     ggml_allocr_alloc_graph_n(
         sched->graph,
-        sched->hash_keys,
+        sched->hash_set,
         sched->node_allocr);
 }
 
@@ -898,6 +890,14 @@ void ggml_backend_sched_free(ggml_backend_sched_t sched) {
 
 void ggml_backend_sched_init_measure(ggml_backend_sched_t sched, struct ggml_cgraph * measure_graph) {
     sched->graph = measure_graph;
+
+    // initialize hash tables
+    size_t hash_size = measure_graph->visited_hash_table.size;
+    sched->hash_set.size = hash_size;
+    sched->hash_set.keys = malloc(sizeof(sched->hash_set.keys[0]) * hash_size);
+    sched->node_allocr   = malloc(sizeof(sched->node_allocr[0])   * hash_size);
+    sched->node_copies   = malloc(sizeof(sched->node_copies[0])   * hash_size);
+
     sched_split_graph(sched);
     sched_alloc_splits(sched);
 
@@ -912,6 +912,7 @@ void ggml_backend_sched_init_measure(ggml_backend_sched_t sched, struct ggml_cgr
 }
 
 void ggml_backend_sched_graph_compute(ggml_backend_sched_t sched, struct ggml_cgraph * graph) {
+    GGML_ASSERT(sched->hash_set.size >= graph->visited_hash_table.size);
     sched->graph = graph;
     sched_split_graph(sched);
     sched_alloc_splits(sched);
