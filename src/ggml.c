@@ -18304,6 +18304,7 @@ static void ggml_build_forward_impl(struct ggml_cgraph * cgraph, struct ggml_ten
     if (!expand) {
         cgraph->n_nodes = 0;
         cgraph->n_leafs = 0;
+        memset(cgraph->visited_hash_table.keys, 0, cgraph->visited_hash_table.size * sizeof(struct ggml_tensor *));
     }
 
     const int n0 = cgraph->n_nodes;
