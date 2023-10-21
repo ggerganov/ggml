@@ -18295,16 +18295,17 @@ static void ggml_visit_parents(struct ggml_cgraph * cgraph, struct ggml_tensor *
         }
 
         cgraph->nodes[cgraph->n_nodes] = node;
-        cgraph->grads[cgraph->n_nodes] = node->grad;
+        if (cgraph->grads) {
+            cgraph->grads[cgraph->n_nodes] = node->grad;
+        }
         cgraph->n_nodes++;
     }
 }
 
 static void ggml_build_forward_impl(struct ggml_cgraph * cgraph, struct ggml_tensor * tensor, bool expand) {
     if (!expand) {
-        cgraph->n_nodes = 0;
-        cgraph->n_leafs = 0;
-        memset(cgraph->visited_hash_table.keys, 0, cgraph->visited_hash_table.size * sizeof(struct ggml_tensor *));
+        // TODO: this branch isn't accessible anymore, maybe move this to ggml_build_forward_expand
+        ggml_graph_clear(cgraph);
     }
 
     const int n0 = cgraph->n_nodes;
@@ -18370,41 +18371,51 @@ void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * 
     ggml_hash_set_free(zero_table);
 }
 
-static size_t ggml_graph_size(size_t size) {
-    return sizeof(struct ggml_cgraph) +
-            size * sizeof(struct ggml_tensor *) * 3 +                   // nodes + grads + leafs
-            ggml_hash_size(size * 2) * sizeof(struct ggml_tensor *);    // hash table
+static size_t ggml_graph_nbytes(size_t size, bool grads) {
+    size_t nbytes = sizeof(struct ggml_cgraph);
+    nbytes += size * sizeof(struct ggml_tensor *) * 2; // leafs + nodes
+    if (grads) {
+        nbytes += size * sizeof(struct ggml_tensor *); // grads
+    }
+    nbytes += ggml_hash_size(size * 2) * sizeof(struct ggml_tensor *); // hash set
+    return nbytes;
 }
 
-size_t ggml_graph_overhead(size_t size) {
-    return GGML_OBJECT_SIZE + GGML_PAD(ggml_graph_size(size), GGML_MEM_ALIGN);
+size_t ggml_graph_overhead_custom(size_t size, bool grads) {
+    return GGML_OBJECT_SIZE + GGML_PAD(ggml_graph_nbytes(size, grads), GGML_MEM_ALIGN);
 }
 
-struct ggml_cgraph * ggml_new_graph(struct ggml_context * ctx, size_t size) {
-    const size_t obj_size = ggml_graph_size(size);
+size_t ggml_graph_overhead() {
+    return ggml_graph_overhead_custom(GGML_DEFAULT_GRAPH_SIZE, false);
+}
+
+struct ggml_cgraph * ggml_new_graph_custom(struct ggml_context * ctx, size_t size, bool grads) {
+    const size_t obj_size = ggml_graph_nbytes(size, grads);
     struct ggml_object * obj = ggml_new_object(ctx, GGML_OBJECT_GRAPH, obj_size);
     struct ggml_cgraph * cgraph = (struct ggml_cgraph *) ((char *) ctx->mem_buffer + obj->offs);
 
     struct ggml_tensor ** data_start = (struct ggml_tensor **) (cgraph + 1);
 
     size_t hash_size = ggml_hash_size(size * 2);
-    struct ggml_tensor ** nodes = data_start;
-    struct ggml_tensor ** grads = nodes + size;
-    struct ggml_tensor ** leafs = grads + size;
-    struct ggml_tensor ** hash_keys = leafs + size;
+    struct ggml_tensor ** nodes_ptr = data_start;
+    struct ggml_tensor ** leafs_ptr = nodes_ptr + size;
+    struct ggml_tensor ** hash_keys_ptr = leafs_ptr + size;
+    struct ggml_tensor ** grads_ptr = grads ? hash_keys_ptr + hash_size : NULL;
 
-    memset(hash_keys, 0, hash_size * sizeof(struct ggml_tensor *));
+    memset(hash_keys_ptr, 0, hash_size * sizeof(struct ggml_tensor *));
 
-    assert(obj_size == (size_t)(((char *)(hash_keys + hash_size)) - (char *)cgraph));
+    // check that we allocated the correct amount of memory
+    assert(obj_size == (size_t) (
+        (grads ? (char *)(grads_ptr + size) : (char *)(hash_keys_ptr + hash_size)) - (char *)cgraph));
 
     *cgraph = (struct ggml_cgraph) {
         /*.size         =*/ size,
         /*.n_nodes      =*/ 0,
         /*.n_leafs      =*/ 0,
-        /*.nodes        =*/ nodes,
-        /*.grads        =*/ grads,
-        /*.leafs        =*/ leafs,
-        /*.hash_table   =*/ { hash_size, hash_keys },
+        /*.nodes        =*/ nodes_ptr,
+        /*.grads        =*/ grads_ptr,
+        /*.leafs        =*/ leafs_ptr,
+        /*.hash_table   =*/ { hash_size, hash_keys_ptr },
         /*.order        =*/ GGML_CGRAPH_EVAL_ORDER_LEFT_TO_RIGHT,
         /*.perf_runs    =*/ 0,
         /*.perf_cycles  =*/ 0,
@@ -18412,6 +18423,10 @@ struct ggml_cgraph * ggml_new_graph(struct ggml_context * ctx, size_t size) {
     };
 
     return cgraph;
+}
+
+struct ggml_cgraph * ggml_new_graph(struct ggml_context * ctx) {
+    return ggml_new_graph_custom(ctx, GGML_DEFAULT_GRAPH_SIZE, false);
 }
 
 struct ggml_cgraph * ggml_graph_view(struct ggml_context * ctx, struct ggml_cgraph * cgraph0, int i0, int i1) {
@@ -18424,28 +18439,16 @@ struct ggml_cgraph * ggml_graph_view(struct ggml_context * ctx, struct ggml_cgra
         /*.n_nodes      =*/ i1 - i0,
         /*.n_leafs      =*/ 0,
         /*.nodes        =*/ cgraph0->nodes + i0,
-        /*.grads        =*/ NULL,
+        /*.grads        =*/ cgraph0->grads ? cgraph0->grads + i0 : NULL,
         /*.leafs        =*/ NULL,
         /*.hash_table   =*/ { 0, NULL },
-        /*.order        =*/ GGML_CGRAPH_EVAL_ORDER_LEFT_TO_RIGHT,
+        /*.order        =*/ cgraph0->order,
         /*.perf_runs    =*/ 0,
         /*.perf_cycles  =*/ 0,
         /*.perf_time_us =*/ 0,
     };
 
     return cgraph;
-}
-
-struct ggml_cgraph * ggml_build_forward_ctx(struct ggml_context * ctx, struct ggml_tensor * tensor, size_t size) {
-    struct ggml_cgraph * cgraph = ggml_new_graph(ctx, size);
-    ggml_build_forward_impl(cgraph, tensor, false);
-    return cgraph;
-}
-
-struct ggml_cgraph * ggml_build_backward_ctx(struct ggml_context * ctx, struct ggml_cgraph * gf, bool keep) {
-    struct ggml_cgraph * result = ggml_graph_dup(ctx, gf);
-    ggml_build_backward_expand(ctx, gf, result, keep);
-    return result;
 }
 
 void ggml_graph_cpy(struct ggml_cgraph * src, struct ggml_cgraph * dst) {
@@ -18463,7 +18466,11 @@ void ggml_graph_cpy(struct ggml_cgraph * src, struct ggml_cgraph * dst) {
 
     for (int i = 0; i < src->n_nodes; ++i) {
         dst->nodes[i] = src->nodes[i];
-        if (src->grads) {
+    }
+
+    if (src->grads) {
+        GGML_ASSERT(dst->grads != NULL);
+        for (int i = 0; i < src->n_nodes; ++i) {
             dst->grads[i] = src->grads[i];
         }
     }
@@ -18476,9 +18483,25 @@ void ggml_graph_cpy(struct ggml_cgraph * src, struct ggml_cgraph * dst) {
 }
 
 struct ggml_cgraph * ggml_graph_dup(struct ggml_context * ctx, struct ggml_cgraph * cgraph) {
-    struct ggml_cgraph * result = ggml_new_graph(ctx, cgraph->size);
+    struct ggml_cgraph * result = ggml_new_graph_custom(ctx, cgraph->size, cgraph->grads != NULL);
     ggml_graph_cpy(cgraph, result);
     return result;
+}
+
+void ggml_graph_reset(struct ggml_cgraph * cgraph) {
+    for (int i = 0; i < cgraph->n_nodes; i++) {
+        struct ggml_tensor * grad = cgraph->grads[i];
+
+        if (grad) {
+            ggml_set_zero(grad);
+        }
+    }
+}
+
+void ggml_graph_clear(struct ggml_cgraph * cgraph) {
+    cgraph->n_leafs = 0;
+    cgraph->n_nodes = 0;
+    memset(cgraph->visited_hash_table.keys, 0, cgraph->visited_hash_table.size * sizeof(struct ggml_tensor *));
 }
 
 //
@@ -19313,16 +19336,6 @@ int ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {
     return compute_status;
 }
 
-void ggml_graph_reset(struct ggml_cgraph * cgraph) {
-    for (int i = 0; i < cgraph->n_nodes; i++) {
-        struct ggml_tensor * grad = cgraph->grads[i];
-
-        if (grad) {
-            ggml_set_zero(grad);
-        }
-    }
-}
-
 void ggml_graph_compute_with_ctx(struct ggml_context * ctx, struct ggml_cgraph * cgraph, int n_threads) {
     struct ggml_cplan cplan = ggml_graph_plan(cgraph, n_threads);
 
@@ -19648,7 +19661,7 @@ struct ggml_cgraph * ggml_graph_import(const char * fname, struct ggml_context *
 
         // create the data context
         {
-            const size_t overhead = (n_leafs + n_nodes)*ggml_tensor_overhead() + ggml_graph_overhead(graph_size);
+            const size_t overhead = (n_leafs + n_nodes)*ggml_tensor_overhead() + ggml_graph_overhead_custom(graph_size, false);
 
             struct ggml_init_params params = {
                 .mem_size   = size_eval + overhead,
@@ -19664,7 +19677,7 @@ struct ggml_cgraph * ggml_graph_import(const char * fname, struct ggml_context *
             }
         }
 
-        result = ggml_new_graph(*ctx_eval, graph_size);
+        result = ggml_new_graph_custom(*ctx_eval, graph_size, false);
 
         result->n_leafs = n_leafs;
         result->n_nodes = n_nodes;
@@ -20720,10 +20733,11 @@ struct ggml_opt_params ggml_opt_default_params(enum ggml_opt_type type) {
         case GGML_OPT_ADAM:
             {
                 result = (struct ggml_opt_params) {
-                    .type      = GGML_OPT_ADAM,
-                    .n_threads = 1,
-                    .past      = 0,
-                    .delta     = 1e-5f,
+                    .type       = GGML_OPT_ADAM,
+                    .graph_size = GGML_DEFAULT_GRAPH_SIZE,
+                    .n_threads  = 1, // FIXME: GGML_DEFAULT_N_THREADS ?
+                    .past       = 0,
+                    .delta      = 1e-5f,
 
                     .max_no_improvement = 100,
 
@@ -20750,10 +20764,11 @@ struct ggml_opt_params ggml_opt_default_params(enum ggml_opt_type type) {
         case GGML_OPT_LBFGS:
             {
                 result = (struct ggml_opt_params) {
-                    .type      = GGML_OPT_LBFGS,
-                    .n_threads = 1,
-                    .past      = 0,
-                    .delta     = 1e-5f,
+                    .type       = GGML_OPT_LBFGS,
+                    .graph_size = GGML_DEFAULT_GRAPH_SIZE,
+                    .n_threads  = 1,
+                    .past       = 0,
+                    .delta      = 1e-5f,
 
                     .max_no_improvement = 0,
 
@@ -20895,11 +20910,11 @@ enum ggml_opt_result ggml_opt_resume(
         struct ggml_tensor * f) {
 
     // build forward + backward compute graphs
-    struct ggml_cgraph * gf;
-    struct ggml_cgraph * gb;
+    struct ggml_cgraph * gf = ggml_new_graph_custom(ctx, opt->params.graph_size, false);
+    struct ggml_cgraph * gb = ggml_new_graph_custom(ctx, opt->params.graph_size, true);
 
-    gf = ggml_build_forward_ctx (ctx, f, GGML_DEFAULT_GRAPH_SIZE); // TODO: make graph size configurable
-    gb = ggml_build_backward_ctx(ctx, gf, true);
+    ggml_build_forward_expand(gf, f);
+    ggml_build_backward_expand(ctx, gf, gb, true);
 
     return ggml_opt_resume_g(ctx, opt, f, gf, gb, NULL, NULL);
 }

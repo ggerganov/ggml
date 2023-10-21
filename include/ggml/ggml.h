@@ -1708,20 +1708,21 @@ extern "C" {
     GGML_API void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * gf, struct ggml_cgraph * gb, bool keep);
 
     // graph allocation in a context
-    GGML_API struct ggml_cgraph * ggml_new_graph         (struct ggml_context * ctx, size_t size);
-    GGML_API struct ggml_cgraph * ggml_build_forward_ctx (struct ggml_context * ctx, struct ggml_tensor * tensor, size_t size);
-    GGML_API struct ggml_cgraph * ggml_build_backward_ctx(struct ggml_context * ctx, struct ggml_cgraph * gf, bool keep);
+    GGML_API struct ggml_cgraph * ggml_new_graph         (struct ggml_context * ctx); // size = GGML_DEFAULT_GRAPH_SIZE, grads = false
+    GGML_API struct ggml_cgraph * ggml_new_graph_custom  (struct ggml_context * ctx, size_t size, bool grads);
     GGML_API struct ggml_cgraph * ggml_graph_dup         (struct ggml_context * ctx, struct ggml_cgraph * cgraph);
     GGML_API struct ggml_cgraph * ggml_graph_view        (struct ggml_context * ctx, struct ggml_cgraph * cgraph, int i0, int i1);
     GGML_API void                 ggml_graph_cpy         (struct ggml_cgraph * src, struct ggml_cgraph * dst);
+    GGML_API void                 ggml_graph_reset       (struct ggml_cgraph * cgraph);  // zero grads
+    GGML_API void                 ggml_graph_clear       (struct ggml_cgraph * cgraph);
 
-    GGML_API size_t ggml_graph_overhead(size_t size);
+    GGML_API size_t ggml_graph_overhead(void);
+    GGML_API size_t ggml_graph_overhead_custom(size_t size, bool grads);
 
     // ggml_graph_plan() has to be called before ggml_graph_compute()
     // when plan.work_size > 0, caller must allocate memory for plan.work_data
     GGML_API struct ggml_cplan ggml_graph_plan   (struct ggml_cgraph * cgraph, int n_threads /*= GGML_DEFAULT_N_THREADS*/);
-    GGML_API               int ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan);
-    GGML_API              void ggml_graph_reset  (struct ggml_cgraph * cgraph);
+    GGML_API int               ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan);
 
     // same as ggml_graph_compute() but the work data is allocated as a part of the context
     // note: the drawback of this API is that you must have ensured that the context has enough memory for the work data
@@ -1792,6 +1793,8 @@ extern "C" {
     //
     struct ggml_opt_params {
         enum ggml_opt_type type;
+
+        size_t graph_size;
 
         int n_threads;
 

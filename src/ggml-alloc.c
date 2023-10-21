@@ -664,7 +664,9 @@ size_t ggml_gallocr_alloc_graph(ggml_gallocr_t galloc, ggml_tallocr_t talloc, st
 }
 
 void ggml_gallocr_alloc_graph_n(ggml_gallocr_t galloc, struct ggml_cgraph * graph, struct ggml_hash_set hash_set, ggml_tallocr_t * hash_node_alloct) {
-    const size_t hash_size = graph->visited_hash_table.size;
+    const size_t hash_size = hash_set.size;
+
+    GGML_ASSERT(hash_size >= (size_t)(graph->n_nodes + graph->n_leafs));
 
     galloc->talloc = NULL;
 

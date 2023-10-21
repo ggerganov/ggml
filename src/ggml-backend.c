@@ -766,7 +766,7 @@ static void sched_split_graph(ggml_backend_sched_t sched, struct ggml_cgraph * g
 
     // create copies of the graph for each split
     // FIXME: avoid this copy, pass split inputs to ggml_gallocr_alloc_graph_n in some other way
-    struct ggml_cgraph * graph_copy = ggml_new_graph(sched->ctx, graph->size + sched->n_splits*GGML_MAX_SPLIT_INPUTS);
+    struct ggml_cgraph * graph_copy = ggml_new_graph_custom(sched->ctx, graph->n_nodes + sched->n_splits*GGML_MAX_SPLIT_INPUTS, false);
     for (int i = 0; i < sched->n_splits; i++) {
         struct ggml_backend_sched_split * split = &sched->splits[i];
         split->graph = ggml_graph_view(sched->ctx, graph, split->i_start, split->i_end);

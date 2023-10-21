@@ -553,7 +553,7 @@ struct ggml_cgraph * gpt2_graph(
     const int n_head  = hparams.n_head;
 
     // since we are using ggml-alloc, this buffer only needs enough space to hold the ggml_tensor and ggml_cgraph structs, but not the tensor data
-    static size_t buf_size = ggml_tensor_overhead()*GGML_DEFAULT_GRAPH_SIZE + ggml_graph_overhead(GGML_DEFAULT_GRAPH_SIZE);
+    static size_t buf_size = ggml_tensor_overhead()*GGML_DEFAULT_GRAPH_SIZE + ggml_graph_overhead();
     static std::vector<uint8_t> buf(buf_size);
 
     struct ggml_init_params params = {
@@ -564,7 +564,7 @@ struct ggml_cgraph * gpt2_graph(
 
     struct ggml_context * ctx0 = ggml_init(params);
 
-    struct ggml_cgraph  * gf = ggml_new_graph(ctx0, GGML_DEFAULT_GRAPH_SIZE);
+    struct ggml_cgraph  * gf = ggml_new_graph(ctx0);
 
     struct ggml_tensor * embd = ggml_view_1d(ctx0, model.embd, N, 0);
 
