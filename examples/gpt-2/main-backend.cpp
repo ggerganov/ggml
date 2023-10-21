@@ -96,7 +96,7 @@ struct gpt2_model {
 };
 
 // load the model's weights from a file
-bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & vocab, int n_gpu_layers) {
+bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & vocab, int n_ctx, int n_gpu_layers) {
     printf("%s: loading model from '%s'\n", __func__, fname.c_str());
 
     auto fin = std::ifstream(fname, std::ios::binary);
@@ -337,6 +337,9 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             model.tensors["model/h" + std::to_string(i) + "/mlp/c_proj/b"]  = layer.c_mlp_proj_b;
         }
     }
+
+    // override the default training context with the user-provided
+    model.hparams.n_ctx = n_ctx;
 
     // key + value memory
     {
@@ -859,7 +862,7 @@ int main(int argc, char ** argv) {
     {
         const int64_t t_start_us = ggml_time_us();
 
-        if (!gpt2_model_load(params.model, model, vocab, params.n_gpu_layers)) {
+        if (!gpt2_model_load(params.model, model, vocab, params.n_ctx, params.n_gpu_layers)) {
             fprintf(stderr, "%s: failed to load model from '%s'\n", __func__, params.model.c_str());
             return 1;
         }
@@ -972,7 +975,7 @@ int main(int argc, char ** argv) {
         fflush(stdout);
 
         // end of text token
-        if (embd.back() == 50256) {
+        if (!params.ignore_eos && embd.back() == 50256) {
             break;
         }
     }
