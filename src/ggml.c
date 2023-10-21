@@ -17376,7 +17376,7 @@ void ggml_build_backward_gradient_checkpointing(
     ggml_build_backward_expand(ctx, gf, gb_tmp, true);
 
     if (n_checkpoints <= 0) {
-        *gb = *gb_tmp;
+        ggml_graph_cpy(gb_tmp, gb);
         return;
     }
 
@@ -17391,7 +17391,7 @@ void ggml_build_backward_gradient_checkpointing(
         replacements->vals[k]     = checkpoints[i];
     }
 
-    *gb = *gf;
+    ggml_graph_cpy(gf, gb);
     // rewrite gb_tmp->nodes[gf->n_nodes:gb_tmp->n_nodes],
     // replacing references to gb_tmp->nodes[0:gf->n_nodes] ( == gf->nodes[0:gf->n_nodes]),
     // by recomputing them from checkpoints
@@ -18402,11 +18402,11 @@ struct ggml_cgraph * ggml_new_graph_custom(struct ggml_context * ctx, size_t siz
     struct ggml_tensor ** hash_keys_ptr = leafs_ptr + size;
     struct ggml_tensor ** grads_ptr = grads ? hash_keys_ptr + hash_size : NULL;
 
-    memset(hash_keys_ptr, 0, hash_size * sizeof(struct ggml_tensor *));
-
     // check that we allocated the correct amount of memory
     assert(obj_size == (size_t) (
         (grads ? (char *)(grads_ptr + size) : (char *)(hash_keys_ptr + hash_size)) - (char *)cgraph));
+
+    memset(hash_keys_ptr, 0, hash_size * sizeof(struct ggml_tensor *));
 
     *cgraph = (struct ggml_cgraph) {
         /*.size         =*/ size,
@@ -18489,6 +18489,8 @@ struct ggml_cgraph * ggml_graph_dup(struct ggml_context * ctx, struct ggml_cgrap
 }
 
 void ggml_graph_reset(struct ggml_cgraph * cgraph) {
+    GGML_ASSERT(cgraph->grads != NULL);
+
     for (int i = 0; i < cgraph->n_nodes; i++) {
         struct ggml_tensor * grad = cgraph->grads[i];
 
@@ -18689,14 +18691,16 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
                 case GGML_UNARY_OP_TANH:
                 case GGML_UNARY_OP_ELU:
                 case GGML_UNARY_OP_RELU:
-                    n_tasks = 1;
-                    break;
+                    {
+                        n_tasks = 1;
+                    } break;
 
                 case GGML_UNARY_OP_GELU:
                 case GGML_UNARY_OP_GELU_QUICK:
                 case GGML_UNARY_OP_SILU:
-                    n_tasks = n_threads;
-                    break;
+                    {
+                        n_tasks = n_threads;
+                    } break;
             }
             break;
         case GGML_OP_SILU_BACK:
@@ -18921,7 +18925,7 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
 
             if (node_n != -1) {
                 /* FINALIZE */
-                struct ggml_tensor * node = state->shared->cgraph->nodes[node_n];
+                struct ggml_tensor * node = cgraph->nodes[node_n];
                 if (GGML_OP_HAS_FINALIZE[node->op]) {
                     params.nth = ggml_get_n_tasks(node, n_threads);
                     ggml_compute_forward(&params, node);
@@ -19242,6 +19246,7 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
             default:
                 break;
         }
+
         work_size = MAX(work_size, cur);
     }
 
@@ -20910,10 +20915,10 @@ enum ggml_opt_result ggml_opt_resume(
         struct ggml_tensor * f) {
 
     // build forward + backward compute graphs
-    struct ggml_cgraph * gf = ggml_new_graph_custom(ctx, opt->params.graph_size, false);
-    struct ggml_cgraph * gb = ggml_new_graph_custom(ctx, opt->params.graph_size, true);
-
+    struct ggml_cgraph * gf = ggml_new_graph_custom(ctx, opt->params.graph_size, true);
     ggml_build_forward_expand(gf, f);
+
+    struct ggml_cgraph * gb = ggml_graph_dup(ctx, gf);
     ggml_build_backward_expand(ctx, gf, gb, true);
 
     return ggml_opt_resume_g(ctx, opt, f, gf, gb, NULL, NULL);

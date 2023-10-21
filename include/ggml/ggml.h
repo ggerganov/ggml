@@ -58,7 +58,8 @@
 //   {
 //       ...
 //
-//       struct ggml_cgraph gf = ggml_build_forward(f);
+//       struct ggml_cgraph * gf = ggml_new_graph(ctx);
+//       ggml_build_forward_expand(gf, f);
 //
 //       // set the input variable and parameter values
 //       ggml_set_f32(x, 2.0f);

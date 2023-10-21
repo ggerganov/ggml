@@ -24,7 +24,7 @@
 
 #define UNUSED(x) (void)(x)
 
-#define GGML_MAX_CONCUR (2*GGML_MAX_NODES)
+#define GGML_MAX_CONCUR (2*GGML_DEFAULT_GRAPH_SIZE)
 
 struct ggml_metal_buffer {
     const char * name;

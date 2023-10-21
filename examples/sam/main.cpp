@@ -2109,7 +2109,7 @@ int main(int argc, char ** argv) {
 
     static const size_t tensor_alignment = 32;
     {
-        state.buf_compute_img_enc.resize(ggml_tensor_overhead()*GGML_MAX_NODES + ggml_graph_overhead());
+        state.buf_compute_img_enc.resize(ggml_tensor_overhead()*GGML_DEFAULT_GRAPH_SIZE + ggml_graph_overhead());
         state.allocr = ggml_allocr_new_measure(tensor_alignment);
         struct ggml_cgraph * gf_measure = sam_encode_image(model, state, img1);
         if (!gf_measure) {
@@ -2144,7 +2144,7 @@ int main(int argc, char ** argv) {
         state.work_buffer.clear();
     }
     {
-        state.buf_compute_fast.resize(ggml_tensor_overhead()*GGML_MAX_NODES + ggml_graph_overhead());
+        state.buf_compute_fast.resize(ggml_tensor_overhead()*GGML_DEFAULT_GRAPH_SIZE + ggml_graph_overhead());
         state.allocr = ggml_allocr_new_measure(tensor_alignment);
 
         // TODO: user input
