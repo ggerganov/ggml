@@ -714,6 +714,7 @@ struct ggml_cgraph * gpt2_graph(
             // K * Q
             // [n_kv, n_tokens, 12]
             struct ggml_tensor * KQ = ggml_mul_mat(ctx0, K, Q);
+            ggml_set_name(KQ, "KQ");
 
             // KQ_scaled = KQ / sqrt(n_embd/n_head)
             // [n_kv, n_tokens, 12]
@@ -721,14 +722,17 @@ struct ggml_cgraph * gpt2_graph(
                 ggml_scale(ctx0,
                         KQ,
                         KQ_scale);
+            ggml_set_name(KQ_scaled, "KQ_scaled");
 
             // KQ_masked = mask_past(KQ_scaled)
             // [n_kv, n_tokens, 12]
             struct ggml_tensor * KQ_masked = ggml_add(ctx0, KQ_scaled, KQ_mask);
+            ggml_set_name(KQ_masked, "KQ_masked");
 
             // KQ = soft_max(KQ_masked)
             // [n_kv, N, 12]
             struct ggml_tensor * KQ_soft_max = ggml_soft_max(ctx0, KQ_masked);
+            ggml_set_name(KQ_soft_max, "KQ_soft_max");
 
             // V_trans = Vmem.view(n_embd/n_head, n_head, n_kv).permute(1, 2, 0, 3).contiguous()
             // [n_kv, 64, 12]
@@ -742,6 +746,7 @@ struct ggml_cgraph * gpt2_graph(
             // KQV = transpose(V) * KQ_soft_max
             // [64, n_tokens, 12]
             struct ggml_tensor * KQV = ggml_mul_mat(ctx0, V, KQ_soft_max);
+            ggml_set_name(KQV, "KQV");
 
             // KQV_merged = KQV.permute(0, 2, 1, 3)
             // [64, 12, n_tokens]
