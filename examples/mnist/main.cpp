@@ -188,7 +188,7 @@ int mnist_eval(
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
-    struct ggml_cgraph gf = {};
+    struct ggml_cgraph * gf = ggml_new_graph(ctx0);
 
     struct ggml_tensor * input = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, hparams.n_input);
     memcpy(input->data, digit.data(), ggml_nbytes(input));
@@ -203,16 +203,16 @@ int mnist_eval(
     ggml_set_name(probs, "probs");
 
     // build / export / run the computation graph
-    ggml_build_forward_expand(&gf, probs);
-    ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
+    ggml_build_forward_expand(gf, probs);
+    ggml_graph_compute_with_ctx(ctx0, gf, n_threads);
 
     //ggml_graph_print   (&gf);
-    ggml_graph_dump_dot(&gf, NULL, "mnist.dot");
+    ggml_graph_dump_dot(gf, NULL, "mnist.dot");
 
     if (fname_cgraph) {
         // export the compute graph for later use
         // see the "mnist-cpu" example
-        ggml_graph_export(&gf, "mnist.ggml");
+        ggml_graph_export(gf, "mnist.ggml");
 
         fprintf(stderr, "%s: exported compute graph to '%s'\n", __func__, fname_cgraph);
     }
