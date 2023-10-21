@@ -7442,6 +7442,17 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
         return false;
     }
 
+    if (false ||
+        //strcmp(tensor->name, "KQ")  == 0 ||
+        //strcmp(tensor->name, "KQ_scaled") == 0 ||
+        //strcmp(tensor->name, "KQ_masked") == 0 ||
+        //strcmp(tensor->name, "KQ_soft_max") == 0 ||
+        //strcmp(tensor->name, "KQV") == 0 ||
+        false) {
+        //printf("skipping %s\n", dst->name);
+        return true;
+    }
+
     switch (tensor->op) {
         case GGML_OP_REPEAT:
             func = ggml_cuda_repeat;
