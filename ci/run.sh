@@ -212,7 +212,9 @@ function gg_run_whisper {
     model_f16="${path_models}/ggml-base.en.bin"
     audio_0="${path_models}/jfk.wav"
 
-    (time ./bin/whisper -m ${model_f16} -f ${audio_0} 2>&1 | tee -a $OUT/${ci}-main.log) || true
+    (time ./bin/whisper -m ${model_f16} -f ${audio_0} ) 2>&1 | tee -a $OUT/${ci}-main.log
+
+    grep -q "And so my fellow Americans" $OUT/${ci}-main.log
 
     set +e
 }
@@ -221,6 +223,41 @@ function gg_sum_whisper {
     gg_printf '### %s\n\n' "${ci}"
 
     gg_printf 'Runs short Whisper transcription\n'
+    gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
+    gg_printf '```\n'
+    gg_printf '%s\n' "$(cat $OUT/${ci}-main.log)"
+    gg_printf '```\n'
+}
+
+# sam
+
+function gg_run_sam {
+    cd ${SRC}
+
+    gg_wget models-mnt/sam/ https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth
+    gg_wget models-mnt/sam/ https://raw.githubusercontent.com/YavorGIvanov/sam.cpp/ceafb7467bff7ec98e0c4f952e58a9eb8fd0238b/img.jpg
+
+    cd build-ci-release
+
+    set -e
+
+    path_models="../models-mnt/sam/"
+    model_f16="${path_models}/ggml-model-f16.bin"
+    img_0="${path_models}/img.jpg"
+
+    python3 ../examples/sam/convert-pth-to-ggml.py ${path_models}/sam_vit_b_01ec64.pth ${path_models}/ 1
+
+    (time ./bin/sam -m ${model_f16} -i ${img_0} ) 2>&1 | tee -a $OUT/${ci}-main.log
+
+    grep -q "bbox (371, 436), (144, 168)" $OUT/${ci}-main.log
+
+    set +e
+}
+
+function gg_sum_sam {
+    gg_printf '### %s\n\n' "${ci}"
+
+    gg_printf 'Run SAM\n'
     gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
     gg_printf '```\n'
     gg_printf '%s\n' "$(cat $OUT/${ci}-main.log)"
@@ -286,6 +323,7 @@ test $ret -eq 0 && gg_run ctest_release
 test $ret -eq 0 && gg_run gpt_2
 test $ret -eq 0 && gg_run mnist
 test $ret -eq 0 && gg_run whisper
+test $ret -eq 0 && gg_run sam
 
 if [ -z $GG_BUILD_LOW_PERF ]; then
     if [ -z ${GG_BUILD_VRAM_GB} ] || [ ${GG_BUILD_VRAM_GB} -ge 16 ]; then
