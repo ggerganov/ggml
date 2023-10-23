@@ -14850,6 +14850,8 @@ static void ggml_compute_forward_conv_transpose_2d(
             }
         }
 
+        memset(dst->data, 0, ggml_nbytes(dst));
+
         return;
     }
 
