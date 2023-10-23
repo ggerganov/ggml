@@ -14315,6 +14315,9 @@ static void ggml_compute_forward_conv_transpose_1d_f16_f32(
             }
         }
 
+        // need to zero dst since we are accumulating into it
+        memset(dst->data, 0, ggml_nbytes(dst));
+
         return;
     }
 
@@ -14405,6 +14408,9 @@ static void ggml_compute_forward_conv_transpose_1d_f32(
                 }
             }
         }
+
+        // need to zero dst since we are accumulating into it
+        memset(dst->data, 0, ggml_nbytes(dst));
 
         return;
     }
