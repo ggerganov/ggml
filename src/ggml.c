@@ -4835,6 +4835,10 @@ GGML_API size_t ggml_used_mem_of_data(const struct ggml_context* ctx) {
     struct ggml_object* obj = ctx->objects_begin;
 
     while (obj != NULL) {
+        if (obj->type != GGML_OBJECT_TENSOR) {
+            obj = obj->next;
+            continue;
+        }
         struct ggml_tensor* tensor = (struct ggml_tensor*)((char*)ctx->mem_buffer + obj->offs);
         if (tensor->not_own_data || tensor->dynamic) {
             obj = obj->next;
