@@ -33,6 +33,9 @@ ggml_backend_buffer_t ggml_backend_buffer_init(
 }
 
 void ggml_backend_buffer_free(ggml_backend_buffer_t buffer) {
+    if (buffer == NULL) {
+        return;
+    }
     if (buffer->iface.free_buffer != NULL) {
         buffer->iface.free_buffer(buffer);
     }
@@ -81,6 +84,9 @@ const char * ggml_backend_name(ggml_backend_t backend) {
 }
 
 void ggml_backend_free(ggml_backend_t backend) {
+    if (backend == NULL) {
+        return;
+    }
     backend->iface.free(backend);
 }
 
@@ -119,6 +125,9 @@ ggml_backend_graph_plan_t ggml_backend_graph_plan_create(ggml_backend_t backend,
 }
 
 void ggml_backend_graph_plan_free(ggml_backend_t backend, ggml_backend_graph_plan_t plan) {
+    if (plan == NULL) {
+        return;
+    }
     backend->iface.graph_plan_free(backend, plan);
 }
 
