@@ -35,3 +35,5 @@ zig-cache/
 *.sw?
 
 __pycache__/
+
+/docs/.vitepress/cache/
