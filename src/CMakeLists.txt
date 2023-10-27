@@ -305,8 +305,16 @@ if (MINGW)
 endif()
 
 if (GGML_CUDA_SOURCES)
-    message(STATUS "GGML CUDA sources found, configuring CUDA architecture")
-    set_property(TARGET ggml  PROPERTY CUDA_ARCHITECTURES "52;61;70")
+    message(STATUS "GGML CUDA sources found")
+    if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        # Only configure gmml CUDA architectures is not globally set
+        if (NOT DEFINED GGML_CUDA_ARCHITECTURES)
+            # Not overriden by user, so set defaults
+            set(GGML_CUDA_ARCHITECTURES 52 61 70)
+        endif()
+        message(STATUS "GGML Configuring CUDA architectures ${GGML_CUDA_ARCHITECTURES}")
+        set_property(TARGET ggml  PROPERTY CUDA_ARCHITECTURES ${GGML_CUDA_ARCHITECTURES})
+    endif()
     set_property(TARGET ggml  PROPERTY CUDA_SELECT_NVCC_ARCH_FLAGS "Auto")
     if (NOT MSVC)
         target_link_libraries(ggml PUBLIC stdc++)
