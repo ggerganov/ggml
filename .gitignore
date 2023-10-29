@@ -35,3 +35,6 @@ zig-cache/
 *.sw?
 
 __pycache__/
+
+# Model files
+ggml-model-f16.bin
