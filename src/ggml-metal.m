@@ -738,6 +738,21 @@ void ggml_metal_graph_compute(
                 struct ggml_tensor * src1 = gf->nodes[i]->src[1];
                 struct ggml_tensor * dst  = gf->nodes[i];
 
+                switch (dst->op) {
+                    case GGML_OP_NONE:
+                    case GGML_OP_RESHAPE:
+                    case GGML_OP_VIEW:
+                    case GGML_OP_TRANSPOSE:
+                    case GGML_OP_PERMUTE:
+                        {
+                            // noop
+                            continue;
+                        } break;
+                    default:
+                        {
+                        } break;
+                }
+
                 const int64_t  ne00 = src0 ? src0->ne[0] : 0;
                 const int64_t  ne01 = src0 ? src0->ne[1] : 0;
                 const int64_t  ne02 = src0 ? src0->ne[2] : 0;
@@ -791,14 +806,6 @@ void ggml_metal_graph_compute(
                 //}
 
                 switch (dst->op) {
-                    case GGML_OP_NONE:
-                    case GGML_OP_RESHAPE:
-                    case GGML_OP_VIEW:
-                    case GGML_OP_TRANSPOSE:
-                    case GGML_OP_PERMUTE:
-                        {
-                            // noop
-                        } break;
                     case GGML_OP_CONCAT:
                         {
                             const int64_t nb = ne00;
