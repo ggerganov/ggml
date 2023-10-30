@@ -109,7 +109,7 @@ static bool load_labels(const char * filename, std::vector<std::string> & labels
     std::string line;
     while (std::getline(file_in, line)) {
         labels.push_back(line);
-    }    
+    }
     GGML_ASSERT(labels.size() == 80);
     return true;
 }
@@ -365,7 +365,7 @@ void detect(yolo_image & img, const yolo_model & model, float thresh, const std:
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
-    struct ggml_cgraph gf = {};
+    struct ggml_cgraph * gf = ggml_new_graph(ctx0);
     std::vector<detection> detections;
 
     yolo_image sized = letterbox_image(img, model.width, model.height);
@@ -420,9 +420,9 @@ void detect(yolo_image & img, const yolo_model & model, float thresh, const std:
     struct ggml_tensor * layer_22 = result;
     print_shape(22, result);
 
-    ggml_build_forward_expand(&gf, layer_15);
-    ggml_build_forward_expand(&gf, layer_22);
-    ggml_graph_compute_with_ctx(ctx0, &gf, 1);
+    ggml_build_forward_expand(gf, layer_15);
+    ggml_build_forward_expand(gf, layer_22);
+    ggml_graph_compute_with_ctx(ctx0, gf, 1);
 
     yolo_layer yolo16{ 80, {3, 4, 5}, {10, 14, 23, 27, 37,58, 81, 82, 135, 169, 344, 319}, layer_15};
     apply_yolo(yolo16);

@@ -178,7 +178,7 @@ int mnist_eval(
 
     const auto & hparams = model.hparams;
 
-    static size_t buf_size = hparams.n_input * sizeof(float) * 4;
+    static size_t buf_size = hparams.n_input * sizeof(float) * 32;
     static void * buf = malloc(buf_size);
 
     struct ggml_init_params params = {
