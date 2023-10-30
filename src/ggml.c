@@ -14354,6 +14354,9 @@ static void ggml_compute_forward_conv_transpose_1d_f16_f32(
             }
         }
 
+        // need to zero dst since we are accumulating into it
+        memset(dst->data, 0, ggml_nbytes(dst));
+
         return;
     }
 
@@ -14426,7 +14429,7 @@ static void ggml_compute_forward_conv_transpose_1d_f32(
                     const float * const src = (float *)((char *) src0->data + i02*nb02 + i01*nb01);
                     float * dst_data = wdata + i01*ne00*ne02;
                     for (int64_t i00 = 0; i00 < ne00; i00++) {
-                        dst_data[i01*ne00*ne02 + i00*ne02 + i02] = src[i00];
+                        dst_data[i00*ne02 + i02] = src[i00];
                     }
                 }
             }
@@ -14444,6 +14447,9 @@ static void ggml_compute_forward_conv_transpose_1d_f32(
                 }
             }
         }
+
+        // need to zero dst since we are accumulating into it
+        memset(dst->data, 0, ggml_nbytes(dst));
 
         return;
     }
@@ -14882,6 +14888,8 @@ static void ggml_compute_forward_conv_transpose_2d(
                 }
             }
         }
+
+        memset(dst->data, 0, ggml_nbytes(dst));
 
         return;
     }
