@@ -3834,6 +3834,7 @@ inline static void ggml_vec_step_f32 (const int n, float * y, const float * x) {
 inline static void ggml_vec_tanh_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = tanhf(x[i]);  }
 inline static void ggml_vec_elu_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? x[i] : expf(x[i])-1; }
 inline static void ggml_vec_relu_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? x[i] : 0.f; }
+inline static void ggml_vec_leaky_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? x[i] : 0.1f*x[i]; }
 
 static const float GELU_COEF_A     = 0.044715f;
 static const float GELU_QUICK_COEF = -1.702f;
@@ -6251,6 +6252,14 @@ struct ggml_tensor * ggml_relu_inplace(
     return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_RELU);
 }
 
+// ggml_leaky
+
+struct ggml_tensor * ggml_leaky(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a) {
+    return ggml_unary(ctx, a, GGML_UNARY_OP_LEAKY);
+}
+
 // ggml_gelu
 
 struct ggml_tensor * ggml_gelu(
@@ -7855,7 +7864,7 @@ struct ggml_tensor * ggml_conv_transpose_2d_p0(
 
 // ggml_pool_*
 
-static int64_t ggml_calc_pool_output_size(int64_t ins, int ks, int s, int p) {
+static int64_t ggml_calc_pool_output_size(int64_t ins, int ks, int s, float p) {
     return (ins + 2 * p - ks) / s + 1;
 }
 
@@ -7902,8 +7911,8 @@ struct ggml_tensor * ggml_pool_2d(
         int                   k1,
         int                   s0,
         int                   s1,
-        int                   p0,
-        int                   p1) {
+        float                 p0,
+        float                 p1) {
 
     bool is_node = false;
 
@@ -7911,7 +7920,6 @@ struct ggml_tensor * ggml_pool_2d(
         GGML_ASSERT(false); // TODO: implement backward
         is_node = true;
     }
-
     const int64_t ne[3] = {
         ggml_calc_pool_output_size(a->ne[0], k0, s0, p0),
         ggml_calc_pool_output_size(a->ne[1], k1, s1, p1),
@@ -11334,6 +11342,48 @@ static void ggml_compute_forward_silu(
         case GGML_TYPE_F32:
             {
                 ggml_compute_forward_silu_f32(params, src0, dst);
+            } break;
+        default:
+            {
+                GGML_ASSERT(false);
+            } break;
+    }
+}
+
+// ggml_compute_forward_leaky
+
+static void ggml_compute_forward_leaky_f32(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src0,
+        struct ggml_tensor * dst) {
+    assert(params->ith == 0);
+    assert(ggml_are_same_shape(src0, dst));
+
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+        return;
+    }
+
+    const int n  = ggml_nrows(src0);
+    const int nc = src0->ne[0];
+
+    assert(dst->nb[0]  == sizeof(float));
+    assert(src0->nb[0] == sizeof(float));
+
+    for (int i = 0; i < n; i++) {
+        ggml_vec_leaky_f32(nc,
+                (float *) ((char *) dst->data  + i*( dst->nb[1])),
+                (float *) ((char *) src0->data + i*(src0->nb[1])));
+    }
+}
+
+static void ggml_compute_forward_leaky(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src0,
+        struct ggml_tensor * dst) {
+    switch (src0->type) {
+        case GGML_TYPE_F32:
+            {
+                ggml_compute_forward_leaky_f32(params, src0, dst);
             } break;
         default:
             {
@@ -14995,14 +15045,11 @@ static void ggml_compute_forward_pool_1d(
     ggml_compute_forward_pool_1d_sk_p0(params, op, src0, k0, dst);
 }
 
-// ggml_compute_forward_pool_2d_sk_p0
+// ggml_compute_forward_pool_2d
 
-static void ggml_compute_forward_pool_2d_sk_p0(
+static void ggml_compute_forward_pool_2d(
         const struct ggml_compute_params * params,
-        const enum   ggml_op_pool op,
         const struct ggml_tensor * src,
-        const int k0,
-        const int k1,
         struct ggml_tensor * dst) {
     assert(src->type == GGML_TYPE_F32);
     assert(params->ith == 0);
@@ -15011,6 +15058,14 @@ static void ggml_compute_forward_pool_2d_sk_p0(
         return;
     }
 
+    const int32_t * opts = (const int32_t *)dst->op_params;
+    enum ggml_op_pool op = opts[0];
+    const int k0 = opts[1];
+    const int k1 = opts[2];
+    const int s0 = opts[3];
+    const int s1 = opts[4];
+    const int p0 = opts[5];
+    const int p1 = opts[6];
     const char * cdata = (const char*)src->data;
     const char * const data_end = cdata + ggml_nbytes(src);
 
@@ -15021,6 +15076,8 @@ static void ggml_compute_forward_pool_2d_sk_p0(
     float * dplane = (float *)dst->data;
 
     const int ka = k0 * k1;
+    const int offset0 = -p0;
+    const int offset1 = -p1;
 
     while (cdata < data_end) {
         for (int oy = 0; oy < py; ++oy) {
@@ -15033,13 +15090,15 @@ static void ggml_compute_forward_pool_2d_sk_p0(
                     case GGML_OP_POOL_COUNT: GGML_ASSERT(false); break;
                 }
 
-                const int ix = ox * k0;
-                const int iy = oy * k1;
+                const int ix = offset0 + ox * s0;
+                const int iy = offset1 + oy * s1;
 
                 for (int ky = 0; ky < k1; ++ky) {
+                    if (iy + ky < 0 || iy + ky >= src->ne[1]) continue;
                     const float * const srow = (const float *)(cdata + src->nb[1] * (iy + ky));
                     for (int kx = 0; kx < k0; ++kx) {
                         int j = ix + kx;
+                        if (j < 0 || j >= src->ne[0]) continue;
                         switch (op) {
                             case GGML_OP_POOL_AVG:                     *out += srow[j]; break;
                             case GGML_OP_POOL_MAX: if (srow[j] > *out) *out  = srow[j]; break;
@@ -15058,29 +15117,6 @@ static void ggml_compute_forward_pool_2d_sk_p0(
         cdata  += src->nb[2];
         dplane += pa;
     }
-}
-
-// ggml_compute_forward_pool_2d
-
-static void ggml_compute_forward_pool_2d(
-        const struct ggml_compute_params * params,
-        const struct ggml_tensor * src0,
-              struct ggml_tensor * dst) {
-
-    const int32_t * opts = (const int32_t *)dst->op_params;
-    enum ggml_op_pool op = opts[0];
-    const int k0 = opts[1];
-    const int k1 = opts[2];
-    const int s0 = opts[3];
-    const int s1 = opts[4];
-    const int p0 = opts[5];
-    const int p1 = opts[6];
-    GGML_ASSERT(p0 == 0);
-    GGML_ASSERT(p1 == 0); // padding not supported
-    GGML_ASSERT(k0 == s0);
-    GGML_ASSERT(k1 == s1); // only s = k supported
-
-    ggml_compute_forward_pool_2d_sk_p0(params, op, src0, k0, k1, dst);
 }
 
 // ggml_compute_forward_upscale
@@ -16283,6 +16319,10 @@ static void ggml_compute_forward_unary(
         case GGML_UNARY_OP_SILU:
             {
                 ggml_compute_forward_silu(params, src0, dst);
+            } break;
+        case GGML_UNARY_OP_LEAKY:
+            {
+                ggml_compute_forward_leaky(params, src0, dst);
             } break;
         default:
             {
@@ -18731,6 +18771,7 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
                         case GGML_UNARY_OP_TANH:
                         case GGML_UNARY_OP_ELU:
                         case GGML_UNARY_OP_RELU:
+                        case GGML_UNARY_OP_LEAKY:
                             {
                                 n_tasks = 1;
                             } break;

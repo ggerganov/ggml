@@ -264,6 +264,43 @@ function gg_sum_sam {
     gg_printf '```\n'
 }
 
+# yolo
+
+function gg_run_yolo {
+    cd ${SRC}
+
+    gg_wget models-mnt/yolo/ https://pjreddie.com/media/files/yolov3-tiny.weights
+    gg_wget models-mnt/yolo/ https://raw.githubusercontent.com/pjreddie/darknet/master/data/dog.jpg
+
+    cd build-ci-release
+    cp -r ../examples/yolo/data .
+
+    set -e
+
+    path_models="../models-mnt/yolo/"
+
+    python3 ../examples/yolo/convert-yolov3-tiny.py ${path_models}/yolov3-tiny.weights
+
+    (time ./bin/yolov3-tiny -m yolov3-tiny.gguf -i ${path_models}/dog.jpg ) 2>&1 | tee -a $OUT/${ci}-main.log
+
+    grep -q "dog: 57%" $OUT/${ci}-main.log
+    grep -q "car: 52%" $OUT/${ci}-main.log
+    grep -q "truck: 56%" $OUT/${ci}-main.log
+    grep -q "bicycle: 59%" $OUT/${ci}-main.log
+
+    set +e
+}
+
+function gg_sum_yolo {
+    gg_printf '### %s\n\n' "${ci}"
+
+    gg_printf 'Run YOLO\n'
+    gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
+    gg_printf '```\n'
+    gg_printf '%s\n' "$(cat $OUT/${ci}-main.log)"
+    gg_printf '```\n'
+}
+
 # mpt
 
 function gg_run_mpt {
@@ -324,6 +361,7 @@ test $ret -eq 0 && gg_run gpt_2
 test $ret -eq 0 && gg_run mnist
 test $ret -eq 0 && gg_run whisper
 test $ret -eq 0 && gg_run sam
+test $ret -eq 0 && gg_run yolo
 
 if [ -z $GG_BUILD_LOW_PERF ]; then
     if [ -z ${GG_BUILD_VRAM_GB} ] || [ ${GG_BUILD_VRAM_GB} -ge 16 ]; then
