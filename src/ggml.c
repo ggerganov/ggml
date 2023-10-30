@@ -18740,7 +18740,7 @@ static void ggml_graph_compute_perf_stats_node(struct ggml_tensor * node, const 
 }
 
 static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
-    int n_tasks;
+    int n_tasks = 0;
 
     switch (node->op) {
         case GGML_OP_CPY:
