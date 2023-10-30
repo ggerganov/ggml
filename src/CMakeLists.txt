@@ -253,6 +253,8 @@ add_library(${TARGET}
     ggml.c
     ggml-alloc.c
     ggml-backend.c
+    ggml-impl.h
+    ggml-backend-impl.h
     ../include/ggml/ggml.h
     ../include/ggml/ggml-alloc.h
     ../include/ggml/ggml-backend.h
@@ -323,7 +325,9 @@ endif()
 
 set (GGML_PUBLIC_HEADERS
      ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml.h
-     ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml-alloc.h)
+     ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml-alloc.h
+     ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml-backend.h)
+
 set_target_properties(${TARGET} PROPERTIES
                       PUBLIC_HEADER "${GGML_PUBLIC_HEADERS}")
 

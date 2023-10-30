@@ -145,8 +145,8 @@ function gg_run_gpt_2 {
     model="../models-mnt/gpt-2/ggml-model-gpt-2-117M.bin"
     prompts="../examples/prompts/gpt-2.txt"
 
-    (time ./bin/gpt-2 --model ${model} -s 1234 -n 64 -tt ${prompts}                       ) 2>&1 | tee -a $OUT/${ci}-tg.log
-    (time ./bin/gpt-2 --model ${model} -s 1234 -n 64 -p "I believe the meaning of life is") 2>&1 | tee -a $OUT/${ci}-tg.log
+    (time ./bin/gpt-2-backend2 --model ${model} -s 1234 -n 64 -tt ${prompts}                       ) 2>&1 | tee -a $OUT/${ci}-tg.log
+    (time ./bin/gpt-2-backend2 --model ${model} -s 1234 -n 64 -p "I believe the meaning of life is") 2>&1 | tee -a $OUT/${ci}-tg.log
 
     (time ./bin/gpt-2-batched --model ${model} -s 1234 -n 64 -np 8 -p "I believe the meaning of life is") 2>&1 | tee -a $OUT/${ci}-tg.log
 
