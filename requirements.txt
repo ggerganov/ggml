@@ -5,3 +5,4 @@ torch==2.0.1
 torchaudio==2.0.2
 torchvision==0.15.2
 transformers==4.29.2
+gguf==0.4.5

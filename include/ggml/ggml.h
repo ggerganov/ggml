@@ -231,8 +231,9 @@
 #define GGML_EXIT_SUCCESS 0
 #define GGML_EXIT_ABORTED 1
 
-#define GGUF_MAGIC   0x46554747 // "GGUF"
-#define GGUF_VERSION 2
+#define GGUF_MAGIC "GGUF"
+
+#define GGUF_VERSION 3
 
 #define GGUF_DEFAULT_ALIGNMENT 32
 
@@ -453,6 +454,7 @@ extern "C" {
         GGML_UNARY_OP_GELU,
         GGML_UNARY_OP_GELU_QUICK,
         GGML_UNARY_OP_SILU,
+        GGML_UNARY_OP_LEAKY
     };
 
     enum ggml_object_type {
@@ -704,6 +706,9 @@ extern "C" {
     GGML_API struct ggml_tensor * ggml_dup_tensor (struct ggml_context * ctx, const struct ggml_tensor * src);
     GGML_API struct ggml_tensor * ggml_view_tensor(struct ggml_context * ctx, struct ggml_tensor * src);
 
+    // Context tensor enumeration and lookup
+    GGML_API struct ggml_tensor * ggml_get_first_tensor(struct ggml_context * ctx);
+    GGML_API struct ggml_tensor * ggml_get_next_tensor (struct ggml_context * ctx, struct ggml_tensor * tensor);
     GGML_API struct ggml_tensor * ggml_get_tensor(struct ggml_context * ctx, const char * name);
 
     GGML_API struct ggml_tensor * ggml_set_zero(struct ggml_tensor * tensor);
@@ -935,6 +940,10 @@ extern "C" {
             struct ggml_tensor  * a);
 
     GGML_API struct ggml_tensor * ggml_relu(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+    GGML_API struct ggml_tensor * ggml_leaky(
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
 
@@ -1458,6 +1467,8 @@ extern "C" {
             int                   s0, // stride
             int                   p0); // padding
 
+    // the result will have 2*p0 padding for the first dimension
+    // and 2*p1 padding for the second dimension
     GGML_API struct ggml_tensor * ggml_pool_2d(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
@@ -1466,8 +1477,8 @@ extern "C" {
             int                   k1,
             int                   s0,
             int                   s1,
-            int                   p0,
-            int                   p1);
+            float                 p0,
+            float                 p1);
 
     // nearest interpolate
     // used in stable-diffusion
