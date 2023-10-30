@@ -18393,7 +18393,7 @@ size_t ggml_graph_overhead_custom(size_t size, bool grads) {
     return GGML_OBJECT_SIZE + GGML_PAD(ggml_graph_nbytes(size, grads), GGML_MEM_ALIGN);
 }
 
-size_t ggml_graph_overhead() {
+size_t ggml_graph_overhead(void) {
     return ggml_graph_overhead_custom(GGML_DEFAULT_GRAPH_SIZE, false);
 }
 
