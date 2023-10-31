@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <cinttypes>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
@@ -51,9 +52,9 @@ std::pair<std::vector<std::size_t>, float> encode_word(const std::string & word,
     std::vector<float> best_segmentations_scores(word.length() + 1, -std::numeric_limits<float>::infinity());
     best_segmentations_scores[0] = 1.0;
 
-    for (int start_idx = 0; start_idx < word.length(); ++start_idx) {
+    for (size_t start_idx = 0; start_idx < word.length(); ++start_idx) {
         float best_score_at_start = best_segmentations_scores[start_idx];
-        for (int end_idx = start_idx + 1; end_idx <= word.length(); ++end_idx) {
+        for (size_t end_idx = start_idx + 1; end_idx <= word.length(); ++end_idx) {
             std::string token = word.substr(start_idx, end_idx - start_idx);
             if (model.count(token) && best_score_at_start != -std::numeric_limits<float>::infinity()) {
                 float token_score = model.at(token).second;
@@ -91,7 +92,7 @@ bool replit_tokenizer_load(replit_tokenizer & tokenizer, std::istream & fin, int
     std::string word;
     std::vector<char> buf(128);
 
-    for (std::size_t i = 0; i < max_vocab_size; i++) {
+    for (int i = 0; i < max_vocab_size; i++) {
         uint32_t len;
         fin.read((char *)&len, sizeof(len));
 
@@ -342,7 +343,7 @@ bool replit_model_load(const std::string & fname, replit_model & model, replit_t
 
         const size_t memory_size = ggml_nbytes(model.memory_k) + ggml_nbytes(model.memory_v);
 
-        printf("%s: memory_size = %8.2f MB, n_mem = %lld\n", __func__, memory_size / 1024.0 / 1024.0, n_mem);
+        printf("%s: memory_size = %8.2f MB, n_mem = %" PRIu64 "\n", __func__, memory_size / 1024.0 / 1024.0, n_mem);
     }
 
     // load weights
@@ -375,14 +376,14 @@ bool replit_model_load(const std::string & fname, replit_model & model, replit_t
             std::string name(length, 0);
             fin.read(&name[0], length);
 
-            if (model.tensors.find(name.data()) == model.tensors.end()) {
-                fprintf(stderr, "%s: unknown tensor '%s' in model file\n", __func__, name.data());
+            if (model.tensors.find(name) == model.tensors.end()) {
+                fprintf(stderr, "%s: unknown tensor '%s' in model file\n", __func__, name.c_str());
                 return false;
             }
 
-            auto tensor = model.tensors[name.data()];
+            auto tensor = model.tensors[name];
             if (ggml_nelements(tensor) != nelements) {
-                fprintf(stderr, "%s: tensor '%s' has wrong size in model file\n", __func__, name.data());
+                fprintf(stderr, "%s: tensor '%s' has wrong size in model file\n", __func__, name.c_str());
                 return false;
             }
 
@@ -390,13 +391,13 @@ bool replit_model_load(const std::string & fname, replit_model & model, replit_t
                 fprintf(stderr,
                         "%s: tensor '%s' has wrong shape in model file: got [%5d, "
                         "%5d], expected [%5d, %5d]\n",
-                        __func__, name.data(), (int)tensor->ne[0], (int)tensor->ne[1], ne[0], ne[1]);
+                        __func__, name.c_str(), (int)tensor->ne[0], (int)tensor->ne[1], ne[0], ne[1]);
                 return false;
             }
 
             // for debugging
             if (0) {
-                printf("%24s - [%5d, %5d], type = %6s, %6.2f MB, %9zu bytes\n", name.data(), ne[0], ne[1],
+                printf("%24s - [%5d, %5d], type = %6s, %6.2f MB, %9zu bytes\n", name.c_str(), ne[0], ne[1],
                        ggml_type_name(ggml_type(ttype)), ggml_nbytes(tensor) / 1024.0 / 1024.0, ggml_nbytes(tensor));
             }
 
@@ -406,7 +407,7 @@ bool replit_model_load(const std::string & fname, replit_model & model, replit_t
                 fprintf(stderr,
                         "%s: tensor '%s' has wrong size in model file: got %zu, "
                         "expected %zu\n",
-                        __func__, name.data(), ggml_nbytes(tensor), nelements * bpe);
+                        __func__, name.c_str(), ggml_nbytes(tensor), nelements * bpe);
                 return false;
             }
 
@@ -449,6 +450,7 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
     const int n_head = hparams.n_heads;
     const int n_vocab = hparams.n_vocab;
     const int n_ctx = hparams.max_seq_len;
+    const float eps = 1e-5f;
 
     static size_t buf_size = 256u * 1024 * 1024;
     static void * buf = malloc(buf_size);
@@ -474,8 +476,7 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
-    struct ggml_cgraph gf = {};
-    gf.n_threads = n_threads;
+    struct ggml_cgraph * gf = ggml_new_graph(ctx0);
 
     struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
     memcpy(embd->data, embd_inp.data(), N * ggml_element_size(embd));
@@ -488,7 +489,7 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
 
         // a = self.ln_1(x)
         {
-            cur = ggml_norm(ctx0, inpL);
+            cur = ggml_norm(ctx0, inpL, eps);
 
             cur = ggml_mul(ctx0, ggml_repeat(ctx0, model.layers[il].norm_1_weight, cur), cur);
         }
@@ -514,8 +515,8 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
                     ggml_view_1d(ctx0, model.memory_v, N * n_embd,
                                  (ggml_element_size(model.memory_v) * n_embd) * (il * n_ctx + n_past));
 
-                ggml_build_forward_expand(&gf, ggml_cpy(ctx0, Kcur, k));
-                ggml_build_forward_expand(&gf, ggml_cpy(ctx0, Vcur, v));
+                ggml_build_forward_expand(gf, ggml_cpy(ctx0, Kcur, k));
+                ggml_build_forward_expand(gf, ggml_cpy(ctx0, Vcur, v));
             }
 
             // Q = Qcur.contiguous().view(n_embd/n_head, n_head, N).permute(0,
@@ -577,7 +578,7 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
 
         // m = self.ln_2(x)
         {
-            cur = ggml_norm(ctx0, inpL);
+            cur = ggml_norm(ctx0, inpL, eps);
 
             cur = ggml_mul(ctx0, ggml_repeat(ctx0, model.layers[il].norm_2_weight, cur), cur);
         }
@@ -601,7 +602,7 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
 
     // norm
     {
-        inpL = ggml_norm(ctx0, inpL);
+        inpL = ggml_norm(ctx0, inpL, eps);
         // inpL = ln_f_g*inpL
         inpL = ggml_mul(ctx0, ggml_repeat(ctx0, model.norm_f_weight, inpL), inpL);
     }
@@ -613,8 +614,8 @@ bool replit_eval(const replit_model & model, const int n_threads, const int n_pa
     // inpL = ggml_soft_max(ctx0, inpL);
 
     // run the computation
-    ggml_build_forward_expand(&gf, inpL);
-    ggml_graph_compute(ctx0, &gf);
+    ggml_build_forward_expand(gf, inpL);
+    ggml_graph_compute_with_ctx(ctx0, gf, n_threads);
 
     // std::cout << "Qcur" << std::endl;
     // print_tensor(Qcur);
@@ -701,8 +702,8 @@ int main(int argc, char ** argv) {
 
     printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
 
-    for (int i = 0; i < embd_inp.size(); i++) {
-        printf("%s: token[%d] = %6zu\n", __func__, i, embd_inp[i]);
+    for (size_t i = 0; i < embd_inp.size(); i++) {
+        printf("%s: token[%zu] = %6zu\n", __func__, i, embd_inp[i]);
         // vocab.id_to_token.at(embd_inp[i]).c_str()
     }
     printf("\n");
@@ -715,7 +716,7 @@ int main(int argc, char ** argv) {
     size_t mem_per_token = 0;
     replit_eval(model, params.n_threads, 0, {0, 1, 2, 3}, logits, false, mem_per_token);
 
-    for (int i = embd.size(); i < embd_inp.size() + params.n_predict; i++) {
+    for (size_t i = embd.size(); i < embd_inp.size() + params.n_predict; i++) {
         // predict
         if (embd.size() > 0) {
             const int64_t t_start_us = ggml_time_us();
@@ -754,9 +755,9 @@ int main(int argc, char ** argv) {
             embd.push_back(id);
         } else {
             // if here, it means we are still processing the input prompt
-            for (int k = i; k < embd_inp.size(); k++) {
+            for (size_t k = i; k < embd_inp.size(); k++) {
                 embd.push_back(embd_inp[k]);
-                if (embd.size() > params.n_batch) {
+                if (int32_t(embd.size()) > params.n_batch) {
                     break;
                 }
             }

@@ -26,65 +26,86 @@ endif()
 
 if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
     message(STATUS "ARM detected")
-    #set(GGML_C_FLAGS "${GGML_C_FLAGS} -mcpu=apple-m1")
+    #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=apple-m1")
+elseif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "ppc64le" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "ppc64")
+    message(STATUS "PPC64 detected")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mpower9-vector")
 else()
     message(STATUS "x86 detected")
-    #set(GGML_C_FLAGS "${GGML_C_FLAGS} -mavx -mavx2 -mfma -mf16c")
+    #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx -mavx2 -mfma -mf16c")
     if (UNAME_S MATCHES "Darwin")
         execute_process(COMMAND sysctl machdep.cpu.features OUTPUT_VARIABLE AVX1_M)
         if (AVX1_M MATCHES "AVX1.0")
-            set(GGML_C_FLAGS "${GGML_C_FLAGS} -mavx")
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx")
         endif()
         execute_process(COMMAND sysctl machdep.cpu.leaf7_features OUTPUT_VARIABLE AVX2_M)
         if (AVX2_M MATCHES "AVX2")
-            set(GGML_C_FLAGS "${GGML_C_FLAGS} -mavx2")
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx2")
         endif()
         if (AVX1_M MATCHES "FMA")
-            set(GGML_C_FLAGS "${GGML_C_FLAGS} -mfma")
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfma")
         endif()
-        set(GGML_C_FLAGS "${GGML_C_FLAGS} -mf16c")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mf16c")
     elseif (UNAME_S MATCHES "Linux")
         message(STATUS "Linux detected")
         execute_process(COMMAND grep "avx " /proc/cpuinfo OUTPUT_VARIABLE AVX1_M)
         if (AVX1_M MATCHES "avx")
-            set(GGML_C_FLAGS "${GGML_C_FLAGS} -mavx")
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx")
         endif()
         execute_process(COMMAND grep "avx2 " /proc/cpuinfo OUTPUT_VARIABLE AVX2_M)
         if (AVX2_M MATCHES "avx2")
-            set(GGML_C_FLAGS "${GGML_C_FLAGS} -mavx2")
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx2")
         endif()
         execute_process(COMMAND grep "fma " /proc/cpuinfo OUTPUT_VARIABLE FMA_M)
         if (FMA_M MATCHES "fma")
-            set(GGML_C_FLAGS "${GGML_C_FLAGS} -mfma")
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfma")
         endif()
         execute_process(COMMAND grep "f16c " /proc/cpuinfo OUTPUT_VARIABLE F16C_M)
         if (F16C_M MATCHES "f16c")
-            set(GGML_C_FLAGS "${GGML_C_FLAGS} -mf16c")
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mf16c")
         endif()
         execute_process(COMMAND grep "sse3 " /proc/cpuinfo OUTPUT_VARIABLE SSE3_M)
         if (SSE3_M MATCHES "sse3")
-            set(GGML_C_FLAGS "${GGML_C_FLAGS} -msse3")
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse3")
         endif()
     elseif (UNAME_S MATCHES "Haiku")
         message(STATUS "Haiku detected")
 	execute_process(COMMAND sysinfo -cpu COMMAND grep "AVX " OUTPUT_VARIABLE AVX1_M)
         if (AVX1_M MATCHES "avx")
-            set(GGML_C_FLAGS "${GGML_C_FLAGS} -mavx")
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx")
         endif()
 	execute_process(COMMAND sysinfo -cpu COMMAND grep "AVX2 " OUTPUT_VARIABLE AVX2_M)
         if (AVX2_M MATCHES "avx2")
-            set(GGML_C_FLAGS "${GGML_C_FLAGS} -mavx2")
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx2")
         endif()
 	execute_process(COMMAND sysinfo -cpu COMMAND grep "FMA " OUTPUT_VARIABLE FMA_M)
         if (FMA_M MATCHES "fma")
-            set(GGML_C_FLAGS "${GGML_C_FLAGS} -mfma")
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfma")
         endif()
 	execute_process(COMMAND sysinfo -cpu COMMAND grep "F16C " OUTPUT_VARIABLE F16C_M)
         if (F16C_M MATCHES "f16c")
-            set(GGML_C_FLAGS "${GGML_C_FLAGS} -mf16c")
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mf16c")
+        endif()
+    elseif (MSVC)
+        if (GGML_AVX512)
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /arch:AVX512")
+            # MSVC has no compile-time flags enabling specific
+            # AVX512 extensions, neither it defines the
+            # macros corresponding to the extensions.
+            # Do it manually.
+            if (GGML_AVX512_VBMI)
+                add_compile_definitions(__AVX512VBMI__)
+            endif()
+            if (GGML_AVX512_VNNI)
+                add_compile_definitions(__AVX512VNNI__)
+            endif()
+        elseif (GGML_AVX2)
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /arch:AVX2")
+        elseif (GGML_AVX)
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /arch:AVX")
         endif()
     else()
-        set(GGML_C_FLAGS  "${GGML_C_FLAGS} -mfma -mf16c -mavx -mavx2")
+        set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -mfma -mf16c -mavx -mavx2")
     endif()
 endif()
 
@@ -126,6 +147,9 @@ if (GGML_OPENBLAS)
     endif()
 endif()
 
+# undefine NDEBUG so asserts don't get disabled in tests
+add_definitions(-UNDEBUG)
+
 #
 # test-vec0
 
@@ -135,12 +159,10 @@ target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 
 #
 # test-vec1 (x86)
-if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86")
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86" AND "${CMAKE_C_FLAGS}" MATCHES "avx")
     set(TEST_TARGET test-vec1)
     add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
     target_link_libraries(${TEST_TARGET} PRIVATE ggml)
-    #set_target_properties(${TEST_TARGET} PROPERTIES COMPILE_FLAGS "-mavx -mavx2 -mfma -mf16c")
-    set_target_properties(${TEST_TARGET} PROPERTIES COMPILE_FLAGS ${GGML_C_FLAGS})
 endif()
 
 #
@@ -155,17 +177,19 @@ endif()
 # test-grad0
 
 set(TEST_TARGET test-grad0)
-add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
 
 #
 # test-opt
 
 set(TEST_TARGET test-opt)
-add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
 
 #
 # test-quantize-fns
@@ -174,6 +198,7 @@ set(TEST_TARGET test-quantize-fns)
 add_executable(${TEST_TARGET} ${TEST_TARGET}.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
 
 #
 # test-quantize-perf
@@ -182,6 +207,7 @@ set(TEST_TARGET test-quantize-perf)
 add_executable(${TEST_TARGET} ${TEST_TARGET}.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
 
 #
 # test-mul-mat0
@@ -189,8 +215,12 @@ add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
 set(TEST_TARGET test-mul-mat0)
 add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml ${GGML_EXTRA_LIBS})
+if (MSVC)
+    target_link_options(${TEST_TARGET} PRIVATE "/STACK: 8388608") # 8MB
+endif()
 target_compile_options(${TEST_TARGET} PRIVATE ${GGML_EXTRA_FLAGS})
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
 
 #
 # test-mul-mat1 (arm)
@@ -211,6 +241,7 @@ if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm" AND NOT GGML_NO_ACCELERATE)
     target_link_libraries(${TEST_TARGET} PRIVATE ggml ${GGML_EXTRA_LIBS})
     target_compile_options(${TEST_TARGET} PRIVATE ${GGML_EXTRA_FLAGS})
     add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}> 128 128 128)
+    set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
 endif()
 
 #
@@ -220,6 +251,7 @@ set(TEST_TARGET test-mul-mat2)
 add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
 
 #
 # test0
@@ -228,6 +260,7 @@ set(TEST_TARGET test0)
 add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
 
 #
 # test1
@@ -239,6 +272,7 @@ if (MSVC)
     target_link_options(${TEST_TARGET} PRIVATE "/STACK: 8388608") # 8MB
 endif()
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
 
 #
 # test2
@@ -247,11 +281,41 @@ set(TEST_TARGET test2)
 add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
 
 #
 # test3
 
 set(TEST_TARGET test3)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
+
+#
+# test-pool
+
+set(TEST_TARGET test-pool)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+if (MSVC)
+    target_link_options(${TEST_TARGET} PRIVATE "/STACK: 8388608") # 8MB
+endif()
+add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
+
+#
+# test-conv-transpose
+
+set(TEST_TARGET test-conv-transpose)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+
+#
+# test-rel-pos
+
+set(TEST_TARGET test-rel-pos)
 add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
@@ -271,3 +335,23 @@ elseif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86" AND GGML_OPENBLAS)
     target_compile_options(${TEST_TARGET} PRIVATE ${GGML_EXTRA_FLAGS})
 endif()
 
+#
+# test-customop
+
+set(TEST_TARGET test-customop)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+if (MSVC)
+    target_link_options(${TEST_TARGET} PRIVATE "/STACK: 8388608") # 8MB
+endif()
+add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
+
+#
+# test-xpos
+
+set(TEST_TARGET test-xpos)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")

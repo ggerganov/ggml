@@ -15,7 +15,7 @@
 #include <Accelerate/Accelerate.h>
 #endif
 
-float frand() {
+float frand(void) {
     return (float) rand() / (float) RAND_MAX;
 }
 

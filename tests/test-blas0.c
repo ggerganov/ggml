@@ -14,7 +14,7 @@
 
 #include <Accelerate/Accelerate.h>
 
-uint64_t get_time_us() {
+uint64_t get_time_us(void) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return tv.tv_sec * 1000000 + tv.tv_usec;
@@ -45,6 +45,8 @@ int main(int argc, const char ** argv) {
         printf("Usage: %s M N K\n", argv[0]);
         return 1;
     }
+
+    const int n_threads = 1;
 
     int M = atoi(argv[1]);
     int N = atoi(argv[2]);
@@ -130,15 +132,17 @@ int main(int argc, const char ** argv) {
     {
         dst2 = ggml_mul_mat(ctx0, s0_f32, s1_f32);
 
-        struct ggml_cgraph gf = ggml_build_forward(dst2);
-        ggml_graph_compute(ctx0, &gf);
+        struct ggml_cgraph * gf = ggml_new_graph(ctx0);
+        ggml_build_forward_expand(gf, dst2);
+        ggml_graph_compute_with_ctx(ctx0, gf, n_threads);
     }
 
     {
         dst3 = ggml_mul_mat(ctx0, s0_f16, s1_f32);
 
-        struct ggml_cgraph gf = ggml_build_forward(dst3);
-        ggml_graph_compute(ctx0, &gf);
+        struct ggml_cgraph * gf = ggml_new_graph(ctx0);
+        ggml_build_forward_expand(gf, dst3);
+        ggml_graph_compute_with_ctx(ctx0, gf, n_threads);
     }
 
     bool ok_blas = true;

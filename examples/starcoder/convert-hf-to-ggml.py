@@ -8,6 +8,7 @@ import torch
 import numpy as np
 import re
 import os
+import argparse
 
 from transformers import AutoModelForCausalLM
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig, BloomForCausalLM
@@ -34,34 +35,29 @@ def bytes_to_unicode():
     cs = [chr(n) for n in cs]
     return dict(zip(bs, cs))
 
-if len(sys.argv) < 2:
-    print("Usage: python convert-hf-to-ggml.py hf-model-name [use-f32]")
-    print("Example: python convert-hf-to-ggml.py bigcode/gpt_bigcode-santacoder")
-    print("Example: python convert-hf-to-ggml.py bigcode/starcoder")
-    sys.exit(1)
+parser = argparse.ArgumentParser(description='Convert starcoder HF model to GGML')
+parser.add_argument('model_name_or_path', type=str, help='Name of model on HF hub, or local model folder')
+parser.add_argument('--outfile', type=str, default='ggml-model.bin', help='Path of GGML file to write.')
+parser.add_argument('--use_f32', action="store_true", help='Save GGML file in fp32')
 
-model_name = sys.argv[1].strip()
-fname_out = "models/" + sys.argv[1].strip() + "-ggml.bin"
-os.makedirs(os.path.dirname(fname_out), exist_ok=True)
-
-
+args = parser.parse_args()
 
 # use 16-bit or 32-bit floats
-use_f16 = True
-if len(sys.argv) > 2:
-    use_f16 = False
+use_f16 = not args.use_f32
 
-print("Loading model: ", model_name)
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+fname_out = args.outfile
+fname_dir = os.path.dirname(fname_out)
+if fname_dir:
+    os.makedirs(fname_dir, exist_ok=True)
+
+print("Loading model: ", args.model_name_or_path)
+tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+config = AutoConfig.from_pretrained(args.model_name_or_path, trust_remote_code=True)
 hparams = config.to_dict()
-model = AutoModelForCausalLM.from_pretrained(model_name, config=config, torch_dtype=torch.float16 if use_f16 else torch.float32, low_cpu_mem_usage=True, trust_remote_code=True, offload_state_dict=True)
-print("Model loaded: ", model_name)
-
-#print (model)
+model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path, config=config, torch_dtype=torch.float16 if use_f16 else torch.float32, low_cpu_mem_usage=True, trust_remote_code=True, offload_state_dict=True)
+print("Model loaded: ", args.model_name_or_path)
 
 list_vars = model.state_dict()
-#print (list_vars)
 
 encoder = tokenizer.vocab
 # Add added_tokens (special tokens) to the encoder

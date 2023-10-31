@@ -35,28 +35,27 @@ int mnist_eval(
     struct ggml_context * ctx_data = NULL;
     struct ggml_context * ctx_eval = NULL;
 
-    struct ggml_cgraph gf = ggml_graph_import(fname_cgraph, &ctx_data, &ctx_eval);
-    gf.n_threads = 1;
+    struct ggml_cgraph * gf = ggml_graph_import(fname_cgraph, &ctx_data, &ctx_eval);
 
     // allocate work context
-    static size_t buf_size = gf.work_size; // TODO
+    static size_t buf_size = 128ull*1024*1024; // TODO
     static void * buf = malloc(buf_size);
 
     struct ggml_init_params params = {
-        .mem_size   = buf_size,
-        .mem_buffer = buf,
-        .no_alloc   = false,
+        /*.mem_size   =*/ buf_size,
+        /*.mem_buffer =*/ buf,
+        /*.no_alloc   =*/ false,
     };
 
     struct ggml_context * ctx_work = ggml_init(params);
 
     // this allocates all Metal resources and memory buffers
-    auto ctx_mtl = mnist_mtl_init(ctx_data, ctx_eval, ctx_work, &gf);
+    auto ctx_mtl = mnist_mtl_init(ctx_data, ctx_eval, ctx_work, gf);
 
     int prediction = -1;
 
     for (int i = 0; i < 1; ++i) {
-        struct ggml_tensor * input = ggml_graph_get_tensor(&gf, "input");
+        struct ggml_tensor * input = ggml_graph_get_tensor(gf, "input");
 
         if (i % 2 == 0) {
             memcpy(input->data, digit.data(), ggml_nbytes(input));
@@ -65,7 +64,7 @@ int mnist_eval(
         }
 
         // the actual inference happens here
-        prediction = mnist_mtl_eval(ctx_mtl, &gf);
+        prediction = mnist_mtl_eval(ctx_mtl, gf);
     }
 
     mnist_mtl_free(ctx_mtl);

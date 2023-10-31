@@ -16,6 +16,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - ADAM and L-BFGS optimizers
 - Optimized for Apple Silicon
 - On x86 architectures utilizes AVX / AVX2 intrinsics
+- On ppc64 architectures utilizes VSX intrinsics
 - No third-party dependencies
 - Zero memory allocations during runtime
 
@@ -29,18 +30,24 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [ ] Example of FLAN-T5 inference https://github.com/ggerganov/ggml/pull/12
 - [X] Example of LLaMA inference [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp)
 - [X] Example of LLaMA training [ggerganov/llama.cpp/examples/baby-llama](https://github.com/ggerganov/llama.cpp/tree/master/examples/baby-llama)
+- [X] Example of Falcon inference [cmp-nct/ggllm.cpp](https://github.com/cmp-nct/ggllm.cpp)
 - [X] Example of BLOOM inference [NouamaneTazi/bloomz.cpp](https://github.com/NouamaneTazi/bloomz.cpp)
 - [X] Example of RWKV inference [saharNooby/rwkv.cpp](https://github.com/saharNooby/rwkv.cpp)
-- [ ] Example of [SAM](https://github.com/facebookresearch/segment-anything) inference
-- [ ] Idea for GPU support: https://github.com/ggerganov/llama.cpp/discussions/915
+- [X] Example of SAM inference [examples/sam](https://github.com/ggerganov/ggml/tree/master/examples/sam)
+- [X] Idea for GPU support: https://github.com/ggerganov/llama.cpp/discussions/915
 - [X] Example of StableLM (GPT-NeoX) inference [examples/gpt-neox](https://github.com/ggerganov/ggml/tree/master/examples/gpt-neox)
 - [X] Example of BERT inference [skeskinen/bert.cpp](https://github.com/skeskinen/bert.cpp)
 - [X] Example of 💫 StarCoder inference [examples/starcoder](https://github.com/ggerganov/ggml/tree/master/examples/starcoder)
 - [X] Example of MPT inference [examples/mpt](https://github.com/ggerganov/ggml/tree/master/examples/mpt)
 - [X] Example of Replit inference [examples/replit](https://github.com/ggerganov/ggml/tree/master/examples/replit)
 - [X] Example of BioGPT inference [PABannier/biogpt.cpp](https://github.com/PABannier/biogpt.cpp)
-- [X] Example of Encodec inference [PABannier/encodec.cpp](https://github.com/PABannier/encodec.cpp) 
+- [X] Example of Encodec inference [PABannier/encodec.cpp](https://github.com/PABannier/encodec.cpp)
 - [X] Example of CLIP inference [monatis/clip.cpp](https://github.com/monatis/clip.cpp)
+- [X] Example of MiniGPT4 inference [Maknee/minigpt4.cpp](https://github.com/Maknee/minigpt4.cpp)
+- [X] Example of ChatGLM inference [li-plus/chatglm.cpp](https://github.com/li-plus/chatglm.cpp)
+- [X] Example of Stable Diffusion inference [leejet/stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp)
+- [X] Example of Qwen inference [QwenLM/qwen.cpp](https://github.com/QwenLM/qwen.cpp)
+- [X] Example of YOLO inference [examples/yolo](https://github.com/ggerganov/ggml/tree/master/examples/yolo)
 
 ## Whisper inference (example)
 
@@ -99,6 +106,19 @@ The inference speeds that I get for the different models on my 32GB MacBook M1 P
 | GPT-J |    6B | 125 ms |
 
 For more information, checkout the corresponding programs in the [examples](examples) folder.
+
+## Using Metal (only with GPT-2)
+
+For GPT-2 models, offloading to GPU is possible. Note that it will not improve inference performances but will reduce power consumption and free up the CPU for other tasks.
+
+To enable GPU offloading on MacOS:
+
+```bash
+cmake -DGGML_METAL=ON -DBUILD_SHARED_LIBS=Off ..
+
+# add -ngl 1
+./bin/gpt-2 -t 4 -ngl 100 -m models/gpt-2-117M/ggml-model.bin -p "This is an example"
+```
 
 ## Using cuBLAS
 

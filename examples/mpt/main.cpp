@@ -243,7 +243,7 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
             // Convert token from utf-8
             std::wstring word_multibytes = convert_to_wstring(word);
             word.resize(word_multibytes.size());
-            for (int w = 0; w < word_multibytes.size(); w++) {
+            for (size_t w = 0; w < word_multibytes.size(); w++) {
                 word[w] = uint8_t(word_multibytes[w]);
             }
 
@@ -392,14 +392,14 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
             std::string name(length, 0);
             fin.read(&name[0], length);
 
-            if (model.tensors.find(name.data()) == model.tensors.end()) {
-                fprintf(stderr, "%s: unknown tensor '%s' in model file\n", __func__, name.data());
+            if (model.tensors.find(name) == model.tensors.end()) {
+                fprintf(stderr, "%s: unknown tensor '%s' in model file\n", __func__, name.c_str());
                 return false;
             }
 
-            auto tensor = model.tensors[name.data()];
+            auto tensor = model.tensors[name];
             if (ggml_nelements(tensor) != nelements) {
-                fprintf(stderr, "%s: tensor '%s' has wrong size in model file\n", __func__, name.data());
+                fprintf(stderr, "%s: tensor '%s' has wrong size in model file\n", __func__, name.c_str());
                 return false;
             }
 
@@ -407,13 +407,13 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
                 fprintf(stderr,
                         "%s: tensor '%s' has wrong shape in model file: got [%5d, "
                         "%5d], expected [%5d, %5d]\n",
-                        __func__, name.data(), (int)tensor->ne[0], (int)tensor->ne[1], ne[0], ne[1]);
+                        __func__, name.c_str(), (int)tensor->ne[0], (int)tensor->ne[1], ne[0], ne[1]);
                 return false;
             }
 
             // for debugging
             if (0) {
-                printf("%24s - [%5d, %5d], type = %6s, %6.2f MB, %9zu bytes\n", name.data(), ne[0], ne[1],
+                printf("%24s - [%5d, %5d], type = %6s, %6.2f MB, %9zu bytes\n", name.c_str(), ne[0], ne[1],
                        ggml_type_name(ggml_type(ttype)), ggml_nbytes(tensor) / 1024.0 / 1024.0, ggml_nbytes(tensor));
             }
 
@@ -423,7 +423,7 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
                 fprintf(stderr,
                         "%s: tensor '%s' has wrong size in model file: got %zu, "
                         "expected %zu\n",
-                        __func__, name.data(), ggml_nbytes(tensor), nelements * bpe);
+                        __func__, name.c_str(), ggml_nbytes(tensor), nelements * bpe);
                 return false;
             }
 
@@ -465,6 +465,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
     const int n_head  = hparams.n_heads;
     const int n_vocab = hparams.n_vocab;
     const int n_ctx   = hparams.n_ctx;
+    const float eps   = 1e-5f;
 
     static size_t buf_size = 256u * 1024 * 1024;
     static void * buf = malloc(buf_size);
@@ -498,8 +499,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
-    struct ggml_cgraph gf = {};
-    gf.n_threads = n_threads;
+    struct ggml_cgraph * gf = ggml_new_graph(ctx0);
 
     struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
     memcpy(embd->data, embd_inp.data(), N * ggml_element_size(embd));
@@ -514,7 +514,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
 
         // a = self.ln_1(x)
         {
-            cur = ggml_norm(ctx0, inpL);
+            cur = ggml_norm(ctx0, inpL, eps);
 
             cur = ggml_mul(ctx0, ggml_repeat(ctx0, model.layers[il].norm_1_weight, cur), cur);
         }
@@ -544,8 +544,8 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
                     ggml_view_1d(ctx0, model.memory_v, N * n_embd,
                                  (ggml_element_size(model.memory_v) * n_embd) * (il * n_ctx + n_past));
 
-                ggml_build_forward_expand(&gf, ggml_cpy(ctx0, Kcur, k));
-                ggml_build_forward_expand(&gf, ggml_cpy(ctx0, Vcur, v));
+                ggml_build_forward_expand(gf, ggml_cpy(ctx0, Kcur, k));
+                ggml_build_forward_expand(gf, ggml_cpy(ctx0, Vcur, v));
             }
 
             // Q = Qcur.contiguous().view(n_embd/n_head, n_head, N).permute(0,
@@ -610,7 +610,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
 
         // m = self.ln_2(x)
         {
-            cur = ggml_norm(ctx0, inpL);
+            cur = ggml_norm(ctx0, inpL, eps);
 
             cur = ggml_mul(ctx0, ggml_repeat(ctx0, model.layers[il].norm_2_weight, cur), cur);
         }
@@ -636,7 +636,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
 
     // norm
     {
-        inpL = ggml_norm(ctx0, inpL);
+        inpL = ggml_norm(ctx0, inpL, eps);
         // inpL = ln_f_g*inpL
         inpL = ggml_mul(ctx0, ggml_repeat(ctx0, model.norm_f_weight, inpL), inpL);
     }
@@ -650,8 +650,8 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
     // inpL = ggml_soft_max(ctx0, inpL);
 
     // run the computation
-    ggml_build_forward_expand(&gf, inpL);
-    ggml_graph_compute(ctx0, &gf);
+    ggml_build_forward_expand(gf, inpL);
+    ggml_graph_compute_with_ctx(ctx0, gf, n_threads);
 
     // std::cout << "Qcur" << std::endl;
     // print_tensor(Qcur);

@@ -39,6 +39,7 @@ struct dollyv2_hparams {
     int32_t n_rot   = 20;    // rotary_pct[25%] * (n_embd / n_head)
     int32_t par_res = 1; // 1 = true, 0 = false
     int32_t ftype   = GGML_FTYPE_MOSTLY_F16;
+    float   eps     = 1e-5f;
 };
 
 const std::string INSTRUCTION_KEY = "### Instruction:";
@@ -361,33 +362,33 @@ bool dollyv2_model_load(const std::string & fname, dollyv2_model & model, gpt_vo
             std::string name(length, 0);
             fin.read(&name[0], length);
 
-            if (model.tensors.find(name.data()) == model.tensors.end()) {
-                fprintf(stderr, "%s: unknown tensor '%s' in model file\n", __func__, name.data());
+            if (model.tensors.find(name) == model.tensors.end()) {
+                fprintf(stderr, "%s: unknown tensor '%s' in model file\n", __func__, name.c_str());
                 return false;
             }
 
-            auto tensor = model.tensors[name.data()];
+            auto tensor = model.tensors[name];
             if (ggml_nelements(tensor) != nelements) {
-                fprintf(stderr, "%s: tensor '%s' has wrong size in model file\n", __func__, name.data());
+                fprintf(stderr, "%s: tensor '%s' has wrong size in model file\n", __func__, name.c_str());
                 return false;
             }
 
             if (tensor->ne[0] != ne[0] || tensor->ne[1] != ne[1]) {
                 fprintf(stderr, "%s: tensor '%s' has wrong shape in model file: got [%5d, %5d], expected [%5d, %5d]\n",
-                        __func__, name.data(), (int) tensor->ne[0], (int) tensor->ne[1], ne[0], ne[1]);
+                        __func__, name.c_str(), (int) tensor->ne[0], (int) tensor->ne[1], ne[0], ne[1]);
                 return false;
             }
 
             // for debugging
             if (0) {
-                printf("%24s - [%5d, %5d], type = %6s, %6.2f MB, %9zu bytes\n", name.data(), ne[0], ne[1], ggml_type_name(ggml_type(ttype)), ggml_nbytes(tensor)/1024.0/1024.0, ggml_nbytes(tensor));
+                printf("%24s - [%5d, %5d], type = %6s, %6.2f MB, %9zu bytes\n", name.c_str(), ne[0], ne[1], ggml_type_name(ggml_type(ttype)), ggml_nbytes(tensor)/1024.0/1024.0, ggml_nbytes(tensor));
             }
 
             const size_t bpe = ggml_type_size(ggml_type(ttype));
 
             if ((nelements*bpe)/ggml_blck_size(tensor->type) != ggml_nbytes(tensor)) {
                 fprintf(stderr, "%s: tensor '%s' has wrong size in model file: got %zu, expected %zu\n",
-                        __func__, name.data(), ggml_nbytes(tensor), nelements*bpe);
+                        __func__, name.c_str(), ggml_nbytes(tensor), nelements*bpe);
                 return false;
             }
 
@@ -412,10 +413,11 @@ bool dollyv2_model_load(const std::string & fname, dollyv2_model & model, gpt_vo
 
 // feed-forward network
 ggml_tensor * gpt_neox_ff(
-        const dollyv2_layer &layer,
-        ggml_context * ctx0,
-        ggml_tensor * inp) {
-    ggml_tensor * cur = ggml_norm(ctx0, inp);
+        const dollyv2_layer & layer,
+        ggml_context        * ctx0,
+        ggml_tensor         * inp,
+        float                 eps) {
+    ggml_tensor * cur = ggml_norm(ctx0, inp, eps);
 
     cur = ggml_add(ctx0,
         ggml_mul(ctx0,
@@ -495,8 +497,14 @@ bool dollyv2_eval(
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
-    struct ggml_cgraph gf = { };
-    gf.n_threads = n_threads;
+    struct ggml_cgraph * gf = ggml_new_graph(ctx0);
+
+    // KQ_pos - contains the positions
+    struct ggml_tensor * KQ_pos = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
+    int * data = (int *) KQ_pos->data;
+    for (int i = 0; i < N; ++i) {
+        data[i] = n_past + i;
+    }
 
     struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
     memcpy(embd->data, embd_inp.data(), N*ggml_element_size(embd));
@@ -510,7 +518,7 @@ bool dollyv2_eval(
         // self-attention
         {
             {
-                cur = ggml_norm(ctx0, inpL);
+                cur = ggml_norm(ctx0, inpL, hparams.eps);
 
                 cur = ggml_add(ctx0,
                         ggml_mul(ctx0,
@@ -535,8 +543,8 @@ bool dollyv2_eval(
             struct ggml_tensor * Vcur = ggml_cont(ctx0, ggml_view_3d(ctx0, cur, n_embd/n_head, n_head, N, cur->nb[1]/n_head, cur->nb[1], 2*sizeof(float)*n_embd/n_head));
 
             // using mode = 2 for GPT-NeoX mode
-            Qcur = ggml_rope_inplace(ctx0, Qcur, n_past, n_rot, 2, 0);
-            Kcur = ggml_rope_inplace(ctx0, Kcur, n_past, n_rot, 2, 0);
+            Qcur = ggml_rope_inplace(ctx0, Qcur, KQ_pos, n_rot, 2, 0);
+            Kcur = ggml_rope_inplace(ctx0, Kcur, KQ_pos, n_rot, 2, 0);
 
             // store key and value to memory
             {
@@ -547,8 +555,8 @@ bool dollyv2_eval(
                         (   n_ctx)*ggml_element_size(model.memory_v),
                         (il*n_ctx)*ggml_element_size(model.memory_v)*n_embd + n_past*ggml_element_size(model.memory_v));
 
-                ggml_build_forward_expand(&gf, ggml_cpy(ctx0, Kcur, k));
-                ggml_build_forward_expand(&gf, ggml_cpy(ctx0, Vcur, v));
+                ggml_build_forward_expand(gf, ggml_cpy(ctx0, Kcur, k));
+                ggml_build_forward_expand(gf, ggml_cpy(ctx0, Vcur, v));
             }
 
             // Q = Qcur.contiguous().view(n_embd/n_head, n_head, N).permute(0, 2, 1, 3)
@@ -613,7 +621,7 @@ bool dollyv2_eval(
         if (hparams.par_res == 0) {
             struct ggml_tensor * inpFF = ggml_add(ctx0, cur, inpL);
 
-            cur = gpt_neox_ff(model.layers[il], ctx0, inpFF);
+            cur = gpt_neox_ff(model.layers[il], ctx0, inpFF, hparams.eps);
 
             // input for next layer
             inpL = ggml_add(ctx0, cur, inpFF);
@@ -622,7 +630,7 @@ bool dollyv2_eval(
 
             // this is independent of the self-attention result, so it could be done in parallel to the self-attention
             // note here we pass inpL instead of cur
-            cur = gpt_neox_ff(model.layers[il], ctx0, inpL);
+            cur = gpt_neox_ff(model.layers[il], ctx0, inpL, hparams.eps);
 
             // layer input + FF
             cur  = ggml_add(ctx0, cur, inpFF);
@@ -635,7 +643,7 @@ bool dollyv2_eval(
 
     // norm
     {
-        inpL = ggml_norm(ctx0, inpL);
+        inpL = ggml_norm(ctx0, inpL, hparams.eps);
 
         // inpL = ln_f_g*inpL + ln_f_b
         inpL = ggml_add(ctx0,
@@ -658,8 +666,8 @@ bool dollyv2_eval(
     //inpL = ggml_soft_max_inplace(ctx0, inpL);
 
     // run the computation
-    ggml_build_forward_expand(&gf, inpL);
-    ggml_graph_compute       (ctx0, &gf);
+    ggml_build_forward_expand(gf, inpL);
+    ggml_graph_compute_with_ctx(ctx0, gf, n_threads);
 
     //if (n_past%100 == 0) {
     //    ggml_graph_print   (&gf);
@@ -704,8 +712,8 @@ std::string execute_prompt(
     params.n_predict = std::min(params.n_predict, model.hparams.n_ctx - (int)embd_inp.size());
 
     printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
-    for (int i = 0; i < embd_inp.size(); i++) {
-        printf("%s: token[%d] = %6d, %s\n", __func__, i, embd_inp[i], vocab.id_to_token.at(embd_inp[i]).c_str());
+    for (size_t i = 0; i < embd_inp.size(); i++) {
+        printf("%s: token[%zu] = %6d, %s\n", __func__, i, embd_inp[i], vocab.id_to_token.at(embd_inp[i]).c_str());
     }
     printf("\n");
 
@@ -715,7 +723,7 @@ std::string execute_prompt(
 
     const int32_t end_token = vocab.token_to_id["### End"];
 
-    for (int i = embd.size(); i < embd_inp.size() + params.n_predict; i++) {
+    for (size_t i = embd.size(); i < embd_inp.size() + params.n_predict; i++) {
         // predict
         if (embd.size() > 0) {
             const int64_t t_start_us = ggml_time_us();
@@ -753,9 +761,9 @@ std::string execute_prompt(
             embd.push_back(id);
         } else {
             // if here, it means we are still processing the input prompt
-            for (int k = i; k < embd_inp.size(); k++) {
+            for (size_t k = i; k < embd_inp.size(); k++) {
                 embd.push_back(embd_inp[k]);
-                if (embd.size() > params.n_batch) {
+                if (int32_t(embd.size()) > params.n_batch) {
                     break;
                 }
             }
@@ -874,7 +882,7 @@ int main(int argc, char ** argv) {
     }
 
 #if defined(DOLLY_INTERACTIVE_PORT)
-    int sockfd;
+    int sockfd = -1;
     if (params.interactive_port != -1) {
         sockfd = setup_port(params.interactive_port);
         if (sockfd == -1) {
@@ -889,7 +897,7 @@ int main(int argc, char ** argv) {
         while (true) {
             std::string prompt_input;
 #if defined(DOLLY_INTERACTIVE_PORT)
-            int clientfd;
+            int clientfd = -1;
             if (params.interactive_port != -1) {
                 sockaddr_in clientaddr;
                 socklen_t clientaddrlen = sizeof(clientaddr);

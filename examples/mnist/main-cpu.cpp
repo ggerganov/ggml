@@ -34,18 +34,19 @@
 int mnist_eval(
         const char * fname_cgraph,
         const int n_threads,
-        std::vector<float> digit
-        ) {
+        std::vector<float> digit) {
     // load the compute graph
     struct ggml_context * ctx_data = NULL;
     struct ggml_context * ctx_eval = NULL;
 
-    struct ggml_cgraph gfi = ggml_graph_import(fname_cgraph, &ctx_data, &ctx_eval);
-    gfi.n_threads = n_threads;
+    struct ggml_cgraph * gfi = ggml_graph_import(fname_cgraph, &ctx_data, &ctx_eval);
+
+    // param export/import test
+    GGML_ASSERT(ggml_graph_get_tensor(gfi, "fc1_bias")->op_params[0] == int(0xdeadbeef));
 
     // allocate work context
     // needed during ggml_graph_compute() to allocate a work tensor
-    static size_t buf_size = gfi.work_size; // TODO
+    static size_t buf_size = 128ull*1024*1024; // TODO
     static void * buf = malloc(buf_size);
 
     struct ggml_init_params params = {
@@ -56,12 +57,12 @@ int mnist_eval(
 
     struct ggml_context * ctx_work = ggml_init(params);
 
-    struct ggml_tensor * input = ggml_graph_get_tensor(&gfi, "input");
+    struct ggml_tensor * input = ggml_graph_get_tensor(gfi, "input");
     memcpy(input->data, digit.data(), ggml_nbytes(input));
 
-    ggml_graph_compute(ctx_work, &gfi);
+    ggml_graph_compute_with_ctx(ctx_work, gfi, n_threads);
 
-    const float * probs_data = ggml_get_data_f32(ggml_graph_get_tensor(&gfi, "probs"));
+    const float * probs_data = ggml_get_data_f32(ggml_graph_get_tensor(gfi, "probs"));
 
     const int prediction = std::max_element(probs_data, probs_data + 10) - probs_data;
 

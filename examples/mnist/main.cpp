@@ -119,6 +119,9 @@ bool mnist_model_load(const std::string & fname, mnist_model & model) {
             model.fc1_bias = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, model.hparams.n_hidden);
             fin.read(reinterpret_cast<char *>(model.fc1_bias->data), ggml_nbytes(model.fc1_bias));
             ggml_set_name(model.fc1_bias, "fc1_bias");
+
+            // just for testing purposes, set some parameters to non-zero
+            model.fc1_bias->op_params[0] = 0xdeadbeef;
         }
     }
 
@@ -175,7 +178,7 @@ int mnist_eval(
 
     const auto & hparams = model.hparams;
 
-    static size_t buf_size = hparams.n_input * sizeof(float) * 4;
+    static size_t buf_size = hparams.n_input * sizeof(float) * 32;
     static void * buf = malloc(buf_size);
 
     struct ggml_init_params params = {
@@ -185,8 +188,7 @@ int mnist_eval(
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
-    struct ggml_cgraph gf = {};
-    gf.n_threads = n_threads;
+    struct ggml_cgraph * gf = ggml_new_graph(ctx0);
 
     struct ggml_tensor * input = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, hparams.n_input);
     memcpy(input->data, digit.data(), ggml_nbytes(input));
@@ -201,16 +203,16 @@ int mnist_eval(
     ggml_set_name(probs, "probs");
 
     // build / export / run the computation graph
-    ggml_build_forward_expand(&gf, probs);
-    ggml_graph_compute       (ctx0, &gf);
+    ggml_build_forward_expand(gf, probs);
+    ggml_graph_compute_with_ctx(ctx0, gf, n_threads);
 
     //ggml_graph_print   (&gf);
-    ggml_graph_dump_dot(&gf, NULL, "mnist.dot");
+    ggml_graph_dump_dot(gf, NULL, "mnist.dot");
 
     if (fname_cgraph) {
         // export the compute graph for later use
         // see the "mnist-cpu" example
-        ggml_graph_export(&gf, "mnist.ggml");
+        ggml_graph_export(gf, "mnist.ggml");
 
         fprintf(stderr, "%s: exported compute graph to '%s'\n", __func__, fname_cgraph);
     }

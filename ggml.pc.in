@@ -1,6 +1,6 @@
 prefix=@CMAKE_INSTALL_PREFIX@
 exec_prefix=${prefix}
-includrdir=${prefix}/include
+includedir=${prefix}/include
 libdir=${prefix}/lib
 
 Name: ggml
