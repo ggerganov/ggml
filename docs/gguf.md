@@ -24,6 +24,8 @@ GGUF files are structured as follows. They use a global alignment specified in t
 
 Fields, including arrays, are written sequentially without alignment unless otherwise specified.
 
+Models are little-endian by default. They can also come in big-endian for use with big-endian computers; in this case, all values (including metadata values and tensors) will also be big-endian. At the time of writing, there is no way to determine if a model is big-endian; this may be rectified in future versions. If no additional information is provided, assume the model is little-endian.
+
 ```c
 enum ggml_type: uint32_t {
     GGML_TYPE_F32  = 0,
