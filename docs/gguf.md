@@ -20,12 +20,12 @@ The key difference between GGJT and GGUF is the use of a key-value structure for
 
 ### File Structure
 
-GGUF files are structured as follows. They use a global alignment specified in the `general.alignment` metadata field. Where required, the file is padded with `0x00` bytes to the next multiple of `general.alignment`.
+GGUF files are structured as follows. They use a global alignment specified in the `general.alignment` metadata field, referred to as `ALIGNMENT` below. Where required, the file is padded with `0x00` bytes to the next multiple of `general.alignment`.
 
 Fields, including arrays, are written sequentially without alignment unless otherwise specified.
 
 ```c
-enum ggml_type {
+enum ggml_type: uint32_t {
     GGML_TYPE_F32  = 0,
     GGML_TYPE_F16  = 1,
     GGML_TYPE_Q4_0 = 2,
@@ -136,7 +136,7 @@ struct gguf_header_t {
     // Consider being *very* explicit about the byte order here.
     uint32_t magic;
     // The version of the format implemented.
-    // Must be `2` for version described in this spec.
+    // Must be `3` for version described in this spec, which introduces big-endian support.
     //
     // This version should only be increased for structural changes to the format.
     // Changes that do not affect the structure of the file should instead update the metadata
@@ -152,6 +152,10 @@ struct gguf_header_t {
     gguf_metadata_kv_t metadata_kv[metadata_kv_count];
 };
 
+uint64_t align_offset(uint64_t offset) {
+    return offset + (ALIGNMENT - (offset % ALIGNMENT)) % ALIGNMENT;
+}
+
 struct gguf_tensor_info_t {
     // The name of the tensor. It is a standard GGUF string, with the caveat that
     // it must be at most 64 bytes long.
@@ -164,11 +168,13 @@ struct gguf_tensor_info_t {
     // The type of the tensor.
     ggml_type type;
     // The offset of the tensor's data in this file in bytes.
+    //
     // This offset is relative to `tensor_data`, not to the start
     // of the file, to make it easier for writers to write the file.
     // Readers should consider exposing this offset relative to the
     // file to make it easier to read the data.
-    // Must be a multiple of `ALIGNMENT`.
+    //
+    // Must be a multiple of `ALIGNMENT`. That is, `align_offset(offset) == offset`.
     uint64_t offset;
 };
 
@@ -180,7 +186,13 @@ struct gguf_file_t {
     gguf_tensor_info_t tensor_infos[header.tensor_count];
 
     // Padding to the nearest multiple of `ALIGNMENT`.
-    uint8_t _padding[ALIGNMENT - (sizeof(header + tensor_infos) % ALIGNMENT)];
+    //
+    // That is, if `sizeof(header) + sizeof(tensor_infos)` is not a multiple of `ALIGNMENT`,
+    // this padding is added to make it so.
+    //
+    // This can be calculated as `align_offset(position) - position`, where `position` is
+    // the position of the end of `tensor_infos` (i.e. `sizeof(header) + sizeof(tensor_infos)`).
+    uint8_t _padding[];
 
     // Tensor data.
     //
@@ -285,7 +297,21 @@ In the following, `[llm]` is used to fill in for the name of a specific LLM arch
 
 - `[llm].rope.dimension_count: uint64`: The number of rotary dimensions for RoPE.
 - `[llm].rope.freq_base: float32`: The base frequency for RoPE.
+
+##### Scaling
+
+The following keys describe RoPE scaling parameters:
+
+- `[llm].rope.scaling.type: string`: Can be `none`, `linear`, or `yarn`.
+- `[llm].rope.scaling.factor: float32`: A scale factor for RoPE to adjust the context length.
+- `[llm].rope.scaling.original_context_length: uint32_t`: The original context length of the base model.
+- `[llm].rope.scaling.finetuned: bool`: True if model has been finetuned with RoPE scaling.
+
+Note that older models may not have these keys, and may instead use the following key:
+
 - `[llm].rope.scale_linear: float32`: A linear scale factor for RoPE to adjust the context length.
+
+It is recommended that models use the newer keys if possible, as they are more flexible and allow for more complex scaling schemes. Executors will need to support both indefinitely.
 
 #### Models
 
@@ -382,7 +408,7 @@ The following sections describe the metadata for each model architecture. Each k
 
 - `falcon.tensor_data_layout`:
 
-  - `jploski` (author of the original GGML implementation of Falcon; this may change in the future):
+  - `jploski` (author of the original GGML implementation of Falcon):
 
     ```python
     # The original query_key_value tensor contains n_head_kv "kv groups",
@@ -461,7 +487,7 @@ It is not guaranteed to be standardized across models, and may change in the fut
   - `rwkv`: RWKV tokenizer
 - `tokenizer.ggml.tokens: array[string]`: A list of tokens indexed by the token ID used by the model.
 - `tokenizer.ggml.scores: array[float32]`: If present, the score/probability of each token. If not present, all tokens are assumed to have equal probability. If present, it must have the same length and index as `tokens`.
-- `tokenizer.ggml.token_type: array[uint32]`: The token type (1=normal, 2=unknown, 3=control, 4=user defined, 5=unused, 6=byte). If present, it must have the same length and index as `tokens`.
+- `tokenizer.ggml.token_type: array[int32]`: The token type (1=normal, 2=unknown, 3=control, 4=user defined, 5=unused, 6=byte). If present, it must have the same length and index as `tokens`.
 - `tokenizer.ggml.merges: array[string]`: If present, the merges of the tokenizer. If not present, the tokens are assumed to be atomic.
 - `tokenizer.ggml.added_tokens: array[string]`: If present, tokens that were added after training.
 
@@ -525,7 +551,23 @@ where N signifies the block number a layer belongs to, and where `BB` could be:
 - `ffn_gate`: Feed-forward network "gate" layer
 - `ffn_down`: Feed-forward network "down" layer
 
----
+## Version History
+
+This document is actively updated to describe the current state of the metadata, and these changes are not tracked outside of the commits.
+
+However, the format _itself_ has changed. The following sections describe the changes to the format itself.
+
+### v3
+
+Adds big-endian support.
+
+### v2
+
+Most countable values (lengths, etc) were changed from `uint32` to `uint64` to allow for larger models to be supported in the future.
+
+### v1
+
+Initial version.
 
 ## Historical State of Affairs
 
