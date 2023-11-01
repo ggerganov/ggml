@@ -448,7 +448,11 @@ struct ggml_backend_sched {
     struct ggml_context * ctx;
 
     // align context_buffer to GGML_MEM_ALIGN
+    #ifdef _MSC_VER
+    __declspec(align(GGML_MEM_ALIGN))
+    #else
     __attribute__((aligned(GGML_MEM_ALIGN)))
+    #endif
     char context_buffer[GGML_MAX_SPLITS*GGML_MAX_SPLIT_INPUTS*sizeof(struct ggml_tensor) + GGML_MAX_SPLITS*sizeof(struct ggml_cgraph)];
 };
 
