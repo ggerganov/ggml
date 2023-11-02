@@ -27,25 +27,23 @@ cd ggml
 # Install Python dependencies
 python3 -m pip install -r requirements.txt
 
+# Download PTH model
+wget -P examples/sam/ https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth
+
 # Convert PTH model to ggml
-python convert-pth-to-ggml.py examples/sam/sam_vit_b_01ec64.pth . 1
+python examples/sam/convert-pth-to-ggml.py examples/sam/sam_vit_b_01ec64.pth examples/sam/ 1
 
 # Build ggml + examples
 mkdir build && cd build
 cmake .. && make -j4
 
 # run inference
-./bin/sam -t 16 -i ../img.jpg -m examples/sam/ggml-model-f16.bin
+./bin/sam -t 16 -i ../examples/sam/example.jpg -m ../examples/sam/ggml-model-f16.bin
 ```
 
 ## Downloading and converting the model checkpoints
 
 You can download a [model checkpoint](https://github.com/facebookresearch/segment-anything/tree/main#model-checkpoints) and convert it to `ggml` format using the script `convert-pth-to-ggml.py`:
-
-```
-# Convert PTH model to ggml
-python convert-pth-to-ggml.py examples/sam/sam_vit_b_01ec64.pth . 1
-```
 
 ## Example output on M2 Ultra
 ```
