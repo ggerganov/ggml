@@ -253,6 +253,7 @@ add_library(${TARGET}
     ggml.c
     ggml-alloc.c
     ggml-backend.c
+    ggml-quants.c
     ggml-impl.h
     ggml-backend-impl.h
     ../include/ggml/ggml.h
