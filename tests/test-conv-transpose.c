@@ -52,6 +52,9 @@ void check_tensor(struct ggml_tensor * t, float * expected_t_d, int ne0, int ne1
             for (int i0 = 0; i0 < ne0; ++i0) {
                 float expected = *(expected_t_d + i2 * ne1 * ne0 + i1 * ne0 + i0);
                 float actual = ggml_get_data_f32(t)[i2 * ne1 * ne0 + i1 * ne0 + i0];
+                if (expected != actual) {
+                    printf("expected %.1f, got %.1f\n", expected, actual);
+                }
                 GGML_ASSERT(expected == actual);
             }
         }
@@ -100,13 +103,17 @@ void test_conv_transpose_1d(void) {
         struct ggml_tensor * out_2 = ggml_conv_transpose_1d(ctx, k, t, 2 /* s0 */, 0 /* p0 */, 1 /* d0 */);
         struct ggml_tensor * out_3 = ggml_conv_transpose_1d(ctx, k, t, 3 /* s0 */, 0 /* p0 */, 1 /* d0 */);
 
-        struct ggml_cgraph gf_1 = ggml_build_forward(out_1);
-        struct ggml_cgraph gf_2 = ggml_build_forward(out_2);
-        struct ggml_cgraph gf_3 = ggml_build_forward(out_3);
+        struct ggml_cgraph * gf_1 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_2 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_3 = ggml_new_graph(ctx);
 
-        ggml_graph_compute_with_ctx(ctx, &gf_1, 1);
-        ggml_graph_compute_with_ctx(ctx, &gf_2, 1);
-        ggml_graph_compute_with_ctx(ctx, &gf_3, 1);
+        ggml_build_forward_expand(gf_1, out_1);
+        ggml_build_forward_expand(gf_2, out_2);
+        ggml_build_forward_expand(gf_3, out_3);
+
+        ggml_graph_compute_with_ctx(ctx, gf_1, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_2, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_3, 1);
 
         check_tensor(out_1, (float*)expected_out_1, 4, 3, 1);
         check_tensor(out_2, (float*)expected_out_2, 6, 3, 1);
@@ -203,13 +210,17 @@ void test_conv_transpose_2d(void) {
         struct ggml_tensor * out_2 = ggml_conv_transpose_2d_p0(ctx, k, t, 2);
         struct ggml_tensor * out_3 = ggml_conv_transpose_2d_p0(ctx, k, t, 3);
 
-        struct ggml_cgraph gf_1 = ggml_build_forward(out_1);
-        struct ggml_cgraph gf_2 = ggml_build_forward(out_2);
-        struct ggml_cgraph gf_3 = ggml_build_forward(out_3);
+        struct ggml_cgraph * gf_1 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_2 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_3 = ggml_new_graph(ctx);
 
-        ggml_graph_compute_with_ctx(ctx, &gf_1, 1);
-        ggml_graph_compute_with_ctx(ctx, &gf_2, 1);
-        ggml_graph_compute_with_ctx(ctx, &gf_3, 1);
+        ggml_build_forward_expand(gf_1, out_1);
+        ggml_build_forward_expand(gf_2, out_2);
+        ggml_build_forward_expand(gf_3, out_3);
+
+        ggml_graph_compute_with_ctx(ctx, gf_1, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_2, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_3, 1);
 
         // printf("in\n");
         // printf_tensor(t);

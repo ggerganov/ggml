@@ -120,13 +120,22 @@ static void byteswap_tensor(ggml_tensor * tensor) {
 //#define WHISPER_USE_FLASH_ATTN
 //#define WHISPER_USE_FLASH_FF
 #define WHISPER_MAX_DECODERS 16
+#define WHISPER_MAX_NODES 4096
 
 //
 // ggml helpers
 //
 
-static void ggml_graph_compute_helper(std::vector<uint8_t> & buf, ggml_cgraph * graph, int n_threads) {
+static void ggml_graph_compute_helper(
+        std::vector<uint8_t> & buf,
+                 ggml_cgraph * graph,
+                         int   n_threads,
+      whisper_abort_callback   abort_callback,
+                        void * abort_callback_data) {
     struct ggml_cplan plan = ggml_graph_plan(graph, n_threads);
+
+    plan.abort_callback = abort_callback;
+    plan.abort_callback_data = abort_callback_data;
 
     if (plan.work_size > 0) {
         buf.resize(plan.work_size);
@@ -655,7 +664,7 @@ static void whisper_allocr_graph_init(struct whisper_allocr & allocr, std::funct
     auto & meta  = allocr.meta;
     auto & data  = allocr.data;
 
-    meta.resize(ggml_tensor_overhead()*GGML_MAX_NODES + ggml_graph_overhead());
+    meta.resize(ggml_tensor_overhead()*WHISPER_MAX_NODES + ggml_graph_overhead());
 
     alloc = ggml_allocr_new_measure(tensor_alignment);
 
@@ -1608,7 +1617,7 @@ static struct ggml_cgraph * whisper_build_graph_encoder(
 
     struct ggml_context * ctx0 = ggml_init(params);
 
-    ggml_cgraph * gf = ggml_new_graph(ctx0);
+    ggml_cgraph * gf = ggml_new_graph_custom(ctx0, WHISPER_MAX_NODES, false);
 
     ggml_allocr * alloc = wstate.alloc_encode.alloc;
 
@@ -1922,7 +1931,9 @@ static bool whisper_encode_internal(
         whisper_context & wctx,
           whisper_state & wstate,
               const int   mel_offset,
-              const int   n_threads) {
+              const int   n_threads,
+ whisper_abort_callback   abort_callback,
+                   void * abort_callback_data) {
     const int64_t t_start_us = ggml_time_us();
 
     // conv
@@ -1936,7 +1947,7 @@ static bool whisper_encode_internal(
         ggml_allocr_alloc_graph(alloc, gf);
 
         if (!whisper_encode_external(wstate)) {
-            ggml_graph_compute_helper(wstate.work_buffer, gf, n_threads);
+            ggml_graph_compute_helper(wstate.work_buffer, gf, n_threads, abort_callback, abort_callback_data);
         }
     }
 
@@ -1955,10 +1966,10 @@ static bool whisper_encode_internal(
             ggml_metal_set_n_cb     (wstate.ctx_metal, n_threads);
             ggml_metal_graph_compute(wstate.ctx_metal, gf);
         } else {
-            ggml_graph_compute_helper(wstate.work_buffer, gf, n_threads);
+            ggml_graph_compute_helper(wstate.work_buffer, gf, n_threads, abort_callback, abort_callback_data);
         }
 #else
-        ggml_graph_compute_helper(wstate.work_buffer, gf, n_threads);
+        ggml_graph_compute_helper(wstate.work_buffer, gf, n_threads, abort_callback, abort_callback_data);
 #endif
     }
 
@@ -1977,10 +1988,10 @@ static bool whisper_encode_internal(
             ggml_metal_set_n_cb     (wstate.ctx_metal, n_threads);
             ggml_metal_graph_compute(wstate.ctx_metal, gf);
         } else {
-            ggml_graph_compute_helper(wstate.work_buffer, gf, n_threads);
+            ggml_graph_compute_helper(wstate.work_buffer, gf, n_threads, abort_callback, abort_callback_data);
         }
 #else
-        ggml_graph_compute_helper(wstate.work_buffer, gf, n_threads);
+        ggml_graph_compute_helper(wstate.work_buffer, gf, n_threads, abort_callback, abort_callback_data);
 #endif
     }
 
@@ -2024,7 +2035,7 @@ static struct ggml_cgraph * whisper_build_graph_decoder(
 
     struct ggml_context * ctx0 = ggml_init(params);
 
-    ggml_cgraph * gf = ggml_new_graph(ctx0);
+    ggml_cgraph * gf = ggml_new_graph_custom(ctx0, WHISPER_MAX_NODES, false);
 
     ggml_allocr * alloc = wstate.alloc_decode.alloc;
 
@@ -2346,7 +2357,9 @@ static bool whisper_decode_internal(
     const whisper_token * tokens,
               const int   n_tokens,
               const int   n_past,
-              const int   n_threads) {
+              const int   n_threads,
+ whisper_abort_callback   abort_callback,
+                   void * abort_callback_data) {
     const int64_t t_start_us = ggml_time_us();
 
     const auto & model   = wctx.model;
@@ -2375,10 +2388,10 @@ static bool whisper_decode_internal(
             ggml_metal_set_n_cb     (wstate.ctx_metal, n_threads);
             ggml_metal_graph_compute(wstate.ctx_metal, gf);
         } else {
-            ggml_graph_compute_helper(wstate.work_buffer, gf, n_threads);
+            ggml_graph_compute_helper(wstate.work_buffer, gf, n_threads, abort_callback, abort_callback_data);
         }
 #else
-        ggml_graph_compute_helper(wstate.work_buffer, gf, n_threads);
+        ggml_graph_compute_helper(wstate.work_buffer, gf, n_threads, abort_callback, abort_callback_data);
 #endif
     }
 
@@ -3290,7 +3303,7 @@ int whisper_set_mel(
 }
 
 int whisper_encode_with_state(struct whisper_context * ctx, struct whisper_state * state, int offset, int n_threads) {
-    if (!whisper_encode_internal(*ctx, *state, offset, n_threads)) {
+    if (!whisper_encode_internal(*ctx, *state, offset, n_threads, nullptr, nullptr)) {
         log("%s: failed to eval\n", __func__);
         return -1;
     }
@@ -3299,7 +3312,7 @@ int whisper_encode_with_state(struct whisper_context * ctx, struct whisper_state
 }
 
 int whisper_encode(struct whisper_context * ctx, int offset, int n_threads) {
-    if (!whisper_encode_internal(*ctx, *ctx->state, offset, n_threads)) {
+    if (!whisper_encode_internal(*ctx, *ctx->state, offset, n_threads, nullptr, nullptr)) {
         log("%s: failed to eval\n", __func__);
         return -1;
     }
@@ -3310,7 +3323,7 @@ int whisper_encode(struct whisper_context * ctx, int offset, int n_threads) {
 int whisper_decode_with_state(struct whisper_context * ctx, struct whisper_state * state, const whisper_token * tokens, int n_tokens, int n_past, int n_threads) {
     const int selected_decoder_id = 0;
 
-    if (!whisper_decode_internal(*ctx, *state, state->decoders[selected_decoder_id], tokens, n_tokens, n_past, n_threads)) {
+    if (!whisper_decode_internal(*ctx, *state, state->decoders[selected_decoder_id], tokens, n_tokens, n_past, n_threads, nullptr, nullptr)) {
         log("%s: failed to eval\n", __func__);
         return 1;
     }
@@ -3327,7 +3340,7 @@ int whisper_decode(struct whisper_context * ctx, const whisper_token * tokens, i
         return false;
     }
 
-    if (!whisper_decode_internal(*ctx, *ctx->state, ctx->state->decoders[selected_decoder_id], tokens, n_tokens, n_past, n_threads)) {
+    if (!whisper_decode_internal(*ctx, *ctx->state, ctx->state->decoders[selected_decoder_id], tokens, n_tokens, n_past, n_threads, nullptr, nullptr)) {
         log("%s: failed to eval\n", __func__);
         return 1;
     }
@@ -4594,7 +4607,7 @@ int whisper_full_with_state(
         }
 
         // encode audio features starting at offset seek
-        if (!whisper_encode_internal(*ctx, *state, seek, params.n_threads)) {
+        if (!whisper_encode_internal(*ctx, *state, seek, params.n_threads, params.abort_callback, params.abort_callback_user_data)) {
             log("%s: failed to encode\n", __func__);
             return -6;
         }
@@ -4677,7 +4690,7 @@ int whisper_full_with_state(
                 }
                 WHISPER_PRINT_DEBUG("\n\n");
 
-                if (!whisper_decode_internal(*ctx, *state, state->decoders[0], prompt.data(), prompt.size(), 0, params.n_threads)) {
+                if (!whisper_decode_internal(*ctx, *state, state->decoders[0], prompt.data(), prompt.size(), 0, params.n_threads, params.abort_callback, params.abort_callback_user_data)) {
                     log("%s: failed to decode\n", __func__);
                     return -7;
                 }
@@ -4901,7 +4914,7 @@ int whisper_full_with_state(
 
                     //WHISPER_PRINT_DEBUG("%s: decoder %d: token %d, kv_self.n %d, seek_delta %d\n", __func__, j, decoder.tokens_tmp[0], decoder.kv_self.n, decoder.seek_delta);
 
-                    if (!whisper_decode_internal(*ctx, *state, decoder, decoder.tokens_tmp.data(), decoder.tokens_tmp.size(), decoder.kv_self.n, params.n_threads)) {
+                    if (!whisper_decode_internal(*ctx, *state, decoder, decoder.tokens_tmp.data(), decoder.tokens_tmp.size(), decoder.kv_self.n, params.n_threads, params.abort_callback, params.abort_callback_user_data)) {
                         log("%s: failed to decode\n", __func__);
                         return -8;
                     }
@@ -5270,6 +5283,10 @@ int64_t whisper_full_get_segment_t1(struct whisper_context * ctx, int i_segment)
     return ctx->state->result_all[i_segment].t1;
 }
 
+bool whisper_full_get_segment_speaker_turn_next_from_state(struct whisper_state * state, int i_segment) {
+    return state->result_all[i_segment].speaker_turn_next;
+}
+
 bool whisper_full_get_segment_speaker_turn_next(struct whisper_context * ctx, int i_segment) {
     return ctx->state->result_all[i_segment].speaker_turn_next;
 }
@@ -5413,7 +5430,7 @@ WHISPER_API const char * whisper_bench_ggml_mul_mat_str(int n_threads) {
     // b: N*N*sizeof(float)
     // c: N*N*sizeof(float)
     // when F16 is used, there is an extra work buffer of size N*N*sizeof(float)
-    std::vector<uint8_t> buf(3llu*N_max*N_max*sizeof(float) + 3*ggml_tensor_overhead());
+    std::vector<uint8_t> buf(3llu*N_max*N_max*sizeof(float) + 3*ggml_tensor_overhead() + ggml_graph_overhead());
     std::vector<uint8_t> work;
 
     // put a bunch of random data in the buffer
@@ -5464,17 +5481,19 @@ WHISPER_API const char * whisper_bench_ggml_mul_mat_str(int n_threads) {
 
             struct ggml_tensor * c = ggml_mul_mat(ctx0, a, b);
 
-            struct ggml_cgraph gf = ggml_build_forward(c);
+            struct ggml_cgraph * gf = ggml_new_graph(ctx0);
+
+            ggml_build_forward_expand(gf, c);
 
             double tsum = 0.0;
 
             // heat-up
-            ggml_graph_compute_helper(work, &gf, n_threads);
+            ggml_graph_compute_helper(work, gf, n_threads, nullptr, nullptr);
 
             for (int i = 0; i < n_max; ++i) {
                 const int64_t t0 = ggml_time_us();
 
-                ggml_graph_compute_helper(work, &gf, n_threads);
+                ggml_graph_compute_helper(work, gf, n_threads, nullptr, nullptr);
 
                 const int64_t t1 = ggml_time_us();
 

@@ -30,9 +30,10 @@ int main(int argc, const char** argv) {
         GGML_ASSERT(t_pooled->ne[1] == 2);
         GGML_ASSERT(t_pooled->ne[2] == 1);
 
-        struct ggml_cgraph graph = ggml_build_forward(t_pooled);
+        struct ggml_cgraph * graph = ggml_new_graph(ctx);
+        ggml_build_forward_expand(graph, t_pooled);
 
-        ggml_graph_compute_with_ctx(ctx, &graph, 4);
+        ggml_graph_compute_with_ctx(ctx, graph, 4);
 
         const float * output = ggml_get_data_f32(t_pooled);
 
@@ -57,9 +58,10 @@ int main(int argc, const char** argv) {
         GGML_ASSERT(t_pooled->ne[1] == 2);
         GGML_ASSERT(t_pooled->ne[2] == 1);
 
-        struct ggml_cgraph graph = ggml_build_forward(t_pooled);
+        struct ggml_cgraph * graph = ggml_new_graph(ctx);
+        ggml_build_forward_expand(graph, t_pooled);
 
-        ggml_graph_compute_with_ctx(ctx, &graph, 4);
+        ggml_graph_compute_with_ctx(ctx, graph, 4);
 
         const float * output = ggml_get_data_f32(t_pooled);
         GGML_ASSERT(output[0] == 3);
@@ -84,9 +86,10 @@ int main(int argc, const char** argv) {
         GGML_ASSERT(t_pooled->ne[2] == 2);
         GGML_ASSERT(t_pooled->ne[3] == 1);
 
-        struct ggml_cgraph graph = ggml_build_forward(t_pooled);
+        struct ggml_cgraph * graph = ggml_new_graph(ctx);
+        ggml_build_forward_expand(graph, t_pooled);
 
-        ggml_graph_compute_with_ctx(ctx, &graph, 4);
+        ggml_graph_compute_with_ctx(ctx, graph, 4);
 
         const float * output = ggml_get_data_f32(t_pooled);
         GGML_ASSERT(output[0] == 17);
@@ -118,9 +121,10 @@ int main(int argc, const char** argv) {
         GGML_ASSERT(t_pooled->ne[2] == 2);
         GGML_ASSERT(t_pooled->ne[3] == 1);
 
-        struct ggml_cgraph graph = ggml_build_forward(t_pooled);
+        struct ggml_cgraph * graph = ggml_new_graph(ctx);
+        ggml_build_forward_expand(graph, t_pooled);
 
-        ggml_graph_compute_with_ctx(ctx, &graph, 4);
+        ggml_graph_compute_with_ctx(ctx, graph, 4);
 
         const float * output = ggml_get_data_f32(t_pooled);
         GGML_ASSERT(output[0] == 33);

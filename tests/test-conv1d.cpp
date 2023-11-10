@@ -58,7 +58,7 @@ void load_model(test_model & model, bool use_gpu = false) {
     }
 
     printf("%s: ggml tensor size    = %d bytes\n", __func__, (int) sizeof(ggml_tensor));
-    printf("%s: backend buffer size = %0.2f MB\n", __func__, (int) (buffer_size/ 1024.f/ 1024.f));
+    printf("%s: backend buffer size = %0.2f MB\n", __func__, (buffer_size/ 1024.f/ 1024.f));
 
     int num_tensors = 2;
     struct ggml_init_params params {
@@ -133,7 +133,7 @@ void load_model(test_model & model, bool use_gpu = false) {
 }
 
 struct ggml_cgraph * build_graph(const test_model& model, struct ggml_allocr * allocr) {
-    static size_t buf_size = ggml_tensor_overhead()*GGML_MAX_NODES + ggml_graph_overhead();
+    static size_t buf_size = ggml_tensor_overhead()*GGML_DEFAULT_GRAPH_SIZE + ggml_graph_overhead();
     static std::vector<uint8_t> buf(buf_size);
 
     struct ggml_init_params params0 = {

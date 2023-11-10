@@ -119,7 +119,7 @@ void load_model(test_model & model, float* a, float* b, int M, int N, int K, boo
 }
 
 struct ggml_cgraph * build_graph(const test_model& model, struct ggml_allocr * allocr) {
-    static size_t buf_size = ggml_tensor_overhead()*GGML_MAX_NODES + ggml_graph_overhead();
+    static size_t buf_size = ggml_tensor_overhead()*GGML_DEFAULT_GRAPH_SIZE + ggml_graph_overhead();
     static std::vector<uint8_t> buf(buf_size);
 
     struct ggml_init_params params0 = {
@@ -351,7 +351,7 @@ int main(void)
         printf("\n");
     }
 
-    printf("ggml_mul_mat (%i): %s\n", ggml_nelements(result), passed && (ggml_nelements(result) == M * N) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
+    printf("ggml_mul_mat (%d): %s\n", (int) ggml_nelements(result), passed && (ggml_nelements(result) == M * N) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
 
    // free memory
     ggml_free(model.ctx);

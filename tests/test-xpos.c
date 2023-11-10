@@ -39,9 +39,10 @@ int main(int argc, char ** argv) {
     struct ggml_tensor * Qx = ggml_rope_xpos_inplace(ctx, Q, KQ_pos, n_embd_head, 512.0f, false);
     struct ggml_tensor * Kx = ggml_rope_xpos_inplace(ctx, K, KQ_pos, n_embd_head, 512.0f, true);
 
-    struct ggml_cgraph gf = ggml_build_forward(Qx);
-    ggml_build_forward_expand(&gf, Kx);
-    ggml_graph_compute_with_ctx(ctx, &gf, n_threads);
+    struct ggml_cgraph * gf = ggml_new_graph(ctx);
+    ggml_build_forward_expand(gf, Qx);
+    ggml_build_forward_expand(gf, Kx);
+    ggml_graph_compute_with_ctx(ctx, gf, n_threads);
 
 	// expected output for Qx:
     // -0.6009  2.7568  1.9782  2.0182
