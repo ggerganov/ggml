@@ -109,7 +109,7 @@ function gg_run_ctest_release {
 
     set -e
 
-    (time cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..   ) 2>&1 | tee -a $OUT/${ci}-cmake.log
+    (time cmake -DCMAKE_BUILD_TYPE=Release ..   ) 2>&1 | tee -a $OUT/${ci}-cmake.log
     (time make -j                               ) 2>&1 | tee -a $OUT/${ci}-make.log
 
     if [ -z $GG_BUILD_LOW_PERF ]; then
