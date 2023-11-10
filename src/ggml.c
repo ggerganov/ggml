@@ -15814,7 +15814,7 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
             } break;
         default:
             {
-                printf("%s: op %s not implemented\n", __func__, ggml_op_name(node->op));
+                fprintf(stderr, "%s: op %s not implemented\n", __func__, ggml_op_name(node->op));
                 GGML_ASSERT(false);
             } break;
     }
