@@ -39,6 +39,7 @@
 #define cudaDeviceCanAccessPeer hipDeviceCanAccessPeer
 #define cudaDeviceDisablePeerAccess hipDeviceDisablePeerAccess
 #define cudaDeviceEnablePeerAccess hipDeviceEnablePeerAccess
+#define cudaDeviceGetMemPool hipDeviceGetMemPool
 #define cudaDeviceProp hipDeviceProp_t
 #define cudaDeviceSynchronize hipDeviceSynchronize
 #define cudaError_t hipError_t
@@ -48,6 +49,7 @@
 #define cudaEvent_t hipEvent_t
 #define cudaEventDestroy hipEventDestroy
 #define cudaFree hipFree
+#define cudaFreeAsync hipFreeAsync
 #define cudaFreeHost hipHostFree
 #define cudaGetDevice hipGetDevice
 #define cudaGetDeviceCount hipGetDeviceCount
@@ -55,6 +57,7 @@
 #define cudaGetErrorString hipGetErrorString
 #define cudaGetLastError hipGetLastError
 #define cudaMalloc hipMalloc
+#define cudaMallocFromPoolAsync hipMallocFromPoolAsync
 #define cudaMallocHost(ptr, size) hipHostMalloc(ptr, size, hipHostMallocDefault)
 #define cudaMemcpy hipMemcpy
 #define cudaMemcpy2DAsync hipMemcpy2DAsync
@@ -63,6 +66,9 @@
 #define cudaMemcpyDeviceToHost hipMemcpyDeviceToHost
 #define cudaMemcpyHostToDevice hipMemcpyHostToDevice
 #define cudaMemcpyKind hipMemcpyKind
+#define cudaMemPool_t hipMemPool_t
+#define cudaMemPoolAttrReleaseThreshold hipMemPoolAttrReleaseThreshold
+#define cudaMemPoolSetAttribute hipMemPoolSetAttribute
 #define cudaMemset hipMemset
 #define cudaMemsetAsync hipMemsetAsync
 #define cudaOccupancyMaxPotentialBlockSize hipOccupancyMaxPotentialBlockSize
@@ -4730,14 +4736,22 @@ static __global__ void clamp_f32(const float * x, float * dst, const float min, 
     dst[i] = x[i] < min ? min : (x[i] > max ? max : x[i]);
 }
 
-static  __global__ void im2col_f32_f16(const float* x, half* dst, int ofs0, int ofs1, int IW,int IH,int CHW,int s0,int s1,int p0,int p1,int d0,int d1) {
-    int iiw = blockIdx.z * s0 + threadIdx.z * d0 - p0;
-	int iih = blockIdx.y * s1 + threadIdx.y * d1 - p1;
-    __syncthreads();
+static  __global__ void im2col_f32_f16(
+        const float * x, half * dst,
+        int ofs0, int ofs1, int IW, int IH, int CHW,
+        int s0, int s1, int p0, int p1, int d0, int d1) {
+    const int iiw = blockIdx.z * s0 + threadIdx.z * d0 - p0;
+	const int iih = blockIdx.y * s1 + threadIdx.y * d1 - p1;
+
+    const int offset_dst =
+        (threadIdx.x * gridDim.y * gridDim.z + blockIdx.y * gridDim.z + blockIdx.z) * CHW +
+        (blockIdx.x * (blockDim.y * blockDim.z) + threadIdx.y * blockDim.z + threadIdx.z);
+
     if (!(iih < 0 || iih >= IH || iiw < 0 || iiw >= IW)) {
-        int offset_dst = (threadIdx.x * gridDim.y * gridDim.z + blockIdx.y * gridDim.z + blockIdx.z) * CHW;
-        int offset_src = threadIdx.x * ofs0 +  blockIdx.x * ofs1;
-        dst[offset_dst + (blockIdx.x * (blockDim.y * blockDim.z) + threadIdx.y * blockDim.z + threadIdx.z)] = __float2half(x[offset_src + iih * IW + iiw]);
+        const int offset_src =  threadIdx.x * ofs0 + blockIdx.x * ofs1;
+        dst[offset_dst] = __float2half(x[offset_src + iih * IW + iiw]);
+    } else {
+        dst[offset_dst] = __float2half(0.0f);
     }
 }
 
@@ -5723,13 +5737,12 @@ static void soft_max_f32_cuda(const float * x, float * dst, const int ncols_x, c
     soft_max_f32<<<block_nums, block_dims, 0, stream>>>(x, dst, ncols_x);
 }
 
-static void im2col_f32_f16_cuda(const float* x, half* dst,
-    int OH, int IW, int IH,
-    int OW, int IC,
-    int KH, int KW, int N, int ofs0, int ofs1,
-    int s0,int s1,int p0,int p1,int d0,int d1, cudaStream_t stream) {
+static void im2col_f32_f16_cuda(const float * x, half * dst,
+    int OH, int IW, int IH, int OW, int IC,
+    int KH, int KW, int N,  int ofs0, int ofs1,
+    int s0, int s1, int p0, int p1, int d0, int d1, cudaStream_t stream) {
     dim3 block_nums(IC, OH, OW);
-    dim3 block_dims(N, KH, KW);
+    dim3 block_dims(N,  KH, KW);
     im2col_f32_f16<<<block_nums, block_dims, 0, stream>>>(x, dst, ofs0, ofs1, IW, IH, (IC * KH * KW), s0, s1, p0, p1, d0, d1);
 }
 
@@ -6708,23 +6721,23 @@ inline void ggml_cuda_op_im2col(
 
     const bool is_2D = ((const int32_t*)(dst->op_params))[6] == 1;
 
-    const int64_t N = src1->ne[is_2D ? 3 : 2];
+    const int64_t N  = src1->ne[is_2D ? 3 : 2];
     const int64_t IC = src1->ne[is_2D ? 2 : 1];
     const int64_t IH = is_2D ? src1->ne[1] : 1;
-    const int64_t IW = src1->ne[0];
+    const int64_t IW =         src1->ne[0];
 
     const int64_t KH = is_2D ? src0->ne[1] : 1;
-    const int64_t KW = src0->ne[0];
+    const int64_t KW =         src0->ne[0];
 
     const int64_t OH = is_2D ? dst->ne[2] : 1;
-    const int64_t OW = dst->ne[1];
+    const int64_t OW =         dst->ne[1];
 
+    const size_t ofs0 = src1->nb[is_2D ? 3 : 2] / 4; // nb is byte offset, src is type float32
+    const size_t ofs1 = src1->nb[is_2D ? 2 : 1] / 4; // nb is byte offset, src is type float32
 
     im2col_f32_f16_cuda(src1_dd, (half*) dst_dd,
         OH, IW, IH, OW, IC, KH, KW, N,
-        src1->nb[is_2D ? 3 : 2] / 4, // nb is byte offset, src is type float32
-        src1->nb[is_2D ? 2 : 1] / 4, // nb is byte offset, src is type float32
-        s0, s1, p0, p1, d0, d1, main_stream);
+        ofs0, ofs1, s0, s1, p0, p1, d0, d1, main_stream);
 
     (void) src0;
     (void) src0_dd;
