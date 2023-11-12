@@ -4741,7 +4741,7 @@ static  __global__ void im2col_f32_f16(
         int ofs0, int ofs1, int IW, int IH, int CHW,
         int s0, int s1, int p0, int p1, int d0, int d1) {
     const int iiw = blockIdx.z * s0 + threadIdx.z * d0 - p0;
-    const int iih = blockIdx.y * s1 + threadIdx.y * d1 - p1;
+	const int iih = blockIdx.y * s1 + threadIdx.y * d1 - p1;
 
     const int offset_dst =
         (threadIdx.x * gridDim.y * gridDim.z + blockIdx.y * gridDim.z + blockIdx.z) * CHW +
@@ -7960,6 +7960,15 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
 
     if (!any_on_device && tensor->op != GGML_OP_MUL_MAT) {
         return false;
+    }
+
+    if (tensor->op == GGML_OP_MUL_MAT) {
+        if (tensor->src[0]->ne[3] != tensor->src[1]->ne[3]) {
+#ifndef NDEBUG
+            fprintf(stderr, "%s: cannot compute %s: src0->ne[3] = %d, src1->ne[3] = %d - fallback to CPU\n", __func__, tensor->name, tensor->src[0]->ne[3], tensor->src[1]->ne[3]);
+#endif
+            return false;
+        }
     }
 
     switch (tensor->op) {

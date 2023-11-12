@@ -35,8 +35,8 @@ void load_model(test_model & model, bool use_gpu = false) {
     int IL = 8, N = 1;
 
     // Initialize adata
-    float* adata = new float[K * IC * OC];
-    for (size_t i = 0; i < K * IC * OC; i++) {
+    float * adata = new float[K * IC * OC];
+    for (int i = 0; i < K * IC * OC; i++) {
         adata[i] = 4.5f;
     }
 
@@ -45,8 +45,8 @@ void load_model(test_model & model, bool use_gpu = false) {
     ggml_fp32_to_fp16_row(adata, hadata.data(), K * IC * OC);
 
     // Initialize bdata
-    float* bdata =  new float[IL * IC * N];
-    for (size_t i = 0; i < IL * IC * N; i++) {
+    float * bdata =  new float[IL * IC * N];
+    for (int i = 0; i < IL * IC * N; i++) {
         bdata[i] = 2.5f;
     }
 
@@ -278,7 +278,7 @@ int main(void)
         }
     }
 
-    printf("ggml_im2col (%i): %s\n", ggml_nelements(im2col_res), passed && (ggml_nelements(im2col_res) == n_im2col_test) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
+    printf("ggml_im2col (%d): %s\n", (int) ggml_nelements(im2col_res), passed && (ggml_nelements(im2col_res) == n_im2col_test) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
 
     passed = true;
     for(int i = 0; i < n_conv1d_test; i++) {
@@ -288,7 +288,7 @@ int main(void)
         }
     }
 
-    printf("ggml_conv1d (%i): %s\n", ggml_nelements(conv1d_res), passed && (ggml_nelements(conv1d_res) == n_conv1d_test) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
+    printf("ggml_conv1d (%d): %s\n", (int) ggml_nelements(conv1d_res), passed && (ggml_nelements(conv1d_res) == n_conv1d_test) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
     ggml_free(model.ctx);
 
     ggml_backend_buffer_free(model.buffer);
