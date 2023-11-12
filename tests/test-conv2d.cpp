@@ -35,8 +35,8 @@ void load_model(test_model & model, bool use_gpu = false) {
     int IW = 8, IH = 6, N = 1;
 
     // Initialize adata
-    float* adata = new float[KW * KH * IC * OC];
-    for (size_t i = 0; i < KW * KH * IC * OC; i++) {
+    float * adata = new float[KW * KH * IC * OC];
+    for (int i = 0; i < KW * KH * IC * OC; i++) {
         adata[i] = 2.5f;
     }
 
@@ -45,8 +45,8 @@ void load_model(test_model & model, bool use_gpu = false) {
     ggml_fp32_to_fp16_row(adata, hadata.data(), KW * KH * IC * OC);
 
     // Initialize bdata
-    float* bdata =  new float[IW * IH * IC * N];
-    for (size_t i = 0; i < IW * IH * IC * N; i++) {
+    float * bdata =  new float[IW * IH * IC * N];
+    for (int i = 0; i < IW * IH * IC * N; i++) {
         bdata[i] = 1.5f;
     }
 
