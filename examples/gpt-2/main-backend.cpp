@@ -878,9 +878,8 @@ int main(int argc, char ** argv) {
     struct ggml_allocr * allocr = NULL;
     // allocate the compute buffer
     {
-         // alignment required by the backend
-        size_t align = ggml_backend_get_alignment(model.backend);
-        allocr = ggml_allocr_new_measure(align);
+        // create an allocator to measure the memory usage
+        allocr = ggml_allocr_new_measure_from_backend(model.backend);
 
         // create the worst case graph for memory usage estimation
         int n_tokens = std::min(model.hparams.n_ctx, params.n_batch);
