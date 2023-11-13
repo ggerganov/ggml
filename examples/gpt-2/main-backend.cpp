@@ -878,7 +878,7 @@ int main(int argc, char ** argv) {
     struct ggml_allocr * allocr = NULL;
     // allocate the compute buffer
     {
-         // alignment required by the backend
+        // create an allocator to measure the memory usage
         allocr = ggml_allocr_new_measure_from_backend(model.backend);
 
         // create the worst case graph for memory usage estimation

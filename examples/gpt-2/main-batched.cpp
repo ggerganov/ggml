@@ -1042,7 +1042,7 @@ int main(int argc, char ** argv) {
     // prepare required memory and allocate the compute buffer
     struct ggml_allocr * allocr = NULL;
     {
-        // alignment required by the backend
+        // create an allocator to measure the memory usage
         allocr = ggml_allocr_new_measure_from_backend(model.backend);
 
         batch.n_tokens = n_batch_max;
