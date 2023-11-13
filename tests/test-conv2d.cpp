@@ -208,8 +208,7 @@ int main(void)
     struct ggml_allocr * allocr = NULL;
 
     {
-        size_t align = ggml_backend_get_alignment(model.backend);
-        allocr = ggml_allocr_new_measure(align);
+        allocr = ggml_allocr_new_measure_from_backend(model.backend);
 
         //create the worst case graph for memory usage estimation
         struct ggml_cgraph * gf = build_graph(model, allocr);

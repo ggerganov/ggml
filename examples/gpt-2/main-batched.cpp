@@ -1043,8 +1043,7 @@ int main(int argc, char ** argv) {
     struct ggml_allocr * allocr = NULL;
     {
         // alignment required by the backend
-        size_t align = ggml_backend_get_alignment(model.backend);
-        allocr = ggml_allocr_new_measure(align);
+        allocr = ggml_allocr_new_measure_from_backend(model.backend);
 
         batch.n_tokens = n_batch_max;
 
