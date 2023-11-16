@@ -26,6 +26,15 @@ if (NOT UNAME_M)
 endif()
 #message(STATUS "UNAME_S: ${UNAME_S}  UNAME_P: ${UNAME_P}  UNAME_M: ${UNAME_M}")
 
+# this version of Apple ld64 is buggy
+execute_process(
+    COMMAND ${CMAKE_C_COMPILER} ${CMAKE_EXE_LINKER_FLAGS} -Wl,-v
+    ERROR_VARIABLE output
+)
+if (output MATCHES "dyld-1015\.7")
+    add_compile_definitions(HAVE_BUGGY_APPLE_LINKER)
+endif()
+
 # Mac OS + Arm can report x86_64
 # ref: https://github.com/ggerganov/whisper.cpp/issues/66#issuecomment-1282546789
 if (UNAME_S MATCHES "Darwin")
