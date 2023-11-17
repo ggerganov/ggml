@@ -4209,7 +4209,7 @@ struct ggml_tensor * ggml_set_2d_inplace(
         struct ggml_tensor *  b,
         size_t                nb1,
         size_t                offset) {
-    return ggml_set_impl(ctx, a, b, nb1, a->nb[2], a->nb[3], offset, false);
+    return ggml_set_impl(ctx, a, b, nb1, a->nb[2], a->nb[3], offset, true);
 }
 
 // ggml_cpy
