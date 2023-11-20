@@ -51,6 +51,15 @@ GGML_API void   ggml_cuda_get_device_description(int device, char * description,
 // backend API
 GGML_API ggml_backend_t ggml_backend_cuda_init(void); // TODO: take a list of devices to use
 
+GGML_API bool ggml_backend_is_cuda(ggml_backend_t backend);
+
+GGML_API extern ggml_backend_buffer_type_t ggml_backend_buffer_type_cuda;
+
+// allocate a CPU pinned host buffer usable by the CPU backend, that can be used for faster transfer between CPU and CUDA buffers
+ggml_backend_buffer_t ggml_backend_cuda_alloc_host_buffer(size_t size);
+
+GGML_API extern ggml_backend_buffer_type_t ggml_backend_buffer_type_cuda_host; // TODO: is the alloc function really necessary?
+
 #ifdef  __cplusplus
 }
 #endif
