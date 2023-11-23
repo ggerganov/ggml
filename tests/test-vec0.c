@@ -85,7 +85,7 @@ void mul_mat_vec_f32_2(
     }
 }
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(__MINGW64__)
 void* aligned_alloc(size_t alignment, size_t size) {
     return _aligned_malloc(size, alignment);
 }
