@@ -1809,10 +1809,22 @@ static struct ggml_backend_i metal_backend_i = {
     /* .supports_op             = */ ggml_backend_metal_supports_op,
 };
 
-ggml_backend_t ggml_backend_metal_init(void) {
-    struct ggml_metal_context * ctx = malloc(sizeof(struct ggml_metal_context));
+// TODO: make a common log callback for all backends in ggml-backend
+static void ggml_backend_log_callback(enum ggml_log_level level, const char * msg, void * user_data) {
+    fprintf(stderr, "%s", msg);
 
-    ctx = ggml_metal_init(GGML_DEFAULT_N_THREADS);
+    UNUSED(level);
+    UNUSED(user_data);
+}
+
+ggml_backend_t ggml_backend_metal_init(void) {
+    ggml_metal_log_set_callback(ggml_backend_log_callback, NULL);
+
+    struct ggml_metal_context * ctx = ggml_metal_init(GGML_DEFAULT_N_THREADS);
+
+    if (ctx == NULL) {
+        return NULL;
+    }
 
     ggml_backend_t metal_backend = malloc(sizeof(struct ggml_backend));
 

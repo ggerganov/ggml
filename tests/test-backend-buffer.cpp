@@ -54,12 +54,19 @@ void test_buffer(ggml_backend_t backend, ggml_backend_buffer_type_t buft) {
 
 int main() {
     // enumerate backends
+    printf("Testing %zu backends\n\n", ggml_backend_reg_get_count());
+
     for (size_t i = 0; i < ggml_backend_reg_get_count(); i++) {
         printf("Backend %zu/%zu (%s)\n", i + 1, ggml_backend_reg_get_count(), ggml_backend_reg_get_name(i));
+
         ggml_backend_t backend = ggml_backend_reg_init_backend(i, NULL);
+        GGML_ASSERT(backend != NULL);
         printf("  Backend name: %s\n", ggml_backend_name(backend));
+
         test_buffer(backend, ggml_backend_reg_get_default_buffer_type(i));
+
         ggml_backend_free(backend);
+
         printf("  OK\n\n");
     }
 }
