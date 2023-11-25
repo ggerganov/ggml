@@ -495,6 +495,7 @@ static void ggml_backend_cpu_graph_compute(ggml_backend_t backend, struct ggml_c
 
 static bool ggml_backend_cpu_supports_op(ggml_backend_t backend, const struct ggml_tensor * op) {
     return true;
+
     GGML_UNUSED(backend);
     GGML_UNUSED(op);
 }
@@ -548,6 +549,7 @@ ggml_backend_buffer_t ggml_backend_cpu_buffer_from_ptr(void * ptr, size_t size) 
 
 static ggml_backend_t ggml_backend_reg_cpu_init(const char * params) {
     return ggml_backend_cpu_init();
+
     GGML_UNUSED(params);
 }
 
@@ -643,7 +645,7 @@ static ggml_backend_t get_allocr_backend(ggml_backend_sched_t sched, ggml_talloc
             return sched->backends[i];
         }
     }
-    GGML_ASSERT(false); // should never happen
+    assert(false); // should never happen
 }
 
 // returns the backend that should be used for the node based on the current locations
