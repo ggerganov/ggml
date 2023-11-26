@@ -410,6 +410,7 @@ extern "C" {
         GGML_OP_POOL_2D,
 
         GGML_OP_UPSCALE, // nearest interpolate
+        GGML_OP_PAD,
 
         GGML_OP_FLASH_ATTN,
         GGML_OP_FLASH_FF,

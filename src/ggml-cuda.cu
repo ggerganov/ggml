@@ -447,6 +447,9 @@ static_assert(sizeof(block_q6_K) == sizeof(ggml_fp16_t) + 13*QK_K/16, "wrong q6_
 #define CUDA_QUANTIZE_BLOCK_SIZE 256
 #define CUDA_DEQUANTIZE_BLOCK_SIZE 256
 #define CUDA_GET_ROWS_BLOCK_SIZE 256
+#define CUDA_UPSCALE_BLOCK_SIZE 256
+#define CUDA_CONCAT_BLOCK_SIZE 256
+#define CUDA_PAD_BLOCK_SIZE 256
 
 // dmmv = dequantize_mul_mat_vec
 #ifndef GGML_CUDA_DMMV_X
@@ -500,40 +503,45 @@ static size_t g_scratch_offset = 0;
 
 static cublasHandle_t g_cublas_handles[GGML_CUDA_MAX_DEVICES] = {nullptr};
 
-static __global__ void add_f32(const float * x, const float * y, float * dst, const int kx, const int ky) {
-    const int i = blockDim.x*blockIdx.x + threadIdx.x;
-
-    if (i >= kx) {
+template<typename dst_t, typename src0_t, typename src1_t>
+static __global__ void k_add(const src0_t * x, const src1_t * y, dst_t * dst, int n_elements, int axis_broadcast, int ne_src, int ne0_dest, int block_dest) {
+    const int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    if(idx >= n_elements) {
         return;
     }
-    dst[i] = x[i] + y[i%ky];
+    // broadcast
+    const int y_idx = axis_broadcast == -1 ? idx : (axis_broadcast == 0 ? (idx % ne_src) :
+                                              axis_broadcast == 1 ? (idx / ne0_dest) % ne_src : (idx / block_dest));
+    dst[idx] = (dst_t)((float)x[idx] + (float)y[y_idx]);
 }
 
-static __global__ void add_f16_f32_f16(const half * x, const float * y, half * dst, const int k) {
+static __global__ void acc_f32(const float * x, const float * y, float * dst, const int ne,
+    const int ne10, const int ne11, const int ne12,
+    const int nb1, const int nb2) {
     const int i = blockDim.x*blockIdx.x + threadIdx.x;
-
-    if (i >= k) {
+    if (i >= ne) {
         return;
     }
-    dst[i] = __hadd(x[i], __float2half(y[i]));
+    int oz = i / nb2;
+    int oy = (i - (oz * nb2)) / nb1;
+    int ox = i % nb1;
+    if(ox < ne10 && oy < ne11 && oz < ne12) {
+        dst[i] = x[i] + y[ox + oy * ne10 + oz * ne10 * ne11];
+    } else {
+        dst[i] = x[i];
+    }
 }
 
-static __global__ void add_f16_f32_f32(const half * x, const float * y, float * dst, const int k) {
-    const int i = blockDim.x*blockIdx.x + threadIdx.x;
+static __global__ void mul_f32(const float * x, const float * y, float * dst, int n_elements, int axis_broadcast, int ne_src, int ne0_dest, int block_dest) {
+    const int idx = blockDim.x * blockIdx.x + threadIdx.x;
 
-    if (i >= k) {
+    if(idx >= n_elements) {
         return;
     }
-    dst[i] = __half2float(x[i]) + y[i];
-}
-
-static __global__ void mul_f32(const float * x, const float * y, float * dst, const int kx, const int ky) {
-    const int i = blockDim.x*blockIdx.x + threadIdx.x;
-
-    if (i >= kx) {
-        return;
-    }
-    dst[i] = x[i] * y[i%ky];
+    // broadcast
+    const int y_idx = axis_broadcast == -1 ? idx : (axis_broadcast == 0 ? (idx % ne_src) :
+                                              axis_broadcast == 1 ? (idx / ne0_dest) % ne_src : (idx / block_dest));
+    dst[idx] = x[idx] * y[y_idx];
 }
 
 static __global__ void gelu_f32(const float * x, float * dst, const int k) {
@@ -556,6 +564,15 @@ static __global__ void silu_f32(const float * x, float * dst, const int k) {
         return;
     }
     dst[i] = x[i] / (1.0f + expf(-x[i]));
+}
+
+static __global__ void gelu_quick_f32(const float *x, float *dst, int k) {
+    const float GELU_QUICK_COEF = -1.702f;
+    const int i  = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i >= k) {
+        return;
+    }
+    dst[i] = x[i] * (1.0f / (1.0f + expf(GELU_QUICK_COEF * x[i])));
 }
 
 static __global__ void relu_f32(const float * x, float * dst, const int k) {
@@ -620,6 +637,114 @@ static __global__ void norm_f32(const float * x, float * dst, const int ncols) {
 
     for (int col = tid; col < ncols; col += block_size) {
         dst[row*ncols + col] = (x[row*ncols + col] - mean) * inv_std;
+    }
+}
+
+static __global__ void group_norm_f32(const float  *x,float *dst, int n_channels, int n_channels_per_group, int ne00, int ne01, int nb02) {
+    int start = threadIdx.x * n_channels_per_group;
+    const float eps = 1e-6f;
+    int end = start + n_channels_per_group;
+    if (end > n_channels) {
+        end = n_channels;
+    }
+    if(start == end) {
+        return;
+    }
+    int step = end - start;
+    float sum = 0.0f;
+    for (int j = start; j < end; j++) {
+        for (int i = 0; i < ne01; i++) {
+            for (int k = 0; k < ne00; k++) {
+                sum += x[k + i * ne00 + j * nb02];
+            }
+        }
+    }
+    float mean = sum / (nb02 * step);
+    float sum2 = 0.0f;
+    for (int j = start; j < end; j++) {
+        for (int i = 0; i < ne01; i++) {
+            for (int k = 0; k < ne00; k++) {
+                int index = k + i * ne00 + j * nb02;
+                float v = x[index] - mean;
+                dst[index] = v;
+                sum2 += v * v;
+            }
+        }
+    }
+    float variance = sum2 / (nb02 * step);
+    const float scale = 1.0f / sqrtf(variance + eps);
+    for (int j = start; j < end; j++) {
+        for (int i = 0; i < ne01; i++) {
+            for (int k = 0; k < ne00; k++) {
+                dst[k + i * ne00 + j * nb02] *= scale;
+            }
+        }
+    }
+}
+
+static __global__ void concat_f32(const float  *x,const float  *y, float *dst, int ne0, int ne02) {
+    int nidx = threadIdx.x + blockIdx.x * blockDim.x;
+    if(nidx >= ne0) {
+        return;
+    }
+    // operation
+	int offset_dst =
+        nidx +
+        blockIdx.y * ne0 +
+        blockIdx.z * ne0 * gridDim.y;
+	if (blockIdx.z < ne02) { // src0
+		int offset_src =
+            nidx +
+            blockIdx.y * ne0 +
+            blockIdx.z * ne0 * gridDim.y;
+            dst[offset_dst] = x[offset_src];
+	} else {
+		int offset_src =
+            nidx +
+            blockIdx.y * ne0 +
+            (blockIdx.z - ne02) * ne0 *  gridDim.y;
+            dst[offset_dst] = y[offset_src];
+	}
+}
+
+static __global__ void upscale_f32(const float  *x, float *dst, int ne00, int nb02, int scale_factor) {
+    int ne0 = ne00 * scale_factor;
+    int nidx = threadIdx.x + blockIdx.x * blockDim.x;
+    if(nidx >= ne0) {
+        return;
+    }
+	// operation
+	int i00 = nidx / scale_factor;
+    int i01 = blockIdx.y / scale_factor;
+	int offset_src =
+        i00 +
+        i01 * ne00 +
+        blockIdx.z * nb02;
+	int offset_dst =
+        nidx +
+        blockIdx.y * ne0 +
+        blockIdx.z * ne0 * gridDim.y;
+	dst[offset_dst] = x[offset_src];
+}
+
+static __global__ void pad_f32(const float  *x, float *dst, int ne0, int ne00, int ne01, int ne02) {
+    int nidx = threadIdx.x + blockIdx.x * blockDim.x;
+    if(nidx >= ne0) {
+        return;
+    }
+	// operation
+	int offset_dst =
+        nidx +
+        blockIdx.y * ne0 +
+        blockIdx.z * ne0 * gridDim.y;
+    if(nidx < ne00 && blockIdx.y < ne01 && blockIdx.z < ne02) {
+        int offset_src =
+        nidx +
+        blockIdx.y * ne00 +
+        blockIdx.z * ne00 * ne01;
+        dst[offset_dst] = x[offset_src];
+    } else {
+        dst[offset_dst] = 0.0f;
     }
 }
 
@@ -4778,24 +4903,22 @@ static void get_rows_cuda(const void * x, const int32_t * y, float * dst, const 
     k_get_rows<qk, qr, dq><<<block_nums, block_dims, 0, stream>>>(x, y, dst, ncols);
 }
 
-static void add_f32_cuda(const float * x, const float * y, float * dst, const int kx, const int ky, cudaStream_t stream) {
-    const int num_blocks = (kx + CUDA_ADD_BLOCK_SIZE - 1) / CUDA_ADD_BLOCK_SIZE;
-    add_f32<<<num_blocks, CUDA_ADD_BLOCK_SIZE, 0, stream>>>(x, y, dst, kx, ky);
+template<typename dst_t, typename src0_t, typename src1_t>
+static void add_cuda(const src0_t * x, const src1_t * y, dst_t * dst, const int n_elements, const int axis_broadcast, const int ne_src, const int ne0_dest, const int block_dest, cudaStream_t stream) {
+    int num_blocks = (n_elements + CUDA_ADD_BLOCK_SIZE - 1) / CUDA_ADD_BLOCK_SIZE;
+    k_add<<<num_blocks, CUDA_ADD_BLOCK_SIZE, 0, stream>>>(x, y, dst, n_elements, axis_broadcast, ne_src, ne0_dest, block_dest);
 }
 
-static void add_f16_f32_f16_cuda(const half * x, const float * y, half * dst, const int k, cudaStream_t stream) {
-    const int num_blocks = (k + CUDA_ADD_BLOCK_SIZE - 1) / CUDA_ADD_BLOCK_SIZE;
-    add_f16_f32_f16<<<num_blocks, CUDA_ADD_BLOCK_SIZE, 0, stream>>>(x, y, dst, k);
+static void acc_f32_cuda(const float * x, const float * y, float * dst, const int n_elements,
+    const int ne10, const int ne11, const int ne12,
+    const int nb1, const int nb2, cudaStream_t stream) {
+    int num_blocks = (n_elements + CUDA_ADD_BLOCK_SIZE - 1) / CUDA_ADD_BLOCK_SIZE;
+    acc_f32<<<num_blocks, CUDA_ADD_BLOCK_SIZE, 0, stream>>>(x, y, dst, n_elements, ne10, ne11, ne12, nb1, nb2);
 }
 
-static void add_f16_f32_f32_cuda(const half * x, const float * y, float * dst, const int k, cudaStream_t stream) {
-    const int num_blocks = (k + CUDA_ADD_BLOCK_SIZE - 1) / CUDA_ADD_BLOCK_SIZE;
-    add_f16_f32_f32<<<num_blocks, CUDA_ADD_BLOCK_SIZE, 0, stream>>>(x, y, dst, k);
-}
-
-static void mul_f32_cuda(const float * x, const float * y, float * dst, const int kx, const int ky, cudaStream_t stream) {
-    const int num_blocks = (kx + CUDA_MUL_BLOCK_SIZE - 1) / CUDA_MUL_BLOCK_SIZE;
-    mul_f32<<<num_blocks, CUDA_MUL_BLOCK_SIZE, 0, stream>>>(x, y, dst, kx, ky);
+static void mul_f32_cuda(const float * x, const float * y, float * dst, const int n_elements, const int axis_broadcast, const int ne_src, const int ne0_dest, const int block_dest, cudaStream_t stream) {
+    int num_blocks = (n_elements + CUDA_MUL_BLOCK_SIZE - 1) / CUDA_MUL_BLOCK_SIZE;
+    mul_f32<<<num_blocks, CUDA_MUL_BLOCK_SIZE, 0, stream>>>(x, y, dst, n_elements, axis_broadcast, ne_src, ne0_dest, block_dest);
 }
 
 static void gelu_f32_cuda(const float * x, float * dst, const int k, cudaStream_t stream) {
@@ -4806,6 +4929,11 @@ static void gelu_f32_cuda(const float * x, float * dst, const int k, cudaStream_
 static void silu_f32_cuda(const float * x, float * dst, const int k, cudaStream_t stream) {
     const int num_blocks = (k + CUDA_SILU_BLOCK_SIZE - 1) / CUDA_SILU_BLOCK_SIZE;
     silu_f32<<<num_blocks, CUDA_SILU_BLOCK_SIZE, 0, stream>>>(x, dst, k);
+}
+
+static void gelu_quick_f32_cuda(const float * x, float * dst, const int k, cudaStream_t stream) {
+    const int num_blocks = (k + CUDA_GELU_BLOCK_SIZE - 1) / CUDA_GELU_BLOCK_SIZE;
+    gelu_quick_f32<<<num_blocks, CUDA_GELU_BLOCK_SIZE, 0, stream>>>(x, dst, k);
 }
 
 static void relu_f32_cuda(const float * x, float * dst, const int k, cudaStream_t stream) {
@@ -4827,6 +4955,31 @@ static void norm_f32_cuda(const float * x, float * dst, const int ncols, const i
         const dim3 block_dims(1024, 1, 1);
         norm_f32<1024><<<nrows, block_dims, 0, stream>>>(x, dst, ncols);
     }
+}
+
+static void group_norm_f32_cuda(const float * x, float * dst, const int num_groups, int num_channels, const int n_channels_per_group, int ne00, int ne01, int nb02, cudaStream_t stream) {
+    group_norm_f32<<<1, num_groups, 0, stream>>>(x, dst, num_channels, n_channels_per_group, ne00, ne01, nb02);
+}
+
+static void concat_f32_cuda(const float * x, const float * y, float * dst, const int ne0, int ne1, int ne2, int ne02, cudaStream_t stream) {
+    int num_blocks = (ne0 + CUDA_CONCAT_BLOCK_SIZE - 1) / CUDA_CONCAT_BLOCK_SIZE;
+    dim3 gridDim(num_blocks, ne1, ne2);
+    concat_f32<<<gridDim, CUDA_CONCAT_BLOCK_SIZE, 0, stream>>>(x, y, dst, ne0, ne02);
+}
+
+static void upscale_f32_cuda(const float * x, float * dst, const int ne00, const int ne01, const int ne02, const int scale_factor, cudaStream_t stream) {
+    int ne0 = (ne00 * scale_factor);
+    int num_blocks = (ne0 + CUDA_UPSCALE_BLOCK_SIZE - 1) / CUDA_UPSCALE_BLOCK_SIZE;
+    dim3 gridDim(num_blocks, (ne01 * scale_factor), ne02);
+    upscale_f32<<<gridDim, CUDA_UPSCALE_BLOCK_SIZE, 0, stream>>>(x, dst, ne00, ne00 * ne01, scale_factor);
+}
+
+static void pad_f32_cuda(const float * x, float * dst,
+    const int ne00, const int ne01, const int ne02,
+    const int ne0, const int ne1, const int ne2, cudaStream_t stream) {
+    int num_blocks = (ne0 + CUDA_PAD_BLOCK_SIZE - 1) / CUDA_PAD_BLOCK_SIZE;
+    dim3 gridDim(num_blocks, ne1, ne2);
+    pad_f32<<<gridDim, CUDA_PAD_BLOCK_SIZE, 0, stream>>>(x, dst, ne0, ne00, ne01, ne02);
 }
 
 static void rms_norm_f32_cuda(const float * x, float * dst, const int ncols, const int nrows, const float eps, cudaStream_t stream) {
@@ -6144,21 +6297,42 @@ inline void ggml_cuda_op_add(
 
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
 
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
+    int axis_broadcast = dst->op_params[0];
+    bool broadcast = axis_broadcast != -1;
+    int64_t ne_src =   broadcast ? dst->ne[axis_broadcast] : 0;
+    int64_t ne0_dest = broadcast ? dst->ne[dst->op_params[1]] : 0;
+    int64_t ne1_dest = broadcast ? dst->ne[dst->op_params[2]] : 0;
+    int64_t block_dest = ne0_dest * ne1_dest;
 
     if (src0->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {
-        add_f32_cuda(src0_dd, src1_dd, dst_dd, ggml_nelements(src0), ne10*ne11, main_stream);
+        add_cuda(src0_dd, src1_dd, dst_dd, ggml_nelements(dst), axis_broadcast, ne_src, ne0_dest, block_dest, main_stream);
     } else if (src0->type == GGML_TYPE_F16 && dst->type == GGML_TYPE_F16) {
-        add_f16_f32_f16_cuda((const half *) src0_dd, src1_dd, (half *) dst_dd, ggml_nelements(src0), main_stream);
+        add_cuda((const half *) src0_dd, src1_dd, (half *) dst_dd, ggml_nelements(dst), axis_broadcast, ne_src, ne0_dest, block_dest, main_stream);
     } else if (src0->type == GGML_TYPE_F16 && dst->type == GGML_TYPE_F32) {
-        add_f16_f32_f32_cuda((const half *) src0_dd, src1_dd, dst_dd, ggml_nelements(src0), main_stream);
+        add_cuda((const half *) src0_dd, src1_dd, dst_dd, ggml_nelements(dst), axis_broadcast, ne_src, ne0_dest, block_dest, main_stream);
     } else {
         fprintf(stderr, "src0->type: %d  dst->type: %d\n", src0->type, dst->type);
         GGML_ASSERT(false);
     }
 
     (void) src1;
+    (void) dst;
+}
+
+inline void ggml_cuda_op_acc(
+    const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
+    const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT(src1->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+    GGML_ASSERT(dst->ne[3] == 1); // just 3D tensors supported
+
+    int nb1 = dst->nb[1] / 4; // 4 bytes of float32
+    int nb2 = dst->nb[2] / 4; // 4 bytes of float32
+
+    acc_f32_cuda(src0_dd, src1_dd, dst_dd, ggml_nelements(dst), src1->ne[0], src1->ne[1], src1->ne[2], nb1, nb2, main_stream);
+
     (void) dst;
 }
 
@@ -6170,10 +6344,14 @@ inline void ggml_cuda_op_mul(
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
     GGML_ASSERT( dst->type == GGML_TYPE_F32);
 
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
+    int axis_broadcast = dst->op_params[0];
+    bool broadcast = axis_broadcast != -1;
+    int64_t ne_src =   broadcast ? dst->ne[axis_broadcast] : 0;
+    int64_t ne0_dest = broadcast ? dst->ne[dst->op_params[1]] : 0;
+    int64_t ne1_dest = broadcast ? dst->ne[dst->op_params[2]] : 0;
+    int64_t block_dest = ne0_dest * ne1_dest;
 
-    mul_f32_cuda(src0_dd, src1_dd, dst_dd, ggml_nelements(src0), ne10*ne11, main_stream);
+    mul_f32_cuda(src0_dd, src1_dd, dst_dd, ggml_nelements(dst), axis_broadcast, ne_src, ne0_dest, block_dest, main_stream);
 
     (void) dst;
 }
@@ -6200,6 +6378,20 @@ inline void ggml_cuda_op_silu(
     GGML_ASSERT( dst->type == GGML_TYPE_F32);
 
     silu_f32_cuda(src0_dd, dst_dd, ggml_nelements(src0), main_stream);
+
+    (void) src1;
+    (void) dst;
+    (void) src1_dd;
+}
+
+inline void ggml_cuda_op_gelu_quick(
+    const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
+    const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+
+    gelu_quick_f32_cuda(src0_dd, dst_dd, ggml_nelements(src0), main_stream);
 
     (void) src1;
     (void) dst;
@@ -6249,6 +6441,72 @@ inline void ggml_cuda_op_norm(
     (void) src1;
     (void) dst;
     (void) src1_dd;
+}
+
+
+inline void ggml_cuda_op_group_norm(
+    const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
+    const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+
+    int num_groups = dst->op_params[0];
+    int n_channels = src0->ne[2];
+    int n_channels_per_group = ((n_channels + num_groups - 1) / num_groups);
+
+    group_norm_f32_cuda(src0_dd, dst_dd, num_groups, n_channels, n_channels_per_group, src0->ne[0], src0->ne[1], src0->ne[0] * src0->ne[1], main_stream);
+
+    (void) src1;
+    (void) dst;
+    (void) src1_dd;
+}
+
+inline void ggml_cuda_op_concat(
+    const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
+    const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT(src1->type == GGML_TYPE_F32);
+    GGML_ASSERT(dst->type == GGML_TYPE_F32);
+    GGML_ASSERT(src0->ne[3] == 1 && dst->ne[3] == 1); // just 3D tensors
+
+    concat_f32_cuda(src0_dd, src1_dd, dst_dd, dst->ne[0], dst->ne[1], dst->ne[2], src0->ne[2], main_stream);
+
+    (void) src1;
+    (void) dst;
+}
+
+inline void ggml_cuda_op_upscale(
+    const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
+    const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT(dst->type == GGML_TYPE_F32);
+    GGML_ASSERT(src0->ne[3] == 1 && dst->ne[3] == 1); // just 3D tensors
+
+    const int scale_factor = dst->op_params[0];
+
+    upscale_f32_cuda(src0_dd, dst_dd, src0->ne[0], src0->ne[1], src0->ne[2], scale_factor, main_stream);
+
+    (void) src1;
+    (void) dst;
+}
+
+inline void ggml_cuda_op_pad(
+    const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
+    const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT(dst->type == GGML_TYPE_F32);
+    GGML_ASSERT(src0->ne[3] == 1 && dst->ne[3] == 1); // just 3D tensors
+
+    pad_f32_cuda(src0_dd, dst_dd,
+        src0->ne[0], src0->ne[1], src0->ne[2],
+        dst->ne[0], dst->ne[1], dst->ne[2], main_stream);
+
+    (void) src1;
+    (void) dst;
 }
 
 inline void ggml_cuda_op_rms_norm(
@@ -7292,6 +7550,10 @@ static void ggml_cuda_add(const ggml_tensor * src0, const ggml_tensor * src1, gg
     ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_add);
 }
 
+static void ggml_cuda_acc(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+    ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_acc);
+}
+
 static void ggml_cuda_mul(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_mul);
 }
@@ -7304,6 +7566,10 @@ static void ggml_cuda_silu(const ggml_tensor * src0, const ggml_tensor * src1, g
     ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_silu);
 }
 
+static void ggml_cuda_gelu_quick(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+    ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_gelu_quick);
+}
+
 static void ggml_cuda_relu(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_relu);
 }
@@ -7314,6 +7580,22 @@ static void ggml_cuda_sqr(const ggml_tensor * src0, const ggml_tensor * src1, gg
 
 static void ggml_cuda_norm(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_norm);
+}
+
+static void ggml_cuda_group_norm(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+    ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_group_norm);
+}
+
+static void ggml_cuda_concat(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+    ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_concat);
+}
+
+static void ggml_cuda_upscale(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+    ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_upscale);
+}
+
+static void ggml_cuda_pad(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+    ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_pad);
 }
 
 static void ggml_cuda_rms_norm(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
@@ -8048,6 +8330,9 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
         case GGML_OP_ADD:
             func = ggml_cuda_add;
             break;
+        case GGML_OP_ACC:
+            func = ggml_cuda_acc;
+            break;
         case GGML_OP_MUL:
             func = ggml_cuda_mul;
             break;
@@ -8059,6 +8344,9 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
                 case GGML_UNARY_OP_SILU:
                     func = ggml_cuda_silu;
                     break;
+                case GGML_UNARY_OP_GELU_QUICK:
+                    func = ggml_cuda_gelu_quick;
+                    break;
                 case GGML_UNARY_OP_RELU:
                     func = ggml_cuda_relu;
                     break;
@@ -8067,6 +8355,18 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
             } break;
         case GGML_OP_NORM:
             func = ggml_cuda_norm;
+            break;
+        case GGML_OP_GROUP_NORM:
+            func = ggml_cuda_group_norm;
+            break;
+        case GGML_OP_CONCAT:
+            func = ggml_cuda_concat;
+            break;
+        case GGML_OP_UPSCALE:
+            func = ggml_cuda_upscale;
+            break;
+        case GGML_OP_PAD:
+            func = ggml_cuda_pad;
             break;
         case GGML_OP_RMS_NORM:
             func = ggml_cuda_rms_norm;
