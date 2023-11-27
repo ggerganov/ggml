@@ -404,7 +404,7 @@ static bool ggml_backend_cpu_buffer_type_supports_backend(ggml_backend_buffer_ty
     GGML_UNUSED(buft);
 }
 
-static struct ggml_backend_buffer_type ggml_backend_buffer_type_cpu_inst = {
+static struct ggml_backend_buffer_type ggml_backend_buffer_type_cpu = {
     /* .iface = */ {
         /* .alloc_buffer     = */ ggml_backend_cpu_buffer_type_alloc_buffer,
         /* .get_alignment    = */ ggml_backend_cpu_buffer_type_get_alignment,
@@ -413,7 +413,9 @@ static struct ggml_backend_buffer_type ggml_backend_buffer_type_cpu_inst = {
     }
 };
 
-ggml_backend_buffer_type_t ggml_backend_buffer_type_cpu = &ggml_backend_buffer_type_cpu_inst;
+ggml_backend_buffer_type_t ggml_backend_cpu_buffer_type(void) {
+    return &ggml_backend_buffer_type_cpu;
+}
 
 struct ggml_backend_cpu_context {
     int n_threads;
@@ -435,7 +437,7 @@ static void ggml_backend_cpu_free(ggml_backend_t backend) {
 }
 
 static ggml_backend_buffer_type_t ggml_backend_cpu_get_default_buffer_type(ggml_backend_t backend) {
-    return ggml_backend_buffer_type_cpu;
+    return ggml_backend_cpu_buffer_type();
 
     GGML_UNUSED(backend);
 }
@@ -544,7 +546,7 @@ void ggml_backend_cpu_set_n_threads(ggml_backend_t backend_cpu, int n_threads) {
 }
 
 ggml_backend_buffer_t ggml_backend_cpu_buffer_from_ptr(void * ptr, size_t size) {
-    return ggml_backend_buffer_init(ggml_backend_buffer_type_cpu, cpu_backend_buffer_i_from_ptr, ptr, size);
+    return ggml_backend_buffer_init(ggml_backend_cpu_buffer_type(), cpu_backend_buffer_i_from_ptr, ptr, size);
 }
 
 static ggml_backend_t ggml_backend_reg_cpu_init(const char * params) {
@@ -553,7 +555,7 @@ static ggml_backend_t ggml_backend_reg_cpu_init(const char * params) {
     GGML_UNUSED(params);
 }
 
-GGML_BACKEND_REGISTER_CONS("CPU", ggml_backend_reg_cpu_init, ggml_backend_buffer_type_cpu)
+GGML_BACKEND_REGISTER("CPU", ggml_backend_reg_cpu_init, ggml_backend_cpu_buffer_type())
 
 // scheduler
 

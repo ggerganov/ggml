@@ -98,7 +98,7 @@ GGML_API ggml_backend_t ggml_backend_metal_init(void);
 
 GGML_API bool ggml_backend_is_metal(ggml_backend_t backend);
 
-GGML_API extern ggml_backend_buffer_type_t ggml_backend_buffer_type_metal;
+GGML_API ggml_backend_buffer_type_t ggml_backend_metal_buffer_type(void);
 
 GGML_API void ggml_backend_metal_set_n_cb(ggml_backend_t backend, int n_cb);
 

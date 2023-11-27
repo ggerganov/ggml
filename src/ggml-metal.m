@@ -1747,7 +1747,7 @@ static bool ggml_backend_metal_buffer_type_supports_backend(ggml_backend_buffer_
     GGML_UNUSED(buft);
 }
 
-static struct ggml_backend_buffer_type ggml_backend_buffer_type_metal_inst = {
+static struct ggml_backend_buffer_type ggml_backend_buffer_type_metal = {
     /* .iface = */ {
         /* .alloc_buffer     = */ ggml_backend_metal_buffer_type_alloc_buffer,
         /* .get_alignment    = */ ggml_backend_metal_buffer_type_get_alignment,
@@ -1756,7 +1756,9 @@ static struct ggml_backend_buffer_type ggml_backend_buffer_type_metal_inst = {
     }
 };
 
-ggml_backend_buffer_type_t ggml_backend_buffer_type_metal = &ggml_backend_buffer_type_metal_inst;
+ggml_backend_buffer_type_t ggml_backend_metal_buffer_type(void) {
+    return &ggml_backend_buffer_type_metal;
+}
 
 static const char * ggml_backend_metal_name(ggml_backend_t backend) {
     return "Metal";
@@ -1854,4 +1856,4 @@ static ggml_backend_t ggml_backend_reg_metal_init(const char * params) {
     GGML_UNUSED(params);
 }
 
-GGML_BACKEND_REGISTER_CONS("Metal", ggml_backend_reg_metal_init, ggml_backend_buffer_type_metal)
+GGML_BACKEND_REGISTER("Metal", ggml_backend_reg_metal_init, ggml_backend_metal_buffer_type())

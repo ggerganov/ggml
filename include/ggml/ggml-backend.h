@@ -74,7 +74,7 @@ extern "C" {
     // Create a backend buffer from an existing pointer
     GGML_API ggml_backend_buffer_t ggml_backend_cpu_buffer_from_ptr(void * ptr, size_t size);
 
-    GGML_API extern ggml_backend_buffer_type_t ggml_backend_buffer_type_cpu;
+    GGML_API ggml_backend_buffer_type_t ggml_backend_cpu_buffer_type(void);
 
     //
     // Backend registry

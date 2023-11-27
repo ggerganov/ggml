@@ -104,23 +104,32 @@ extern "C" {
 
     size_t ggml_backend_register(const char * name, ggml_backend_init_fn init_fn, ggml_backend_buffer_type_t default_buffer_type);
 
-#if defined(__GNUC__) || defined(__clang__)
-    #define GGML_BACKEND_REGISTER_CONS(name, init_fn, buft) \
-        static void __attribute__((constructor)) init_fn ## _backend_register_constructor(void) { \
-            ggml_backend_register(name, init_fn, buft); \
-        }
-#elif defined(_MSC_VER)
-    #define GGML_BACKEND_REGISTER_CONS(name, init_fn, buft) \
-        __declspec(allocate(".CRT$XCU")) void init_fn ## _backend_register_constructor(void) { \
+
+    // Register a int function to be called at program startup
+    #if defined(__GNUC__) || defined(__clang__)
+        #define GGML_CONSTRUCTOR(init_fn) \
+            static void __attribute__((constructor)) init_fn ## _ggml_constructor(void) { \
+                init_fn(); \
+            }
+    #elif defined(_MSC_VER)
+        #define GGML_CONSTRUCTOR(init_fn) \
+            __declspec(allocate(".CRT$XCU")) void init_fn ## _ggml_constructor(void) { \
+                init_fn(); \
+            } \
+            __pragma(comment(linker, "/include:" #init_fn "_ggml_constructor"))
+    #else
+        // Fallback for other compilers
+        #define GGML_CONSTRUCTOR(init_fn) \
+            static int init_fn ## _backend_register_dummy = init_fn();
+    #endif
+
+
+    // Register a backend
+    #define GGML_BACKEND_REGISTER(name, init_fn, buft) \
+        static void init_fn ## _backend_register(void) { \
             ggml_backend_register(name, init_fn, buft); \
         } \
-        __pragma(comment(linker, "/include:" #init_fn "_backend_register_constructor"))
-#else
-    // Fallback for other compilers
-    #define GGML_BACKEND_REGISTER_CONS(name, init_fn, buft) \
-        int init_fn ## _backend_register_dummy = ggml_backend_register(name, init_fn, buft);
-#endif
-
+        GGML_CONSTRUCTOR(init_fn ## _backend_register)
 
 #ifdef  __cplusplus
 }

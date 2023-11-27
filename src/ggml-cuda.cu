@@ -8297,7 +8297,7 @@ static bool ggml_backend_cuda_buffer_type_supports_backend(ggml_backend_buffer_t
     UNUSED(buft);
 }
 
-static struct ggml_backend_buffer_type ggml_backend_buffer_type_cuda_inst = {
+static struct ggml_backend_buffer_type ggml_backend_buffer_type_cuda = {
     /* .iface = */ {
         /* .alloc_buffer     = */ ggml_backend_cuda_buffer_type_alloc_buffer,
         /* .get_alignment    = */ ggml_backend_cuda_buffer_type_get_alignment,
@@ -8306,7 +8306,11 @@ static struct ggml_backend_buffer_type ggml_backend_buffer_type_cuda_inst = {
     }
 };
 
-ggml_backend_buffer_type_t ggml_backend_buffer_type_cuda = &ggml_backend_buffer_type_cuda_inst;
+ggml_backend_buffer_type_t ggml_backend_cuda_buffer_type(/*int device*/) {
+    // TODO: per device
+    return &ggml_backend_buffer_type_cuda;
+}
+
 
 // backend
 
@@ -8326,13 +8330,13 @@ static void ggml_backend_cuda_free(ggml_backend_t backend) {
 }
 
 static ggml_backend_buffer_type_t ggml_backend_cuda_get_default_buffer_type(ggml_backend_t backend) {
-    return ggml_backend_buffer_type_cuda;
+    return ggml_backend_cuda_buffer_type();
 
     UNUSED(backend);
 }
 
 static void ggml_backend_cuda_set_tensor_async(ggml_backend_t backend, ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
-    GGML_ASSERT(tensor->buffer->buft == ggml_backend_buffer_type_cuda && "unsupported buffer type");
+    GGML_ASSERT(tensor->buffer->buft == ggml_backend_cuda_buffer_type() && "unsupported buffer type");
     GGML_ASSERT(offset + size <= ggml_nbytes(tensor) && "tensor write out of bounds");
     GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
     GGML_ASSERT(tensor->backend == GGML_BACKEND_GPU);
@@ -8343,7 +8347,7 @@ static void ggml_backend_cuda_set_tensor_async(ggml_backend_t backend, ggml_tens
 }
 
 static void ggml_backend_cuda_get_tensor_async(ggml_backend_t backend, const ggml_tensor * tensor, void * data, size_t offset, size_t size) {
-    GGML_ASSERT(tensor->buffer->buft == ggml_backend_buffer_type_cuda && "unsupported buffer type");
+    GGML_ASSERT(tensor->buffer->buft == ggml_backend_cuda_buffer_type() && "unsupported buffer type");
     GGML_ASSERT(offset + size <= ggml_nbytes(tensor) && "tensor read out of bounds");
     GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
     GGML_ASSERT(tensor->backend == GGML_BACKEND_GPU);
@@ -8395,13 +8399,13 @@ static void ggml_backend_cuda_graph_compute(ggml_backend_t backend, ggml_cgraph 
             continue;
 
         assert(node->backend == GGML_BACKEND_GPU);
-        assert(node->buffer->buft == ggml_backend_buffer_type_cuda);
+        assert(node->buffer->buft == ggml_backend_cuda_buffer_type());
         assert(node->extra != nullptr);
 
         for (int j = 0; j < GGML_MAX_SRC; j++) {
             if (node->src[j] != nullptr) {
                 assert(node->src[j]->backend == GGML_BACKEND_GPU);
-                assert(node->src[j]->buffer->buft == ggml_backend_buffer_type_cuda);
+                assert(node->src[j]->buffer->buft == ggml_backend_cuda_buffer_type());
                 assert(node->src[j]->extra != nullptr);
             }
         }
@@ -8463,7 +8467,7 @@ static ggml_backend_i cuda_backend_i = {
     /* .supports_op             = */ ggml_backend_cuda_supports_op,
 };
 
-ggml_backend_t ggml_backend_cuda_init() {
+ggml_backend_t ggml_backend_cuda_init(/*int device*/) {
     ggml_init_cublas(); // TODO: remove from ggml.c
 
     ggml_backend_context_cuda * ctx = new ggml_backend_context_cuda;
@@ -8486,4 +8490,5 @@ bool ggml_backend_is_cuda(ggml_backend_t backend) {
     return backend->iface.get_name == ggml_backend_cuda_name;
 }
 
-GGML_BACKEND_REGISTER_CONS(GGML_CUDA_NAME, ggml_backend_reg_cuda_init, ggml_backend_buffer_type_cuda)
+// TODO: per device
+GGML_BACKEND_REGISTER(GGML_CUDA_NAME, ggml_backend_reg_cuda_init, ggml_backend_cuda_buffer_type())
