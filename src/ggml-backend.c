@@ -242,23 +242,33 @@ void ggml_backend_tensor_copy(struct ggml_tensor * src, struct ggml_tensor * dst
 // backend registry
 
 struct ggml_backend_reg {
-    const char * name;
+    char name[128];
     ggml_backend_init_fn init_fn;
     ggml_backend_buffer_type_t default_buffer_type;
+    void * user_data;
 };
 
 #define GGML_MAX_BACKENDS_REG 16
 static struct ggml_backend_reg ggml_backend_registry[GGML_MAX_BACKENDS_REG];
 static size_t ggml_backend_registry_count = 0;
 
-size_t ggml_backend_register(const char * name, ggml_backend_init_fn init_fn, ggml_backend_buffer_type_t default_buffer_type) {
+size_t ggml_backend_register(const char * name, ggml_backend_init_fn init_fn, ggml_backend_buffer_type_t default_buffer_type, void * user_data) {
     GGML_ASSERT(ggml_backend_registry_count < GGML_MAX_BACKENDS_REG);
-    ggml_backend_registry[ggml_backend_registry_count++] = (struct ggml_backend_reg) {
-        /* .name                = */ name,
+
+    int id = ggml_backend_registry_count;
+
+    ggml_backend_registry[id] = (struct ggml_backend_reg) {
+        /* .name                = */ {0},
         /* .fn                  = */ init_fn,
-        /* .default_buffer_type = */ default_buffer_type
+        /* .default_buffer_type = */ default_buffer_type,
+        /* .user_data           = */ user_data,
     };
+
+    snprintf(ggml_backend_registry[id].name, sizeof(ggml_backend_registry[id].name), "%s", name);
+
     fprintf(stderr, "%s: registered backend %s\n", __func__, name);
+
+    ggml_backend_registry_count++;
     return ggml_backend_registry_count - 1;
 }
 
@@ -306,7 +316,7 @@ const char * ggml_backend_reg_get_name(size_t i) {
 
 ggml_backend_t ggml_backend_reg_init_backend(size_t i, const char * params) {
     GGML_ASSERT(i < ggml_backend_registry_count);
-    return ggml_backend_registry[i].init_fn(params);
+    return ggml_backend_registry[i].init_fn(params, ggml_backend_registry[i].user_data);
 }
 
 ggml_backend_buffer_type_t ggml_backend_reg_get_default_buffer_type(size_t i) {
@@ -404,16 +414,17 @@ static bool ggml_backend_cpu_buffer_type_supports_backend(ggml_backend_buffer_ty
     GGML_UNUSED(buft);
 }
 
-static struct ggml_backend_buffer_type ggml_backend_buffer_type_cpu = {
-    /* .iface = */ {
-        /* .alloc_buffer     = */ ggml_backend_cpu_buffer_type_alloc_buffer,
-        /* .get_alignment    = */ ggml_backend_cpu_buffer_type_get_alignment,
-        /* .get_alloc_size   = */ NULL, // defaults to ggml_nbytes
-        /* .supports_backend = */ ggml_backend_cpu_buffer_type_supports_backend,
-    }
-};
-
 ggml_backend_buffer_type_t ggml_backend_cpu_buffer_type(void) {
+    static struct ggml_backend_buffer_type ggml_backend_buffer_type_cpu = {
+        /* .iface = */ {
+            /* .alloc_buffer     = */ ggml_backend_cpu_buffer_type_alloc_buffer,
+            /* .get_alignment    = */ ggml_backend_cpu_buffer_type_get_alignment,
+            /* .get_alloc_size   = */ NULL, // defaults to ggml_nbytes
+            /* .supports_backend = */ ggml_backend_cpu_buffer_type_supports_backend,
+        },
+        /* .context = */ NULL,
+    };
+
     return &ggml_backend_buffer_type_cpu;
 }
 
@@ -549,13 +560,14 @@ ggml_backend_buffer_t ggml_backend_cpu_buffer_from_ptr(void * ptr, size_t size) 
     return ggml_backend_buffer_init(ggml_backend_cpu_buffer_type(), cpu_backend_buffer_i_from_ptr, ptr, size);
 }
 
-static ggml_backend_t ggml_backend_reg_cpu_init(const char * params) {
+static ggml_backend_t ggml_backend_reg_cpu_init(const char * params, void * user_data) {
     return ggml_backend_cpu_init();
 
     GGML_UNUSED(params);
+    GGML_UNUSED(user_data);
 }
 
-GGML_BACKEND_REGISTER("CPU", ggml_backend_reg_cpu_init, ggml_backend_cpu_buffer_type())
+GGML_BACKEND_REGISTER("CPU", ggml_backend_reg_cpu_init, ggml_backend_cpu_buffer_type(), NULL)
 
 // scheduler
 

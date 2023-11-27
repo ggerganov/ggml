@@ -197,7 +197,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 #ifdef GGML_USE_CUBLAS
     if (n_gpu_layers > 0) {
         fprintf(stderr, "%s: using CUDA backend\n", __func__);
-        model.backend = ggml_backend_cuda_init();
+        model.backend = ggml_backend_cuda_init(0);
         if (!model.backend) {
             fprintf(stderr, "%s: ggml_backend_cuda_init() failed\n", __func__);
         }

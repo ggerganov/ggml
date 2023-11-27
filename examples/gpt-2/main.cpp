@@ -107,7 +107,7 @@ void init_backends(gpt2_model & model, const gpt_params & params) {
 #ifdef GGML_USE_CUBLAS
     if (params.n_gpu_layers > 0) {
         fprintf(stderr, "%s: using CUDA backend\n", __func__);
-        gpu_backend = ggml_backend_cuda_init();
+        gpu_backend = ggml_backend_cuda_init(0);
         if (!gpu_backend) {
             fprintf(stderr, "%s: ggml_backend_cuda_init() failed\n", __func__);
         }

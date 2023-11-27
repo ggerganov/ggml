@@ -13,6 +13,8 @@ extern "C" {
     //
 
     // buffer type
+    typedef void * ggml_backend_buffer_type_context_t;
+
     struct ggml_backend_buffer_type_i {
         ggml_backend_buffer_t (*alloc_buffer)    (ggml_backend_buffer_type_t buft, size_t size);
         size_t                (*get_alignment)   (ggml_backend_buffer_type_t buft); // tensor alignment
@@ -21,7 +23,8 @@ extern "C" {
     };
 
     struct ggml_backend_buffer_type {
-        struct ggml_backend_buffer_type_i iface;
+        struct ggml_backend_buffer_type_i  iface;
+        ggml_backend_buffer_type_context_t context;
     };
 
     // buffer
@@ -100,9 +103,9 @@ extern "C" {
     // Backend registry
     //
 
-    typedef ggml_backend_t (*ggml_backend_init_fn)(const char * params);
+    typedef ggml_backend_t (*ggml_backend_init_fn)(const char * params, void * user_data);
 
-    size_t ggml_backend_register(const char * name, ggml_backend_init_fn init_fn, ggml_backend_buffer_type_t default_buffer_type);
+    size_t ggml_backend_register(const char * name, ggml_backend_init_fn init_fn, ggml_backend_buffer_type_t default_buffer_type, void * user_data);
 
 
     // Register a int function to be called at program startup
@@ -125,9 +128,9 @@ extern "C" {
 
 
     // Register a backend
-    #define GGML_BACKEND_REGISTER(name, init_fn, buft) \
+    #define GGML_BACKEND_REGISTER(name, init_fn, buft, user_data) \
         static void init_fn ## _backend_register(void) { \
-            ggml_backend_register(name, init_fn, buft); \
+            ggml_backend_register(name, init_fn, buft, user_data); \
         } \
         GGML_CONSTRUCTOR(init_fn ## _backend_register)
 
