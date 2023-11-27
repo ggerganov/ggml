@@ -436,6 +436,7 @@ static_assert(sizeof(block_q6_K) == sizeof(ggml_fp16_t) + 13*QK_K/16, "wrong q6_
 #define CUDA_MUL_BLOCK_SIZE 256
 #define CUDA_GELU_BLOCK_SIZE 256
 #define CUDA_SILU_BLOCK_SIZE 256
+#define CUDA_TANH_BLOCK_SIZE 256
 #define CUDA_RELU_BLOCK_SIZE 256
 #define CUDA_SQR_BLOCK_SIZE 256
 #define CUDA_CPY_BLOCK_SIZE 32
@@ -450,6 +451,7 @@ static_assert(sizeof(block_q6_K) == sizeof(ggml_fp16_t) + 13*QK_K/16, "wrong q6_
 #define CUDA_UPSCALE_BLOCK_SIZE 256
 #define CUDA_CONCAT_BLOCK_SIZE 256
 #define CUDA_PAD_BLOCK_SIZE 256
+
 
 // dmmv = dequantize_mul_mat_vec
 #ifndef GGML_CUDA_DMMV_X
@@ -573,6 +575,14 @@ static __global__ void gelu_quick_f32(const float *x, float *dst, int k) {
         return;
     }
     dst[i] = x[i] * (1.0f / (1.0f + expf(GELU_QUICK_COEF * x[i])));
+}
+
+static __global__ void tanh_f32(const float *x, float *dst, int k) {
+    const int i  = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i >= k) {
+        return;
+    }
+    dst[i] = tanhf(x[i]);
 }
 
 static __global__ void relu_f32(const float * x, float * dst, const int k) {
@@ -4936,6 +4946,11 @@ static void gelu_quick_f32_cuda(const float * x, float * dst, const int k, cudaS
     gelu_quick_f32<<<num_blocks, CUDA_GELU_BLOCK_SIZE, 0, stream>>>(x, dst, k);
 }
 
+static void tanh_f32_cuda(const float * x, float * dst, const int k, cudaStream_t stream) {
+    const int num_blocks = (k + CUDA_TANH_BLOCK_SIZE - 1) / CUDA_TANH_BLOCK_SIZE;
+    tanh_f32<<<num_blocks, CUDA_TANH_BLOCK_SIZE, 0, stream>>>(x, dst, k);
+}
+
 static void relu_f32_cuda(const float * x, float * dst, const int k, cudaStream_t stream) {
     const int num_blocks = (k + CUDA_RELU_BLOCK_SIZE - 1) / CUDA_RELU_BLOCK_SIZE;
     relu_f32<<<num_blocks, CUDA_RELU_BLOCK_SIZE, 0, stream>>>(x, dst, k);
@@ -6398,6 +6413,20 @@ inline void ggml_cuda_op_gelu_quick(
     (void) src1_dd;
 }
 
+inline void ggml_cuda_op_tanh(
+    const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
+    const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+
+    tanh_f32_cuda(src0_dd, dst_dd, ggml_nelements(src0), main_stream);
+
+    (void) src1;
+    (void) dst;
+    (void) src1_dd;
+}
+
 inline void ggml_cuda_op_relu(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
     const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
@@ -7570,6 +7599,10 @@ static void ggml_cuda_gelu_quick(const ggml_tensor * src0, const ggml_tensor * s
     ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_gelu_quick);
 }
 
+static void ggml_cuda_tanh(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+    ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_tanh);
+}
+
 static void ggml_cuda_relu(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_relu);
 }
@@ -8346,6 +8379,9 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
                     break;
                 case GGML_UNARY_OP_GELU_QUICK:
                     func = ggml_cuda_gelu_quick;
+                    break;
+                case GGML_UNARY_OP_TANH:
+                    func = ggml_cuda_tanh;
                     break;
                 case GGML_UNARY_OP_RELU:
                     func = ggml_cuda_relu;
