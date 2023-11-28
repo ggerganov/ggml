@@ -7988,8 +7988,9 @@ void ggml_cuda_set_main_device(const int main_device) {
                 main_device, g_device_count, g_main_device);
         return;
     }
-    g_main_device = main_device;
-    if (g_device_count > 1) {
+
+    if (g_main_device != main_device && g_device_count > 1) {
+        g_main_device = main_device;
         cudaDeviceProp prop;
         CUDA_CHECK(cudaGetDeviceProperties(&prop, g_main_device));
         fprintf(stderr, "%s: using device %d (%s) as main device\n", __func__, g_main_device, prop.name);
@@ -8199,7 +8200,7 @@ static void ggml_backend_cuda_buffer_init_tensor(ggml_backend_buffer_t buffer, g
 
     ggml_tensor_extra_gpu * extra = ctx->ggml_cuda_alloc_temp_tensor_extra();
 
-    extra->data_device[g_main_device] = tensor->data;
+    extra->data_device[ctx->device] = tensor->data;
 
     tensor->backend = GGML_BACKEND_GPU;
     tensor->extra = extra;
@@ -8214,7 +8215,7 @@ static void ggml_backend_cuda_buffer_init_tensor(ggml_backend_buffer_t buffer, g
         size_t padded_size = ggml_backend_buft_get_alloc_size(buffer->buft, tensor);
 
         if (padded_size > original_size && tensor->view_src == nullptr) {
-            CUDA_CHECK(cudaMemsetAsync((char *)tensor->data + original_size, 0, padded_size - original_size, g_cudaStreams[g_main_device][0]));
+            CUDA_CHECK(cudaMemsetAsync((char *)tensor->data + original_size, 0, padded_size - original_size, g_cudaStreams[ctx->device][0]));
         }
     }
 
@@ -8341,6 +8342,8 @@ static ggml_backend_buffer_t ggml_backend_cuda_host_buffer_type_alloc_buffer(ggm
     buffer->iface.free_buffer = ggml_backend_cuda_host_buffer_free_buffer;
 
     return buffer;
+
+    UNUSED(buft);
 }
 
 struct ggml_backend_buffer_type_i cuda_backend_host_buffer_type_interface = {
@@ -8392,7 +8395,7 @@ static void ggml_backend_cuda_set_tensor_async(ggml_backend_t backend, ggml_tens
     GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
     GGML_ASSERT(tensor->backend == GGML_BACKEND_GPU);
 
-    CUDA_CHECK(cudaMemcpyAsync((char *)tensor->data + offset, data, size, cudaMemcpyHostToDevice, g_cudaStreams[g_main_device][0]));
+    CUDA_CHECK(cudaMemcpyAsync((char *)tensor->data + offset, data, size, cudaMemcpyHostToDevice, g_cudaStreams[cuda_ctx->device][0]));
 }
 
 static void ggml_backend_cuda_get_tensor_async(ggml_backend_t backend, const ggml_tensor * tensor, void * data, size_t offset, size_t size) {
@@ -8403,7 +8406,7 @@ static void ggml_backend_cuda_get_tensor_async(ggml_backend_t backend, const ggm
     GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
     GGML_ASSERT(tensor->backend == GGML_BACKEND_GPU);
 
-    CUDA_CHECK(cudaMemcpyAsync(data, (const char *)tensor->data + offset, size, cudaMemcpyDeviceToHost, g_cudaStreams[g_main_device][0]));
+    CUDA_CHECK(cudaMemcpyAsync(data, (const char *)tensor->data + offset, size, cudaMemcpyDeviceToHost, g_cudaStreams[cuda_ctx->device][0]));
 }
 
 static void ggml_backend_cuda_synchronize(ggml_backend_t backend) {
@@ -8497,11 +8500,46 @@ static void ggml_backend_cuda_graph_compute(ggml_backend_t backend, ggml_cgraph 
 }
 
 static bool ggml_backend_cuda_supports_op(ggml_backend_t backend, const ggml_tensor * tensor) {
-    // TODO: implement
-    return true;
+
+
+    switch (tensor->op) {
+        case GGML_OP_UNARY:
+            switch (ggml_get_unary_op(tensor)) {
+                case GGML_UNARY_OP_GELU:
+                case GGML_UNARY_OP_SILU:
+                case GGML_UNARY_OP_RELU:
+                    return true;
+                default:
+                    return false;
+            } break;
+        case GGML_OP_NORM:
+        case GGML_OP_REPEAT:
+        case GGML_OP_GET_ROWS:
+        case GGML_OP_DUP:
+        case GGML_OP_ADD:
+        case GGML_OP_MUL:
+        case GGML_OP_RMS_NORM:
+        case GGML_OP_MUL_MAT:
+        case GGML_OP_SCALE:
+        case GGML_OP_SQR:
+        case GGML_OP_CLAMP:
+        case GGML_OP_CPY:
+        case GGML_OP_CONT:
+        case GGML_OP_RESHAPE:
+        case GGML_OP_VIEW:
+        case GGML_OP_PERMUTE:
+        case GGML_OP_TRANSPOSE:
+        case GGML_OP_DIAG_MASK_INF:
+        case GGML_OP_SOFT_MAX:
+        case GGML_OP_ROPE:
+        case GGML_OP_ALIBI:
+        case GGML_OP_IM2COL:
+            return true;
+        default:
+            return false;
+    }
 
     UNUSED(backend);
-    UNUSED(tensor);
 }
 
 static ggml_backend_i cuda_backend_i = {

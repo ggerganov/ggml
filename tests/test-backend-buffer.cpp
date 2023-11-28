@@ -1,3 +1,4 @@
+#include <cstring>
 #include <ggml.h>
 #include <ggml-alloc.h>
 #include <ggml-backend.h>
@@ -6,12 +7,14 @@
 #include <stdlib.h>
 
 
-bool is_pow2(size_t x) {
+static bool is_pow2(size_t x) {
     return (x & (x - 1)) == 0;
 }
 
-void test_buffer(ggml_backend_t backend, ggml_backend_buffer_type_t buft) {
+static void test_buffer(ggml_backend_t backend, ggml_backend_buffer_type_t buft) {
     GGML_ASSERT(ggml_backend_get_default_buffer_type(backend) == buft);
+
+    GGML_ASSERT(ggml_backend_buft_supports_backend(buft, backend));
 
     //ggml_backend_buffer_t buffer = ggml_backend_alloc_buffer(backend, 1024);
     ggml_backend_buffer_t buffer = ggml_backend_buft_alloc_buffer(buft, 1024);
@@ -31,9 +34,11 @@ void test_buffer(ggml_backend_t backend, ggml_backend_buffer_type_t buft) {
     };
     struct ggml_context * ctx = ggml_init(params);
 
-    struct ggml_tensor * tensor = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 10);
+    static const size_t n = 10;
 
-    GGML_ASSERT(ggml_backend_buffer_get_alloc_size(buffer, tensor) >= 10 * sizeof(float));
+    struct ggml_tensor * tensor = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n);
+
+    GGML_ASSERT(ggml_backend_buffer_get_alloc_size(buffer, tensor) >= n * sizeof(float));
 
     ggml_tallocr_t allocr = ggml_tallocr_new_from_buffer(buffer);
     ggml_tallocr_alloc(allocr, tensor);
@@ -42,10 +47,17 @@ void test_buffer(ggml_backend_t backend, ggml_backend_buffer_type_t buft) {
 
     GGML_ASSERT(tensor->data >= ggml_backend_buffer_get_base(buffer));
 
-    // TODO:
-    // supports_backend
-    // get/set tensor
-    // cpy tensor from/to
+    float data[n];
+    for (size_t i = 0; i < n; i++) {
+        data[i] = i;
+    }
+
+    ggml_backend_tensor_set(tensor, data, 0, sizeof(data));
+
+    float data2[n];
+    ggml_backend_tensor_get(tensor, data2, 0, sizeof(data2));
+
+    GGML_ASSERT(memcmp(data, data2, sizeof(data)) == 0);
 
     ggml_tallocr_free(allocr);
     ggml_backend_buffer_free(buffer);

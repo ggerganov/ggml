@@ -728,93 +728,6 @@ struct ggml_cgraph * gpt2_graph(
     return gf;
 }
 
-/// temp: move somewhere else
-std::vector<float> tensor_to_float(const struct ggml_tensor * t) {
-    std::vector<float> tv;
-    tv.reserve(ggml_nelements(t));
-
-    std::vector<uint8_t> buf(ggml_nbytes(t));
-    ggml_backend_tensor_get(t, buf.data(), 0, ggml_nbytes(t));
-
-    for (int64_t i3 = 0; i3 < t->ne[3]; i3++) {
-        for (int64_t i2 = 0; i2 < t->ne[2]; i2++) {
-            for (int64_t i1 = 0; i1 < t->ne[1]; i1++) {
-                for (int64_t i0 = 0; i0 < t->ne[0]; i0++) {
-                    size_t i = i3*t->nb[3] + i2*t->nb[2] + i1*t->nb[1] + i0*t->nb[0];
-                    float v;
-                    if (t->type == GGML_TYPE_F16) {
-                        v = (float) ggml_fp16_to_fp32(*(ggml_fp16_t*)&buf[i]);
-                    } else if (t->type == GGML_TYPE_F32) {
-                        v = *(float *) &buf[i];
-                    } else {
-                        assert(false);
-                    }
-                    tv.push_back(v);
-                }
-            }
-        }
-    }
-
-    return tv;
-}
-
-float cosine_similarity(const std::vector<float> & v1, const std::vector<float> & v2) {
-    assert(v1.size() == v2.size());
-
-    double dot = 0.0;
-    double mag1 = 0.0;
-    double mag2 = 0.0;
-
-    for (size_t i = 0; i < v1.size(); i++) {
-        if (std::isnan(v1[i]) || std::isnan(v2[i])) {
-            return -1.0f;
-        }
-        if (std::isinf(v1[i]) && std::isinf(v2[i])) {
-            continue;
-        }
-        dot  += v1[i]*v2[i];
-        mag1 += v1[i]*v1[i];
-        mag2 += v2[i]*v2[i];
-    }
-
-    return dot/sqrt(mag1*mag2);
-}
-
-float distance(const std::vector<float> & v1, const std::vector<float> & v2) {
-    assert(v1.size() == v2.size());
-
-    double d = 0.0;
-
-    for (size_t i = 0; i < v1.size(); i++) {
-        if (std::isnan(v1[i]) || std::isnan(v2[i])) {
-            return INFINITY;
-        }
-        if (std::isinf(v1[i]) && std::isinf(v2[i])) {
-            continue;
-        }
-        d += (v1[i] - v2[i])*(v1[i] - v2[i]);
-    }
-
-    return sqrt(d);
-}
-
-float vec_len(const std::vector<float> & v) {
-    double d = 0.0;
-
-    for (size_t i = 0; i < v.size(); i++) {
-        if (std::isnan(v[i])) {
-            return INFINITY;
-        }
-        if (std::isinf(v[i])) {
-            continue;
-        }
-        d += v[i]*v[i];
-    }
-
-    return sqrt(d);
-}
-
-
 // evaluate the transformer
 //
 //   - model:     the model
@@ -857,7 +770,7 @@ bool gpt2_eval(
 #endif
 
     // test
-#ifdef GGML_USE_CUBLAS
+#if 0 && defined(GGML_USE_CUBLAS)
     if (ggml_backend_is_cuda(model.backend)) {
         auto eval_callback = [](int index, struct ggml_tensor * t1, struct ggml_tensor * t2, void * user_data) {
             auto tv1 = tensor_to_float(t1);
