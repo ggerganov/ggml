@@ -8729,7 +8729,6 @@ static void ggml_compute_forward_gelu_f32(
     // row range for this thread
     const int ir0 = dr*ith;
     const int ir1 = MIN(ir0 + dr, nr);
-#if 1
     for (int i1 = ir0; i1 < ir1; i1++) {
         ggml_vec_gelu_f32(nc,
                 (float *) ((char *) dst->data  + i1*( dst->nb[1])),
@@ -8744,15 +8743,6 @@ static void ggml_compute_forward_gelu_f32(
         }
 #endif
     }
-#else
-    for (int i1 = ir0; i1 < ir1; i1++) {
-        const float * src_row = (float *) ((char *) src0->data + i1*(src0->nb[1]));
-        float *       dst_row = (float *) ((char *) dst->data  + i1*( dst->nb[1]));
-        for (int i0 = 0; i0 < nc; i0++) {
-            dst_row[i0] = ggml_gelu_f32(src_row[i0]);
-        }
-    }
-#endif
 }
 
 static void ggml_compute_forward_gelu(

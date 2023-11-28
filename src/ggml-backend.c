@@ -138,7 +138,7 @@ void ggml_backend_tensor_get_async(ggml_backend_t backend, const struct ggml_ten
     GGML_ASSERT(tensor->data != NULL && "tensor not allocated");
     GGML_ASSERT(offset + size <= ggml_nbytes(tensor) && "tensor read out of bounds");
 
-    backend->iface.get_tensor_async(backend, tensor, data, offset, size);//
+    backend->iface.get_tensor_async(backend, tensor, data, offset, size);
 }
 
 void ggml_backend_tensor_set(struct ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
@@ -1147,12 +1147,13 @@ static struct ggml_tensor * graph_dup_tensor(struct ggml_hash_set hash_set, stru
     }
 
     struct ggml_tensor * dst = ggml_dup_tensor_layout(src->data && !src->view_src ? ctx_allocated : ctx_unallocated, src);
-    ggml_set_name(dst, src->name);
     if (src->view_src != NULL) {
         dst->view_src = graph_dup_tensor(hash_set, node_copies, ctx_allocated, ctx_unallocated, src->view_src);
         dst->view_offs = src->view_offs;
     }
     dst->op = src->op;
+    memcpy(dst->op_params, src->op_params, sizeof(dst->op_params));
+    ggml_set_name(dst, src->name);
 
     // copy src
     for (int i = 0; i < GGML_MAX_SRC; i++) {
@@ -1274,6 +1275,10 @@ void ggml_backend_compare_graph_backend(ggml_backend_t backend1, ggml_backend_t 
 
         ggml_backend_graph_compute(backend1, &g1v);
         ggml_backend_graph_compute(backend2, &g2v);
+
+        if (ggml_is_view_op(t1->op)) {
+            continue;
+        }
 
         // compare results, calculate rms etc
         if (!callback(i, t1, t2, user_data)) {

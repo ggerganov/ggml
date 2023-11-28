@@ -728,6 +728,93 @@ struct ggml_cgraph * gpt2_graph(
     return gf;
 }
 
+/// temp: move somewhere else
+std::vector<float> tensor_to_float(const struct ggml_tensor * t) {
+    std::vector<float> tv;
+    tv.reserve(ggml_nelements(t));
+
+    std::vector<uint8_t> buf(ggml_nbytes(t));
+    ggml_backend_tensor_get(t, buf.data(), 0, ggml_nbytes(t));
+
+    for (int64_t i3 = 0; i3 < t->ne[3]; i3++) {
+        for (int64_t i2 = 0; i2 < t->ne[2]; i2++) {
+            for (int64_t i1 = 0; i1 < t->ne[1]; i1++) {
+                for (int64_t i0 = 0; i0 < t->ne[0]; i0++) {
+                    size_t i = i3*t->nb[3] + i2*t->nb[2] + i1*t->nb[1] + i0*t->nb[0];
+                    float v;
+                    if (t->type == GGML_TYPE_F16) {
+                        v = (float) ggml_fp16_to_fp32(*(ggml_fp16_t*)&buf[i]);
+                    } else if (t->type == GGML_TYPE_F32) {
+                        v = *(float *) &buf[i];
+                    } else {
+                        assert(false);
+                    }
+                    tv.push_back(v);
+                }
+            }
+        }
+    }
+
+    return tv;
+}
+
+float cosine_similarity(const std::vector<float> & v1, const std::vector<float> & v2) {
+    assert(v1.size() == v2.size());
+
+    double dot = 0.0;
+    double mag1 = 0.0;
+    double mag2 = 0.0;
+
+    for (size_t i = 0; i < v1.size(); i++) {
+        if (std::isnan(v1[i]) || std::isnan(v2[i])) {
+            return -1.0f;
+        }
+        if (std::isinf(v1[i]) && std::isinf(v2[i])) {
+            continue;
+        }
+        dot  += v1[i]*v2[i];
+        mag1 += v1[i]*v1[i];
+        mag2 += v2[i]*v2[i];
+    }
+
+    return dot/sqrt(mag1*mag2);
+}
+
+float distance(const std::vector<float> & v1, const std::vector<float> & v2) {
+    assert(v1.size() == v2.size());
+
+    double d = 0.0;
+
+    for (size_t i = 0; i < v1.size(); i++) {
+        if (std::isnan(v1[i]) || std::isnan(v2[i])) {
+            return INFINITY;
+        }
+        if (std::isinf(v1[i]) && std::isinf(v2[i])) {
+            continue;
+        }
+        d += (v1[i] - v2[i])*(v1[i] - v2[i]);
+    }
+
+    return sqrt(d);
+}
+
+float vec_len(const std::vector<float> & v) {
+    double d = 0.0;
+
+    for (size_t i = 0; i < v.size(); i++) {
+        if (std::isnan(v[i])) {
+            return INFINITY;
+        }
+        if (std::isinf(v[i])) {
+            continue;
+        }
+        d += v[i]*v[i];
+    }
+
+    return sqrt(d);
+}
+
+
 // evaluate the transformer
 //
 //   - model:     the model
@@ -773,30 +860,29 @@ bool gpt2_eval(
 #ifdef GGML_USE_CUBLAS
     if (ggml_backend_is_cuda(model.backend)) {
         auto eval_callback = [](int index, struct ggml_tensor * t1, struct ggml_tensor * t2, void * user_data) {
-            if (t1->type == GGML_TYPE_F32) {
-                // fixme: check index by index to avoid gaps in views
-                std::vector<float> v1(GGML_PAD(ggml_nbytes(t1), sizeof(float)) / sizeof(float));
-                std::vector<float> v2(GGML_PAD(ggml_nbytes(t2), sizeof(float)) / sizeof(float));
-                assert(v1.size()*sizeof(float) >= ggml_nbytes(t1));
+            auto tv1 = tensor_to_float(t1);
+            auto tv2 = tensor_to_float(t2);
 
-                ggml_backend_tensor_get(t1, v1.data(), 0, ggml_nbytes(t1));
-                ggml_backend_tensor_get(t2, v2.data(), 0, ggml_nbytes(t2));
+#if 1
+            float sim = cosine_similarity(tv1, tv2);
+            float len1 = vec_len(tv1);
+            float len2 = vec_len(tv2);
+            float lenr = len1/len2;
+            float lenrd = std::abs(1.0f-lenr);
 
-                // todo: better, built-in, normalized measures of error
-                // - normalized RMSE
-                // - normalized L1/L2 norm
-                // - cosine similarity
-                // - ??
-                for (size_t i = 0; i < v1.size(); ++i) {
-                    if (fabsf(v1[i] - v2[i]) > 1e0) {
-                        // todo: nans, infs
-                        // inf = flt_min
-                        printf("[%d] %s [%s]: mismatch at index %zu: %f != %f\n", index, t1->name, ggml_op_desc(t1), i, v1[i], v2[i]);
-                        //return false; // stop graph eval on first error
-                        return true;
-                    }
-                }
+            float angle = acosf(sim)*180.0f/M_PI;
+
+            if (angle > 0.5f || lenrd > 0.05f) {
+                printf("%3d [%15s] %s: sim = %f, a = %f, lenrd = %f\n", index, ggml_op_desc(t1), t1->name, sim, angle, lenrd);
             }
+            assert(sim > 0.90f);
+#else
+            float dist = distance(tv1, tv2) / vec_len(tv1);
+            if (dist > 0.01f) {
+                printf("%3d [%15s] %s: distance = %f\n", index, ggml_op_desc(t1), t1->name, dist);
+            }
+#endif
+
             return true;
         };
         ggml_backend_t backend_cpu = ggml_backend_cpu_init();
