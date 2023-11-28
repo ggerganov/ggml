@@ -659,7 +659,7 @@ static ggml_backend_t get_allocr_backend(ggml_backend_sched_t sched, ggml_talloc
             return sched->backends[i];
         }
     }
-    assert(false); // should never happen
+    GGML_UNREACHABLE();
 }
 
 // returns the backend that should be used for the node based on the current locations

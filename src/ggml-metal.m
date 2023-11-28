@@ -488,7 +488,7 @@ static id<MTLBuffer> ggml_metal_get_buffer(struct ggml_metal_context * ctx, stru
     const int64_t tsize = ggml_nbytes(t);
 
     // compatibility with ggml-backend
-    if (t->buffer && t->buffer->buft == ggml_backend_buffer_type_metal) {
+    if (t->buffer && t->buffer->buft == ggml_backend_metal_buffer_type()) {
         struct ggml_backend_metal_buffer_context * buf_ctx = (struct ggml_backend_metal_buffer_context *) t->buffer->context;
 
         const int64_t ioffs = (int64_t) t->data - (int64_t) buf_ctx->data;
@@ -1747,16 +1747,17 @@ static bool ggml_backend_metal_buffer_type_supports_backend(ggml_backend_buffer_
     GGML_UNUSED(buft);
 }
 
-static struct ggml_backend_buffer_type ggml_backend_buffer_type_metal = {
-    /* .iface = */ {
-        /* .alloc_buffer     = */ ggml_backend_metal_buffer_type_alloc_buffer,
-        /* .get_alignment    = */ ggml_backend_metal_buffer_type_get_alignment,
-        /* .get_alloc_size   = */ NULL, // defaults to ggml_nbytes
-        /* .supports_backend = */ ggml_backend_metal_buffer_type_supports_backend,
-    }
-};
-
 ggml_backend_buffer_type_t ggml_backend_metal_buffer_type(void) {
+    static struct ggml_backend_buffer_type ggml_backend_buffer_type_metal = {
+        /* .iface = */ {
+            /* .alloc_buffer     = */ ggml_backend_metal_buffer_type_alloc_buffer,
+            /* .get_alignment    = */ ggml_backend_metal_buffer_type_get_alignment,
+            /* .get_alloc_size   = */ NULL, // defaults to ggml_nbytes
+            /* .supports_backend = */ ggml_backend_metal_buffer_type_supports_backend,
+        },
+        /* .context = */ NULL,
+    };
+
     return &ggml_backend_buffer_type_metal;
 }
 
@@ -1777,7 +1778,7 @@ static void ggml_backend_metal_synchronize(ggml_backend_t backend) {
 }
 
 static ggml_backend_buffer_type_t ggml_backend_metal_get_default_buffer_type(ggml_backend_t backend) {
-    return ggml_backend_buffer_type_metal;
+    return ggml_backend_metal_buffer_type();
 
     UNUSED(backend);
 }
@@ -1850,10 +1851,11 @@ void ggml_backend_metal_set_n_cb(ggml_backend_t backend, int n_cb) {
     ggml_metal_set_n_cb(ctx, n_cb);
 }
 
-static ggml_backend_t ggml_backend_reg_metal_init(const char * params) {
+static ggml_backend_t ggml_backend_reg_metal_init(const char * params, void * user_data) {
     return ggml_backend_metal_init();
 
     GGML_UNUSED(params);
+    GGML_UNUSED(user_data);
 }
 
-GGML_BACKEND_REGISTER("Metal", ggml_backend_reg_metal_init, ggml_backend_metal_buffer_type())
+GGML_BACKEND_REGISTER("Metal", ggml_backend_reg_metal_init, ggml_backend_metal_buffer_type(), NULL)
