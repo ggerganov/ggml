@@ -8343,7 +8343,6 @@ static ggml_backend_buffer_t ggml_backend_cuda_host_buffer_type_alloc_buffer(ggm
     return buffer;
 }
 
-
 struct ggml_backend_buffer_type_i cuda_backend_host_buffer_type_interface = {
     /* .alloc_buffer     = */ ggml_backend_cuda_host_buffer_type_alloc_buffer,
     /* .get_alignment    = */ ggml_backend_cpu_buffer_type()->iface.get_alignment,

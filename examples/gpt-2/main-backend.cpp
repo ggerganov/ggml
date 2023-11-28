@@ -805,9 +805,10 @@ bool gpt2_eval(
         //printf("done\n");
     } else
 #endif
-
-    // run the computation
-    ggml_backend_graph_compute(model.backend, gf);
+    {
+        // run the computation
+        ggml_backend_graph_compute(model.backend, gf);
+    }
 
     //if (n_past%100 == 0) {
     //    ggml_graph_print   (&gf);

@@ -769,15 +769,23 @@ ggml_backend_buffer_t ggml_backend_alloc_ctx_tensors_from_buft(struct ggml_conte
 
     size_t nbytes = 0;
     for (struct ggml_tensor * t = ggml_get_first_tensor(ctx); t != NULL; t = ggml_get_next_tensor(ctx, t)) {
-        GGML_ASSERT(t->data == NULL); // TODO: skip allocated tensors?
-        nbytes += GGML_PAD(ggml_backend_buft_get_alloc_size(buft, t), alignment);
+        if (t->data == NULL) {
+            nbytes += GGML_PAD(ggml_backend_buft_get_alloc_size(buft, t), alignment);
+        }
+    }
+
+    if (nbytes == 0) {
+        fprintf(stderr, "%s: no tensors to allocate\n", __func__);
+        return NULL;
     }
 
     ggml_backend_buffer_t buffer = ggml_backend_buft_alloc_buffer(buft, nbytes);
     ggml_tallocr_t tallocr = ggml_tallocr_new_from_buffer(buffer);
 
     for (struct ggml_tensor * t = ggml_get_first_tensor(ctx); t != NULL; t = ggml_get_next_tensor(ctx, t)) {
-        ggml_tallocr_alloc(tallocr, t);
+        if (t->data == NULL) {
+            ggml_tallocr_alloc(tallocr, t);
+        }
     }
 
     ggml_tallocr_free(tallocr);
