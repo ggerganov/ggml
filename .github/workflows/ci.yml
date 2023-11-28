@@ -59,7 +59,7 @@ jobs:
 
     - name: Configure CMake
       working-directory: ./build
-      run: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DGGML_TEST_COVERAGE=ON -DGGML_METAL=ON ..
+      run: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DGGML_TEST_COVERAGE=ON ..
 
     - name: Build
       working-directory: ./build
@@ -67,7 +67,7 @@ jobs:
 
     - name: Test
       working-directory: ./build
-      run: GGML_METAL_PATH_RESOURCES=./bin ctest --verbose --timeout 900
+      run: ctest --verbose --timeout 900
 
     - name: Test Coverage
       working-directory: ./build
