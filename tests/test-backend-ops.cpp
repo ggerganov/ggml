@@ -769,7 +769,11 @@ static bool test_backend(ggml_backend_t backend) {
         test_cases.emplace_back(new test_unary((ggml_unary_op) op));
     }
 
-    test_cases.emplace_back(new test_get_rows());
+    for (ggml_type type : {GGML_TYPE_F32, GGML_TYPE_F16}) {
+        test_cases.emplace_back(new test_get_rows(type, 10, 5, 3));
+        test_cases.emplace_back(new test_get_rows(type, 16, 5, 3));
+    }
+
     test_cases.emplace_back(new test_repeat());
     test_cases.emplace_back(new test_dup());
     test_cases.emplace_back(new test_cpy());
