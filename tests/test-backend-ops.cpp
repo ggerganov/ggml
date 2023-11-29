@@ -805,7 +805,17 @@ static bool test_backend(ggml_backend_t backend) {
     test_cases.emplace_back(new test_clamp());
     test_cases.emplace_back(new test_diag_mask_inf());
     test_cases.emplace_back(new test_soft_max());
-    test_cases.emplace_back(new test_rope());
+
+    test_cases.emplace_back(new test_rope(GGML_TYPE_F32, {128,  32, 10, 1}, 128, 0, 512)); // llama 7B
+    test_cases.emplace_back(new test_rope(GGML_TYPE_F32, {128,  40, 10, 1}, 128, 0, 512)); // llama 13B
+    test_cases.emplace_back(new test_rope(GGML_TYPE_F32, {128,  52, 10, 1}, 128, 0, 512)); // llama 30B
+    test_cases.emplace_back(new test_rope(GGML_TYPE_F32, {128,  64, 10, 1}, 128, 0, 512)); // llama 65B
+    test_cases.emplace_back(new test_rope(GGML_TYPE_F32, { 64,   1, 10, 1},  64, 2, 512)); // neox (falcon 7B)
+    test_cases.emplace_back(new test_rope(GGML_TYPE_F32, { 64,  71, 10, 1},  64, 2, 512)); // neox (falcon 7B)
+    test_cases.emplace_back(new test_rope(GGML_TYPE_F32, { 64,   8, 10, 1},  64, 2, 512)); // neox (falcon 40B)
+    test_cases.emplace_back(new test_rope(GGML_TYPE_F32, { 64, 128, 10, 1},  64, 2, 512)); // neox (falcon 40B)
+    //test_cases.emplace_back(new test_rope(GGML_TYPE_F32, {80, 32, 10, 1}, 20, 2, 512)); // neox rope (stablelm) (TODO: enable after llama.cpp sync)
+
     test_cases.emplace_back(new test_alibi());
     test_cases.emplace_back(new test_im2col());
     test_cases.emplace_back(new test_concat());
