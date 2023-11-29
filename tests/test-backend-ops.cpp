@@ -27,11 +27,9 @@ static void init_tensor_uniform(ggml_tensor * tensor, float min = -1.0f, float m
     if (tensor->type == GGML_TYPE_F32) {
         ggml_backend_tensor_set(tensor, data.data(), 0, size * sizeof(float));
     } else if (tensor->type == GGML_TYPE_F16) {
-        std::vector<uint16_t> data16(size);
-        for (size_t i = 0; i < size; i++) {
-            data16[i] = ggml_fp32_to_fp16(data[i]);
-        }
-        ggml_backend_tensor_set(tensor, data16.data(), 0, size * sizeof(uint16_t));
+        std::vector<ggml_fp16_t> data16(size);
+        ggml_fp32_to_fp16_row(data.data(), data16.data(), size);
+        ggml_backend_tensor_set(tensor, data16.data(), 0, size * sizeof(ggml_fp16_t));
     } else {
         GGML_ASSERT(false);
     }
@@ -163,7 +161,7 @@ static std::string var_to_str(ggml_type type) {
 }
 
 #define VARS_TO_STR1(a) VAR_TO_STR(a)
-#define VARS_TO_STR2(a, ...) VAR_TO_STR(a) + "," + VAR_TO_STR(__VA_ARGS__)
+#define VARS_TO_STR2(a, ...) VAR_TO_STR(a) + "," + VARS_TO_STR1(__VA_ARGS__)
 #define VARS_TO_STR3(a, ...) VAR_TO_STR(a) + "," + VARS_TO_STR2(__VA_ARGS__)
 #define VARS_TO_STR4(a, ...) VAR_TO_STR(a) + "," + VARS_TO_STR3(__VA_ARGS__)
 #define VARS_TO_STR5(a, ...) VAR_TO_STR(a) + "," + VARS_TO_STR4(__VA_ARGS__)
