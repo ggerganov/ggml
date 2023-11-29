@@ -699,35 +699,39 @@ struct test_alibi : public test_case {
 
 // GGML_OP_IM2COL
 struct test_im2col : public test_case {
-    const ggml_type type_a;
-    const ggml_type type_b;
-    const std::array<int64_t, 4> ne_a;
-    const std::array<int64_t, 4> ne_b;
+    const ggml_type type_input;
+    const ggml_type type_kernel;
+    const std::array<int64_t, 4> ne_input;
+    const std::array<int64_t, 4> ne_kernel;
+    // stride
     const int s0;
     const int s1;
+    // padding
     const int p0;
     const int p1;
+    // dilatation
     const int d0;
     const int d1;
+    // mode
     const bool is_2D;
 
     std::string vars() override {
-        return VARS_TO_STR11(type_a, type_b, ne_a, ne_b, s0, s1, p0, p1, d0, d1, is_2D);
+        return VARS_TO_STR11(type_input, type_kernel, ne_input, ne_kernel, s0, s1, p0, p1, d0, d1, is_2D);
     }
 
-    test_im2col(ggml_type type_a = GGML_TYPE_F16, ggml_type type_b = GGML_TYPE_F32,
-            std::array<int64_t, 4> ne_a = {10, 10, 10, 10},
-            std::array<int64_t, 4> ne_b = {10, 10, 10, 10},
+    test_im2col(ggml_type type_input = GGML_TYPE_F32, ggml_type type_kernel = GGML_TYPE_F16,
+            std::array<int64_t, 4> ne_input = {10, 10, 3, 1}, // [input_width, input_height, input_channels, 1]
+            std::array<int64_t, 4> ne_kernel = {3, 3, 3, 1}, // [kernel_width, kernel_height, input_channels, 1]
             int s0 = 1, int s1 = 1,
-            int p0 = 0, int p1 = 0,
+            int p0 = 1, int p1 = 1,
             int d0 = 1, int d1 = 1,
-            bool is_2D = false)
-        : type_a(type_a), type_b(type_b), ne_a(ne_a), ne_b(ne_b), s0(s0), s1(s1), p0(p0), p1(p1), d0(d0), d1(d1), is_2D(is_2D) {}
+            bool is_2D = true)
+        : type_input(type_input), type_kernel(type_kernel), ne_input(ne_input), ne_kernel(ne_kernel), s0(s0), s1(s1), p0(p0), p1(p1), d0(d0), d1(d1), is_2D(is_2D) {}
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
-        ggml_tensor * a = ggml_new_tensor(ctx, type_a, 4, ne_a.data());
-        ggml_tensor * b = ggml_new_tensor(ctx, type_b, 4, ne_b.data());
-        ggml_tensor * out = ggml_im2col(ctx, a, b, s0, s1, p0, p1, d0, d1, is_2D);
+        ggml_tensor * input = ggml_new_tensor(ctx, type_input, 4, ne_input.data());
+        ggml_tensor * kernel = ggml_new_tensor(ctx, type_kernel, 4, ne_kernel.data());
+        ggml_tensor * out = ggml_im2col(ctx, kernel, input, s0, s1, p0, p1, d0, d1, is_2D);
         return out;
     }
 };
