@@ -4,6 +4,7 @@
 #include <ggml-alloc.h>
 #include <ggml-backend.h>
 #include <ggml-backend-impl.h>
+#include <memory>
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
@@ -54,6 +55,7 @@ static std::vector<float> tensor_to_float(const struct ggml_tensor * t) {
     return tv;
 }
 
+/*
 static double cosine_similarity(const float * v1, const float * v2, size_t n) {
     double dot = 0.0;
     double mag1 = 0.0;
@@ -105,6 +107,7 @@ static float vec_len(const float * v, size_t n) {
 
     return sqrt(d);
 }
+*/
 
 // normalized mean squared error = mse(a, b) / mse(a, 0)
 static double nmse(const float * a, const float * b, size_t n) {
@@ -176,7 +179,12 @@ struct test_case {
 
         ggml_backend_compare_graph_backend(backend1, backend2, gf, callback, &ok);
 
-        printf("  %s: %s\n", ggml_op_desc(out), ok ? "OK" : "FAIL");
+        printf("  %s: ", ggml_op_desc(out));
+        if (ok) {
+            printf("\033[1;32mOK\033[0m\n");
+        } else {
+            printf("\033[1;31mFAIL\033[0m\n");
+        }
 
         ggml_backend_buffer_free(buf);
 
@@ -305,12 +313,12 @@ struct test_cont : public test_case {
 struct test_add : public test_case {
     const ggml_type type;
     const int64_t ne[4] = { 10, 10, 10, 10 };
-    // TODO: broadcasting
+    const int nr[4] = { 1, 2, 2, 2 };
 
     test_add(ggml_type type = GGML_TYPE_F32) : type(type) {}
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
-        ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne);
+        ggml_tensor * a = ggml_new_tensor_4d(ctx, type, ne[0]*nr[0], ne[1]*nr[1], ne[2]*nr[2], ne[3]*nr[3]);
         ggml_tensor * b = ggml_new_tensor(ctx, type, 4, ne);
         ggml_tensor * out = ggml_add(ctx, a, b);
         return out;
@@ -321,12 +329,12 @@ struct test_add : public test_case {
 struct test_mul : public test_case {
     const ggml_type type;
     const int64_t ne[4] = { 10, 10, 10, 10 };
-    // TODO: broadcasting
+    const int nr[4] = { 1, 2, 2, 2 };
 
     test_mul(ggml_type type = GGML_TYPE_F32) : type(type) {}
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
-        ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne);
+        ggml_tensor * a = ggml_new_tensor_4d(ctx, type, ne[0]*nr[0], ne[1]*nr[1], ne[2]*nr[2], ne[3]*nr[3]);
         ggml_tensor * b = ggml_new_tensor(ctx, type, 4, ne);
         ggml_tensor * out = ggml_mul(ctx, a, b);
         return out;
@@ -385,7 +393,7 @@ struct test_mul_mat : public test_case {
     const int64_t n = 10;
     const int64_t k = 10;
     const int64_t bs[2] = {10, 10}; // dims 3 and 4
-    const int64_t nr[2] = {10, 10};  // broadcast in dims 3 and 4
+    const int64_t nr[2] = {10, 10}; // repeat in dims 3 and 4
 
     test_mul_mat(ggml_type type = GGML_TYPE_F32) : type(type) {}
 
@@ -523,129 +531,58 @@ struct test_im2col : public test_case {
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
         // TODO
+        return NULL;
     }
 };
 
-
-void test_backend(ggml_backend_t backend) {
+bool test_backend(ggml_backend_t backend) {
     ggml_backend_t backend_cpu = ggml_backend_cpu_init();
+
+    std::vector<std::unique_ptr<test_case>> test_cases;
 
     // unary ops
     for (int op = 0; op < GGML_UNARY_OP_COUNT; op++) {
-        test_unary test((ggml_unary_op) op);
-        test.eval(backend_cpu, backend);
+        test_cases.emplace_back(new test_unary((ggml_unary_op) op));
     }
 
-    // get_rows
-    {
-        test_get_rows test;
-        test.eval(backend_cpu, backend);
+    test_cases.emplace_back(new test_get_rows());
+    test_cases.emplace_back(new test_repeat());
+    test_cases.emplace_back(new test_dup());
+    test_cases.emplace_back(new test_cpy());
+    test_cases.emplace_back(new test_cont());
+    test_cases.emplace_back(new test_add());
+    test_cases.emplace_back(new test_mul());
+    test_cases.emplace_back(new test_scale());
+    test_cases.emplace_back(new test_norm());
+    test_cases.emplace_back(new test_rms_norm());
+    test_cases.emplace_back(new test_mul_mat());
+    test_cases.emplace_back(new test_sqr());
+    test_cases.emplace_back(new test_clamp());
+    test_cases.emplace_back(new test_diag_mask_inf());
+    test_cases.emplace_back(new test_soft_max());
+    test_cases.emplace_back(new test_rope());
+    test_cases.emplace_back(new test_alibi());
+    //test_cases.emplace_back(new test_im2col());
+
+    size_t n_ok = 0;
+    for (auto & test : test_cases) {
+        if (test->eval(backend, backend_cpu)) {
+            n_ok++;
+        }
     }
 
-    // ggml_repeat
-    {
-        test_repeat test;
-        test.eval(backend_cpu, backend);
-    }
-
-    // ggml_dup
-    {
-        test_dup test;
-        test.eval(backend_cpu, backend);
-    }
-
-    // ggml_cpy
-    {
-        test_cpy test;
-        test.eval(backend_cpu, backend);
-    }
-
-    // ggml_cont
-    {
-        test_cont test;
-        test.eval(backend_cpu, backend);
-    }
-
-    // ggml_add
-    {
-        test_add test;
-        test.eval(backend_cpu, backend);
-    }
-
-    // ggml_mul
-    {
-        test_mul test;
-        test.eval(backend_cpu, backend);
-    }
-
-    // ggml_scale
-    {
-        test_scale test;
-        test.eval(backend_cpu, backend);
-    }
-
-    // ggml_norm
-    {
-        test_norm test;
-        test.eval(backend_cpu, backend);
-    }
-
-    // ggml_rms_norm
-    {
-        test_rms_norm test;
-        test.eval(backend_cpu, backend);
-    }
-
-    // ggml_mul_mat
-    {
-        test_mul_mat test;
-        test.eval(backend_cpu, backend);
-    }
-
-    // ggml_sqr
-    {
-        test_sqr test;
-        test.eval(backend_cpu, backend);
-    }
-
-    // ggml_clamp,
-    {
-        test_clamp test;
-        test.eval(backend_cpu, backend);
-    }
-
-    // ggml_diag_mask_inf
-    {
-        test_diag_mask_inf test;
-        test.eval(backend_cpu, backend);
-    }
-
-    // ggml_soft_max
-    {
-        test_soft_max test;
-        test.eval(backend_cpu, backend);
-    }
-
-    // ggml_rope
-    {
-        test_rope test;
-        test.eval(backend_cpu, backend);
-    }
-
-    // ggml_alibi
-    {
-        test_alibi test;
-        test.eval(backend_cpu, backend);
-    }
-
-    // ggml_im2col
+    printf("  %zu/%zu tests passed\n", n_ok, test_cases.size());
 
     ggml_backend_free(backend_cpu);
+
+    return n_ok == test_cases.size();
 }
 
 int main() {
     // enumerate backends
     printf("Testing %zu backends\n\n", ggml_backend_reg_get_count());
+
+    size_t n_ok = 0;
 
     for (size_t i = 0; i < ggml_backend_reg_get_count(); i++) {
         printf("Backend %zu/%zu (%s)\n", i + 1, ggml_backend_reg_get_count(), ggml_backend_reg_get_name(i));
@@ -654,10 +591,27 @@ int main() {
         GGML_ASSERT(backend != NULL);
         printf("  Backend name: %s\n", ggml_backend_name(backend));
 
-        test_backend(backend);
+        bool ok = test_backend(backend);
+
+        printf("  Backend %s: ", ggml_backend_name(backend));
+        if (ok) {
+            printf("\033[1;32mOK\033[0m\n");
+            n_ok++;
+        } else {
+            printf("\033[1;31mFAIL\033[0m\n");
+        }
+
+        printf("\n");
 
         ggml_backend_free(backend);
+    }
 
-        printf("  OK\n\n");
+    printf("%zu/%zu backends passed\n", n_ok, ggml_backend_reg_get_count());
+    if (n_ok != ggml_backend_reg_get_count()) {
+        printf("\033[1;31mFAIL\033[0m\n");
+        return 1;
+    } else {
+        printf("\033[1;32mOK\033[0m\n");
+        return 0;
     }
 }
