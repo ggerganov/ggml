@@ -769,7 +769,7 @@ ggml_backend_buffer_t ggml_backend_alloc_ctx_tensors_from_buft(struct ggml_conte
 
     size_t nbytes = 0;
     for (struct ggml_tensor * t = ggml_get_first_tensor(ctx); t != NULL; t = ggml_get_next_tensor(ctx, t)) {
-        if (t->data == NULL) {
+        if (t->data == NULL && t->view_src == NULL) {
             nbytes += GGML_PAD(ggml_backend_buft_get_alloc_size(buft, t), alignment);
         }
     }
@@ -784,7 +784,15 @@ ggml_backend_buffer_t ggml_backend_alloc_ctx_tensors_from_buft(struct ggml_conte
 
     for (struct ggml_tensor * t = ggml_get_first_tensor(ctx); t != NULL; t = ggml_get_next_tensor(ctx, t)) {
         if (t->data == NULL) {
-            ggml_tallocr_alloc(tallocr, t);
+            if (t->view_src == NULL) {
+                ggml_tallocr_alloc(tallocr, t);
+            } else {
+                // TODO: ggml_backend_init_view
+                t->backend = t->view_src->backend;
+                t->data = (char *)t->view_src->data + t->view_offs;
+                t->buffer = buffer;
+                ggml_backend_buffer_init_tensor(buffer, t);
+            }
         }
     }
 

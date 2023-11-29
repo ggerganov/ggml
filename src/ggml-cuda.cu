@@ -8500,8 +8500,6 @@ static void ggml_backend_cuda_graph_compute(ggml_backend_t backend, ggml_cgraph 
 }
 
 static bool ggml_backend_cuda_supports_op(ggml_backend_t backend, const ggml_tensor * tensor) {
-
-
     switch (tensor->op) {
         case GGML_OP_UNARY:
             switch (ggml_get_unary_op(tensor)) {

@@ -1181,6 +1181,7 @@ static void graph_init_tensor(struct ggml_hash_set hash_set, struct ggml_tensor 
         dst->backend = dst->view_src->backend;
         dst->buffer = dst->view_src->buffer;
         dst->data = (char *)dst->view_src->data + dst->view_offs;
+        ggml_backend_buffer_init_tensor(dst->buffer, dst);
     }
     else {
         ggml_backend_tensor_copy(src, dst);
