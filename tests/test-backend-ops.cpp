@@ -732,6 +732,29 @@ struct test_im2col : public test_case {
     }
 };
 
+// GGML_OP_CONCAT
+struct test_concat : public test_case {
+    const ggml_type type;
+    const std::array<int64_t, 4> ne;
+    const int64_t b_ne2;
+
+    std::string vars() override {
+        return VARS_TO_STR3(type, ne, b_ne2);
+    }
+
+    test_concat(ggml_type type = GGML_TYPE_F32,
+            std::array<int64_t, 4> ne = {10, 10, 10, 10},
+            int64_t b_ne2 = 10)
+        : type(type), ne(ne), b_ne2(b_ne2) {}
+
+    ggml_tensor * build_graph(ggml_context * ctx) override {
+        ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne.data());
+        ggml_tensor * b = ggml_new_tensor_4d(ctx, type, ne[0], ne[1], b_ne2, ne[3]);
+        ggml_tensor * out = ggml_concat(ctx, a, b);
+        return out;
+    }
+};
+
 static bool test_backend(ggml_backend_t backend) {
     ggml_backend_t backend_cpu = ggml_backend_cpu_init();
 
@@ -781,6 +804,7 @@ static bool test_backend(ggml_backend_t backend) {
     test_cases.emplace_back(new test_rope());
     test_cases.emplace_back(new test_alibi());
     test_cases.emplace_back(new test_im2col());
+    test_cases.emplace_back(new test_concat());
 
     size_t n_ok = 0;
     for (auto & test : test_cases) {

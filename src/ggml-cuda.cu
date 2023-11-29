@@ -8509,7 +8509,13 @@ static bool ggml_backend_cuda_supports_op(ggml_backend_t backend, const ggml_ten
                     return true;
                 default:
                     return false;
-            } break;
+            }
+            break;
+        case GGML_OP_NONE:
+        case GGML_OP_RESHAPE:
+        case GGML_OP_VIEW:
+        case GGML_OP_PERMUTE:
+        case GGML_OP_TRANSPOSE:
         case GGML_OP_NORM:
         case GGML_OP_REPEAT:
         case GGML_OP_GET_ROWS:
@@ -8523,10 +8529,6 @@ static bool ggml_backend_cuda_supports_op(ggml_backend_t backend, const ggml_ten
         case GGML_OP_CLAMP:
         case GGML_OP_CPY:
         case GGML_OP_CONT:
-        case GGML_OP_RESHAPE:
-        case GGML_OP_VIEW:
-        case GGML_OP_PERMUTE:
-        case GGML_OP_TRANSPOSE:
         case GGML_OP_DIAG_MASK_INF:
         case GGML_OP_SOFT_MAX:
         case GGML_OP_ROPE:
