@@ -1,15 +1,16 @@
-#include <cstring>
-#include <functional>
 #include <ggml.h>
 #include <ggml-alloc.h>
 #include <ggml-backend.h>
 #include <ggml-backend-impl.h>
 #include <array>
+#include <cstring>
+#include <cfloat>
+#include <functional>
 #include <memory>
+#include <random>
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
-#include <random>
 
 
 static void init_tensor_uniform(ggml_tensor * tensor, float min = -1.0f, float max = 1.0f) {
@@ -189,6 +190,10 @@ static std::string var_to_str(ggml_type type) {
 #define VARS_TO_STR10(a,...) VAR_TO_STR(a) + "," + VARS_TO_STR9(__VA_ARGS__)
 #define VARS_TO_STR11(a,...) VAR_TO_STR(a) + "," + VARS_TO_STR10(__VA_ARGS__)
 
+// accept FLT_MAX as infinity
+static bool isinf_or_max(float f) {
+    return std::isinf(f) || f == FLT_MAX || f == -FLT_MAX;
+}
 
 struct test_case {
     virtual ~test_case() {}
@@ -240,10 +245,35 @@ struct test_case {
         auto callback = [](int index, ggml_tensor * t1, ggml_tensor * t2, void * user_data) -> bool {
             std::vector<float> f1 = tensor_to_float(t1);
             std::vector<float> f2 = tensor_to_float(t2);
+            bool * ok = (bool *) user_data;
+
+            for (size_t i = 0; i < f1.size(); i++) {
+                // check for nans
+                if (std::isnan(f1[i]) || std::isnan(f2[i])) {
+                    printf("    Error: %s: NaN\n", ggml_op_desc(t1));
+                    *ok = false;
+                    return true;
+                }
+                // check for infs: both must be inf of the same sign, or both must be finite
+                if (isinf_or_max(f1[i]) || isinf_or_max(f2[i])) {
+                    if (isinf_or_max(f1[i]) && isinf_or_max(f2[i])) {
+                        if (std::signbit(f1[i]) != std::signbit(f2[i])) {
+                            printf("    Error: %s: inf sign mismatch: %f %f\n", ggml_op_desc(t1), f1[i], f2[i]);
+                            *ok = false;
+                            return true;
+                        }
+                    } else {
+                        printf("    Error: %s: inf mismatch: %f %f\n", ggml_op_desc(t1), f1[i], f2[i]);
+                        *ok = false;
+                        return true;
+                    }
+                }
+            }
+
             double err = nmse(f1.data(), f2.data(), f1.size());
             if (err > 1e-6) {
-                printf("Error: %s: NMSE = %f\n", ggml_op_desc(t1), err);
-                *(bool *) user_data = false;
+                printf("    Error: %s: NMSE = %f\n", ggml_op_desc(t1), err);
+                *ok = false;
             }
             return true;
        };

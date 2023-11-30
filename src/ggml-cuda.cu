@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <float.h>
 #include <limits>
 #include <stdint.h>
 #include <stdio.h>
@@ -4684,8 +4685,9 @@ static __global__ void diag_mask_inf_f32(const float * x, float * dst, const int
     }
 
     const int i = row*ncols + col;
-    dst[i] = col > (n_past + row % rows_per_channel) ? -INFINITY : x[i];
+    //dst[i] = col > (n_past + row % rows_per_channel) ? -INFINITY : x[i];
     //dst[i] = x[i] - (col > n_past + row % rows_per_channel) * INT_MAX; // equivalent within rounding error but slightly faster on GPU
+    dst[i] = x[i] - (col > n_past + row % rows_per_channel) * FLT_MAX;
 }
 
 // the CUDA soft max implementation differs from the CPU implementation
