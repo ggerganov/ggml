@@ -817,24 +817,24 @@ static bool test_backend(ggml_backend_t backend) {
     test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 1, 1}, {1, 1, 1, 1}));
     test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 1}, {1, 1, 1, 1}));
     test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 1, 1}));
-    //test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 1, 1, 1})); // broadcasting dim 0 is not supported
+    test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 1, 1, 1}));
     test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 2, 1, 1}));
     test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 2, 1}));
     test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 1, 2}));
     test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 2, 2}));
     test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 2, 2, 2}));
-    //test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 2, 2, 2}));
+    test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 2, 2, 2}));
 
     test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 1, 1}, {1, 1, 1, 1}));
     test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 1}, {1, 1, 1, 1}));
     test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 1, 1}));
-    //test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 1, 1, 1})); // broadcasting dim 0 is not supported
+    test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 1, 1, 1}));
     test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 2, 1, 1}));
     test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 2, 1}));
     test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 1, 2}));
     test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 2, 2}));
     test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 2, 2, 2}));
-    //test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 2, 2, 2}));
+    test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 2, 2, 2}));
 
     test_cases.emplace_back(new test_scale());
 
