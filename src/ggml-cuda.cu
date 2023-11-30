@@ -8592,19 +8592,13 @@ static ggml_backend_t ggml_backend_reg_cuda_init(const char * params, void * use
 }
 
 static int ggml_backend_cuda_reg_devices() {
-    ggml_init_cublas();
-
-    if (g_cublas_loaded) {
-        int device_count = ggml_cuda_get_device_count();
-        for (int i = 0; i < device_count; i++) {
-            char name[128];
-            snprintf(name, sizeof(name), "%s%d", GGML_CUDA_NAME, i);
-            ggml_backend_register(name, ggml_backend_reg_cuda_init, ggml_backend_cuda_buffer_type(i), (void *) (intptr_t) i);
-        }
-        return device_count;
+    int device_count = ggml_cuda_get_device_count();
+    for (int i = 0; i < device_count; i++) {
+        char name[128];
+        snprintf(name, sizeof(name), "%s%d", GGML_CUDA_NAME, i);
+        ggml_backend_register(name, ggml_backend_reg_cuda_init, ggml_backend_cuda_buffer_type(i), (void *) (intptr_t) i);
     }
-
-    return 0;
+    return device_count;
 }
 
 GGML_CONSTRUCTOR(ggml_backend_cuda_reg_devices)

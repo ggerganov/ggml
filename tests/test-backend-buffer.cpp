@@ -49,7 +49,7 @@ static void test_buffer(ggml_backend_t backend, ggml_backend_buffer_type_t buft)
 
     float data[n];
     for (size_t i = 0; i < n; i++) {
-        data[i] = i;
+        data[i] = (float) i;
     }
 
     ggml_backend_tensor_set(tensor, data, 0, sizeof(data));

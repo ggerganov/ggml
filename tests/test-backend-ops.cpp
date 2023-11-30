@@ -10,6 +10,7 @@
 #include <random>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <vector>
 
 
@@ -179,16 +180,17 @@ static std::string var_to_str(ggml_type type) {
 }
 
 #define VARS_TO_STR1(a) VAR_TO_STR(a)
-#define VARS_TO_STR2(a, ...) VAR_TO_STR(a) + "," + VARS_TO_STR1(__VA_ARGS__)
-#define VARS_TO_STR3(a, ...) VAR_TO_STR(a) + "," + VARS_TO_STR2(__VA_ARGS__)
-#define VARS_TO_STR4(a, ...) VAR_TO_STR(a) + "," + VARS_TO_STR3(__VA_ARGS__)
-#define VARS_TO_STR5(a, ...) VAR_TO_STR(a) + "," + VARS_TO_STR4(__VA_ARGS__)
-#define VARS_TO_STR6(a, ...) VAR_TO_STR(a) + "," + VARS_TO_STR5(__VA_ARGS__)
-#define VARS_TO_STR7(a, ...) VAR_TO_STR(a) + "," + VARS_TO_STR6(__VA_ARGS__)
-#define VARS_TO_STR8(a, ...) VAR_TO_STR(a) + "," + VARS_TO_STR7(__VA_ARGS__)
-#define VARS_TO_STR9(a, ...) VAR_TO_STR(a) + "," + VARS_TO_STR8(__VA_ARGS__)
-#define VARS_TO_STR10(a,...) VAR_TO_STR(a) + "," + VARS_TO_STR9(__VA_ARGS__)
-#define VARS_TO_STR11(a,...) VAR_TO_STR(a) + "," + VARS_TO_STR10(__VA_ARGS__)
+#define VARS_TO_STR2(a, b) VAR_TO_STR(a) + "," + VAR_TO_STR(b)
+#define VARS_TO_STR3(a, b, c) VAR_TO_STR(a) + "," + VARS_TO_STR2(b, c)
+#define VARS_TO_STR4(a, b, c, d) VAR_TO_STR(a) + "," + VARS_TO_STR3(b, c, d)
+#define VARS_TO_STR5(a, b, c, d, e) VAR_TO_STR(a) + "," + VARS_TO_STR4(b, c, d, e)
+#define VARS_TO_STR6(a, b, c, d, e, f) VAR_TO_STR(a) + "," + VARS_TO_STR5(b, c, d, e, f)
+#define VARS_TO_STR7(a, b, c, d, e, f, g) VAR_TO_STR(a) + "," + VARS_TO_STR6(b, c, d, e, f, g)
+#define VARS_TO_STR8(a, b, c, d, e, f, g, h) VAR_TO_STR(a) + "," + VARS_TO_STR7(b, c, d, e, f, g, h)
+#define VARS_TO_STR9(a, b, c, d, e, f, g, h, i) VAR_TO_STR(a) + "," + VARS_TO_STR8(b, c, d, e, f, g, h, i)
+#define VARS_TO_STR10(a, b, c, d, e, f, g, h, i, j) VAR_TO_STR(a) + "," + VARS_TO_STR9(b, c, d, e, f, g, h, i, j)
+#define VARS_TO_STR11(a, b, c, d, e, f, g, h, i, j, k) VAR_TO_STR(a) + "," + VARS_TO_STR10(b, c, d, e, f, g, h, i, j, k)
+
 
 // accept FLT_MAX as infinity
 static bool isinf_or_max(float f) {

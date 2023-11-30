@@ -115,15 +115,17 @@ extern "C" {
                 init_fn(); \
             }
     #elif defined(_MSC_VER)
-        #define GGML_CONSTRUCTOR(init_fn) \
-            __declspec(allocate(".CRT$XCU")) void init_fn ## _ggml_constructor(void) { \
-                init_fn(); \
-            } \
-            __pragma(comment(linker, "/include:" #init_fn "_ggml_constructor"))
+        #ifdef __cplusplus
+            #define GGML_CONSTRUCTOR(init_fn) \
+                static int init_fn ## _ggml_constructor_dummy = init_fn();
+        #else
+            #define GGML_CONSTRUCTOR(init_fn) \
+                __pragma(section(".CRT$XCV", read)) \
+                __declspec(allocate(".CRT$XCV")) int (*init_fn ## _ggml_constructor)(void) = init_fn; \
+                __pragma(comment(linker, "/include:" #init_fn "_ggml_constructor"))
+        #endif
     #else
-        // Fallback for other compilers
-        #define GGML_CONSTRUCTOR(init_fn) \
-            static int init_fn ## _backend_register_dummy = init_fn();
+        #error "GGML_CONSTRUCTOR not implemented for this compiler"
     #endif
 
 
