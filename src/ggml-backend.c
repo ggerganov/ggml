@@ -662,8 +662,16 @@ static ggml_backend_t get_allocr_backend(ggml_backend_sched_t sched, ggml_talloc
     GGML_UNREACHABLE();
 }
 
+#if 0
+static char causes[GGML_DEFAULT_GRAPH_SIZE*8 + GGML_MAX_SPLITS*GGML_MAX_SPLIT_INPUTS][128]; // debug, remove
+#define SET_CAUSE(node, ...) sprintf(causes[hash_id(node)], __VA_ARGS__)
+#define GET_CAUSE(node) causes[hash_id(node)]
+#else
+#define SET_CAUSE(node, ...)
+#define GET_CAUSE(node) ""
+#endif
+
 // returns the backend that should be used for the node based on the current locations
-char causes[GGML_DEFAULT_GRAPH_SIZE*4 + GGML_MAX_SPLITS*GGML_MAX_SPLIT_INPUTS][128]; // debug, remove
 static ggml_backend_t sched_backend_from_cur(ggml_backend_sched_t sched, struct ggml_tensor * node) {
     // if the dst tensor is already allocated in a buffer, we must assume that it is critical to keep it there
     // ie. kv cache updates
@@ -671,13 +679,13 @@ static ggml_backend_t sched_backend_from_cur(ggml_backend_sched_t sched, struct 
     // dst
     ggml_backend_t cur_backend = get_buffer_backend(sched, node->buffer);
     if (cur_backend != NULL) {
-        sprintf(causes[hash_id(node)], "1.dst");
+        SET_CAUSE(node, "1.dst");
         return cur_backend;
     }
 
     // view_src
     if (node->view_src != NULL && get_buffer_backend(sched, node->view_src->buffer) != NULL) {
-        sprintf(causes[hash_id(node)], "1.vsrc");
+        SET_CAUSE(node, "1.vsrc");
         return get_buffer_backend(sched, node->view_src->buffer);
     }
 
@@ -698,7 +706,7 @@ static ggml_backend_t sched_backend_from_cur(ggml_backend_sched_t sched, struct 
                 cur_prio = src_prio;
                 cur_size = src_size;
                 cur_backend = src_backend;
-                sprintf(causes[hash_id(node)], "1.src%d", i);
+                SET_CAUSE(node, "1.src%d", i);
             }
         }
     }
@@ -736,7 +744,7 @@ static void sched_print_assignments(ggml_backend_sched_t sched, struct ggml_cgra
         ggml_tallocr_t node_allocr = node_allocr(node);
         ggml_backend_t node_backend = node_allocr ? get_allocr_backend(sched, node_allocr) : NULL; // FIXME:
         fprintf(stderr, "node #%3d (%10.10s): %20.20s (%4.4s) [%4.4s %8.8s]:", i, ggml_op_name(node->op), node->name,
-            fmt_size(ggml_nbytes(node)), node_allocr ? ggml_backend_name(node_backend) : "NULL", causes[hash_id(node)]);
+            fmt_size(ggml_nbytes(node)), node_allocr ? ggml_backend_name(node_backend) : "NULL", GET_CAUSE(node));
         for (int j = 0; j < GGML_MAX_SRC; j++) {
             struct ggml_tensor * src = node->src[j];
             if (src == NULL) {
@@ -745,7 +753,7 @@ static void sched_print_assignments(ggml_backend_sched_t sched, struct ggml_cgra
             ggml_tallocr_t src_allocr = node_allocr(src);
             ggml_backend_t src_backend = src_allocr ? get_allocr_backend(sched, src_allocr) : NULL;
             fprintf(stderr, " %20.20s (%4.4s) [%4.4s %8.8s]", src->name,
-                fmt_size(ggml_nbytes(src)), src_backend ? ggml_backend_name(src_backend) : "NULL", causes[hash_id(src)]);
+                fmt_size(ggml_nbytes(src)), src_backend ? ggml_backend_name(src_backend) : "NULL", GET_CAUSE(src));
         }
         fprintf(stderr, "\n");
     }
@@ -833,7 +841,7 @@ static void sched_split_graph(ggml_backend_sched_t sched, struct ggml_cgraph * g
                         cur_prio = src_prio;
                         cur_size = src_size;
                         node_allocr = src_allocr;
-                        sprintf(causes[hash_id(node)], "2.src%d", j);
+                        SET_CAUSE(node, "2.src%d", j);
                     }
                 }
             }
