@@ -996,26 +996,23 @@ static void sched_compute_splits(ggml_backend_sched_t sched) {
         // copy the input tensors to the split backend
         uint64_t copy_start_us = ggml_time_us();
         for (int j = 0; j < split->n_inputs; j++) {
-            struct ggml_tensor * input_cpy = sched->node_copies[hash_id(split->inputs[j])][sched_backend_prio(sched, split_backend)];
-            if (split->inputs[j]->buffer == NULL) {
-                if (split->inputs[j]->view_src == NULL) {
-                    fprintf(stderr, "input %s has no buffer and no view_src\n", split->inputs[j]->name);
+            struct ggml_tensor * input = split->inputs[j];
+            struct ggml_tensor * input_cpy = sched->node_copies[hash_id(input)][sched_backend_prio(sched, split_backend)];
+            if (input->buffer == NULL) {
+                if (input->view_src == NULL) {
+                    fprintf(stderr, "input %s has no buffer and no view_src\n", input->name);
                     exit(1);
                 }
-                struct ggml_tensor * view = split->inputs[j];
-                view->backend = view->view_src->backend;
-                view->buffer  = view->view_src->buffer;
-                view->data    = (char *)view->view_src->data + view->view_offs;
-                //ggml_backend_buffer_init_tensor(ggml_backend_sched_get_buffer(sched, view->buffer->backend), view);
-                ggml_backend_buffer_init_tensor(view->buffer, view);
+                // FIXME: may need to use the sched buffer instead
+                ggml_backend_view_init(input->view_src->buffer, input);
             }
             if (input_cpy->buffer == NULL) {
                 fprintf(stderr, "input_cpy %s has no buffer\n", input_cpy->name);
                 exit(1);
             }
-            //GGML_ASSERT(split->inputs[j]->buffer->backend != input_cpy->buffer->backend);
+            //GGML_ASSERT(input->buffer->backend != input_cpy->buffer->backend);
             //GGML_ASSERT(input_cpy->buffer->backend == split_backend);
-            ggml_backend_tensor_copy(split->inputs[j], input_cpy);
+            ggml_backend_tensor_copy(input, input_cpy);
         }
         // ggml_backend_synchronize(split_backend);
         int64_t copy_end_us = ggml_time_us();
@@ -1135,6 +1132,32 @@ void ggml_backend_sched_set_node_backend(ggml_backend_sched_t sched, struct ggml
 }
 
 // utils
+void ggml_backend_view_init(ggml_backend_buffer_t buffer, struct ggml_tensor * tensor) {
+    GGML_ASSERT(tensor->buffer == NULL);
+    GGML_ASSERT(tensor->data == NULL);
+    GGML_ASSERT(tensor->view_src != NULL);
+    GGML_ASSERT(tensor->view_src->buffer != NULL);
+    GGML_ASSERT(tensor->view_src->data != NULL);
+
+    tensor->buffer = buffer;
+    tensor->data = (char *)tensor->view_src->data + tensor->view_offs;
+    tensor->backend = tensor->view_src->backend;
+    ggml_backend_buffer_init_tensor(buffer, tensor);
+}
+
+void ggml_backend_tensor_alloc(ggml_backend_buffer_t buffer, struct ggml_tensor * tensor, void * addr) {
+    GGML_ASSERT(tensor->buffer == NULL);
+    GGML_ASSERT(tensor->data == NULL);
+    GGML_ASSERT(tensor->view_src == NULL);
+    GGML_ASSERT(addr >= ggml_backend_buffer_get_base(buffer));
+    GGML_ASSERT((char *)addr + ggml_backend_buffer_get_alloc_size(buffer, tensor) <=
+                (char *)ggml_backend_buffer_get_base(buffer) + ggml_backend_buffer_get_size(buffer));
+
+    tensor->buffer = buffer;
+    tensor->data = addr;
+    ggml_backend_buffer_init_tensor(buffer, tensor);
+}
+
 static struct ggml_tensor * graph_dup_tensor(struct ggml_hash_set hash_set, struct ggml_tensor ** node_copies,
     struct ggml_context * ctx_allocated, struct ggml_context * ctx_unallocated, struct ggml_tensor * src) {
 
@@ -1177,11 +1200,7 @@ static void graph_init_tensor(struct ggml_hash_set hash_set, struct ggml_tensor 
 
     struct ggml_tensor * dst = node_copies[id];
     if (dst->view_src != NULL) {
-        // todo: add ggml_backend_init_view, reuse in ggml-alloc
-        dst->backend = dst->view_src->backend;
-        dst->buffer = dst->view_src->buffer;
-        dst->data = (char *)dst->view_src->data + dst->view_offs;
-        ggml_backend_buffer_init_tensor(dst->buffer, dst);
+        ggml_backend_view_init(dst->view_src->buffer, dst);
     }
     else {
         ggml_backend_tensor_copy(src, dst);

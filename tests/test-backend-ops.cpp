@@ -119,6 +119,23 @@ static float vec_len(const float * v, size_t n) {
 }
 */
 
+// normalized mean squared error = mse(a, b) / mse(a, 0)
+static double nmse(const float * a, const float * b, size_t n) {
+    double mse_a_b = 0.0;
+    double mse_a_0 = 0.0;
+
+    for (size_t i = 0; i < n; i++) {
+        float a_i = a[i];
+        float b_i = b[i];
+
+        mse_a_b += (a_i - b_i) * (a_i - b_i);
+        mse_a_0 += a_i * a_i;
+    }
+
+    return mse_a_b / mse_a_0;
+}
+
+// utils for printing the variables of the test cases
 #define VAR_TO_STR(x) (#x "=" + var_to_str(x))
 
 template<typename T>
@@ -172,22 +189,6 @@ static std::string var_to_str(ggml_type type) {
 #define VARS_TO_STR10(a,...) VAR_TO_STR(a) + "," + VARS_TO_STR9(__VA_ARGS__)
 #define VARS_TO_STR11(a,...) VAR_TO_STR(a) + "," + VARS_TO_STR10(__VA_ARGS__)
 
-
-// normalized mean squared error = mse(a, b) / mse(a, 0)
-static double nmse(const float * a, const float * b, size_t n) {
-    double mse_a_b = 0.0;
-    double mse_a_0 = 0.0;
-
-    for (size_t i = 0; i < n; i++) {
-        float a_i = a[i];
-        float b_i = b[i];
-
-        mse_a_b += (a_i - b_i) * (a_i - b_i);
-        mse_a_0 += a_i * a_i;
-    }
-
-    return mse_a_b / mse_a_0;
-}
 
 struct test_case {
     virtual ~test_case() {}

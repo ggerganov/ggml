@@ -135,6 +135,7 @@ void ggml_tallocr_alloc(ggml_tallocr_t alloc, struct ggml_tensor * tensor) {
         ggml_backend_buffer_init_tensor(alloc->buffer, tensor);
     }
 
+
 #ifdef GGML_ALLOCATOR_DEBUG
     add_allocated_tensor(alloc, tensor);
     size_t cur_max = (char*)addr - (char*)alloc->data + size;
@@ -787,11 +788,7 @@ ggml_backend_buffer_t ggml_backend_alloc_ctx_tensors_from_buft(struct ggml_conte
             if (t->view_src == NULL) {
                 ggml_tallocr_alloc(tallocr, t);
             } else {
-                // TODO: ggml_backend_init_view
-                t->backend = t->view_src->backend;
-                t->data = (char *)t->view_src->data + t->view_offs;
-                t->buffer = buffer;
-                ggml_backend_buffer_init_tensor(buffer, t);
+                ggml_backend_view_init(buffer, t);
             }
         }
     }
