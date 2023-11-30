@@ -814,6 +814,9 @@ static bool test_backend(ggml_backend_t backend) {
     for (ggml_type t0 : {GGML_TYPE_F32, GGML_TYPE_F16}) {
         for (ggml_type t1 : {GGML_TYPE_F32 /*, GGML_TYPE_F16 */}) {
             // FIXME: CPU crashes on f16xf16
+            test_cases.emplace_back(new test_mul_mat(t0, t1, 32, 32, 32, { 1,  1}, {1, 1}));
+            test_cases.emplace_back(new test_mul_mat(t0, t1, 32, 32, 32, {10,  1}, {1, 1}));
+            test_cases.emplace_back(new test_mul_mat(t0, t1, 32, 32, 32, {10,  1}, {2, 1}));
             test_cases.emplace_back(new test_mul_mat(t0, t1, 32, 32, 32, {10, 10}, {1, 1}));
             test_cases.emplace_back(new test_mul_mat(t0, t1, 32, 32, 32, {10, 10}, {2, 1}));
             test_cases.emplace_back(new test_mul_mat(t0, t1, 32, 32, 32, {10, 10}, {1, 2}));
