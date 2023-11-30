@@ -26,6 +26,8 @@
 #pragma warning(disable: 4244 4267) // possible loss of data
 #endif
 
+#define GPT2_MAX_NODES 4096
+
 static void ggml_log_callback_default(ggml_log_level level, const char * text, void * user_data) {
     (void) level;
     (void) user_data;
@@ -452,7 +454,7 @@ struct ggml_cgraph * gpt2_graph(
     const int n_head  = hparams.n_head;
 
     // since we are using ggml-alloc, this buffer only needs enough space to hold the ggml_tensor and ggml_cgraph structs, but not the tensor data
-    static size_t buf_size = ggml_tensor_overhead()*GGML_DEFAULT_GRAPH_SIZE + ggml_graph_overhead();
+    static size_t buf_size = ggml_tensor_overhead()*GPT2_MAX_NODES + ggml_graph_overhead_custom(GPT2_MAX_NODES, false);
     static std::vector<uint8_t> buf(buf_size);
 
     struct ggml_init_params params = {
@@ -463,7 +465,7 @@ struct ggml_cgraph * gpt2_graph(
 
     struct ggml_context * ctx0 = ggml_init(params);
 
-    struct ggml_cgraph  * gf = ggml_new_graph(ctx0);
+    struct ggml_cgraph  * gf = ggml_new_graph_custom(ctx0, GPT2_MAX_NODES, false);
 
     struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
     ggml_allocr_alloc(allocr, embd);
