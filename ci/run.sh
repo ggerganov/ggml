@@ -94,6 +94,10 @@ function gg_run_ctest_debug {
     (time cmake -DCMAKE_BUILD_TYPE=Debug ${CMAKE_EXTRA} ..     ) 2>&1 | tee -a $OUT/${ci}-cmake.log
     (time make -j                                              ) 2>&1 | tee -a $OUT/${ci}-make.log
 
+    if [ ! -z ${GG_BUILD_METAL} ]; then
+        export GGML_METAL_PATH_RESOURCES="$(pwd)/bin"
+    fi
+
     (time ctest --output-on-failure -E test-opt ) 2>&1 | tee -a $OUT/${ci}-ctest.log
 
     set +e
@@ -121,6 +125,10 @@ function gg_run_ctest_release {
 
     (time cmake -DCMAKE_BUILD_TYPE=Release ${CMAKE_EXTRA} ..   ) 2>&1 | tee -a $OUT/${ci}-cmake.log
     (time make -j                                              ) 2>&1 | tee -a $OUT/${ci}-make.log
+
+    if [ ! -z ${GG_BUILD_METAL} ]; then
+        export GGML_METAL_PATH_RESOURCES="$(pwd)/bin"
+    fi
 
     if [ -z $GG_BUILD_LOW_PERF ]; then
         (time ctest --output-on-failure ) 2>&1 | tee -a $OUT/${ci}-ctest.log
