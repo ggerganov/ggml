@@ -802,9 +802,11 @@ static bool test_backend(ggml_backend_t backend) {
     //test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 2, 2, 2}));
 
     test_cases.emplace_back(new test_scale());
-    test_cases.emplace_back(new test_norm());
-    test_cases.emplace_back(new test_rms_norm());
 
+    for (float eps : {1e-6f, 1e-5f, 1e-3f, 1e-1f}) {
+        test_cases.emplace_back(new test_norm(GGML_TYPE_F32, {64, 10, 10, 10}, eps));
+        test_cases.emplace_back(new test_rms_norm(GGML_TYPE_F32, {64, 10, 10, 10}, eps));
+    }
 
     for (ggml_type t0 : {GGML_TYPE_F32, GGML_TYPE_F16}) {
         for (ggml_type t1 : {GGML_TYPE_F32 /*, GGML_TYPE_F16 */}) {
