@@ -856,7 +856,11 @@ static bool test_backend(ggml_backend_t backend) {
 
     test_cases.emplace_back(new test_sqr());
     test_cases.emplace_back(new test_clamp());
-    test_cases.emplace_back(new test_diag_mask_inf());
+
+    test_cases.emplace_back(new test_diag_mask_inf(GGML_TYPE_F32, {10, 10,  1,  1}, 5));
+    test_cases.emplace_back(new test_diag_mask_inf(GGML_TYPE_F32, {10, 10, 10,  1}, 5));
+    test_cases.emplace_back(new test_diag_mask_inf(GGML_TYPE_F32, {10, 10, 10, 10}, 5));
+
     test_cases.emplace_back(new test_soft_max());
 
     for (ggml_type type : {GGML_TYPE_F32, GGML_TYPE_F16}) {
