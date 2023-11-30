@@ -71,7 +71,7 @@ void load_model(test_model & model, bool use_gpu = false) {
 #ifdef GGML_USE_CUBLAS
     if (use_gpu) {
         fprintf(stderr, "%s: using CUDA backend\n", __func__);
-        model.backend = ggml_backend_cuda_init();
+        model.backend = ggml_backend_cuda_init(0);
         if (!model.backend) {
             fprintf(stderr, "%s: ggml_backend_cuda_init() failed\n", __func__);
         }

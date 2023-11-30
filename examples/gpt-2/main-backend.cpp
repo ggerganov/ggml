@@ -26,6 +26,8 @@
 #pragma warning(disable: 4244 4267) // possible loss of data
 #endif
 
+#define GPT2_MAX_NODES 4096
+
 static void ggml_log_callback_default(ggml_log_level level, const char * text, void * user_data) {
     (void) level;
     (void) user_data;
@@ -177,47 +179,6 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
     auto & ctx = model.ctx;
 
-    size_t buffer_size = 0;
-
-    {
-        const auto & hparams = model.hparams;
-
-        const int n_embd  = hparams.n_embd;
-        const int n_layer = hparams.n_layer;
-        const int n_ctx   = hparams.n_ctx;
-        const int n_vocab = hparams.n_vocab;
-
-        buffer_size += n_embd*ggml_type_sizef(GGML_TYPE_F32); // ln_f_g
-        buffer_size += n_embd*ggml_type_sizef(GGML_TYPE_F32); // ln_f_b
-
-        buffer_size += n_vocab*n_embd*ggml_type_sizef(wtype);         // wte
-        buffer_size +=   n_ctx*n_embd*ggml_type_sizef(GGML_TYPE_F32); // wpe
-        buffer_size += n_vocab*n_embd*ggml_type_sizef(wtype);         // lm_head
-
-        buffer_size += n_layer*(n_embd*ggml_type_sizef(GGML_TYPE_F32)); // ln_1_g
-        buffer_size += n_layer*(n_embd*ggml_type_sizef(GGML_TYPE_F32)); // ln_1_b
-
-        buffer_size += n_layer*(n_embd*ggml_type_sizef(GGML_TYPE_F32)); // ln_2_g
-        buffer_size += n_layer*(n_embd*ggml_type_sizef(GGML_TYPE_F32)); // ln_2_b
-
-        buffer_size += n_layer*(3*n_embd*n_embd*ggml_type_sizef(wtype));         // c_attn_attn_w
-        buffer_size += n_layer*(       3*n_embd*ggml_type_sizef(GGML_TYPE_F32)); // c_attn_attn_b
-
-        buffer_size += n_layer*(n_embd*n_embd*ggml_type_sizef(wtype));           // c_attn_proj_w
-        buffer_size += n_layer*(       n_embd*ggml_type_sizef(GGML_TYPE_F32));   // c_attn_proj_b
-
-        buffer_size += n_layer*(4*n_embd*n_embd*ggml_type_sizef(wtype));         // c_mlp_fc_w
-        buffer_size += n_layer*(       4*n_embd*ggml_type_sizef(GGML_TYPE_F32)); // c_mlp_fc_b
-
-        buffer_size += n_layer*(4*n_embd*n_embd*ggml_type_sizef(wtype));         // c_mlp_proj_w
-        buffer_size += n_layer*(         n_embd*ggml_type_sizef(GGML_TYPE_F32)); // c_mlp_proj_b
-
-        buffer_size += (6 + 12*n_layer)*128; // alignment overhead
-
-        printf("%s: ggml tensor size    = %d bytes\n", __func__, (int) sizeof(ggml_tensor));
-        printf("%s: backend buffer size = %6.2f MB\n", __func__, buffer_size/(1024.0*1024.0));
-    }
-
     // create the ggml context
     {
         size_t n_tensors = 2 + 6 + 12*model.hparams.n_layer;
@@ -227,8 +188,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             /*.no_alloc   =*/ true,
         };
 
-        model.ctx = ggml_init(params);
-        if (!model.ctx) {
+        ctx = ggml_init(params);
+        if (!ctx) {
             fprintf(stderr, "%s: ggml_init() failed\n", __func__);
             return false;
         }
@@ -238,7 +199,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 #ifdef GGML_USE_CUBLAS
     if (n_gpu_layers > 0) {
         fprintf(stderr, "%s: using CUDA backend\n", __func__);
-        model.backend = ggml_backend_cuda_init();
+        model.backend = ggml_backend_cuda_init(0);
         if (!model.backend) {
             fprintf(stderr, "%s: ggml_backend_cuda_init() failed\n", __func__);
         }
@@ -267,10 +228,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         return false;
     }
 
-    // allocate weights buffer
-    model.buffer_w = ggml_backend_alloc_buffer(model.backend, buffer_size);
-
-    // prepare memory for the weights
+    // create the tensors for the model
     {
         const auto & hparams = model.hparams;
 
@@ -338,6 +296,12 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         }
     }
 
+    // allocate the model tensors in a backend buffer
+    model.buffer_w = ggml_backend_alloc_ctx_tensors(ctx, model.backend);
+
+    printf("%s: ggml tensor size    = %d bytes\n", __func__, (int) sizeof(ggml_tensor));
+    printf("%s: backend buffer size = %6.2f MB\n", __func__, ggml_backend_buffer_get_size(model.buffer_w)/(1024.0*1024.0));
+
     // override the default training context with the user-provided
     model.hparams.n_ctx = n_ctx;
 
@@ -378,8 +342,6 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
     // load weights
     {
-        ggml_allocr * alloc = ggml_allocr_new_from_buffer(model.buffer_w);
-
         size_t total_size = 0;
 
         bool has_lm_head = false;
@@ -440,8 +402,6 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
                 return false;
             }
 
-            ggml_allocr_alloc(alloc, tensor);
-
             if (ggml_backend_is_cpu  (model.backend)
 #ifdef GGML_USE_METAL
                 || ggml_backend_is_metal(model.backend)
@@ -470,7 +430,6 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             total_size += ggml_nbytes(tensor);
         }
 
-        ggml_allocr_free(alloc);
         printf("%s: model size  = %8.2f MB\n", __func__, total_size/1024.0/1024.0);
     }
 
@@ -495,7 +454,7 @@ struct ggml_cgraph * gpt2_graph(
     const int n_head  = hparams.n_head;
 
     // since we are using ggml-alloc, this buffer only needs enough space to hold the ggml_tensor and ggml_cgraph structs, but not the tensor data
-    static size_t buf_size = ggml_tensor_overhead()*GGML_DEFAULT_GRAPH_SIZE + ggml_graph_overhead();
+    static size_t buf_size = ggml_tensor_overhead()*GPT2_MAX_NODES + ggml_graph_overhead_custom(GPT2_MAX_NODES, false);
     static std::vector<uint8_t> buf(buf_size);
 
     struct ggml_init_params params = {
@@ -506,7 +465,7 @@ struct ggml_cgraph * gpt2_graph(
 
     struct ggml_context * ctx0 = ggml_init(params);
 
-    struct ggml_cgraph  * gf = ggml_new_graph(ctx0);
+    struct ggml_cgraph  * gf = ggml_new_graph_custom(ctx0, GPT2_MAX_NODES, false);
 
     struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
     ggml_allocr_alloc(allocr, embd);
@@ -801,16 +760,56 @@ bool gpt2_eval(
     // allocate tensors
     ggml_allocr_alloc_graph(allocr, gf);
 
-    // run the computation
+    // set backend options
     if (ggml_backend_is_cpu(model.backend)) {
         ggml_backend_cpu_set_n_threads(model.backend, n_threads);
     }
+
 #ifdef GGML_USE_METAL
     if (ggml_backend_is_metal(model.backend)) {
         ggml_backend_metal_set_n_cb(model.backend, n_threads);
     }
 #endif
-    ggml_backend_graph_compute(model.backend, gf);
+
+    // test
+#if 0 && defined(GGML_USE_CUBLAS)
+    if (ggml_backend_is_cuda(model.backend)) {
+        auto eval_callback = [](int index, struct ggml_tensor * t1, struct ggml_tensor * t2, void * user_data) {
+            auto tv1 = tensor_to_float(t1);
+            auto tv2 = tensor_to_float(t2);
+
+#if 1
+            float sim = cosine_similarity(tv1, tv2);
+            float len1 = vec_len(tv1);
+            float len2 = vec_len(tv2);
+            float lenr = len1/len2;
+            float lenrd = std::abs(1.0f-lenr);
+
+            float angle = acosf(sim)*180.0f/M_PI;
+
+            if (angle > 0.5f || lenrd > 0.05f) {
+                printf("%3d [%15s] %s: sim = %f, a = %f, lenrd = %f\n", index, ggml_op_desc(t1), t1->name, sim, angle, lenrd);
+            }
+            assert(sim > 0.90f);
+#else
+            float dist = distance(tv1, tv2) / vec_len(tv1);
+            if (dist > 0.01f) {
+                printf("%3d [%15s] %s: distance = %f\n", index, ggml_op_desc(t1), t1->name, dist);
+            }
+#endif
+
+            return true;
+        };
+        ggml_backend_t backend_cpu = ggml_backend_cpu_init();
+        ggml_backend_compare_graph_backend(model.backend, backend_cpu, gf, eval_callback, nullptr);
+        ggml_backend_free(backend_cpu);
+        //printf("done\n");
+    } else
+#endif
+    {
+        // run the computation
+        ggml_backend_graph_compute(model.backend, gf);
+    }
 
     //if (n_past%100 == 0) {
     //    ggml_graph_print   (&gf);
