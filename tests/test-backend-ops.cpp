@@ -190,6 +190,8 @@ static double nmse(const float * a, const float * b, size_t n) {
 }
 
 struct test_case {
+    virtual ~test_case() {}
+
     virtual std::string vars() {
         return "";
     }
