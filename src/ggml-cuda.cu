@@ -8584,10 +8584,10 @@ bool ggml_backend_is_cuda(ggml_backend_t backend) {
     return backend->iface.get_name == ggml_backend_cuda_name;
 }
 
-
 static ggml_backend_t ggml_backend_reg_cuda_init(const char * params, void * user_data) {
     ggml_backend_t cuda_backend = ggml_backend_cuda_init((int) (intptr_t) user_data);
     return cuda_backend;
+
     UNUSED(params);
 }
 
@@ -8597,17 +8597,14 @@ static int ggml_backend_cuda_reg_devices() {
     if (g_cublas_loaded) {
         int device_count = ggml_cuda_get_device_count();
         for (int i = 0; i < device_count; i++) {
-            ggml_backend_t cuda_backend = ggml_backend_cuda_init(i);
             char name[128];
             snprintf(name, sizeof(name), "%s%d", GGML_CUDA_NAME, i);
             ggml_backend_register(name, ggml_backend_reg_cuda_init, ggml_backend_cuda_buffer_type(i), (void *) (intptr_t) i);
         }
         return device_count;
-    } else {
-        return 0;
     }
+
+    return 0;
 }
 
 GGML_CONSTRUCTOR(ggml_backend_cuda_reg_devices)
-// TODO: per device
-// GGML_BACKEND_REGISTER(GGML_CUDA_NAME, ggml_backend_reg_cuda_init, ggml_backend_cuda_buffer_type())
