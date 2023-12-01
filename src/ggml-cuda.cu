@@ -433,8 +433,7 @@ static_assert(sizeof(block_q6_K) == sizeof(ggml_fp16_t) + 13*QK_K/16, "wrong q6_
 #define WARP_SIZE 32
 #define MATRIX_ROW_PADDING 512 // last row of quant. matrices is a multiple of this to avoid out-of-bounds memory accesses
 
-#define CUDA_ADD_BLOCK_SIZE 256
-#define CUDA_MUL_BLOCK_SIZE 256
+#define CUDA_ADDMUL_BLOCK_SIZE 256
 #define CUDA_GELU_BLOCK_SIZE 256
 #define CUDA_SILU_BLOCK_SIZE 256
 #define CUDA_RELU_BLOCK_SIZE 256
@@ -501,38 +500,16 @@ static size_t g_scratch_offset = 0;
 
 static cublasHandle_t g_cublas_handles[GGML_CUDA_MAX_DEVICES] = {nullptr};
 
-template<typename src0_t, typename src1_t, typename dst_t>
-static __global__ void k_add(const src0_t * src0, const src1_t * src1, dst_t * dst,
-        int64_t ne0, int64_t ne1, int64_t ne2, int64_t ne3,
-        int64_t ne10, int64_t ne11, int64_t ne12, int64_t ne13,
-        int64_t s10, int64_t s11, int64_t s12, int64_t s13) {
-
-    const int64_t i = blockDim.x*blockIdx.x + threadIdx.x;
-    const int64_t ne = ne0*ne1*ne2*ne3;
-
-    if (i >= ne) {
-        return;
-    }
-
-    const int64_t i3 = i / (ne2*ne1*ne0);
-    const int64_t i2 = (i - i3*ne2*ne1*ne0) / (ne1*ne0);
-    const int64_t i1 = (i - i3*ne2*ne1*ne0 - i2*ne1*ne0) / ne0;
-    const int64_t i0 = i - i3*ne2*ne1*ne0 - i2*ne1*ne0 - i1*ne0;
-
-    const int64_t i10 = i0 % ne10;
-    const int64_t i11 = i1 % ne11;
-    const int64_t i12 = i2 % ne12;
-    const int64_t i13 = i3 % ne13;
-
-    const size_t i_dst  = i;
-    const size_t i_src0 = i;
-    const size_t i_src1 = i13*s13 + i12*s12 + i11*s11 + i10*s10;
-
-    dst[i_dst] = (dst_t)((float)src0[i_src0] + (float)src1[i_src1]);
+static __device__ __forceinline__ float op_add(const float a, const float b) {
+    return a + b;
 }
 
-template<typename src0_t, typename src1_t, typename dst_t>
-static __global__ void k_mul(const src0_t * src0, const src1_t * src1, dst_t * dst,
+static __device__ __forceinline__ float op_mul(const float a, const float b) {
+    return a * b;
+}
+
+template<float (*bin_op)(const float, const float), typename src0_t, typename src1_t, typename dst_t>
+static __global__ void k_bin_bcast(const src0_t * src0, const src1_t * src1, dst_t * dst,
         int64_t ne0, int64_t ne1, int64_t ne2, int64_t ne3,
         int64_t ne10, int64_t ne11, int64_t ne12, int64_t ne13,
         int64_t s10, int64_t s11, int64_t s12, int64_t s13) {
@@ -558,7 +535,7 @@ static __global__ void k_mul(const src0_t * src0, const src1_t * src1, dst_t * d
     const size_t i_src0 = i;
     const size_t i_src1 = i13*s13 + i12*s12 + i11*s11 + i10*s10;
 
-    dst[i_dst] = (dst_t)((float)src0[i_src0] * (float)src1[i_src1]);
+    dst[i_dst] = (dst_t)bin_op((float)src0[i_src0], (float)src1[i_src1]);
 }
 
 static __global__ void gelu_f32(const float * x, float * dst, const int k) {
@@ -4802,8 +4779,8 @@ static void get_rows_cuda(const void * x, const int32_t * y, float * dst, const 
     k_get_rows<qk, qr, dq><<<block_nums, block_dims, 0, stream>>>(x, y, dst, ncols);
 }
 
-template<typename src0_t, typename src1_t, typename dst_t>
-static void add_cuda(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst,
+template<float (*bin_op)(const float, const float), typename src0_t, typename src1_t, typename dst_t>
+static void bin_bcast_cuda(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst,
         const src0_t * src0_dd, const src1_t * src1_dd, dst_t * dst_dd,
         cudaStream_t stream) {
 
@@ -4815,31 +4792,25 @@ static void add_cuda(const struct ggml_tensor * src0, const struct ggml_tensor *
     size_t s13 = nb13 / sizeof(src1_t);
 
     const int64_t ne = ne0*ne1*ne2*ne3;
-    const int num_blocks = (ne + CUDA_ADD_BLOCK_SIZE - 1) / CUDA_ADD_BLOCK_SIZE;
-    k_add<<<num_blocks, CUDA_ADD_BLOCK_SIZE, 0, stream>>>(src0_dd, src1_dd, dst_dd,
+    const int num_blocks = (ne + CUDA_ADDMUL_BLOCK_SIZE - 1) / CUDA_ADDMUL_BLOCK_SIZE;
+    k_bin_bcast<bin_op><<<num_blocks, CUDA_ADDMUL_BLOCK_SIZE, 0, stream>>>(src0_dd, src1_dd, dst_dd,
         ne0, ne1, ne2, ne3,
         ne10, ne11, ne12, ne13,
         s10, s11, s12, s13);
 }
 
 template<typename src0_t, typename src1_t, typename dst_t>
+static void add_cuda(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst,
+        const src0_t * src0_dd, const src1_t * src1_dd, dst_t * dst_dd,
+        cudaStream_t stream) {
+    bin_bcast_cuda<op_add>(src0, src1, dst, src0_dd, src1_dd, dst_dd, stream);
+}
+
+template<typename src0_t, typename src1_t, typename dst_t>
 static void mul_cuda(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst,
         const src0_t * src0_dd, const src1_t * src1_dd, dst_t * dst_dd,
         cudaStream_t stream) {
-
-    GGML_TENSOR_BINARY_OP_LOCALS
-
-    size_t s10 = nb10 / sizeof(src1_t);
-    size_t s11 = nb11 / sizeof(src1_t);
-    size_t s12 = nb12 / sizeof(src1_t);
-    size_t s13 = nb13 / sizeof(src1_t);
-
-    const int64_t ne = ne0*ne1*ne2*ne3;
-    const int num_blocks = (ne + CUDA_ADD_BLOCK_SIZE - 1) / CUDA_ADD_BLOCK_SIZE;
-    k_mul<<<num_blocks, CUDA_ADD_BLOCK_SIZE, 0, stream>>>(src0_dd, src1_dd, dst_dd,
-        ne0, ne1, ne2, ne3,
-        ne10, ne11, ne12, ne13,
-        s10, s11, s12, s13);
+    bin_bcast_cuda<op_mul>(src0, src1, dst, src0_dd, src1_dd, dst_dd, stream);
 }
 
 static void gelu_f32_cuda(const float * x, float * dst, const int k, cudaStream_t stream) {
