@@ -8135,7 +8135,9 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
 
 int ggml_cuda_get_device_count() {
     int device_count;
-    CUDA_CHECK(cudaGetDeviceCount(&device_count));
+    if (cudaGetDeviceCount(&device_count) != cudaSuccess) {
+        return 0;
+    }
     return device_count;
 }
 
