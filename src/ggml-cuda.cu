@@ -508,6 +508,10 @@ static __device__ __forceinline__ float op_mul(const float a, const float b) {
     return a * b;
 }
 
+static __device__ __forceinline__ float op_div(const float a, const float b) {
+    return a / b;
+}
+
 template<float (*bin_op)(const float, const float), typename src0_t, typename src1_t, typename dst_t>
 static __global__ void k_bin_bcast(const src0_t * src0, const src1_t * src1, dst_t * dst,
         int ne0,/* int ne1, int ne2, */int ne3,
@@ -4776,46 +4780,35 @@ static void get_rows_cuda(const void * x, const int32_t * y, float * dst, const 
     k_get_rows<qk, qr, dq><<<block_nums, block_dims, 0, stream>>>(x, y, dst, ncols);
 }
 
-template<float (*bin_op)(const float, const float), typename src0_t, typename src1_t, typename dst_t>
-static void bin_bcast_cuda(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst,
-        const src0_t * src0_dd, const src1_t * src1_dd, dst_t * dst_dd,
-        cudaStream_t stream) {
+template<float (*bin_op)(const float, const float)>
+struct bin_bcast_cuda {
+    template<typename src0_t, typename src1_t, typename dst_t>
+    void operator()(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst,
+            const src0_t * src0_dd, const src1_t * src1_dd, dst_t * dst_dd,
+            cudaStream_t stream) {
 
-    GGML_TENSOR_BINARY_OP_LOCALS
+        GGML_TENSOR_BINARY_OP_LOCALS
 
-    //size_t s0 = nb0 / sizeof(src1_t);
-    size_t s1 = nb1 / sizeof(src1_t);
-    size_t s2 = nb2 / sizeof(src1_t);
-    size_t s3 = nb3 / sizeof(src1_t);
+        //size_t s0 = nb0 / sizeof(src1_t);
+        size_t s1 = nb1 / sizeof(src1_t);
+        size_t s2 = nb2 / sizeof(src1_t);
+        size_t s3 = nb3 / sizeof(src1_t);
 
-    //size_t s10 = nb10 / sizeof(src1_t);
-    size_t s11 = nb11 / sizeof(src1_t);
-    size_t s12 = nb12 / sizeof(src1_t);
-    size_t s13 = nb13 / sizeof(src1_t);
+        //size_t s10 = nb10 / sizeof(src1_t);
+        size_t s11 = nb11 / sizeof(src1_t);
+        size_t s12 = nb12 / sizeof(src1_t);
+        size_t s13 = nb13 / sizeof(src1_t);
 
-    const int num_blocks_x = (ne0 + CUDA_ADDMUL_BLOCK_SIZE - 1) / CUDA_ADDMUL_BLOCK_SIZE;
-    dim3 num_blocks(num_blocks_x, ne1, ne2*ne3);
+        const int num_blocks_x = (ne0 + CUDA_ADDMUL_BLOCK_SIZE - 1) / CUDA_ADDMUL_BLOCK_SIZE;
+        dim3 num_blocks(num_blocks_x, ne1, ne2*ne3);
 
-    k_bin_bcast<bin_op><<<num_blocks, CUDA_ADDMUL_BLOCK_SIZE, 0, stream>>>(src0_dd, src1_dd, dst_dd,
-        ne0,/* ne1, ne2, */ne3,
-        ne10, ne11, ne12, ne13,
-        /* s0, */s1, s2, s3,
-        /* s10,*/ s11, s12, s13);
-}
-
-template<typename src0_t, typename src1_t, typename dst_t>
-static void add_cuda(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst,
-        const src0_t * src0_dd, const src1_t * src1_dd, dst_t * dst_dd,
-        cudaStream_t stream) {
-    bin_bcast_cuda<op_add>(src0, src1, dst, src0_dd, src1_dd, dst_dd, stream);
-}
-
-template<typename src0_t, typename src1_t, typename dst_t>
-static void mul_cuda(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst,
-        const src0_t * src0_dd, const src1_t * src1_dd, dst_t * dst_dd,
-        cudaStream_t stream) {
-    bin_bcast_cuda<op_mul>(src0, src1, dst, src0_dd, src1_dd, dst_dd, stream);
-}
+        k_bin_bcast<bin_op><<<num_blocks, CUDA_ADDMUL_BLOCK_SIZE, 0, stream>>>(src0_dd, src1_dd, dst_dd,
+            ne0,/* ne1, ne2, */ne3,
+            ne10, ne11, ne12, ne13,
+            /* s0, */s1, s2, s3,
+            /* s10,*/ s11, s12, s13);
+    }
+};
 
 static void gelu_f32_cuda(const float * x, float * dst, const int k, cudaStream_t stream) {
     const int num_blocks = (k + CUDA_GELU_BLOCK_SIZE - 1) / CUDA_GELU_BLOCK_SIZE;
@@ -6157,43 +6150,53 @@ static void ggml_cuda_op_get_rows(
     }
 }
 
-inline void ggml_cuda_op_add(
+//template<typename src0_t, typename src1_t, typename dst_t>
+//static void add_cuda(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst,
+//        const src0_t * src0_dd, const src1_t * src1_dd, dst_t * dst_dd,
+//        cudaStream_t stream)
+
+template<class op>
+inline void ggml_cuda_op_bin_bcast(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
     const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
 
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
 
     if (src0->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {
-        add_cuda(src0, src1, dst, src0_dd, src1_dd, dst_dd, main_stream);
+        op()(src0, src1, dst, src0_dd, src1_dd, dst_dd, main_stream);
     } else if (src0->type == GGML_TYPE_F16 && dst->type == GGML_TYPE_F16) {
-        add_cuda(src0, src1, dst, (const half *) src0_dd, src1_dd, (half *) dst_dd, main_stream);
+        op()(src0, src1, dst, (const half *) src0_dd, src1_dd, (half *) dst_dd, main_stream);
     } else if (src0->type == GGML_TYPE_F16 && dst->type == GGML_TYPE_F32) {
-        add_cuda(src0, src1, dst, (const half *) src0_dd, src1_dd, dst_dd, main_stream);
+        op()(src0, src1, dst, (const half *) src0_dd, src1_dd, dst_dd, main_stream);
     } else {
         fprintf(stderr, "%s: unsupported types: dst: %s, src0: %s, src1: %s\n", __func__,
             ggml_type_name(dst->type), ggml_type_name(src0->type), ggml_type_name(src1->type));
         GGML_ASSERT(false);
     }
+
+}
+
+inline void ggml_cuda_op_add(
+    const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
+    const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
+
+    ggml_cuda_op_bin_bcast<bin_bcast_cuda<op_add>>(src0, src1, dst, src0_dd, src1_dd, dst_dd, main_stream);
 }
 
 inline void ggml_cuda_op_mul(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
     const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
 
-    GGML_ASSERT(src1->type == GGML_TYPE_F32);
-
-    if (src0->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {
-        mul_cuda(src0, src1, dst, src0_dd, src1_dd, dst_dd, main_stream);
-    } else if (src0->type == GGML_TYPE_F16 && dst->type == GGML_TYPE_F16) {
-        mul_cuda(src0, src1, dst, (const half *) src0_dd, src1_dd, (half *) dst_dd, main_stream);
-    } else if (src0->type == GGML_TYPE_F16 && dst->type == GGML_TYPE_F32) {
-        mul_cuda(src0, src1, dst, (const half *) src0_dd, src1_dd, dst_dd, main_stream);
-    } else {
-        fprintf(stderr, "%s: unsupported types: dst: %s, src0: %s, src1: %s\n", __func__,
-            ggml_type_name(dst->type), ggml_type_name(src0->type), ggml_type_name(src1->type));
-        GGML_ASSERT(false);
-    }
+    ggml_cuda_op_bin_bcast<bin_bcast_cuda<op_mul>>(src0, src1, dst, src0_dd, src1_dd, dst_dd, main_stream);
 }
+
+inline void ggml_cuda_op_div(
+    const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
+    const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
+
+    ggml_cuda_op_bin_bcast<bin_bcast_cuda<op_div>>(src0, src1, dst, src0_dd, src1_dd, dst_dd, main_stream);
+}
+
 inline void ggml_cuda_op_gelu(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
     const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
@@ -7315,6 +7318,10 @@ static void ggml_cuda_mul(const ggml_tensor * src0, const ggml_tensor * src1, gg
     ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_mul);
 }
 
+static void ggml_cuda_div(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+    ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_div);
+}
+
 static void ggml_cuda_gelu(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_gelu);
 }
@@ -8071,6 +8078,9 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
         case GGML_OP_MUL:
             func = ggml_cuda_mul;
             break;
+        case GGML_OP_DIV:
+            func = ggml_cuda_div;
+            break;
         case GGML_OP_UNARY:
             switch (ggml_get_unary_op(tensor)) {
                 case GGML_UNARY_OP_GELU:
@@ -8543,6 +8553,7 @@ static bool ggml_backend_cuda_supports_op(ggml_backend_t backend, const ggml_ten
         case GGML_OP_DUP:
         case GGML_OP_ADD:
         case GGML_OP_MUL:
+        case GGML_OP_DIV:
         case GGML_OP_RMS_NORM:
         case GGML_OP_MUL_MAT:
         case GGML_OP_SCALE:
