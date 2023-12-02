@@ -7822,7 +7822,7 @@ static void ggml_compute_forward_div_f32(
 #ifdef GGML_USE_ACCELERATE
                 UNUSED(ggml_vec_div_f32);
 
-                vDSP_vdiv(src1_ptr + r*ne10, 1, src0_ptr, 1, dst_ptr + r*ne10, 1, ne10);
+                vDSP_vdiv(src1_ptr, 1, src0_ptr + r*ne10, 1, dst_ptr + r*ne10, 1, ne10);
 #else
                 ggml_vec_div_f32(ne10, dst_ptr + r*ne10, src0_ptr + r*ne10, src1_ptr);
 #endif
