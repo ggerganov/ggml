@@ -424,7 +424,7 @@ extern "C" {
         GGML_OP_POOL_1D,
         GGML_OP_POOL_2D,
         GGML_OP_UPSCALE, // nearest interpolate
-        GGML_OP_SORT,
+        GGML_OP_ARGSORT,
 
         GGML_OP_FLASH_ATTN,
         GGML_OP_FLASH_FF,
@@ -1548,12 +1548,7 @@ extern "C" {
         GGML_SORT_DESC,
     };
 
-    GGML_API struct ggml_tensor * ggml_sort(
-            struct ggml_context * ctx,
-            struct ggml_tensor  * a,
-            enum ggml_sort_order  order);
-
-    GGML_API struct ggml_tensor * ggml_sort_inplace(
+    GGML_API struct ggml_tensor * ggml_argsort(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             enum ggml_sort_order  order);

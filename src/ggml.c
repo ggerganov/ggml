@@ -1,5 +1,6 @@
 #define _CRT_SECURE_NO_DEPRECATE // Disables ridiculous "unsafe" warnigns on Windows
 #define _USE_MATH_DEFINES // For M_PI on MSVC
+#define __STDC_WANT_LIB_EXT1__ // For qsort_s
 
 #include "ggml-impl.h"
 #include "ggml-quants.h"
@@ -1623,7 +1624,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "POOL_1D",
     "POOL_2D",
     "UPSCALE",
-    "SORT",
+    "ARGSORT",
 
     "FLASH_ATTN",
     "FLASH_FF",
@@ -1707,7 +1708,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "pool_1d(x)",
     "pool_2d(x)",
     "upscale(x)",
-    "sort(x)",
+    "argsort(x)",
 
     "flash_attn(x)",
     "flash_ff(x)",
@@ -5504,42 +5505,23 @@ struct ggml_tensor * ggml_upscale(
     return ggml_upscale_impl(ctx, a, scale_factor);
 }
 
-// ggml_sort
+// ggml_argsort
 
-static struct ggml_tensor * ggml_sort_impl(
+struct ggml_tensor * ggml_argsort(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
-        enum ggml_sort_order  order,
-        bool                  inplace) {
+        enum ggml_sort_order  order) {
     bool is_node = false;
 
-    if (!inplace && (a->grad)) {
-        is_node = true;
-    }
-
-    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
+    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_I32, a->n_dims, a->ne);
 
     ggml_set_op_params_i32(result, 0, (int32_t) order);
 
-    result->op   = GGML_OP_SORT;
+    result->op   = GGML_OP_ARGSORT;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
 
     return result;
-}
-
-struct ggml_tensor * ggml_sort(
-        struct ggml_context * ctx,
-        struct ggml_tensor  * a,
-        enum ggml_sort_order  order) {
-    return ggml_sort_impl(ctx, a, order, false);
-}
-
-struct ggml_tensor * ggml_sort_inplace(
-        struct ggml_context * ctx,
-        struct ggml_tensor  * a,
-        enum ggml_sort_order  order) {
-    return ggml_sort_impl(ctx, a, order, true);
 }
 
 // ggml_top_k
@@ -5550,7 +5532,7 @@ struct ggml_tensor * ggml_top_k(
         int                   k) {
     GGML_ASSERT(a->ne[0] >= k);
 
-    struct ggml_tensor * result = ggml_sort(ctx, a, GGML_SORT_DESC);
+    struct ggml_tensor * result = ggml_argsort(ctx, a, GGML_SORT_DESC);
 
     result = ggml_view_4d(ctx, result,
                 k, result->ne[1], result->ne[2], result->ne[3],
@@ -12079,19 +12061,37 @@ static void ggml_compute_forward_upscale(
 
 // ggml_compute_forward_sort
 
-static int ggml_compare_float_asc(const void * a, const void * b) {
-    const float * x = (const float *) a;
-    const float * y = (const float *) b;
-    return *x < *y ? -1 : *x > *y ? 1 : 0;
+#ifdef _MSC_VER
+static int ggml_compare_arg_float_asc(void * context, const void * a, const void * b) {
+#else
+static int ggml_compare_arg_float_asc(const void * a, const void * b, void * context) {
+#endif
+    const float * const src = (const float *) context;
+    const int32_t * const ia = (const int32_t *) a;
+    const int32_t * const ib = (const int32_t *) b;
+    const float x = src[*ia];
+    const float y = src[*ib];
+    return x < y ? -1 : x > y ? 1 : 0;
 }
 
-static int ggml_compare_float_desc(const void * a, const void * b) {
-    const float * x = (const float *) a;
-    const float * y = (const float *) b;
-    return *x > *y ? -1 : *x < *y ? 1 : 0;
+#ifdef _MSC_VER
+static int ggml_compare_arg_float_desc(void * context, const void * a, const void * b) {
+#else
+static int ggml_compare_arg_float_desc(const void * a, const void * b, void * context) {
+#endif
+    const float * const src = (const float *) context;
+    const int32_t * const ia = (const int32_t *) a;
+    const int32_t * const ib = (const int32_t *) b;
+    const float x = src[*ia];
+    const float y = src[*ib];
+    return x > y ? -1 : x < y ? 1 : 0;
 }
 
-static void ggml_compute_forward_sort_f32(
+#ifdef _MSC_VER
+#define qsort_r qsort_s
+#endif
+
+static void ggml_compute_forward_argsort_f32(
     const struct ggml_compute_params * params,
     const struct ggml_tensor * src0,
     struct ggml_tensor * dst) {
@@ -12112,22 +12112,23 @@ static void ggml_compute_forward_sort_f32(
     enum ggml_sort_order order = (enum ggml_sort_order) ggml_get_op_params_i32(dst, 0);
 
     for (int64_t i = ith; i < nr; i += nth) {
-        float * dst_data = (float *)((char *) dst->data + i*nb1);
-        const float * src_data = (float *)((char *) src0->data + i*nb1);
+        int32_t * dst_data = (int32_t *)((char *) dst->data + i*nb1);
+        const float * src_data = (float *)((char *) src0->data + i*nb01);
 
-        for (int64_t j = 0; j < ne0; j++) {
-            dst_data[j] = src_data[j];
+        for (int64_t j = 0; j < ne0; ++j) {
+            dst_data[j] = j;
         }
 
+
         if (order == GGML_SORT_ASC) {
-            qsort(dst_data, ne0, sizeof(float), ggml_compare_float_asc);
+            qsort_r(dst_data, ne0, sizeof(float), ggml_compare_arg_float_asc, (void *)(uintptr_t)src_data);
         } else {
-            qsort(dst_data, ne0, sizeof(float), ggml_compare_float_desc);
+            qsort_r(dst_data, ne0, sizeof(float), ggml_compare_arg_float_desc, (void *)(uintptr_t)src_data);
         }
     }
 }
 
-static void ggml_compute_forward_sort(
+static void ggml_compute_forward_argsort(
     const struct ggml_compute_params * params,
     const struct ggml_tensor * src0,
     struct ggml_tensor * dst) {
@@ -12135,7 +12136,7 @@ static void ggml_compute_forward_sort(
     switch (src0->type) {
         case GGML_TYPE_F32:
             {
-                ggml_compute_forward_sort_f32(params, src0, dst);
+                ggml_compute_forward_argsort_f32(params, src0, dst);
             } break;
         default:
             {
@@ -14075,9 +14076,9 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_upscale(params, tensor->src[0], tensor);
             } break;
-        case GGML_OP_SORT:
+        case GGML_OP_ARGSORT:
             {
-                ggml_compute_forward_sort(params, tensor->src[0], tensor);
+                ggml_compute_forward_argsort(params, tensor->src[0], tensor);
             } break;
         case GGML_OP_FLASH_ATTN:
             {
@@ -15071,7 +15072,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             {
                 GGML_ASSERT(false); // TODO: not implemented
             } break;
-        case GGML_OP_SORT:
+        case GGML_OP_ARGSORT:
             {
                 GGML_ASSERT(false); // TODO: not implemented
             } break;
@@ -15808,7 +15809,7 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
             {
                 n_tasks = n_threads;
             } break;
-        case GGML_OP_SORT:
+        case GGML_OP_ARGSORT:
             {
                 n_tasks = n_threads;
             } break;

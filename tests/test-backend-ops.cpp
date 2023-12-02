@@ -56,6 +56,8 @@ static std::vector<float> tensor_to_float(const ggml_tensor * t) {
                         v = (float) ggml_fp16_to_fp32(*(ggml_fp16_t*)&buf[i]);
                     } else if (t->type == GGML_TYPE_F32) {
                         v = *(float *) &buf[i];
+                    } else if (t->type == GGML_TYPE_I32) {
+                        v = *(int32_t *) &buf[i];
                     } else {
                         GGML_ASSERT(false);
                     }
@@ -781,8 +783,8 @@ struct test_concat : public test_case {
     }
 };
 
-// GGML_OP_SORT
-struct test_sort : public test_case {
+// GGML_OP_ARGSORT
+struct test_argsort : public test_case {
     const ggml_type type;
     const std::array<int64_t, 4> ne;
     ggml_sort_order order;
@@ -791,15 +793,30 @@ struct test_sort : public test_case {
         return VARS_TO_STR3(type, ne, order);
     }
 
-    test_sort(ggml_type type = GGML_TYPE_F32,
+    test_argsort(ggml_type type = GGML_TYPE_F32,
             std::array<int64_t, 4> ne = {10, 10, 10, 10},
             ggml_sort_order order = GGML_SORT_ASC)
         : type(type), ne(ne), order(order) {}
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
         ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne.data());
-        ggml_tensor * out = ggml_sort(ctx, a, order);
+        ggml_tensor * out = ggml_argsort(ctx, a, order);
         return out;
+    }
+
+    void initialize_tensors(ggml_context * ctx) override {
+        for (ggml_tensor * t = ggml_get_first_tensor(ctx); t != NULL; t = ggml_get_next_tensor(ctx, t)) {
+            if (t->type == GGML_TYPE_I32) {
+                std::vector<int> data(ggml_nelements(t));
+                for (int i = 0; i < ggml_nelements(t); i++) {
+                    data[i] = rand();
+                }
+                std::shuffle(data.begin(), data.end(), std::default_random_engine(std::random_device()()));
+                ggml_backend_tensor_set(t, data.data(), 0, ne[0]*ne[1]*ne[2]*ne[3] * sizeof(int));
+            } else {
+                init_tensor_uniform(t);
+            }
+        }
     }
 };
 
@@ -946,7 +963,7 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
     test_cases.emplace_back(new test_concat());
 
     for (ggml_sort_order order : {GGML_SORT_ASC, GGML_SORT_DESC}) {
-        test_cases.emplace_back(new test_sort(GGML_TYPE_F32, {10, 10, 10, 10}, order));
+        test_cases.emplace_back(new test_argsort(GGML_TYPE_F32, {10, 10, 10, 10}, order));
     }
 
     for (ggml_type type_a : {GGML_TYPE_F32, GGML_TYPE_F16}) {
