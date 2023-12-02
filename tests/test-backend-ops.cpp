@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <ggml.h>
 #include <ggml-alloc.h>
 #include <ggml-backend.h>
@@ -780,6 +781,83 @@ struct test_concat : public test_case {
     }
 };
 
+// GGML_OP_SORT
+struct test_sort : public test_case {
+    const ggml_type type;
+    const std::array<int64_t, 4> ne;
+    ggml_sort_order order;
+
+    std::string vars() override {
+        return VARS_TO_STR3(type, ne, order);
+    }
+
+    test_sort(ggml_type type = GGML_TYPE_F32,
+            std::array<int64_t, 4> ne = {10, 10, 10, 10},
+            ggml_sort_order order = GGML_SORT_ASC)
+        : type(type), ne(ne), order(order) {}
+
+    ggml_tensor * build_graph(ggml_context * ctx) override {
+        ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne.data());
+        ggml_tensor * out = ggml_sort(ctx, a, order);
+        return out;
+    }
+};
+
+
+// GGML_OP_MUL_MAT_ID
+struct test_mul_mat_id : public test_case {
+    const ggml_type type_a;
+    const ggml_type type_b;
+    const int n_mats;
+    const int id;
+    const int64_t m;
+    const int64_t n;
+    const int64_t k;
+    const std::array<int64_t, 2> bs; // dims 3 and 4
+    const std::array<int64_t, 2> nr; // repeat in dims 3 and 4
+
+    std::string vars() override {
+        return VARS_TO_STR9(type_a, type_b, n_mats, id, m, n, k, bs, nr);
+    }
+
+    test_mul_mat_id(ggml_type type_a = GGML_TYPE_F32, ggml_type type_b = GGML_TYPE_F32,
+            int n_mats = 2, int id = 0,
+            int64_t m = 32, int64_t n = 32, int64_t k = 32,
+            std::array<int64_t, 2> bs = {10, 10},
+            std::array<int64_t, 2> nr = {2, 2})
+        : type_a(type_a), type_b(type_b), n_mats(n_mats), id(id),
+            m(m), n(n), k(k), bs(bs), nr(nr) {}
+
+    ggml_tensor * build_graph(ggml_context * ctx) override {
+        // C^T = A * B^T: (k, m) * (k, n) => (m, n)
+        std::vector<ggml_tensor *> mats;
+        for (int i = 0; i < n_mats; i++) {
+            ggml_tensor * a = ggml_new_tensor_4d(ctx, type_a, k, m, bs[0]*nr[0], bs[1]*nr[1]);
+            mats.push_back(a);
+        }
+        ggml_tensor * ids = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, n_mats);
+        ggml_tensor * b = ggml_new_tensor_4d(ctx, type_b, k, n, bs[0]*nr[0], bs[1]*nr[1]);
+        ggml_tensor * out = ggml_mul_mat_id(ctx, mats.data(), ids, id, b);
+        return out;
+    }
+
+    void initialize_tensors(ggml_context * ctx) override {
+        for (ggml_tensor * t = ggml_get_first_tensor(ctx); t != NULL; t = ggml_get_next_tensor(ctx, t)) {
+            if (t->type == GGML_TYPE_I32) {
+                // ids
+                std::vector<int> data(n_mats);
+                for (int i = 0; i < n_mats; i++) {
+                    data[i] = i;
+                }
+                std::shuffle(data.begin(), data.end(), std::default_random_engine(std::random_device()()));
+                ggml_backend_tensor_set(t, data.data(), 0, n_mats * sizeof(int));
+            } else {
+                init_tensor_uniform(t);
+            }
+        }
+    }
+};
+
 enum test_mode {
     MODE_TEST,
     MODE_PERF,
@@ -829,16 +907,16 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
         test_cases.emplace_back(new test_rms_norm(GGML_TYPE_F32, {64, 10, 10, 10}, eps));
     }
 
-    for (ggml_type t0 : {GGML_TYPE_F32, GGML_TYPE_F16}) {
-        for (ggml_type t1 : {GGML_TYPE_F32 /*, GGML_TYPE_F16 */}) {
+    for (ggml_type type_a : {GGML_TYPE_F32, GGML_TYPE_F16}) {
+        for (ggml_type type_b : {GGML_TYPE_F32 /*, GGML_TYPE_F16 */}) {
             // FIXME: CPU crashes on f16xf16
-            test_cases.emplace_back(new test_mul_mat(t0, t1, 32, 32, 32, { 1,  1}, {1, 1}));
-            test_cases.emplace_back(new test_mul_mat(t0, t1, 32, 32, 32, {10,  1}, {1, 1}));
-            test_cases.emplace_back(new test_mul_mat(t0, t1, 32, 32, 32, {10,  1}, {2, 1}));
-            test_cases.emplace_back(new test_mul_mat(t0, t1, 32, 32, 32, {10, 10}, {1, 1}));
-            test_cases.emplace_back(new test_mul_mat(t0, t1, 32, 32, 32, {10, 10}, {2, 1}));
-            test_cases.emplace_back(new test_mul_mat(t0, t1, 32, 32, 32, {10, 10}, {1, 2}));
-            test_cases.emplace_back(new test_mul_mat(t0, t1, 32, 32, 32, {10, 10}, {2, 2}));
+            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 32, { 1,  1}, {1, 1}));
+            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 32, {10,  1}, {1, 1}));
+            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 32, {10,  1}, {2, 1}));
+            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 32, {10, 10}, {1, 1}));
+            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 32, {10, 10}, {2, 1}));
+            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 32, {10, 10}, {1, 2}));
+            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 32, {10, 10}, {2, 2}));
         }
     }
 
@@ -866,6 +944,20 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
     test_cases.emplace_back(new test_alibi());
     test_cases.emplace_back(new test_im2col());
     test_cases.emplace_back(new test_concat());
+
+    for (ggml_sort_order order : {GGML_SORT_ASC, GGML_SORT_DESC}) {
+        test_cases.emplace_back(new test_sort(GGML_TYPE_F32, {10, 10, 10, 10}, order));
+    }
+
+    for (ggml_type type_a : {GGML_TYPE_F32, GGML_TYPE_F16}) {
+        for (ggml_type type_b : {GGML_TYPE_F32 /*, GGML_TYPE_F16 */}) {
+            for (int n_mats : {2, 4}) {
+                for (int id = 0; id < 2; id++) {
+                    test_cases.emplace_back(new test_mul_mat_id(type_a, type_b, n_mats, id, 32, 32, 32, {1, 1}, {1, 1}));
+                }
+            }
+        }
+    }
 
     size_t n_ok = 0;
     for (auto & test : test_cases) {
