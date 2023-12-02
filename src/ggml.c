@@ -1,6 +1,5 @@
 #define _CRT_SECURE_NO_DEPRECATE // Disables ridiculous "unsafe" warnigns on Windows
 #define _USE_MATH_DEFINES // For M_PI on MSVC
-#define __STDC_WANT_LIB_EXT1__ // For qsort_s
 
 #include "ggml-impl.h"
 #include "ggml-quants.h"
@@ -12058,38 +12057,7 @@ static void ggml_compute_forward_upscale(
     }
 }
 
-
-// ggml_compute_forward_sort
-
-#ifdef _MSC_VER
-static int ggml_compare_arg_float_asc(void * context, const void * a, const void * b) {
-#else
-static int ggml_compare_arg_float_asc(const void * a, const void * b, void * context) {
-#endif
-    const float * const src = (const float *) context;
-    const int32_t * const ia = (const int32_t *) a;
-    const int32_t * const ib = (const int32_t *) b;
-    const float x = src[*ia];
-    const float y = src[*ib];
-    return x < y ? -1 : x > y ? 1 : 0;
-}
-
-#ifdef _MSC_VER
-static int ggml_compare_arg_float_desc(void * context, const void * a, const void * b) {
-#else
-static int ggml_compare_arg_float_desc(const void * a, const void * b, void * context) {
-#endif
-    const float * const src = (const float *) context;
-    const int32_t * const ia = (const int32_t *) a;
-    const int32_t * const ib = (const int32_t *) b;
-    const float x = src[*ia];
-    const float y = src[*ib];
-    return x > y ? -1 : x < y ? 1 : 0;
-}
-
-#ifdef _MSC_VER
-#define qsort_r qsort_s
-#endif
+// ggml_compute_forward_argsort
 
 static void ggml_compute_forward_argsort_f32(
     const struct ggml_compute_params * params,
@@ -12115,15 +12083,20 @@ static void ggml_compute_forward_argsort_f32(
         int32_t * dst_data = (int32_t *)((char *) dst->data + i*nb1);
         const float * src_data = (float *)((char *) src0->data + i*nb01);
 
-        for (int64_t j = 0; j < ne0; ++j) {
+        for (int64_t j = 0; j < ne0; j++) {
             dst_data[j] = j;
         }
 
-
-        if (order == GGML_SORT_ASC) {
-            qsort_r(dst_data, ne0, sizeof(float), ggml_compare_arg_float_asc, (void *)(uintptr_t)src_data);
-        } else {
-            qsort_r(dst_data, ne0, sizeof(float), ggml_compare_arg_float_desc, (void *)(uintptr_t)src_data);
+        // C doesn't have a functional sort, so we do a bubble sort instead
+        for (int64_t j = 0; j < ne0; j++) {
+            for (int64_t k = j + 1; k < ne0; k++) {
+                if ((order == GGML_SORT_ASC && src_data[dst_data[j]] > src_data[dst_data[k]]) ||
+                    (order == GGML_SORT_DESC && src_data[dst_data[j]] < src_data[dst_data[k]])) {
+                    int32_t tmp = dst_data[j];
+                    dst_data[j] = dst_data[k];
+                    dst_data[k] = tmp;
+                }
+            }
         }
     }
 }
