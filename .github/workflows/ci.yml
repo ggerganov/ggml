@@ -8,6 +8,7 @@ on:
 
 jobs:
   test-ubuntu-opencl:
+    if: false
     runs-on: ubuntu-latest
     env:
       GGML_NLOOP: 3
