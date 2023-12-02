@@ -7805,8 +7805,7 @@ static void ggml_compute_forward_div_f32(
         const struct ggml_tensor * src0,
         const struct ggml_tensor * src1,
         struct ggml_tensor * dst) {
-    assert(params->ith == 0);
-    assert(ggml_can_repeat(src1, src0) && ggml_are_same_shape(src0, dst));
+    GGML_ASSERT(ggml_can_repeat(src1, src0) && ggml_are_same_shape(src0, dst));
 
     if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
         return;
@@ -7840,7 +7839,7 @@ static void ggml_compute_forward_div_f32(
 
             for (int64_t r = 0 ; r < nr0; ++r) {
 #ifdef GGML_USE_ACCELERATE
-                UNUSED(ggml_vec_mul_f32);
+                UNUSED(ggml_vec_div_f32);
 
                 vDSP_vdiv( src0_ptr + r*ne10, 1, src1_ptr, 1, dst_ptr + r*ne10,  1, ne10);
 #else
@@ -15672,7 +15671,6 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
                 n_tasks = n_threads;
             } break;
         case GGML_OP_SUB:
-        case GGML_OP_DIV:
         case GGML_OP_SQR:
         case GGML_OP_SQRT:
         case GGML_OP_LOG:
@@ -15711,6 +15709,7 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
             break;
         case GGML_OP_SILU_BACK:
         case GGML_OP_MUL:
+        case GGML_OP_DIV:
         case GGML_OP_NORM:
         case GGML_OP_RMS_NORM:
         case GGML_OP_RMS_NORM_BACK:
