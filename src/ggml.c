@@ -7747,7 +7747,7 @@ static void ggml_compute_forward_mul_f32(
 #ifdef GGML_USE_ACCELERATE
                 UNUSED(ggml_vec_mul_f32);
 
-                vDSP_vmul( src0_ptr + r*ne10, 1, src1_ptr, 1, dst_ptr + r*ne10,  1, ne10);
+                vDSP_vmul(src0_ptr + r*ne10, 1, src1_ptr, 1, dst_ptr + r*ne10, 1, ne10);
 #else
                 ggml_vec_mul_f32(ne10, dst_ptr + r*ne10, src0_ptr + r*ne10, src1_ptr);
 #endif
@@ -7837,11 +7837,11 @@ static void ggml_compute_forward_div_f32(
             float * src0_ptr = (float *) ((char *) src0->data + i03*nb03 + i02*nb02 + i01*nb01);
             float * src1_ptr = (float *) ((char *) src1->data + i13*nb13 + i12*nb12 + i11*nb11);
 
-            for (int64_t r = 0 ; r < nr0; ++r) {
+            for (int64_t r = 0; r < nr0; ++r) {
 #ifdef GGML_USE_ACCELERATE
                 UNUSED(ggml_vec_div_f32);
 
-                vDSP_vdiv( src0_ptr + r*ne10, 1, src1_ptr, 1, dst_ptr + r*ne10,  1, ne10);
+                vDSP_vdiv(src1_ptr + r*ne10, 1, src0_ptr, 1, dst_ptr + r*ne10, 1, ne10);
 #else
                 ggml_vec_div_f32(ne10, dst_ptr + r*ne10, src0_ptr + r*ne10, src1_ptr);
 #endif
