@@ -212,7 +212,7 @@ struct test_case {
         }
     }
 
-    bool eval(ggml_backend_t backend1, ggml_backend_t backend2) {
+    bool eval(ggml_backend_t backend1, ggml_backend_t backend2, const char * op_name) {
         ggml_init_params params = {
             /* .mem_size = */ ggml_tensor_overhead()*128 + ggml_graph_overhead(),
             /* .mem_base = */ NULL,
@@ -221,6 +221,12 @@ struct test_case {
         ggml_context * ctx = ggml_init(params);
 
         ggml_tensor * out = build_graph(ctx);
+
+        if (op_name != nullptr && strcmp(ggml_op_desc(out), op_name) != 0) {
+            //printf("  %s: skipping\n", ggml_op_desc(out));
+            ggml_free(ctx);
+            return true;
+        }
 
         // check if backends support op
         for (ggml_backend_t backend : {backend1, backend2}) {
@@ -444,30 +450,10 @@ struct test_cont : public test_case {
 };
 
 // GGML_OP_ADD
-struct test_add : public test_case {
-    const ggml_type type;
-    const std::array<int64_t, 4> ne;
-    const std::array<int,4> nr;
-
-    std::string vars() override {
-        return VARS_TO_STR3(type, ne, nr);
-    }
-
-    test_add(ggml_type type = GGML_TYPE_F32,
-            std::array<int64_t, 4> ne = {10, 10, 1, 1},
-            std::array<int, 4> nr = {1, 2, 1, 1})
-        : type(type), ne(ne), nr(nr) {}
-
-    ggml_tensor * build_graph(ggml_context * ctx) override {
-        ggml_tensor * a = ggml_new_tensor_4d(ctx, type, ne[0]*nr[0], ne[1]*nr[1], ne[2]*nr[2], ne[3]*nr[3]);
-        ggml_tensor * b = ggml_new_tensor(ctx, type, 4, ne.data());
-        ggml_tensor * out = ggml_add(ctx, a, b);
-        return out;
-    }
-};
-
 // GGML_OP_MUL
-struct test_mul : public test_case {
+struct test_bin_cast : public test_case {
+    using op_t = std::function<ggml_tensor * (ggml_context *, ggml_tensor *, ggml_tensor *)>;
+    op_t op;
     const ggml_type type;
     const std::array<int64_t, 4> ne;
     const std::array<int,4> nr;
@@ -476,15 +462,15 @@ struct test_mul : public test_case {
         return VARS_TO_STR3(type, ne, nr);
     }
 
-    test_mul(ggml_type type = GGML_TYPE_F32,
+    test_bin_cast(op_t op, ggml_type type = GGML_TYPE_F32,
             std::array<int64_t, 4> ne = {10, 10, 1, 1},
             std::array<int, 4> nr = {1, 2, 1, 1})
-        : type(type), ne(ne), nr(nr) {}
+        : op(op), type(type), ne(ne), nr(nr) {}
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
         ggml_tensor * a = ggml_new_tensor_4d(ctx, type, ne[0]*nr[0], ne[1]*nr[1], ne[2]*nr[2], ne[3]*nr[3]);
         ggml_tensor * b = ggml_new_tensor(ctx, type, 4, ne.data());
-        ggml_tensor * out = ggml_mul(ctx, a, b);
+        ggml_tensor * out = op(ctx, a, b);
         return out;
     }
 };
@@ -794,7 +780,12 @@ struct test_concat : public test_case {
     }
 };
 
-static bool test_backend(ggml_backend_t backend) {
+enum test_mode {
+    MODE_TEST,
+    MODE_PERF,
+};
+
+static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op_name) {
     ggml_backend_t backend_cpu = ggml_backend_cpu_init();
 
     std::vector<std::unique_ptr<test_case>> test_cases;
@@ -814,27 +805,22 @@ static bool test_backend(ggml_backend_t backend) {
     test_cases.emplace_back(new test_cpy());
     test_cases.emplace_back(new test_cont());
 
-    test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 1, 1}, {1, 1, 1, 1}));
-    test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 1}, {1, 1, 1, 1}));
-    test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 1, 1}));
-    test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 1, 1, 1}));
-    test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 2, 1, 1}));
-    test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 2, 1}));
-    test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 1, 2}));
-    test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 2, 2}));
-    test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 2, 2, 2}));
-    test_cases.emplace_back(new test_add(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 2, 2, 2}));
+    auto test_bin_bcast = [&](ggml_type type, std::array<int64_t, 4> ne, std::array<int, 4> nr) {
+        for (auto op : {ggml_add, ggml_mul, ggml_div}) {
+            test_cases.emplace_back(new test_bin_cast(op, type, ne, nr));
+        }
+    };
 
-    test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 1, 1}, {1, 1, 1, 1}));
-    test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 1}, {1, 1, 1, 1}));
-    test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 1, 1}));
-    test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 1, 1, 1}));
-    test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 2, 1, 1}));
-    test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 2, 1}));
-    test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 1, 2}));
-    test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 2, 2}));
-    test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 2, 2, 2}));
-    test_cases.emplace_back(new test_mul(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 2, 2, 2}));
+    test_bin_bcast(GGML_TYPE_F32, {16, 10, 1, 1}, {1, 1, 1, 1});
+    test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 1}, {1, 1, 1, 1});
+    test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 1, 1});
+    test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 1, 1, 1});
+    test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 2, 1, 1});
+    test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 2, 1});
+    test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 1, 2});
+    test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 2, 2});
+    test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 2, 2, 2});
+    test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 2, 2, 2});
 
     test_cases.emplace_back(new test_scale());
 
@@ -883,7 +869,7 @@ static bool test_backend(ggml_backend_t backend) {
 
     size_t n_ok = 0;
     for (auto & test : test_cases) {
-        if (test->eval(backend, backend_cpu)) {
+        if (test->eval(backend, backend_cpu, op_name)) {
             n_ok++;
         }
     }
@@ -895,7 +881,44 @@ static bool test_backend(ggml_backend_t backend) {
     return n_ok == test_cases.size();
 }
 
-int main() {
+static void usage(char ** argv) {
+    // command line: test-backend-ops [mode] [-o op] [-b backend]
+    // modes are correctness (compare with CPU) or performance
+    printf("Usage: %s [mode] [-o op] [-b backend]\n", argv[0]);
+    printf("  valid modes are: test (compare with CPU backend for performance) or perf (performance evaluation)\n");
+    printf("  op names are as given ggml_op_desc()\n");
+}
+
+int main(int argc, char ** argv) {
+    test_mode mode = MODE_TEST;
+    const char * op_name = NULL;
+    const char * backend = NULL;
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "test") == 0) {
+            mode = MODE_TEST;
+        } else if (strcmp(argv[i], "perf") == 0) {
+            mode = MODE_PERF;
+        } else if (strcmp(argv[i], "-o") == 0) {
+            if (i + 1 < argc) {
+                op_name = argv[++i];
+            } else {
+                usage(argv);
+                return 1;
+            }
+        } else if (strcmp(argv[i], "-b") == 0) {
+            if (i + 1 < argc) {
+                backend = argv[++i];
+            } else {
+                usage(argv);
+                return 1;
+            }
+        } else {
+            usage(argv);
+            return 1;
+        }
+    }
+
     // enumerate backends
     printf("Testing %zu backends\n\n", ggml_backend_reg_get_count());
 
@@ -904,11 +927,17 @@ int main() {
     for (size_t i = 0; i < ggml_backend_reg_get_count(); i++) {
         printf("Backend %zu/%zu (%s)\n", i + 1, ggml_backend_reg_get_count(), ggml_backend_reg_get_name(i));
 
+        if (backend != NULL && strcmp(backend, ggml_backend_reg_get_name(i)) != 0) {
+            printf("  Skipping\n");
+            n_ok++;
+            continue;
+        }
+
         ggml_backend_t backend = ggml_backend_reg_init_backend(i, NULL);
         GGML_ASSERT(backend != NULL);
         printf("  Backend name: %s\n", ggml_backend_name(backend));
 
-        bool ok = test_backend(backend);
+        bool ok = test_backend(backend, mode, op_name);
 
         printf("  Backend %s: ", ggml_backend_name(backend));
         if (ok) {
