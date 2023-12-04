@@ -3,6 +3,7 @@
 using namespace metal;
 
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
+#define SWAP(x, y) { auto tmp = (x); (x) = (y); (y) = tmp; }
 
 #define QK4_0 32
 #define QR4_0 2
@@ -38,6 +39,11 @@ typedef struct {
     half    d;         // delta
     int8_t  qs[QK8_0]; // quants
 } block_q8_0;
+
+enum ggml_sort_order {
+    GGML_SORT_ASC,
+    GGML_SORT_DESC,
+};
 
 // general-purpose kernel for addition, multiplication and division of two tensors
 // pros: works for non-contiguous tensors, supports broadcast across all dims
@@ -1476,6 +1482,58 @@ kernel void kernel_im2col_f16(
         dst[offset_dst] = x[offset_src + iih * IW + iiw];
     }
 }
+
+// bitonic sort implementation following the CUDA kernels as reference
+typedef void (argsort_t)(
+        device const float * x,
+        device     int32_t * dst,
+        constant   int64_t & ncols,
+        uint3 tgpig[[threadgroup_position_in_grid]],
+        uint3 tpitg[[thread_position_in_threadgroup]]);
+
+template<ggml_sort_order order>
+kernel void kernel_argsort_f32_i32(
+        device const float   * x,
+        device       int32_t * dst,
+        constant     int64_t & ncols,
+        uint3 tgpig[[threadgroup_position_in_grid]],
+        uint3 tpitg[[thread_position_in_threadgroup]]) {
+    // bitonic sort
+    int col = tpitg[0];
+    int row = tgpig[1];
+
+    if (col >= ncols) return;
+
+    device const float   * x_row   = x   + row * ncols;
+    device       int32_t * dst_row = dst + row * ncols;
+
+    // initialize indices
+    if (col < ncols) {
+        dst_row[col] = col;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    for (int k = 2; k <= ncols; k *= 2) {
+        for (int j = k / 2; j > 0; j /= 2) {
+            int ixj = col ^ j;
+            if (ixj >= ncols || col >= ncols) continue;
+            if (ixj > col) {
+                if ((col & k) == 0) {
+                    if (order == GGML_SORT_ASC ? x_row[dst_row[col]] > x_row[dst_row[ixj]] : x_row[dst_row[col]] < x_row[dst_row[ixj]]) {
+                        SWAP(dst_row[col], dst_row[ixj]);
+                    }
+                } else {
+                    if (order == GGML_SORT_ASC ? x_row[dst_row[col]] < x_row[dst_row[ixj]] : x_row[dst_row[col]] > x_row[dst_row[ixj]]) {
+                        SWAP(dst_row[col], dst_row[ixj]);
+                    }
+                }
+            }
+        }
+    }
+}
+
+template [[host_name("kernel_argsort_f32_i32_asc")]]  kernel argsort_t kernel_argsort_f32_i32<GGML_SORT_ASC>;
+template [[host_name("kernel_argsort_f32_i32_desc")]] kernel argsort_t kernel_argsort_f32_i32<GGML_SORT_DESC>;
 
 kernel void kernel_cpy_f16_f16(
         device const half * src0,
