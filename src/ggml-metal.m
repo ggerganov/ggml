@@ -62,6 +62,8 @@ struct ggml_metal_context {
     GGML_METAL_DECL_KERNEL(add_row); // TODO: avoid this extra kernel, instead extend the "add" kernel to support broadcast
     GGML_METAL_DECL_KERNEL(mul);
     GGML_METAL_DECL_KERNEL(mul_row); // TODO: avoid this extra kernel, instead extend the "mul" kernel to support broadcast
+    GGML_METAL_DECL_KERNEL(div);
+    GGML_METAL_DECL_KERNEL(div_row);
     GGML_METAL_DECL_KERNEL(scale);
     GGML_METAL_DECL_KERNEL(scale_4);
     GGML_METAL_DECL_KERNEL(silu);
@@ -289,6 +291,8 @@ struct ggml_metal_context * ggml_metal_init(int n_cb) {
         GGML_METAL_ADD_KERNEL(add_row);
         GGML_METAL_ADD_KERNEL(mul);
         GGML_METAL_ADD_KERNEL(mul_row);
+        GGML_METAL_ADD_KERNEL(div);
+        GGML_METAL_ADD_KERNEL(div_row);
         GGML_METAL_ADD_KERNEL(scale);
         GGML_METAL_ADD_KERNEL(scale_4);
         GGML_METAL_ADD_KERNEL(silu);
@@ -367,6 +371,8 @@ void ggml_metal_free(struct ggml_metal_context * ctx) {
     GGML_METAL_DEL_KERNEL(add_row);
     GGML_METAL_DEL_KERNEL(mul);
     GGML_METAL_DEL_KERNEL(mul_row);
+    GGML_METAL_DEL_KERNEL(div);
+    GGML_METAL_DEL_KERNEL(div_row);
     GGML_METAL_DEL_KERNEL(scale);
     GGML_METAL_DEL_KERNEL(scale_4);
     GGML_METAL_DEL_KERNEL(silu);
@@ -885,6 +891,7 @@ void ggml_metal_graph_compute(
                         } break;
                     case GGML_OP_ADD:
                     case GGML_OP_MUL:
+                    case GGML_OP_DIV:
                         {
                             GGML_ASSERT(ggml_is_contiguous(src0));
                             GGML_ASSERT(ggml_is_contiguous(src1));
@@ -898,18 +905,20 @@ void ggml_metal_graph_compute(
                                 GGML_ASSERT(ne11 == 1);
 
                                 nb = ne00 / 4;
-                                if (dst->op == GGML_OP_ADD) {
-                                    [encoder setComputePipelineState:ctx->pipeline_add_row];
-                                } else {
-                                    [encoder setComputePipelineState:ctx->pipeline_mul_row];
+                                switch (dst->op) {
+                                    case GGML_OP_ADD: [encoder setComputePipelineState:ctx->pipeline_add_row]; break;
+                                    case GGML_OP_MUL: [encoder setComputePipelineState:ctx->pipeline_mul_row]; break;
+                                    case GGML_OP_DIV: [encoder setComputePipelineState:ctx->pipeline_div_row]; break;
+                                    default: GGML_ASSERT(false);
                                 }
 
                                 bcast_row = true;
                             } else {
-                                if (dst->op == GGML_OP_ADD) {
-                                    [encoder setComputePipelineState:ctx->pipeline_add];
-                                } else {
-                                    [encoder setComputePipelineState:ctx->pipeline_mul];
+                                switch (dst->op) {
+                                    case GGML_OP_ADD: [encoder setComputePipelineState:ctx->pipeline_add]; break;
+                                    case GGML_OP_MUL: [encoder setComputePipelineState:ctx->pipeline_mul]; break;
+                                    case GGML_OP_DIV: [encoder setComputePipelineState:ctx->pipeline_div]; break;
+                                    default: GGML_ASSERT(false);
                                 }
                             }
                             [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
@@ -1793,6 +1802,7 @@ static bool ggml_backend_metal_supports_op(ggml_backend_t backend, const struct 
         case GGML_OP_CONCAT:
         case GGML_OP_ADD:
         case GGML_OP_MUL:
+        case GGML_OP_DIV:
         case GGML_OP_SCALE:
         case GGML_OP_SQR:
         case GGML_OP_SOFT_MAX:
