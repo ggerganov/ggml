@@ -4692,6 +4692,49 @@ static __global__ void k_sum_rows_f32(const float * x, float * dst, const int nc
     }
 }
 
+template<typename T>
+static inline __device__ void swap(T & a, T & b) {
+    T tmp = a;
+    a = b;
+    b = tmp;
+}
+
+template<ggml_sort_order order>
+static __global__ void k_argsort_f32_i32(const float * x, int * dst, const int ncols) {
+    // bitonic sort
+    int col = threadIdx.x;
+    int row = blockIdx.y;
+
+    if (col >= ncols) return;
+
+    const float * x_row = x + row * ncols;
+    int * dst_row = dst + row * ncols;
+
+    // initialize indices
+    if (col < ncols) {
+        dst_row[col] = col;
+    }
+    __syncthreads();
+
+    for (int k = 2; k <= ncols; k *= 2) {
+        for (int j = k / 2; j > 0; j /= 2) {
+            int ixj = col ^ j;
+            if (ixj >= ncols || col >= ncols) continue;
+            if (ixj > col) {
+                if ((col & k) == 0) {
+                    if (order == GGML_SORT_ASC ? x_row[dst_row[col]] > x_row[dst_row[ixj]] : x_row[dst_row[col]] < x_row[dst_row[ixj]]) {
+                        swap(dst_row[col], dst_row[ixj]);
+                    }
+                } else {
+                    if (order == GGML_SORT_ASC ? x_row[dst_row[col]] < x_row[dst_row[ixj]] : x_row[dst_row[col]] > x_row[dst_row[ixj]]) {
+                        swap(dst_row[col], dst_row[ixj]);
+                    }
+                }
+            }
+        }
+    }
+}
+
 static __global__ void diag_mask_inf_f32(const float * x, float * dst, const int ncols, const int rows_per_channel, const int n_past) {
     const int col = blockDim.y*blockIdx.y + threadIdx.y;
     const int row = blockDim.x*blockIdx.x + threadIdx.x;
@@ -5782,49 +5825,6 @@ static void sum_rows_f32_cuda(const float * x, float * dst, const int ncols, con
     const dim3 block_dims(WARP_SIZE, 1, 1);
     const dim3 block_nums(1, nrows, 1);
     k_sum_rows_f32<<<block_nums, block_dims, 0, stream>>>(x, dst, ncols);
-}
-
-template<typename T>
-static inline __device__ void swap(T & a, T & b) {
-    T tmp = a;
-    a = b;
-    b = tmp;
-}
-
-template<ggml_sort_order order>
-static __global__ void k_argsort_f32_i32(const float * x, int * dst, const int ncols) {
-    // bitonic sort
-    int col = threadIdx.x;
-    int row = blockIdx.y;
-
-    if (col >= ncols) return;
-
-    const float * x_row = x + row * ncols;
-    int * dst_row = dst + row * ncols;
-
-    // initialize indices
-    if (col < ncols) {
-        dst_row[col] = col;
-    }
-    __syncthreads();
-
-    for (int k = 2; k <= ncols; k *= 2) {
-        for (int j = k / 2; j > 0; j /= 2) {
-            int ixj = col ^ j;
-            if (ixj >= ncols || col >= ncols) continue;
-            if (ixj > col) {
-                if ((col & k) == 0) {
-                    if (order == GGML_SORT_ASC ? x_row[dst_row[col]] > x_row[dst_row[ixj]] : x_row[dst_row[col]] < x_row[dst_row[ixj]]) {
-                        swap(dst_row[col], dst_row[ixj]);
-                    }
-                } else {
-                    if (order == GGML_SORT_ASC ? x_row[dst_row[col]] < x_row[dst_row[ixj]] : x_row[dst_row[col]] > x_row[dst_row[ixj]]) {
-                        swap(dst_row[col], dst_row[ixj]);
-                    }
-                }
-            }
-        }
-    }
 }
 
 static void argsort_f32_i32_cuda(const float * x, int * dst, const int ncols, const int nrows, ggml_sort_order order, cudaStream_t stream) {
