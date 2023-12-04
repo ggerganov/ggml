@@ -1516,7 +1516,6 @@ kernel void kernel_argsort_f32_i32(
     for (int k = 2; k <= ncols; k *= 2) {
         for (int j = k / 2; j > 0; j /= 2) {
             int ixj = col ^ j;
-            if (ixj >= ncols || col >= ncols) continue;
             if (ixj > col) {
                 if ((col & k) == 0) {
                     if (order == GGML_SORT_ASC ? x_row[dst_row[col]] > x_row[dst_row[ixj]] : x_row[dst_row[col]] < x_row[dst_row[ixj]]) {
@@ -1528,6 +1527,7 @@ kernel void kernel_argsort_f32_i32(
                     }
                 }
             }
+            threadgroup_barrier(mem_flags::mem_threadgroup);
         }
     }
 }
