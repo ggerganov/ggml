@@ -1995,10 +1995,6 @@ static bool ggml_backend_metal_supports_op(ggml_backend_t backend, const struct 
         case GGML_OP_SQR:
         case GGML_OP_SUM_ROWS:
         case GGML_OP_SOFT_MAX:
-        case GGML_OP_DIAG_MASK_INF:
-        case GGML_OP_MUL_MAT:
-        case GGML_OP_MUL_MAT_ID:
-        case GGML_OP_GET_ROWS:
         case GGML_OP_RMS_NORM:
         case GGML_OP_NORM:
         case GGML_OP_ALIBI:
@@ -2009,6 +2005,33 @@ static bool ggml_backend_metal_supports_op(ggml_backend_t backend, const struct 
         case GGML_OP_CPY:
         case GGML_OP_CONT:
             return true;
+        case GGML_OP_DIAG_MASK_INF:
+        case GGML_OP_GET_ROWS:
+            {
+                // TODO: also check during graph_compute
+                return op->ne[0] % 4 == 0;
+            } break;
+        case GGML_OP_MUL_MAT:
+        case GGML_OP_MUL_MAT_ID:
+            {
+                // TODO: also check during graph_compute
+                struct ggml_tensor * a;
+                struct ggml_tensor * b; UNUSED(b);
+                if (op->op == GGML_OP_MUL_MAT) {
+                    a = op->src[0];
+                    b = op->src[1];
+                } else {
+                    a = op->src[2];
+                    b = op->src[1];
+                }
+                if (a->ne[3] != 1) {
+                    return false;
+                }
+                if (ggml_is_quantized(a->type) && a->ne[2] != 1) {
+                    return false;
+                }
+                return true;
+            } break;
         default:
             return false;
     }
