@@ -17953,8 +17953,8 @@ size_t ggml_quantize_q5_0(const float * src, void * dst, int n, int k, int64_t *
             memcpy(&qh, &y[i].qh, sizeof(qh));
 
             for (int j = 0; j < QK5_0; j += 2) {
-                const uint8_t vh0 = ((qh & (1u << (j + 0 ))) >> (j + 0 )) << 4;
-                const uint8_t vh1 = ((qh & (1u << (j + 16))) >> (j + 12));
+                const uint8_t vh0 = ((qh & (1u << (j/2 + 0 ))) >> (j/2 + 0 )) << 4;
+                const uint8_t vh1 = ((qh & (1u << (j/2 + 16))) >> (j/2 + 12));
 
                 // cast to 16 bins
                 const uint8_t vi0 = ((y[i].qs[j/2] & 0x0F) | vh0) / 2;
@@ -17983,8 +17983,8 @@ size_t ggml_quantize_q5_1(const float * src, void * dst, int n, int k, int64_t *
             memcpy(&qh, &y[i].qh, sizeof(qh));
 
             for (int j = 0; j < QK5_1; j += 2) {
-                const uint8_t vh0 = ((qh & (1u << (j + 0 ))) >> (j + 0 )) << 4;
-                const uint8_t vh1 = ((qh & (1u << (j + 16))) >> (j + 12));
+                const uint8_t vh0 = ((qh & (1u << (j/2 + 0 ))) >> (j/2 + 0 )) << 4;
+                const uint8_t vh1 = ((qh & (1u << (j/2 + 16))) >> (j/2 + 12));
 
                 // cast to 16 bins
                 const uint8_t vi0 = ((y[i].qs[j/2] & 0x0F) | vh0) / 2;
