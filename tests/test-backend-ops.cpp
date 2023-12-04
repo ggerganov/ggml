@@ -795,7 +795,7 @@ struct test_argsort : public test_case {
     }
 
     test_argsort(ggml_type type = GGML_TYPE_F32,
-            std::array<int64_t, 4> ne = {10, 10, 10, 10},
+            std::array<int64_t, 4> ne = {16, 10, 10, 10},
             ggml_sort_order order = GGML_SORT_ASC)
         : type(type), ne(ne), order(order) {}
 
@@ -984,7 +984,7 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
     test_cases.emplace_back(new test_concat());
 
     for (ggml_sort_order order : {GGML_SORT_ASC, GGML_SORT_DESC}) {
-        test_cases.emplace_back(new test_argsort(GGML_TYPE_F32, {10, 10, 10, 10}, order));
+        test_cases.emplace_back(new test_argsort(GGML_TYPE_F32, {16, 10, 10, 10}, order));
     }
 
     for (ggml_type type_a : {GGML_TYPE_F32, GGML_TYPE_F16}) {
