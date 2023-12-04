@@ -211,6 +211,10 @@ struct test_case {
 
     virtual ggml_tensor * build_graph(ggml_context * ctx) = 0;
 
+    virtual double max_nmse_err() {
+        return 1e-6;
+    }
+
     virtual void initialize_tensors(ggml_context * ctx) {
         for (ggml_tensor * t = ggml_get_first_tensor(ctx); t != nullptr; t = ggml_get_next_tensor(ctx, t)) {
             init_tensor_uniform(t);
@@ -253,18 +257,26 @@ struct test_case {
         initialize_tensors(ctx);
 
         // compare
-        bool ok = true;
+        struct callback_userdata {
+            bool   ok;
+            double max_err;
+        };
+
+        callback_userdata ud {
+            true,
+            max_nmse_err(),
+        };
 
         auto callback = [](int index, ggml_tensor * t1, ggml_tensor * t2, void * user_data) -> bool {
             std::vector<float> f1 = tensor_to_float(t1);
             std::vector<float> f2 = tensor_to_float(t2);
-            bool * ok = (bool *) user_data;
+            callback_userdata * ud = (callback_userdata *) user_data;
 
             for (size_t i = 0; i < f1.size(); i++) {
                 // check for nans
                 if (std::isnan(f1[i]) || std::isnan(f2[i])) {
                     printf("    Error: %s: NaN at index %zu\n", ggml_op_desc(t1), i);
-                    *ok = false;
+                    ud->ok = false;
                     return true;
                 }
                 // check for infs: both must be inf of the same sign, or both must be finite
@@ -272,29 +284,29 @@ struct test_case {
                     if (isinf_or_max(f1[i]) && isinf_or_max(f2[i])) {
                         if (std::signbit(f1[i]) != std::signbit(f2[i])) {
                             printf("    Error: %s: inf sign mismatch: %f %f\n", ggml_op_desc(t1), f1[i], f2[i]);
-                            *ok = false;
+                            ud->ok = false;
                             return true;
                         }
                     } else {
                         printf("    Error: %s: inf mismatch: %f %f\n", ggml_op_desc(t1), f1[i], f2[i]);
-                        *ok = false;
+                        ud->ok = false;
                         return true;
                     }
                 }
             }
 
             double err = nmse(f1.data(), f2.data(), f1.size());
-            if (err > 1e-6) {
+            if (err > ud->max_err) {
                 printf("    Error: %s: NMSE = %f\n", ggml_op_desc(t1), err);
-                *ok = false;
+                ud->ok = false;
             }
             return true;
        };
 
-        ggml_backend_compare_graph_backend(backend1, backend2, gf, callback, &ok);
+        ggml_backend_compare_graph_backend(backend1, backend2, gf, callback, &ud);
 
         printf("  %s(%s): ", ggml_op_desc(out), vars().c_str());
-        if (ok) {
+        if (ud.ok) {
             printf("\033[1;32mOK\033[0m\n");
         } else {
             printf("\033[1;31mFAIL\033[0m\n");
@@ -304,7 +316,7 @@ struct test_case {
 
         ggml_free(ctx);
 
-        return ok;
+        return ud.ok;
     }
 };
 
@@ -558,6 +570,10 @@ struct test_mul_mat : public test_case {
 
     std::string vars() override {
         return VARS_TO_STR7(type_a, type_b, m, n, k, bs, nr);
+    }
+
+    double max_nmse_err() override {
+        return 1e-4;
     }
 
     test_mul_mat(ggml_type type_a = GGML_TYPE_F32, ggml_type type_b = GGML_TYPE_F32,
@@ -840,6 +856,10 @@ struct test_mul_mat_id : public test_case {
         return VARS_TO_STR9(type_a, type_b, n_mats, id, m, n, k, bs, nr);
     }
 
+    double max_nmse_err() override {
+        return 1e-4;
+    }
+
     test_mul_mat_id(ggml_type type_a = GGML_TYPE_F32, ggml_type type_b = GGML_TYPE_F32,
             int n_mats = 2, int id = 0,
             int64_t m = 32, int64_t n = 32, int64_t k = 32,
@@ -1007,11 +1027,11 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
         test_cases.emplace_back(new test_argsort(GGML_TYPE_F32, {16, 10, 10, 10}, order));
     }
 
-    for (ggml_type type_a : {/*GGML_TYPE_F32,*/ GGML_TYPE_F16}) {
+    for (ggml_type type_a : all_types) {
         for (ggml_type type_b : {GGML_TYPE_F32 /*, GGML_TYPE_F16 */}) {
             for (int n_mats : {1, 2, 4}) {
                 for (int id = 0; id < n_mats; id++) {
-                    test_cases.emplace_back(new test_mul_mat_id(type_a, type_b, n_mats, id, 32, 32, 32, {1, 1}, {1, 1}));
+                    test_cases.emplace_back(new test_mul_mat_id(type_a, type_b, n_mats, id, 16, 16, 256, {1, 1}, {1, 1}));
                 }
             }
         }
