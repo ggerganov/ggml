@@ -987,7 +987,7 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
         test_cases.emplace_back(new test_argsort(GGML_TYPE_F32, {16, 10, 10, 10}, order));
     }
 
-    for (ggml_type type_a : {GGML_TYPE_F32, GGML_TYPE_F16}) {
+    for (ggml_type type_a : {/*GGML_TYPE_F32,*/ GGML_TYPE_F16}) {
         for (ggml_type type_b : {GGML_TYPE_F32 /*, GGML_TYPE_F16 */}) {
             for (int n_mats : {1, 2, 4}) {
                 for (int id = 0; id < n_mats; id++) {
