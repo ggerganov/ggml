@@ -261,7 +261,7 @@ struct test_case {
             for (size_t i = 0; i < f1.size(); i++) {
                 // check for nans
                 if (std::isnan(f1[i]) || std::isnan(f2[i])) {
-                    printf("    Error: %s: NaN\n", ggml_op_desc(t1));
+                    printf("    Error: %s: NaN at index %zu\n", ggml_op_desc(t1), i);
                     *ok = false;
                     return true;
                 }
@@ -989,8 +989,8 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
 
     for (ggml_type type_a : {GGML_TYPE_F32, GGML_TYPE_F16}) {
         for (ggml_type type_b : {GGML_TYPE_F32 /*, GGML_TYPE_F16 */}) {
-            for (int n_mats : {2, 4}) {
-                for (int id = 0; id < 2; id++) {
+            for (int n_mats : {1, 2, 4}) {
+                for (int id = 0; id < n_mats; id++) {
                     test_cases.emplace_back(new test_mul_mat_id(type_a, type_b, n_mats, id, 32, 32, 32, {1, 1}, {1, 1}));
                 }
             }

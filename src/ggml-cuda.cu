@@ -8756,8 +8756,8 @@ static ggml_backend_t ggml_backend_reg_cuda_init(const char * params, void * use
 }
 
 static int ggml_backend_cuda_reg_devices() {
-    //int device_count = ggml_cuda_get_device_count();
-    int device_count = 1; // DEBUG: some tools require delaying CUDA initialization
+    int device_count = ggml_cuda_get_device_count();
+    //int device_count = 1; // DEBUG: some tools require delaying CUDA initialization
     for (int i = 0; i < device_count; i++) {
         char name[128];
         snprintf(name, sizeof(name), "%s%d", GGML_CUDA_NAME, i);

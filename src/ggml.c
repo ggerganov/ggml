@@ -1775,6 +1775,7 @@ static void ggml_setup_op_has_task_pass(void) {
 
         p[GGML_OP_ACC                    ] = true;
         p[GGML_OP_MUL_MAT                ] = true;
+        p[GGML_OP_MUL_MAT_ID             ] = true;
         p[GGML_OP_OUT_PROD               ] = true;
         p[GGML_OP_SET                    ] = true;
         p[GGML_OP_GET_ROWS_BACK          ] = true;
@@ -4111,7 +4112,6 @@ struct ggml_tensor * ggml_mul_mat_id(
     }
 
     return result;
-
 }
 
 // ggml_out_prod
@@ -9605,6 +9605,8 @@ static void ggml_compute_forward_mul_mat(
             char * wdata = params->wdata;
             const size_t row_size = ne10*ggml_type_size(vec_dot_type)/ggml_blck_size(vec_dot_type);
 
+            assert(params->wsize >= ne11*ne12*ne13*row_size);
+
             for (int64_t i13 = 0; i13 < ne13; ++i13) {
                 for (int64_t i12 = 0; i12 < ne12; ++i12) {
                     for (int64_t i11 = 0; i11 < ne11; ++i11) {
@@ -9718,6 +9720,8 @@ static void ggml_compute_forward_mul_mat_id(
     const int id = ggml_get_op_params_i32(dst, 0);
 
     const int a_id = ((int32_t *)ids->data)[id];
+
+    GGML_ASSERT(a_id >= 0 && a_id < ids->ne[0]);
 
     const struct ggml_tensor * src0 = dst->src[a_id + 2];
 
@@ -16056,7 +16060,7 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
                     const enum ggml_type vec_dot_type = type_traits[a->type].vec_dot_type;
 #if defined(GGML_USE_ACCELERATE) || defined(GGML_USE_OPENBLAS)
                     if (ggml_compute_forward_mul_mat_use_blas(a, b, node)) {
-                        if (node->src[0]->type != GGML_TYPE_F32) {
+                        if (a->type != GGML_TYPE_F32) {
                             // here we need memory just for single 2D matrix from src0
                             cur = ggml_type_size(GGML_TYPE_F32)*(a->ne[0]*a->ne[1]);
                         }
