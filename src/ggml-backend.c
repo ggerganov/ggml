@@ -1271,6 +1271,7 @@ struct ggml_backend_graph_copy ggml_backend_graph_copy(ggml_backend_t backend, s
 
     free(hash_set.keys);
     free(node_copies);
+    free(node_init);
 
     return (struct ggml_backend_graph_copy) {
         /* .buffer           = */ buffer,
