@@ -123,6 +123,7 @@ struct ggml_metal_context {
     GGML_METAL_DECL_KERNEL(cpy_f16_f16);
     GGML_METAL_DECL_KERNEL(concat);
     GGML_METAL_DECL_KERNEL(sqr);
+    GGML_METAL_DECL_KERNEL(sum_rows);
 
 #undef GGML_METAL_DECL_KERNEL
 };
@@ -354,6 +355,7 @@ struct ggml_metal_context * ggml_metal_init(int n_cb) {
         GGML_METAL_ADD_KERNEL(cpy_f16_f16);
         GGML_METAL_ADD_KERNEL(concat);
         GGML_METAL_ADD_KERNEL(sqr);
+        GGML_METAL_ADD_KERNEL(sum_rows);
 
 #undef GGML_METAL_ADD_KERNEL
     }
@@ -434,6 +436,7 @@ void ggml_metal_free(struct ggml_metal_context * ctx) {
     GGML_METAL_DEL_KERNEL(cpy_f16_f16);
     GGML_METAL_DEL_KERNEL(concat);
     GGML_METAL_DEL_KERNEL(sqr);
+    GGML_METAL_DEL_KERNEL(sum_rows);
 
 #undef GGML_METAL_DEL_KERNEL
 
@@ -1031,6 +1034,40 @@ void ggml_metal_graph_compute(
 
                             const int64_t n = ggml_nelements(dst);
                             [encoder dispatchThreadgroups:MTLSizeMake(n, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+                        } break;
+                    case GGML_OP_SUM_ROWS:
+                        {
+                            GGML_ASSERT(src0->nb[0] == ggml_type_size(src0->type));
+
+                            [encoder setComputePipelineState:ctx->pipeline_sum_rows];
+                            [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
+                            [encoder setBuffer:id_dst  offset:offs_dst  atIndex:1];
+                            [encoder setBytes:&ne00 length:sizeof(ne00) atIndex:2];
+                            [encoder setBytes:&ne01 length:sizeof(ne01) atIndex:3];
+                            [encoder setBytes:&ne02 length:sizeof(ne02) atIndex:4];
+                            [encoder setBytes:&ne03 length:sizeof(ne03) atIndex:5];
+                            [encoder setBytes:&nb00 length:sizeof(nb00) atIndex:6];
+                            [encoder setBytes:&nb01 length:sizeof(nb01) atIndex:7];
+                            [encoder setBytes:&nb02 length:sizeof(nb02) atIndex:8];
+                            [encoder setBytes:&nb03 length:sizeof(nb03) atIndex:9];
+                            [encoder setBytes:&ne10 length:sizeof(ne10) atIndex:10];
+                            [encoder setBytes:&ne11 length:sizeof(ne11) atIndex:11];
+                            [encoder setBytes:&ne12 length:sizeof(ne12) atIndex:12];
+                            [encoder setBytes:&ne13 length:sizeof(ne13) atIndex:13];
+                            [encoder setBytes:&nb10 length:sizeof(nb10) atIndex:14];
+                            [encoder setBytes:&nb11 length:sizeof(nb11) atIndex:15];
+                            [encoder setBytes:&nb12 length:sizeof(nb12) atIndex:16];
+                            [encoder setBytes:&nb13 length:sizeof(nb13) atIndex:17];
+                            [encoder setBytes:&ne0  length:sizeof(ne0)  atIndex:18];
+                            [encoder setBytes:&ne1  length:sizeof(ne1)  atIndex:19];
+                            [encoder setBytes:&ne2  length:sizeof(ne2)  atIndex:20];
+                            [encoder setBytes:&ne3  length:sizeof(ne3)  atIndex:21];
+                            [encoder setBytes:&nb0  length:sizeof(nb0)  atIndex:22];
+                            [encoder setBytes:&nb1  length:sizeof(nb1)  atIndex:23];
+                            [encoder setBytes:&nb2  length:sizeof(nb2)  atIndex:24];
+                            [encoder setBytes:&nb3  length:sizeof(nb3)  atIndex:25];
+
+                            [encoder dispatchThreadgroups:MTLSizeMake(ne01, ne02, ne03) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
                         } break;
                     case GGML_OP_SOFT_MAX:
                         {
@@ -1805,6 +1842,7 @@ static bool ggml_backend_metal_supports_op(ggml_backend_t backend, const struct 
         case GGML_OP_DIV:
         case GGML_OP_SCALE:
         case GGML_OP_SQR:
+        case GGML_OP_SUM_ROWS:
         case GGML_OP_SOFT_MAX:
         case GGML_OP_DIAG_MASK_INF:
         case GGML_OP_MUL_MAT:
