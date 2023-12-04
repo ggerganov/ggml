@@ -29,10 +29,12 @@ static void init_tensor_uniform(ggml_tensor * tensor, float min = -1.0f, float m
 
     if (tensor->type == GGML_TYPE_F32) {
         ggml_backend_tensor_set(tensor, data.data(), 0, size * sizeof(float));
-    } else if (tensor->type == GGML_TYPE_F16) {
-        std::vector<ggml_fp16_t> data16(size);
-        ggml_fp32_to_fp16_row(data.data(), data16.data(), size);
-        ggml_backend_tensor_set(tensor, data16.data(), 0, size * sizeof(ggml_fp16_t));
+    } else if (ggml_is_quantized(tensor->type) || tensor->type == GGML_TYPE_F16) {
+        GGML_ASSERT(size % ggml_blck_size(tensor->type) == 0);
+        std::vector<uint8_t> dataq(ggml_type_size(tensor->type)*size/ggml_blck_size(tensor->type));
+        int64_t hist[16];
+        ggml_quantize_chunk(tensor->type, data.data(), dataq.data(), 0, size, hist);
+        ggml_backend_tensor_set(tensor, dataq.data(), 0, dataq.size());
     } else {
         GGML_ASSERT(false);
     }
@@ -945,16 +947,26 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
         test_cases.emplace_back(new test_rms_norm(GGML_TYPE_F32, {64, 10, 10, 10}, eps));
     }
 
-    for (ggml_type type_a : {GGML_TYPE_F32, GGML_TYPE_F16}) {
+    ggml_type all_types[] = {
+        GGML_TYPE_F32, GGML_TYPE_F16,
+        GGML_TYPE_Q4_0, GGML_TYPE_Q4_1,
+        GGML_TYPE_Q5_0, GGML_TYPE_Q5_1,
+        GGML_TYPE_Q8_0,
+        GGML_TYPE_Q2_K, GGML_TYPE_Q3_K,
+        GGML_TYPE_Q4_K, GGML_TYPE_Q5_K,
+        GGML_TYPE_Q6_K
+    };
+
+    for (ggml_type type_a : all_types) {
         for (ggml_type type_b : {GGML_TYPE_F32 /*, GGML_TYPE_F16 */}) {
             // FIXME: CPU crashes on f16xf16
-            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 32, { 1,  1}, {1, 1}));
-            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 32, {10,  1}, {1, 1}));
-            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 32, {10,  1}, {2, 1}));
-            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 32, {10, 10}, {1, 1}));
-            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 32, {10, 10}, {2, 1}));
-            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 32, {10, 10}, {1, 2}));
-            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 32, {10, 10}, {2, 2}));
+            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 256, { 1,  1}, {1, 1}));
+            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 256, {10,  1}, {1, 1}));
+            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 256, {10,  1}, {2, 1}));
+            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 256, {10, 10}, {1, 1}));
+            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 256, {10, 10}, {2, 1}));
+            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 256, {10, 10}, {1, 2}));
+            test_cases.emplace_back(new test_mul_mat(type_a, type_b, 32, 32, 256, {10, 10}, {2, 2}));
         }
     }
 
