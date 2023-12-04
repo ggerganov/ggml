@@ -1,11 +1,11 @@
-#include <algorithm>
 #include <ggml.h>
 #include <ggml-alloc.h>
 #include <ggml-backend.h>
 #include <ggml-backend-impl.h>
+#include <algorithm>
 #include <array>
-#include <cstring>
 #include <cfloat>
+#include <cstring>
 #include <functional>
 #include <memory>
 #include <random>

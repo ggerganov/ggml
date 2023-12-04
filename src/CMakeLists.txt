@@ -222,6 +222,9 @@ if (GGML_CUBLAS)
             add_compile_definitions(GGML_CUDA_FORCE_MMQ)
         endif()
 
+        # required for dynamic parallelism
+        set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
+
         if (GGML_STATIC)
             set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} CUDA::cudart_static CUDA::cublas_static CUDA::cublasLt_static)
         else()
