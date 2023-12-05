@@ -501,6 +501,10 @@ static size_t g_scratch_offset = 0;
 
 static cublasHandle_t g_cublas_handles[GGML_CUDA_MAX_DEVICES] = {nullptr};
 
+static __device__ __forceinline__ float op_repeat(const float a, const float b) {
+    return b;
+}
+
 static __device__ __forceinline__ float op_add(const float a, const float b) {
     return a + b;
 }
@@ -537,7 +541,7 @@ static __global__ void k_bin_bcast(const src0_t * src0, const src1_t * src1, dst
     const size_t i_src0 = i_dst;
     const size_t i_src1 = i13*s13 + i12*s12 + i11*s11 + i10;
 
-    dst[i_dst] = (dst_t)bin_op((float)src0[i_src0], (float)src1[i_src1]);
+    dst[i_dst] = (dst_t)bin_op(src0 ? (float)src0[i_src0] : 0.0f, (float)src1[i_src1]);
 }
 
 static __global__ void gelu_f32(const float * x, float * dst, const int k) {
@@ -4862,7 +4866,8 @@ struct bin_bcast_cuda {
         const int num_blocks_x = (ne0 + CUDA_ADDMUL_BLOCK_SIZE - 1) / CUDA_ADDMUL_BLOCK_SIZE;
         dim3 num_blocks(num_blocks_x, ne1, ne2*ne3);
 
-        k_bin_bcast<bin_op><<<num_blocks, CUDA_ADDMUL_BLOCK_SIZE, 0, stream>>>(src0_dd, src1_dd, dst_dd,
+        k_bin_bcast<bin_op><<<num_blocks, CUDA_ADDMUL_BLOCK_SIZE, 0, stream>>>(
+            src0_dd, src1_dd, dst_dd,
             ne0,/* ne1, ne2, */ne3,
             ne10, ne11, ne12, ne13,
             /* s0, */s1, s2, s3,
@@ -6096,63 +6101,6 @@ static cudaError_t ggml_cuda_cpy_tensor_2d(
     }
 }
 
-static void ggml_cuda_op_repeat(
-    const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
-    const float * src0_d, const float * src1_d, float * dst_d, const cudaStream_t & stream) {
-    // guaranteed to be an integer due to the check in ggml_can_repeat
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
-    const int64_t ne2 = dst->ne[2];
-    const int64_t ne3 = dst->ne[3];
-
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-    const int64_t ne02 = src0->ne[2];
-    const int64_t ne03 = src0->ne[3];
-
-    const size_t nb0 = dst->nb[0];
-    const size_t nb1 = dst->nb[1];
-    const size_t nb2 = dst->nb[2];
-    const size_t nb3 = dst->nb[3];
-
-    const size_t nb00 = src0->nb[0];
-    const size_t nb01 = src0->nb[1];
-    const size_t nb02 = src0->nb[2];
-    const size_t nb03 = src0->nb[3];
-
-    const int nr0 = (int)(ne0/ne00);
-    const int nr1 = (int)(ne1/ne01);
-    const int nr2 = (int)(ne2/ne02);
-    const int nr3 = (int)(ne3/ne03);
-
-    // TODO: support for transposed / permuted tensors
-    GGML_ASSERT(nb0  == sizeof(float));
-    GGML_ASSERT(nb00 == sizeof(float));
-
-    // TODO: very inefficient, implement in a kernel, or fewer cudaMemcpyAsync calls for contiguous tensors
-    for                         (int i3 = 0; i3 < nr3;  i3++) {
-        for                     (int k3 = 0; k3 < ne03; k3++) {
-            for                 (int i2 = 0; i2 < nr2;  i2++) {
-                for             (int k2 = 0; k2 < ne02; k2++) {
-                    for         (int i1 = 0; i1 < nr1;  i1++) {
-                        for     (int k1 = 0; k1 < ne01; k1++) {
-                            for (int i0 = 0; i0 < nr0;  i0++) {
-                                CUDA_CHECK(cudaMemcpyAsync(
-                                              (char *)  dst_d + (i3*ne03 + k3)*nb3  + (i2*ne02 + k2)*nb2  + (i1*ne01 + k1)*nb1  + (i0*ne00)*nb0,
-                                        (const char *) src0_d + (          k3)*nb03 + (          k2)*nb02 + (          k1)*nb01,
-                                        ne00*nb0, cudaMemcpyDeviceToDevice, stream));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    (void) src1;
-    (void) src1_d;
-}
-
 static void ggml_cuda_op_get_rows(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
     const float * src0_d, const float * src1_d, float * dst_d, const cudaStream_t & stream) {
@@ -6215,7 +6163,16 @@ inline void ggml_cuda_op_bin_bcast(
             ggml_type_name(dst->type), ggml_type_name(src0->type), ggml_type_name(src1->type));
         GGML_ASSERT(false);
     }
+}
 
+static void ggml_cuda_op_repeat(
+    const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
+    const float * src0_d, const float * src1_d, float * dst_d, const cudaStream_t & main_stream) {
+
+    ggml_cuda_op_bin_bcast<bin_bcast_cuda<op_repeat>>(dst, src0, dst, nullptr, src0_d, dst_d, main_stream);
+
+    (void) src1;
+    (void) src1_d;
 }
 
 inline void ggml_cuda_op_add(
