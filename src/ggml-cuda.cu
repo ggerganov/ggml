@@ -7762,9 +7762,9 @@ static __global__ void k_compute_batched_ptrs_id(
         int nb12, int nb13,
         int nb2, int nb3,
         int r2, int r3,
-        ggml_type src0_type, half * src0_as_f16, int src0_ne,
+        ggml_type src0_type, half * src0_as_f16, int64_t src0_ne,
         const half * src1_f16, half * dst_f16,
-        const int * ids, const int id,
+        const int32_t * ids, const int id,
         Srcs... src0s) {
 
     int i = ids[id];
@@ -7878,7 +7878,7 @@ static void ggml_cuda_mul_mat_id_cublas(ggml_tensor * dst) {
     ptrs_src = (const void **) ggml_cuda_pool_malloc(2*ne23*sizeof(void *), &ptrs_src_s);
     ptrs_dst = (      void **) ggml_cuda_pool_malloc(1*ne23*sizeof(void *), &ptrs_dst_s);
 
-    size_t src0_ne = ggml_nelements(src00);
+    int64_t src0_ne = ggml_nelements(src00);
     half * src0_as_f16 = nullptr;
     size_t src0_as = 0;
     if (src00->type != GGML_TYPE_F16) {
@@ -7891,7 +7891,7 @@ static void ggml_cuda_mul_mat_id_cublas(ggml_tensor * dst) {
             ptrs_src, ptrs_dst,
             ne12, ne13,
             ne23,
-            (int)ne00*ne01*sizeof(half),(int) ne00*ne01*ne02*sizeof(half), //nb02, nb03,
+            ne00*ne01*sizeof(half), ne00*ne01*ne02*sizeof(half),
             nb12, nb13,
             dst->nb[2], dst->nb[3],
             r2, r3,
@@ -7908,8 +7908,8 @@ static void ggml_cuda_mul_mat_id_cublas(ggml_tensor * dst) {
     CUBLAS_CHECK(
     cublasGemmBatchedEx(g_cublas_handles[g_main_device], CUBLAS_OP_T, CUBLAS_OP_N,
             ne01, ne11, ne10,
-            &alpha_f16, (const void **) (ptrs_src + 0*ne23), CUDA_R_16F, ne00, //nb01/sizeof(half),
-                        (const void **) (ptrs_src + 1*ne23), CUDA_R_16F, ne10, //nb11/sizeof(float),
+            &alpha_f16, (const void **) (ptrs_src + 0*ne23), CUDA_R_16F, ne00,
+                        (const void **) (ptrs_src + 1*ne23), CUDA_R_16F, ne10,
             &beta_f16,  (      void **) (ptrs_dst + 0*ne23), CUDA_R_16F, ne01,
             ne23,
             CUBLAS_COMPUTE_16F,
