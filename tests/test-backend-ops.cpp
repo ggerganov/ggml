@@ -1058,7 +1058,7 @@ static void usage(char ** argv) {
     // command line: test-backend-ops [mode] [-o op] [-b backend]
     // modes are correctness (compare with CPU) or performance
     printf("Usage: %s [mode] [-o op] [-b backend]\n", argv[0]);
-    printf("  valid modes are: test (compare with CPU backend for performance) or perf (performance evaluation)\n");
+    printf("  valid modes are: test (compare with CPU backend for correctness) or perf (performance evaluation) [not implemented]\n");
     printf("  op names are as given ggml_op_desc()\n");
 }
 
