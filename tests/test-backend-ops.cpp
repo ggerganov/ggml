@@ -824,21 +824,33 @@ struct test_argsort : public test_case {
     }
 
     void initialize_tensors(ggml_context * ctx) override {
+        std::random_device rd;
+        std::default_random_engine rng(rd());
         for (ggml_tensor * t = ggml_get_first_tensor(ctx); t != NULL; t = ggml_get_next_tensor(ctx, t)) {
             if (t->type == GGML_TYPE_I32) {
+                // indices
                 std::vector<int> data(ggml_nelements(t));
                 for (int i = 0; i < ggml_nelements(t); i++) {
                     data[i] = rand();
                 }
-                std::shuffle(data.begin(), data.end(), std::default_random_engine(std::random_device()()));
+                std::shuffle(data.begin(), data.end(), rng);
                 ggml_backend_tensor_set(t, data.data(), 0, ne[0]*ne[1]*ne[2]*ne[3] * sizeof(int));
+            } else if (t->type == GGML_TYPE_F32) {
+                // initialize with unique values to avoid ties
+                for (int64_t r = 0; r < ggml_nrows(t); r++) {
+                    std::vector<float> data(t->ne[0]);
+                    for (int i = 0; i < t->ne[0]; i++) {
+                        data[i] = i;
+                    }
+                    std::shuffle(data.begin(), data.end(), rng);
+                    ggml_backend_tensor_set(t, data.data(), r * t->nb[1], t->ne[0] * sizeof(float));
+                }
             } else {
-                init_tensor_uniform(t);
+                GGML_ASSERT(false);
             }
         }
     }
 };
-
 
 // GGML_OP_MUL_MAT_ID
 struct test_mul_mat_id : public test_case {
