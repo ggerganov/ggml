@@ -385,9 +385,14 @@ struct test_case {
             return true;
         }
 
-        for (int i = len; i < 70; i++) {
-            printf(" ");
+        // align while also leaving some margin for variations in parameters
+        int align = 20;
+        int last = (len + align - 1) / align * align;
+        if (last - len < 5) {
+            last += align;
         }
+        last = std::max(last, 60);
+        printf("%*s", last - len, "");
 
         // allocate
         ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors(ctx, backend);
