@@ -266,7 +266,9 @@ size_t ggml_backend_register(const char * name, ggml_backend_init_fn init_fn, gg
 
     snprintf(ggml_backend_registry[id].name, sizeof(ggml_backend_registry[id].name), "%s", name);
 
+#ifndef NDEBUG
     fprintf(stderr, "%s: registered backend %s\n", __func__, name);
+#endif
 
     ggml_backend_registry_count++;
     return ggml_backend_registry_count - 1;
