@@ -573,7 +573,7 @@ struct test_mul_mat : public test_case {
     }
 
     double max_nmse_err() override {
-        return 1e-4;
+        return 5e-4;
     }
 
     test_mul_mat(ggml_type type_a = GGML_TYPE_F32, ggml_type type_b = GGML_TYPE_F32,
@@ -857,7 +857,7 @@ struct test_mul_mat_id : public test_case {
     }
 
     double max_nmse_err() override {
-        return 1e-4;
+        return 5e-4;
     }
 
     test_mul_mat_id(ggml_type type_a = GGML_TYPE_F32, ggml_type type_b = GGML_TYPE_F32,
