@@ -6197,11 +6197,6 @@ static void ggml_cuda_op_get_rows(
     }
 }
 
-//template<typename src0_t, typename src1_t, typename dst_t>
-//static void add_cuda(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst,
-//        const src0_t * src0_dd, const src1_t * src1_dd, dst_t * dst_dd,
-//        cudaStream_t stream)
-
 template<class op>
 inline void ggml_cuda_op_bin_bcast(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
@@ -7753,6 +7748,7 @@ static void ggml_cuda_mul_mat(const ggml_tensor * src0, const ggml_tensor * src1
     }
 }
 
+#if 0
 template<typename ... Srcs>
 static __global__ void k_compute_batched_ptrs_id(
         const void ** ptrs_src, void ** ptrs_dst,
@@ -7931,6 +7927,7 @@ static void ggml_cuda_mul_mat_id_cublas(ggml_tensor * dst) {
     ggml_cuda_pool_free(src1_as_f16, src1_as);
     ggml_cuda_pool_free(dst_f16, dst_as);
 }
+#endif
 
 static void ggml_cuda_mul_mat_id(const ggml_tensor * _src0, const ggml_tensor * _src1, ggml_tensor * dst) {
 #if 0
@@ -7958,8 +7955,6 @@ static void ggml_cuda_mul_mat_id(const ggml_tensor * _src0, const ggml_tensor * 
     const struct ggml_tensor * src0 = dst->src[a_id + 2];
 
     ggml_cuda_mul_mat(src0, src1, dst);
-
-    (void) ggml_cuda_mul_mat_id_cublas;
 #endif
 
     (void) _src0;
