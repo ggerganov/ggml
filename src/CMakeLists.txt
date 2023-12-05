@@ -171,7 +171,7 @@ if (GGML_OPENBLAS)
 
         set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${OPENBLAS_LIB})
         set(GGML_EXTRA_INCS  ${GGML_EXTRA_INCS}  ${OPENBLAS_INC})
-	set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_OPENBLAS)
+        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_OPENBLAS)
     else()
         message(WARNING "OpenBLAS not found")
     endif()
@@ -213,7 +213,17 @@ if (GGML_CUBLAS)
 
         set(GGML_CUDA_SOURCES ggml-cuda.cu ggml-cuda.h)
 
-        add_compile_definitions(GGML_USE_CUBLAS)
+        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CUBLAS)
+
+        if (GGML_CUDA_FORCE_DMMV)
+            add_compile_definitions(GGML_CUDA_FORCE_DMMV)
+        endif()
+        if (GGML_CUDA_FORCE_MMQ)
+            add_compile_definitions(GGML_CUDA_FORCE_MMQ)
+        endif()
+
+        # required for dynamic parallelism
+        set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
 
         if (GGML_STATIC)
             set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} CUDA::cudart_static CUDA::cublas_static CUDA::cublasLt_static)
@@ -245,7 +255,9 @@ if (GGML_HIPBLAS)
 
     if (${hipblas_FOUND} AND ${hip_FOUND})
         message(STATUS "HIP and hipBLAS found")
-        add_compile_definitions(GGML_USE_HIPBLAS GGML_USE_CUBLAS)
+
+        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CUBLAS)
+
         add_library(ggml-rocm OBJECT ggml-cuda.cu ggml-cuda.h)
         if (BUILD_SHARED_LIBS)
             set_target_properties(ggml-rocm PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -280,7 +292,8 @@ if (GGML_METAL)
 
     set(GGML_METAL_SOURCES ggml-metal.m ggml-metal.h)
 
-    add_compile_definitions(GGML_USE_METAL)
+    set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_METAL)
+
     #add_compile_definitions(GGML_METAL_NDEBUG)
 
     # get full path to the file

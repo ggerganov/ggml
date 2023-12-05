@@ -1341,10 +1341,10 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
             model.e_pe = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, n_audio_state, n_audio_ctx);
 
             model.e_conv_1_w     = ggml_new_tensor_3d(ctx, vtype,         3, n_mels,     n_audio_state);
-            model.e_conv_1_b     = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 2*n_audio_ctx, n_audio_state);
+            model.e_conv_1_b     = ggml_new_tensor_2d(ctx, GGML_TYPE_F32,         1,     n_audio_state);
 
             model.e_conv_2_w     = ggml_new_tensor_3d(ctx, vtype,         3, n_audio_state, n_audio_state);
-            model.e_conv_2_b     = ggml_new_tensor_2d(ctx, GGML_TYPE_F32,    n_audio_ctx,   n_audio_state);
+            model.e_conv_2_b     = ggml_new_tensor_2d(ctx, GGML_TYPE_F32,                1, n_audio_state);
 
             model.e_ln_w = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state);
             model.e_ln_b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_audio_state);
@@ -1574,29 +1574,25 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
 
             auto tensor = model.tensors[name.data()];
 
-            const bool is_conv_bias = (name == "encoder.conv1.bias" || name == "encoder.conv2.bias");
+            if (ggml_nelements(tensor) != nelements) {
+                WHISPER_LOG_ERROR("%s: tensor '%s' has wrong size in model file\n", __func__, name.data());
+                WHISPER_LOG_ERROR("%s: shape: [%d, %d, %d], expected: [%d, %d, %d]\n",
+                        __func__, ne[0], ne[1], ne[2], (int) tensor->ne[0], (int) tensor->ne[1], (int) tensor->ne[2]);
+                return false;
+            }
 
-            if (!is_conv_bias) {
-                if (ggml_nelements(tensor) != nelements) {
-                    WHISPER_LOG_ERROR("%s: tensor '%s' has wrong size in model file\n", __func__, name.data());
-                    WHISPER_LOG_ERROR("%s: shape: [%d, %d, %d], expected: [%d, %d, %d]\n",
-                            __func__, ne[0], ne[1], ne[2], (int) tensor->ne[0], (int) tensor->ne[1], (int) tensor->ne[2]);
-                    return false;
-                }
+            if (tensor->ne[0] != ne[0] || tensor->ne[1] != ne[1] || tensor->ne[2] != ne[2]) {
+                WHISPER_LOG_ERROR("%s: tensor '%s' has wrong shape in model file: got [%d, %d, %d], expected [%d, %d, %d]\n",
+                        __func__, name.data(), (int) tensor->ne[0], (int) tensor->ne[1], (int) tensor->ne[2], ne[0], ne[1], ne[2]);
+                return false;
+            }
 
-                if (tensor->ne[0] != ne[0] || tensor->ne[1] != ne[1] || tensor->ne[2] != ne[2]) {
-                    WHISPER_LOG_ERROR("%s: tensor '%s' has wrong shape in model file: got [%d, %d, %d], expected [%d, %d, %d]\n",
-                            __func__, name.data(), (int) tensor->ne[0], (int) tensor->ne[1], (int) tensor->ne[2], ne[0], ne[1], ne[2]);
-                    return false;
-                }
+            const size_t bpe = ggml_type_size(ggml_type(ttype));
 
-                const size_t bpe = ggml_type_size(ggml_type(ttype));
-
-                if ((nelements*bpe)/ggml_blck_size(tensor->type) != ggml_nbytes(tensor)) {
-                    WHISPER_LOG_ERROR("%s: tensor '%s' has wrong size in model file: got %zu, expected %zu\n",
-                            __func__, name.data(), ggml_nbytes(tensor), nelements*bpe);
-                    return false;
-                }
+            if ((nelements*bpe)/ggml_blck_size(tensor->type) != ggml_nbytes(tensor)) {
+                WHISPER_LOG_ERROR("%s: tensor '%s' has wrong size in model file: got %zu, expected %zu\n",
+                        __func__, name.data(), ggml_nbytes(tensor), nelements*bpe);
+                return false;
             }
 
             ggml_backend_t backend = wctx.backend;
@@ -1607,7 +1603,7 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
 #ifdef GGML_USE_METAL
                 || ggml_backend_is_metal(backend)
 #endif
-                ) && !is_conv_bias) {
+                )) {
                 // for the CPU and Metal backend, we can read directly into the tensor
                 loader->read(loader->context, tensor->data, ggml_nbytes(tensor));
                 BYTESWAP_TENSOR(tensor);
@@ -1618,7 +1614,7 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
                 // we repeat the 2 bias tensors along dim 0:
                 // [1, 512] -> [3000, 512] (conv1.bias)
                 // [1, 512] -> [1500, 512] (conv2.bias)
-                if (is_conv_bias) {
+                if (false) {
                     loader->read(loader->context, read_buf.data(), read_buf.size() / tensor->ne[0]);
 
                     float * data_f32 = (float *) read_buf.data();
@@ -1733,21 +1729,11 @@ static struct ggml_cgraph * whisper_build_graph_conv(
         {
             cur = ggml_conv_1d_ph(ctx0, model.e_conv_1_w, mel, 1, 1);
             cur = ggml_add(ctx0, cur, model.e_conv_1_b);
-            //cur = ggml_add(ctx0,
-            //        ggml_repeat(ctx0,
-            //            model.e_conv_1_b,
-            //            cur),
-            //        cur);
 
             cur = ggml_gelu(ctx0, cur);
 
             cur = ggml_conv_1d_ph(ctx0, model.e_conv_2_w, cur, 2, 1);
             cur = ggml_add(ctx0, cur, model.e_conv_2_b);
-            //cur = ggml_add(ctx0,
-            //        ggml_repeat(ctx0,
-            //            model.e_conv_2_b,
-            //            cur),
-            //        cur);
 
             cur = ggml_gelu(ctx0, cur);
         }

@@ -1064,8 +1064,6 @@ ggml_backend_sched_t ggml_backend_sched_new(ggml_backend_t * backends, int n_bac
     struct ggml_backend_sched * sched = malloc(sizeof(struct ggml_backend_sched));
     memset(sched, 0, sizeof(struct ggml_backend_sched));
 
-    fprintf(stderr, "ggml_backend_sched size: %lu KB\n", sizeof(struct ggml_backend_sched)/1024);
-
     sched->n_backends = n_backends;
     for (int i = 0; i < n_backends; i++) {
         sched->backends[i] = backends[i];
@@ -1271,6 +1269,7 @@ struct ggml_backend_graph_copy ggml_backend_graph_copy(ggml_backend_t backend, s
 
     free(hash_set.keys);
     free(node_copies);
+    free(node_init);
 
     return (struct ggml_backend_graph_copy) {
         /* .buffer           = */ buffer,

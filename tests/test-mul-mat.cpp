@@ -21,6 +21,13 @@
 #include <string>
 #include <vector>
 
+static void ggml_log_callback_default(ggml_log_level level, const char * text, void * user_data) {
+    (void) level;
+    (void) user_data;
+    fputs(text, stderr);
+    fflush(stderr);
+}
+
 struct test_model {
     struct ggml_tensor * a;
     struct ggml_tensor * b;
