@@ -69,6 +69,7 @@
 #define cudaOccupancyMaxPotentialBlockSize hipOccupancyMaxPotentialBlockSize
 #define cudaSetDevice hipSetDevice
 #define cudaStreamCreateWithFlags hipStreamCreateWithFlags
+#define cudaStreamFireAndForget hipStreamFireAndForget
 #define cudaStreamNonBlocking hipStreamNonBlocking
 #define cudaStreamSynchronize hipStreamSynchronize
 #define cudaStreamWaitEvent(stream, event, flags) hipStreamWaitEvent(stream, event, flags)
@@ -7932,6 +7933,7 @@ static void ggml_cuda_mul_mat_id_cublas(ggml_tensor * dst) {
 }
 
 static void ggml_cuda_mul_mat_id(const ggml_tensor * _src0, const ggml_tensor * _src1, ggml_tensor * dst) {
+#if 0
 //#ifdef CUDA_USE_TENSOR_CORES
 //    const bool use_tensor_cores = true;
 //#else
@@ -7941,6 +7943,24 @@ static void ggml_cuda_mul_mat_id(const ggml_tensor * _src0, const ggml_tensor * 
     ggml_cuda_mul_mat_id_cublas(dst);
 
     // TODO: mmq/mmv support
+#else
+    const struct ggml_tensor * ids = dst->src[0];
+    const struct ggml_tensor * src1 = dst->src[1];
+    const int id = dst->op_params[0];
+
+    int32_t * ids_dev = (int32_t *)((ggml_tensor_extra_gpu *)ids->extra)->data_device[g_main_device];
+
+    int32_t a_id;
+    CUDA_CHECK(cudaMemcpyAsync(&a_id, ids_dev + id, sizeof(int32_t), cudaMemcpyDeviceToHost, g_cudaStreams[g_main_device][0]));
+    CUDA_CHECK(cudaStreamSynchronize(g_cudaStreams[g_main_device][0]));
+
+    GGML_ASSERT(a_id >= 0 && a_id < ids->ne[0]);
+    const struct ggml_tensor * src0 = dst->src[a_id + 2];
+
+    ggml_cuda_mul_mat(src0, src1, dst);
+
+    (void) ggml_cuda_mul_mat_id_cublas;
+#endif
 
     (void) _src0;
     (void) _src1;
