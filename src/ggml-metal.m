@@ -1420,14 +1420,14 @@ void ggml_metal_graph_compute(
                             const int64_t  ne20 = src2 ? src2->ne[0] : 0;
                             const int64_t  ne21 = src2 ? src2->ne[1] : 0;
                             const int64_t  ne22 = src2 ? src2->ne[2] : 0;
-                            const int64_t  ne23 = src2 ? src2->ne[3] : 0;
+                            const int64_t  ne23 = src2 ? src2->ne[3] : 0; GGML_UNUSED(ne23);
 
-                            const uint64_t nb20 = src2 ? src2->nb[0] : 0;
+                            const uint64_t nb20 = src2 ? src2->nb[0] : 0; GGML_UNUSED(nb20);
                             const uint64_t nb21 = src2 ? src2->nb[1] : 0;
                             const uint64_t nb22 = src2 ? src2->nb[2] : 0;
-                            const uint64_t nb23 = src2 ? src2->nb[3] : 0;
+                            const uint64_t nb23 = src2 ? src2->nb[3] : 0; GGML_UNUSED(nb23);
 
-                            const enum ggml_type src2t = src2 ? src2->type : GGML_TYPE_COUNT;
+                            const enum ggml_type src2t = src2 ? src2->type : GGML_TYPE_COUNT; GGML_UNUSED(src2t);
 
                             GGML_ASSERT(!ggml_is_transposed(src2));
                             GGML_ASSERT(!ggml_is_transposed(src1));
@@ -1479,14 +1479,16 @@ void ggml_metal_graph_compute(
                                 [encoder setBytes:&ne1     length:sizeof(ne1)  atIndex:12];
                                 [encoder setBytes:&gqa     length:sizeof(gqa)  atIndex:13];
                                 [encoder setBytes:&idx     length:sizeof(idx)  atIndex:14];
-                                for (int i = 0; i < n_as; ++i) {
-                                    struct ggml_tensor * src_cur = dst->src[2 + i];
+                                // TODO: how to make this an array? read Metal docs
+                                for (int j = 0; j < n_as; ++j) {
+                                    struct ggml_tensor * src_cur = dst->src[2 + j];
 
                                     size_t offs_src_cur = 0;
                                     id<MTLBuffer> id_src_cur = ggml_metal_get_buffer(ctx, src_cur, &offs_src_cur);
 
-                                    [encoder setBuffer:id_src_cur offset:offs_src_cur atIndex:15 + i];
+                                    [encoder setBuffer:id_src_cur offset:offs_src_cur atIndex:15 + j];
                                 }
+
                                 [encoder setThreadgroupMemoryLength:8192 atIndex:0];
                                 [encoder dispatchThreadgroups:MTLSizeMake( (ne11 + 31)/32, (ne21 + 63)/64, ne12) threadsPerThreadgroup:MTLSizeMake(128, 1, 1)];
                             }
