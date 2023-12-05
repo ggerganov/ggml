@@ -809,13 +809,11 @@ static bool ggml_metal_supports_op(const struct ggml_tensor * op) {
         case GGML_OP_DIAG_MASK_INF:
         case GGML_OP_GET_ROWS:
             {
-                // TODO: also check during graph_compute
                 return op->ne[0] % 4 == 0;
             } break;
         case GGML_OP_MUL_MAT:
         case GGML_OP_MUL_MAT_ID:
             {
-                // TODO: also check during graph_compute
                 struct ggml_tensor * a;
                 struct ggml_tensor * b; UNUSED(b);
                 if (op->op == GGML_OP_MUL_MAT) {
