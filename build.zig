@@ -17,6 +17,7 @@ const builtin = @import("builtin");
 //     zig build run_test-mul-mat2
 //     zig build run_test-opt
 //     zig build run_test-vec1
+//     zig build run_test-circularpadding
 //     zig build run_test0
 //     zig build run_test1
 //     zig build run_test2
@@ -95,6 +96,7 @@ pub fn build(b: *std.build.Builder) void {
         "test1",
         "test2",
         "test3",
+        "test-circularpadding",
     } else .{
         // "test-blas0",
         // "test-grad0",
@@ -110,6 +112,7 @@ pub fn build(b: *std.build.Builder) void {
         "test1",
         "test2",
         "test3",
+        "test-circularpadding",
     };
     inline for (tests) |name| {
         const exe = b.addExecutable(.{
