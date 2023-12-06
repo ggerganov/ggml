@@ -4876,7 +4876,7 @@ struct bin_bcast_cuda {
         dim3 block_dims;
         block_dims.x = std::min<unsigned int>(hne0, block_size);
         block_dims.y = std::min<unsigned int>(ne1, block_size / block_dims.x);
-        block_dims.z = std::min<unsigned int>(ne2*ne3, block_size / block_dims.x / block_dims.y);
+        block_dims.z = std::min(std::min<unsigned int>(ne2*ne3, block_size / block_dims.x / block_dims.y), 64U);
 
         dim3 block_nums(
             (hne0 + block_dims.x - 1) / block_dims.x,
