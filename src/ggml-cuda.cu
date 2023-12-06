@@ -434,7 +434,6 @@ static_assert(sizeof(block_q6_K) == sizeof(ggml_fp16_t) + 13*QK_K/16, "wrong q6_
 #define WARP_SIZE 32
 #define MATRIX_ROW_PADDING 512 // last row of quant. matrices is a multiple of this to avoid out-of-bounds memory accesses
 
-#define CUDA_ADDMUL_BLOCK_SIZE 256
 #define CUDA_GELU_BLOCK_SIZE 256
 #define CUDA_SILU_BLOCK_SIZE 256
 #define CUDA_RELU_BLOCK_SIZE 256
@@ -519,29 +518,36 @@ static __device__ __forceinline__ float op_div(const float a, const float b) {
 
 template<float (*bin_op)(const float, const float), typename src0_t, typename src1_t, typename dst_t>
 static __global__ void k_bin_bcast(const src0_t * src0, const src1_t * src1, dst_t * dst,
-        int ne0,/* int ne1, int ne2, */int ne3,
+        int ne0, int ne1, int ne2, int ne3,
         int ne10, int ne11, int ne12, int ne13,
         /*int s0, */ int s1,  int s2,  int s3,
         /*int s10,*/ int s11, int s12, int s13) {
-    const int i0 = blockDim.x*blockIdx.x + threadIdx.x;
-    const int i1 = blockIdx.y;
-    const int i2 = blockIdx.z / ne3;
-    const int i3 = blockIdx.z % ne3;
+    const int i0s = blockDim.x*blockIdx.x + threadIdx.x;
+    const int i1 = (blockDim.y*blockIdx.y + threadIdx.y);
+    const int i2 = (blockDim.z*blockIdx.z + threadIdx.z) / ne3;
+    const int i3 = (blockDim.z*blockIdx.z + threadIdx.z) % ne3;
 
-    if (i0 >= ne0) {
+    if (i0s >= ne0 || i1 >= ne1 || i2 >= ne2 || i3 >= ne3) {
         return;
     }
 
-    const int i10 = i0 % ne10;
     const int i11 = i1 % ne11;
     const int i12 = i2 % ne12;
     const int i13 = i3 % ne13;
 
-    const size_t i_dst  = i3*s3 + i2*s2 + i1*s1 + i0;
-    const size_t i_src0 = i_dst;
-    const size_t i_src1 = i13*s13 + i12*s12 + i11*s11 + i10;
+    const size_t i_src0 = i3*s3 + i2*s2 + i1*s1;
+    const size_t i_src1 = i13*s13 + i12*s12 + i11*s11;
+    const size_t i_dst  = i_src0;
 
-    dst[i_dst] = (dst_t)bin_op(src0 ? (float)src0[i_src0] : 0.0f, (float)src1[i_src1]);
+    const src0_t * src0_row = src0 + i_src0;
+    const src1_t * src1_row = src1 + i_src1;
+    dst_t * dst_row = dst + i_dst;
+
+    for (int i0 = i0s; i0 < ne0; i0 += blockDim.x*gridDim.x) {
+        const int i10 = i0 % ne10;
+
+        dst_row[i0] = (dst_t)bin_op(src0 ? (float)src0_row[i0] : 0.0f, (float)src1_row[i10]);
+    }
 }
 
 static __global__ void gelu_f32(const float * x, float * dst, const int k) {
@@ -4863,12 +4869,22 @@ struct bin_bcast_cuda {
         size_t s12 = nb12 / sizeof(src1_t);
         size_t s13 = nb13 / sizeof(src1_t);
 
-        const int num_blocks_x = (ne0 + CUDA_ADDMUL_BLOCK_SIZE - 1) / CUDA_ADDMUL_BLOCK_SIZE;
-        dim3 num_blocks(num_blocks_x, ne1, ne2*ne3);
+        static const int64_t block_size = 128;
 
-        k_bin_bcast<bin_op><<<num_blocks, CUDA_ADDMUL_BLOCK_SIZE, 0, stream>>>(
+        dim3 block_dims;
+        block_dims.x = std::min<unsigned int>(ne0/2, block_size);
+        block_dims.y = std::min<unsigned int>(ne1, block_size / block_dims.x);
+        block_dims.z = std::min<unsigned int>(ne2*ne3, block_size / block_dims.x / block_dims.y);
+
+        dim3 block_nums(
+            (ne0/2 + block_dims.x - 1) / block_dims.x,
+            (ne1 + block_dims.y - 1) / block_dims.y,
+            (ne2*ne3 + block_dims.z - 1) / block_dims.z
+        );
+
+        k_bin_bcast<bin_op><<<block_nums, block_dims, 0, stream>>>(
             src0_dd, src1_dd, dst_dd,
-            ne0,/* ne1, ne2, */ne3,
+            ne0, ne1, ne2, ne3,
             ne10, ne11, ne12, ne13,
             /* s0, */s1, s2, s3,
             /* s10,*/ s11, s12, s13);
