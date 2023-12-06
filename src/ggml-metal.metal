@@ -731,7 +731,7 @@ inline float block_q_n_dot_y(device const block_q5_1 * qb_curr, float sumy, thre
 //      N_DST, so this is another explicit assumption of the implementation.
 template<typename block_q_type, int nr, int nsg, int nw>
 void mul_vec_q_n_f32(device const void * src0, device const float * src1, device float * dst,
-                    int64_t ne00, int64_t ne01, int64_t ne02, int64_t ne10, int64_t ne12, int64_t ne0, int64_t ne1, uint gqa,
+                    int64_t ne00, int64_t ne01, int64_t ne02, int64_t ne10, int64_t ne12, int64_t ne0, int64_t ne1, uint r2,
                     uint3 tgpig, uint tiisg, uint sgitg) {
     const int nb = ne00/QK4_0;
 
@@ -741,7 +741,7 @@ void mul_vec_q_n_f32(device const void * src0, device const float * src1, device
 
     const int first_row = (r0 * nsg + sgitg) * nr;
 
-    const uint offset0 = first_row * nb + im/gqa*(nb*ne0);
+    const uint offset0 = first_row * nb + im/r2*(nb*ne0);
 
     device const block_q_type * x = (device const block_q_type *) src0 + offset0;
     device const float        * y = (device const float        *) src1 + r1*ne10 + im*ne00*ne1;
@@ -791,13 +791,13 @@ kernel void kernel_mul_mv_q4_0_f32(
         constant   int64_t & ne02[[buffer(5)]],
         constant   int64_t & ne10[[buffer(9)]],
         constant   int64_t & ne12[[buffer(11)]],
-        constant   int64_t & ne0[[buffer(15)]],
-        constant   int64_t & ne1[[buffer(16)]],
-        constant   uint    & gqa[[buffer(17)]],
+        constant   int64_t & ne0 [[buffer(15)]],
+        constant   int64_t & ne1 [[buffer(16)]],
+        constant   uint    & r2  [[buffer(17)]],
         uint3 tgpig[[threadgroup_position_in_grid]],
         uint  tiisg[[thread_index_in_simdgroup]],
         uint  sgitg[[simdgroup_index_in_threadgroup]]) {
-    mul_vec_q_n_f32<block_q4_0, N_DST, N_SIMDGROUP, N_SIMDWIDTH>(src0,src1,dst,ne00,ne01,ne02,ne10,ne12,ne0,ne1,gqa,tgpig,tiisg,sgitg);
+    mul_vec_q_n_f32<block_q4_0, N_DST, N_SIMDGROUP, N_SIMDWIDTH>(src0,src1,dst,ne00,ne01,ne02,ne10,ne12,ne0,ne1,r2,tgpig,tiisg,sgitg);
 }
 
 kernel void kernel_mul_mv_q4_1_f32(
@@ -809,13 +809,13 @@ kernel void kernel_mul_mv_q4_1_f32(
         constant   int64_t & ne02[[buffer(5)]],
         constant   int64_t & ne10[[buffer(9)]],
         constant   int64_t & ne12[[buffer(11)]],
-        constant   int64_t & ne0[[buffer(15)]],
-        constant   int64_t & ne1[[buffer(16)]],
-        constant   uint    & gqa[[buffer(17)]],
+        constant   int64_t & ne0 [[buffer(15)]],
+        constant   int64_t & ne1 [[buffer(16)]],
+        constant   uint    & r2  [[buffer(17)]],
         uint3 tgpig[[threadgroup_position_in_grid]],
         uint tiisg[[thread_index_in_simdgroup]],
         uint sgitg[[simdgroup_index_in_threadgroup]]) {
-     mul_vec_q_n_f32<block_q4_1, N_DST, N_SIMDGROUP, N_SIMDWIDTH>(src0,src1,dst,ne00,ne01,ne02,ne10,ne12,ne0,ne1,gqa,tgpig,tiisg,sgitg);
+     mul_vec_q_n_f32<block_q4_1, N_DST, N_SIMDGROUP, N_SIMDWIDTH>(src0,src1,dst,ne00,ne01,ne02,ne10,ne12,ne0,ne1,r2,tgpig,tiisg,sgitg);
 }
 
 kernel void kernel_mul_mv_q5_0_f32(
@@ -827,13 +827,13 @@ kernel void kernel_mul_mv_q5_0_f32(
         constant   int64_t & ne02[[buffer(5)]],
         constant   int64_t & ne10[[buffer(9)]],
         constant   int64_t & ne12[[buffer(11)]],
-        constant   int64_t & ne0[[buffer(15)]],
-        constant   int64_t & ne1[[buffer(16)]],
-        constant   uint    & gqa[[buffer(17)]],
+        constant   int64_t & ne0 [[buffer(15)]],
+        constant   int64_t & ne1 [[buffer(16)]],
+        constant   uint    & r2  [[buffer(17)]],
         uint3 tgpig[[threadgroup_position_in_grid]],
         uint  tiisg[[thread_index_in_simdgroup]],
         uint  sgitg[[simdgroup_index_in_threadgroup]]) {
-    mul_vec_q_n_f32<block_q5_0, N_DST, N_SIMDGROUP, N_SIMDWIDTH>(src0,src1,dst,ne00,ne01,ne02,ne10,ne12,ne0,ne1,gqa,tgpig,tiisg,sgitg);
+    mul_vec_q_n_f32<block_q5_0, N_DST, N_SIMDGROUP, N_SIMDWIDTH>(src0,src1,dst,ne00,ne01,ne02,ne10,ne12,ne0,ne1,r2,tgpig,tiisg,sgitg);
 }
 
 kernel void kernel_mul_mv_q5_1_f32(
@@ -845,13 +845,13 @@ kernel void kernel_mul_mv_q5_1_f32(
         constant   int64_t & ne02[[buffer(5)]],
         constant   int64_t & ne10[[buffer(9)]],
         constant   int64_t & ne12[[buffer(11)]],
-        constant   int64_t & ne0[[buffer(15)]],
-        constant   int64_t & ne1[[buffer(16)]],
-        constant   uint    & gqa[[buffer(17)]],
+        constant   int64_t & ne0 [[buffer(15)]],
+        constant   int64_t & ne1 [[buffer(16)]],
+        constant   uint    & r2  [[buffer(17)]],
         uint3 tgpig[[threadgroup_position_in_grid]],
         uint  tiisg[[thread_index_in_simdgroup]],
         uint  sgitg[[simdgroup_index_in_threadgroup]]) {
-    mul_vec_q_n_f32<block_q5_1, N_DST, N_SIMDGROUP, N_SIMDWIDTH>(src0,src1,dst,ne00,ne01,ne02,ne10,ne12,ne0,ne1,gqa,tgpig,tiisg,sgitg);
+    mul_vec_q_n_f32<block_q5_1, N_DST, N_SIMDGROUP, N_SIMDWIDTH>(src0,src1,dst,ne00,ne01,ne02,ne10,ne12,ne0,ne1,r2,tgpig,tiisg,sgitg);
 }
 
 
@@ -866,9 +866,9 @@ kernel void kernel_mul_mv_q8_0_f32(
         constant   int64_t & ne02[[buffer(5)]],
         constant   int64_t & ne10[[buffer(9)]],
         constant   int64_t & ne12[[buffer(11)]],
-        constant   int64_t & ne0[[buffer(15)]],
-        constant   int64_t & ne1[[buffer(16)]],
-        constant   uint    & gqa[[buffer(17)]],
+        constant   int64_t & ne0 [[buffer(15)]],
+        constant   int64_t & ne1 [[buffer(16)]],
+        constant   uint    & r2  [[buffer(17)]],
         uint3 tgpig[[threadgroup_position_in_grid]],
         uint tiisg[[thread_index_in_simdgroup]],
         uint sgitg[[simdgroup_index_in_threadgroup]]) {
@@ -881,7 +881,7 @@ kernel void kernel_mul_mv_q8_0_f32(
     const int r1 = tgpig.y;
     const int im = tgpig.z;
     const int first_row = (r0 * nsg + sgitg) * nr;
-    const uint offset0 = first_row * nb + im/gqa*(nb*ne0);
+    const uint offset0 = first_row * nb + im/r2*(nb*ne0);
     device const block_q8_0 * x = (device const block_q8_0 *) src0 + offset0;
     device const float      * y = (device const float      *) src1 + r1*ne10 + im*ne00*ne1;
 
@@ -1821,9 +1821,9 @@ kernel void kernel_mul_mv_q2_K_f32(
         constant   int64_t & ne02[[buffer(5)]],
         constant   int64_t & ne10[[buffer(9)]],
         constant   int64_t & ne12[[buffer(11)]],
-        constant   int64_t & ne0[[buffer(15)]],
-        constant   int64_t & ne1[[buffer(16)]],
-        constant   uint    & gqa[[buffer(17)]],
+        constant   int64_t & ne0 [[buffer(15)]],
+        constant   int64_t & ne1 [[buffer(16)]],
+        constant   uint    & r2  [[buffer(17)]],
         uint3 tgpig[[threadgroup_position_in_grid]],
         uint tiisg[[thread_index_in_simdgroup]],
         uint sgitg[[simdgroup_index_in_threadgroup]]) {
@@ -1831,13 +1831,13 @@ kernel void kernel_mul_mv_q2_K_f32(
     const int nb = ne00/QK_K;
     const int r0 = tgpig.x;
     const int r1 = tgpig.y;
-    const int r2 = tgpig.z;
+    const int im = tgpig.z;
 
     const int first_row = (r0 * N_SIMDGROUP + sgitg) * N_DST;
     const int ib_row = first_row * nb;
-    const uint offset0 = r2/gqa*(nb*ne0);
+    const uint offset0 = im/r2*(nb*ne0);
     device const block_q2_K * x = (device const block_q2_K *) src0 + ib_row + offset0;
-    device const float      * y = (device const float      *) src1 + r1*ne10 + r2*ne00*ne1;
+    device const float      * y = (device const float      *) src1 + r1*ne10 + im*ne00*ne1;
     float yl[32];
     float sumf[N_DST]={0.f}, all_sum;
 
@@ -1846,11 +1846,11 @@ kernel void kernel_mul_mv_q2_K_f32(
 #if QK_K == 256
     const int ix = tiisg/8;  // 0...3
     const int it = tiisg%8;  // 0...7
-    const int im = it/4;     // 0 or 1
+    const int iq = it/4;     // 0 or 1
     const int ir = it%4;     // 0...3
     const int is = (8*ir)/16;// 0 or 1
 
-    device const float * y4 = y + ix * QK_K + 128 * im + 8 * ir;
+    device const float * y4 = y + ix * QK_K + 128 * iq + 8 * ir;
 
     for (int ib = ix; ib < nb; ib += 4) {
 
@@ -1862,8 +1862,8 @@ kernel void kernel_mul_mv_q2_K_f32(
             yl[i+24] = y4[i+96]; sumy[3] += yl[i+24];
         }
 
-        device const uint8_t  * sc = (device const uint8_t  *)x[ib].scales + 8*im + is;
-        device const uint16_t * qs = (device const uint16_t *)x[ib].qs + 16 * im + 4 * ir;
+        device const uint8_t  * sc = (device const uint8_t  *)x[ib].scales + 8*iq + is;
+        device const uint16_t * qs = (device const uint16_t *)x[ib].qs + 16 * iq + 4 * ir;
         device const half     * dh = &x[ib].d;
 
         for (int row = 0; row < N_DST; row++) {
@@ -1950,7 +1950,7 @@ kernel void kernel_mul_mv_q2_K_f32(
     for (int row = 0; row < N_DST; ++row) {
         all_sum = simd_sum(sumf[row]);
         if (tiisg == 0) {
-            dst[r1*ne0 + r2*ne0*ne1 + first_row + row] = all_sum;
+            dst[r1*ne0 + im*ne0*ne1 + first_row + row] = all_sum;
         }
     }
 }
@@ -1965,9 +1965,9 @@ kernel void kernel_mul_mv_q3_K_f32(
         constant   int64_t & ne02[[buffer(5)]],
         constant   int64_t & ne10[[buffer(9)]],
         constant   int64_t & ne12[[buffer(11)]],
-        constant   int64_t & ne0[[buffer(15)]],
-        constant   int64_t & ne1[[buffer(16)]],
-        constant   uint    & gqa[[buffer(17)]],
+        constant   int64_t & ne0 [[buffer(15)]],
+        constant   int64_t & ne1 [[buffer(16)]],
+        constant   uint    & r2  [[buffer(17)]],
         uint3 tgpig[[threadgroup_position_in_grid]],
         uint tiisg[[thread_index_in_simdgroup]],
         uint sgitg[[simdgroup_index_in_threadgroup]]) {
@@ -1976,12 +1976,12 @@ kernel void kernel_mul_mv_q3_K_f32(
 
     const int64_t r0 = tgpig.x;
     const int64_t r1 = tgpig.y;
-    const int64_t r2 = tgpig.z;
+    const int64_t im = tgpig.z;
 
     const int first_row = (r0 * N_SIMDGROUP + sgitg) * 2;
-    const uint offset0 = r2/gqa*(nb*ne0);
+    const uint offset0 = im/r2*(nb*ne0);
     device const block_q3_K * x = (device const block_q3_K *) src0 + first_row*nb + offset0;
-    device const float     * yy = (device const float      *) src1 + r1*ne10 + r2*ne00*ne1;
+    device const float     * yy = (device const float      *) src1 + r1*ne10 + im*ne00*ne1;
 
     float yl[32];
 
@@ -2103,7 +2103,7 @@ kernel void kernel_mul_mv_q3_K_f32(
     }
     if (tiisg == 0) {
         for (int row = 0; row < 2; ++row) {
-            dst[r1*ne0 + r2*ne0*ne1 + first_row + row] = sumf1[row];
+            dst[r1*ne0 + im*ne0*ne1 + first_row + row] = sumf1[row];
         }
     }
 }
@@ -2117,9 +2117,9 @@ kernel void kernel_mul_mv_q3_K_f32(
         constant   int64_t & ne02[[buffer(5)]],
         constant   int64_t & ne10[[buffer(9)]],
         constant   int64_t & ne12[[buffer(11)]],
-        constant   int64_t & ne0[[buffer(15)]],
-        constant   int64_t & ne1[[buffer(16)]],
-        constant   uint    & gqa[[buffer(17)]],
+        constant   int64_t & ne0 [[buffer(15)]],
+        constant   int64_t & ne1 [[buffer(16)]],
+        constant   uint    & r2  [[buffer(17)]],
         uint3 tgpig[[threadgroup_position_in_grid]],
         uint tiisg[[thread_index_in_simdgroup]],
         uint sgitg[[simdgroup_index_in_threadgroup]]) {
@@ -2128,15 +2128,15 @@ kernel void kernel_mul_mv_q3_K_f32(
 
     const int64_t r0 = tgpig.x;
     const int64_t r1 = tgpig.y;
-    const int64_t r2 = tgpig.z;
+    const int64_t im = tgpig.z;
 
     const int row = 2 * r0 + sgitg;
-    const uint offset0 = r2/gqa*(nb*ne0);
+    const uint offset0 = im/r2*(nb*ne0);
     device const block_q3_K * x = (device const block_q3_K *) src0 + row*nb + offset0;
-    device const float     * yy = (device const float      *) src1 + r1*ne10 + r2*ne00*ne1;
+    device const float     * yy = (device const float      *) src1 + r1*ne10 + im*ne00*ne1;
     const int ix = tiisg/4;
     const int il = 4 * (tiisg%4);// 0, 4, 8, 12
-    const int im = il/8;         // 0, 0, 1, 1
+    const int iq = il/8;         // 0, 0, 1, 1
     const int in = il%8;         // 0, 4, 0, 4
 
     float2 sum = {0.f, 0.f};
@@ -2156,7 +2156,7 @@ kernel void kernel_mul_mv_q3_K_f32(
         const float d4 = d_all * ((int32_t)(s[0] & 0xF000) - 32768) * 1.f/262144.f;
 
         for (int l = 0; l < 4; l += 2) {
-            const uint16_t hm = h[l/2] >> im;
+            const uint16_t hm = h[l/2] >> iq;
             sum[0] += y[l+ 0] * d1 * ((int32_t)(q[l/2] & 0x0003) - ((hm & 0x0001) ? 0 :  4))
                     + y[l+16] * d2 * ((int32_t)(q[l/2] & 0x000c) - ((hm & 0x0004) ? 0 : 16))
                     + y[l+32] * d3 * ((int32_t)(q[l/2] & 0x0030) - ((hm & 0x0010) ? 0 : 64))
@@ -2172,7 +2172,7 @@ kernel void kernel_mul_mv_q3_K_f32(
 
     const float tot = simd_sum(sumf);
     if (tiisg == 0) {
-        dst[r1*ne0 + r2*ne0*ne1 + row] = tot;
+        dst[r1*ne0 + im*ne0*ne1 + row] = tot;
     }
 
 }
@@ -2190,7 +2190,7 @@ kernel void kernel_mul_mv_q4_K_f32(
         constant   int64_t & ne12 [[buffer(11)]],
         constant   int64_t & ne0  [[buffer(15)]],
         constant   int64_t & ne1  [[buffer(16)]],
-        constant   uint    & gqa  [[buffer(17)]],
+        constant   uint    & r2  [[buffer(17)]],
         uint3 tgpig[[threadgroup_position_in_grid]],
         uint tiisg[[thread_index_in_simdgroup]],
         uint sgitg[[simdgroup_index_in_threadgroup]]) {
@@ -2201,26 +2201,26 @@ kernel void kernel_mul_mv_q4_K_f32(
 
     const int ix = tiisg/8;  // 0...3
     const int it = tiisg%8;  // 0...7
-    const int im = it/4;     // 0 or 1
+    const int iq = it/4;     // 0 or 1
     const int ir = it%4;     // 0...3
 
     const int nb = ne00/QK_K;
     const int r0 = tgpig.x;
     const int r1 = tgpig.y;
-    const int r2 = tgpig.z;
+    const int im = tgpig.z;
     //const int first_row = (r0 * N_SIMDGROUP + sgitg) * N_DST;
     const int first_row = r0 * N_DST;
     const int ib_row = first_row * nb;
-    const uint offset0 = r2/gqa*(nb*ne0);
+    const uint offset0 = im/r2*(nb*ne0);
     device const block_q4_K * x = (device const block_q4_K *) src0 + ib_row + offset0;
-    device const float      * y = (device const float      *) src1 + r1*ne10 + r2*ne00*ne1;
+    device const float      * y = (device const float      *) src1 + r1*ne10 + im*ne00*ne1;
     float yl[16];
     float yh[16];
     float sumf[N_DST]={0.f}, all_sum;
 
     const int step = sizeof(block_q4_K) * nb / 2;
 
-    device const float * y4 = y + ix * QK_K + 64 * im + 8 * ir;
+    device const float * y4 = y + ix * QK_K + 64 * iq + 8 * ir;
 
     uint16_t sc16[4];
     thread const uint8_t * sc8 = (thread const uint8_t *)sc16;
@@ -2235,8 +2235,8 @@ kernel void kernel_mul_mv_q4_K_f32(
             yh[i+8] = y4[i+160]; sumy[3] += yh[i+8];
         }
 
-        device const uint16_t * sc = (device const uint16_t *)x[ib].scales + im;
-        device const uint16_t * q1 = (device const uint16_t *)x[ib].qs + 16 * im + 4 * ir;
+        device const uint16_t * sc = (device const uint16_t *)x[ib].scales + iq;
+        device const uint16_t * q1 = (device const uint16_t *)x[ib].qs + 16 * iq + 4 * ir;
         device const half     * dh = &x[ib].d;
 
         for (int row = 0; row < N_DST; row++) {
@@ -2280,7 +2280,7 @@ kernel void kernel_mul_mv_q4_K_f32(
     for (int row = 0; row < N_DST; ++row) {
         all_sum = simd_sum(sumf[row]);
         if (tiisg == 0) {
-            dst[r1*ne0 + r2*ne0*ne1 + first_row + row] = all_sum;
+            dst[r1*ne0 + im*ne0*ne1 + first_row + row] = all_sum;
         }
     }
 }
@@ -2294,9 +2294,9 @@ kernel void kernel_mul_mv_q4_K_f32(
         constant   int64_t & ne02[[buffer(5)]],
         constant   int64_t & ne10[[buffer(9)]],
         constant   int64_t & ne12[[buffer(11)]],
-        constant   int64_t & ne0[[buffer(15)]],
-        constant   int64_t & ne1[[buffer(16)]],
-        constant   uint    & gqa[[buffer(17)]],
+        constant   int64_t & ne0 [[buffer(15)]],
+        constant   int64_t & ne1 [[buffer(16)]],
+        constant   uint    & r2  [[buffer(17)]],
         uint3 tgpig[[threadgroup_position_in_grid]],
         uint tiisg[[thread_index_in_simdgroup]],
         uint sgitg[[simdgroup_index_in_threadgroup]]) {
@@ -2307,12 +2307,12 @@ kernel void kernel_mul_mv_q4_K_f32(
     const int nb = ne00/QK_K;
     const int r0 = tgpig.x;
     const int r1 = tgpig.y;
-    const int r2 = tgpig.z;
+    const int im = tgpig.z;
     const int first_row = (r0 * N_SIMDGROUP + sgitg) * N_DST;
     const int ib_row = first_row * nb;
-    const uint offset0 = r2/gqa*(nb*ne0);
+    const uint offset0 = im/r2*(nb*ne0);
     device const block_q4_K * x = (device const block_q4_K *) src0 + ib_row + offset0;
-    device const float      * y = (device const float      *) src1 + r1*ne10 + r2*ne00*ne1;
+    device const float      * y = (device const float      *) src1 + r1*ne10 + im*ne00*ne1;
     float yl[8];
     float yh[8];
     float sumf[N_DST]={0.f}, all_sum;
@@ -2368,7 +2368,7 @@ kernel void kernel_mul_mv_q4_K_f32(
     for (int row = 0; row < N_DST; ++row) {
         all_sum = simd_sum(sumf[row]);
         if (tiisg == 0) {
-            dst[r1*ne0+ r2*ne0*ne1 + first_row + row] = all_sum;
+            dst[r1*ne0+ im*ne0*ne1 + first_row + row] = all_sum;
         }
     }
 }
@@ -2383,9 +2383,9 @@ kernel void kernel_mul_mv_q5_K_f32(
         constant   int64_t & ne02[[buffer(5)]],
         constant   int64_t & ne10[[buffer(9)]],
         constant   int64_t & ne12[[buffer(11)]],
-        constant   int64_t & ne0[[buffer(15)]],
-        constant   int64_t & ne1[[buffer(16)]],
-        constant   uint    & gqa[[buffer(17)]],
+        constant   int64_t & ne0 [[buffer(15)]],
+        constant   int64_t & ne1 [[buffer(16)]],
+        constant   uint    & r2  [[buffer(17)]],
         uint3 tgpig[[threadgroup_position_in_grid]],
         uint tiisg[[thread_index_in_simdgroup]],
         uint sgitg[[simdgroup_index_in_threadgroup]]) {
@@ -2394,12 +2394,12 @@ kernel void kernel_mul_mv_q5_K_f32(
 
     const int64_t r0 = tgpig.x;
     const int64_t r1 = tgpig.y;
-    const int r2 = tgpig.z;
+    const int im = tgpig.z;
 
     const int first_row = (r0 * N_SIMDGROUP + sgitg) * 2;
-    const uint offset0 = r2/gqa*(nb*ne0);
+    const uint offset0 = im/r2*(nb*ne0);
     device const block_q5_K * x = (device const block_q5_K *) src0 + first_row*nb + offset0;
-    device const float     * yy = (device const float      *) src1 + r1*ne10 + r2*ne00*ne1;
+    device const float     * yy = (device const float      *) src1 + r1*ne10 + im*ne00*ne1;
 
     float sumf[2]={0.f};
 
@@ -2415,15 +2415,15 @@ kernel void kernel_mul_mv_q5_K_f32(
 
     const int tid = tiisg/4;
     const int ix  = tiisg%4;
-    const int im  = tid/4;
+    const int iq  = tid/4;
     const int ir  = tid%4;
     const int n   = 8;
 
     const int l0 = n*ir;
-    const int q_offset = 32*im + l0;
-    const int y_offset = 64*im + l0;
+    const int q_offset = 32*iq + l0;
+    const int y_offset = 64*iq + l0;
 
-    const uint8_t hm1 = 1u << (2*im);
+    const uint8_t hm1 = 1u << (2*iq);
     const uint8_t hm2 = hm1 << 1;
     const uint8_t hm3 = hm1 << 4;
     const uint8_t hm4 = hm2 << 4;
@@ -2438,7 +2438,7 @@ kernel void kernel_mul_mv_q5_K_f32(
         device const uint8_t * q1 = x[i].qs + q_offset;
         device const uint8_t * qh = x[i].qh + l0;
         device const half * dh = &x[i].d;
-        device const uint16_t * a = (device const uint16_t *)x[i].scales + im;
+        device const uint16_t * a = (device const uint16_t *)x[i].scales + iq;
 
         device const float * y2 = y1 + 128;
         float4 sumy = {0.f, 0.f, 0.f, 0.f};
@@ -2494,7 +2494,7 @@ kernel void kernel_mul_mv_q5_K_f32(
 
     const int il = 4 * (tiisg/8);  // 0, 4, 8, 12
     const int ix = tiisg%8;
-    const int im = il/8;         // 0, 0, 1, 1
+    const int iq = il/8;         // 0, 0, 1, 1
     const int in = il%8;         // 0, 4, 0, 4
 
     device const float * y = yy + ix*QK_K + il;
@@ -2519,7 +2519,7 @@ kernel void kernel_mul_mv_q5_K_f32(
 
             float2 acc = {0.f, 0.f};
             for (int l = 0; l < 4; ++l) {
-                const uint8_t hl = h[l] >> im;
+                const uint8_t hl = h[l] >> iq;
                 acc[0] += yl[l+0] * s[0] * ((int16_t)(q[l+ 0] & 0x0F) - (hl & 0x01 ? 0 : 16))
                         + yl[l+4] * s[1] * ((int16_t)(q[l+16] & 0x0F) - (hl & 0x04 ? 0 : 16));
                 acc[1] += yh[l+0] * s[2] * ((int16_t)(q[l+ 0] & 0xF0) - (hl & 0x10 ? 0 : 256))
@@ -2541,7 +2541,7 @@ kernel void kernel_mul_mv_q5_K_f32(
     for (int row = 0; row < 2; ++row) {
         const float tot = simd_sum(sumf[row]);
         if (tiisg == 0) {
-            dst[r1*ne0 + r2*ne0*ne1 + first_row + row] = tot;
+            dst[r1*ne0 + im*ne0*ne1 + first_row + row] = tot;
         }
     }
 
@@ -2556,9 +2556,9 @@ kernel void kernel_mul_mv_q6_K_f32(
         constant   int64_t & ne02[[buffer(5)]],
         constant   int64_t & ne10[[buffer(9)]],
         constant   int64_t & ne12[[buffer(11)]],
-        constant   int64_t & ne0[[buffer(15)]],
-        constant   int64_t & ne1[[buffer(16)]],
-        constant   uint    & gqa[[buffer(17)]],
+        constant   int64_t & ne0 [[buffer(15)]],
+        constant   int64_t & ne1 [[buffer(16)]],
+        constant   uint    & r2  [[buffer(17)]],
         uint3 tgpig[[threadgroup_position_in_grid]],
         uint tiisg[[thread_index_in_simdgroup]],
         uint sgitg[[simdgroup_index_in_threadgroup]]) {
@@ -2572,12 +2572,12 @@ kernel void kernel_mul_mv_q6_K_f32(
 
     const int64_t r0 = tgpig.x;
     const int64_t r1 = tgpig.y;
-    const int r2 = tgpig.z;
+    const int im = tgpig.z;
 
     const int row = 2 * r0 + sgitg;
-    const uint offset0 = r2/gqa*(nb*ne0);
+    const uint offset0 = im/r2*(nb*ne0);
     device const block_q6_K * x = (device const block_q6_K *) src0 + row * nb + offset0;
-    device const float     * yy = (device const float      *) src1 + r1*ne10 + r2*ne00*ne1;
+    device const float     * yy = (device const float      *) src1 + r1*ne10 + im*ne00*ne1;
 
     float sumf = 0;
 
@@ -2643,7 +2643,7 @@ kernel void kernel_mul_mv_q6_K_f32(
 
     const float tot = simd_sum(sumf);
     if (tiisg == 0) {
-        dst[r1*ne0 + r2*ne0*ne1 + row] = tot;
+        dst[r1*ne0 + im*ne0*ne1 + row] = tot;
     }
 }
 

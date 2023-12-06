@@ -823,7 +823,7 @@ static bool ggml_metal_supports_op(const struct ggml_tensor * op) {
                     a = op->src[2];
                     b = op->src[1];
                 }
-                if (ggml_is_quantized(a->type) && a->ne[2] != 1) {
+                if (ggml_is_quantized(a->type) && a->ne[3] != 1) {
                     return false;
                 }
                 return true;
@@ -1328,90 +1328,60 @@ void ggml_metal_graph_compute(
                                         } break;
                                     case GGML_TYPE_Q4_0:
                                         {
-                                            GGML_ASSERT(ne02 == 1);
-                                            GGML_ASSERT(ne12 == 1);
-
                                             nth0 = 8;
                                             nth1 = 8;
                                             [encoder setComputePipelineState:ctx->pipeline_mul_mv_q4_0_f32];
                                         } break;
                                     case GGML_TYPE_Q4_1:
                                         {
-                                            GGML_ASSERT(ne02 == 1);
-                                            GGML_ASSERT(ne12 == 1);
-
                                             nth0 = 8;
                                             nth1 = 8;
                                             [encoder setComputePipelineState:ctx->pipeline_mul_mv_q4_1_f32];
                                         } break;
                                     case GGML_TYPE_Q5_0:
                                         {
-                                            GGML_ASSERT(ne02 == 1);
-                                            GGML_ASSERT(ne12 == 1);
-
                                             nth0 = 8;
                                             nth1 = 8;
                                             [encoder setComputePipelineState:ctx->pipeline_mul_mv_q5_0_f32];
                                         } break;
                                     case GGML_TYPE_Q5_1:
                                         {
-                                            GGML_ASSERT(ne02 == 1);
-                                            GGML_ASSERT(ne12 == 1);
-
                                             nth0 = 8;
                                             nth1 = 8;
                                             [encoder setComputePipelineState:ctx->pipeline_mul_mv_q5_1_f32];
                                         } break;
                                     case GGML_TYPE_Q8_0:
                                         {
-                                            GGML_ASSERT(ne02 == 1);
-                                            GGML_ASSERT(ne12 == 1);
-
                                             nth0 = 8;
                                             nth1 = 8;
                                             [encoder setComputePipelineState:ctx->pipeline_mul_mv_q8_0_f32];
                                         } break;
                                     case GGML_TYPE_Q2_K:
                                         {
-                                            GGML_ASSERT(ne02 == 1);
-                                            GGML_ASSERT(ne12 == 1);
-
                                             nth0 = 2;
                                             nth1 = 32;
                                             [encoder setComputePipelineState:ctx->pipeline_mul_mv_q2_K_f32];
                                         } break;
                                     case GGML_TYPE_Q3_K:
                                         {
-                                            GGML_ASSERT(ne02 == 1);
-                                            GGML_ASSERT(ne12 == 1);
-
                                             nth0 = 2;
                                             nth1 = 32;
                                             [encoder setComputePipelineState:ctx->pipeline_mul_mv_q3_K_f32];
                                         } break;
                                     case GGML_TYPE_Q4_K:
                                         {
-                                            GGML_ASSERT(ne02 == 1);
-                                            GGML_ASSERT(ne12 == 1);
-
                                             nth0 = 4; //1;
                                             nth1 = 8; //32;
                                             [encoder setComputePipelineState:ctx->pipeline_mul_mv_q4_K_f32];
                                         } break;
                                     case GGML_TYPE_Q5_K:
                                         {
-                                            GGML_ASSERT(ne02 == 1);
-                                            GGML_ASSERT(ne12 == 1);
-
                                             nth0 = 2;
                                             nth1 = 32;
                                             [encoder setComputePipelineState:ctx->pipeline_mul_mv_q5_K_f32];
                                         } break;
                                     case GGML_TYPE_Q6_K:
                                         {
-                                            GGML_ASSERT(ne02 == 1);
-                                            GGML_ASSERT(ne12 == 1);
-
                                             nth0 = 2;
                                             nth1 = 32;
                                             [encoder setComputePipelineState:ctx->pipeline_mul_mv_q6_K_f32];
