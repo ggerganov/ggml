@@ -1127,24 +1127,45 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
         }
     };
 
-    add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 1, 1}, {1, 1, 1, 1});
-    add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 1}, {1, 1, 1, 1});
-    add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 1, 1});
-    add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 1, 1, 1});
-    add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 2, 1, 1});
-    add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 2, 1});
-    add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 1, 2});
-    add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 2, 2});
-    add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 2, 2, 2});
-    add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 2, 2, 2});
-
     if (mode == MODE_PERF) {
         // add a test with a larger input
-        add_test_bin_bcast(GGML_TYPE_F32, {4096, 4096, 1, 1}, {1, 1, 1, 1});
-        add_test_bin_bcast(GGML_TYPE_F32, {4096, 4096, 1, 1}, {2, 1, 1, 1});
-        add_test_bin_bcast(GGML_TYPE_F32, {4096, 4096, 1, 1}, {2, 2, 1, 1});
-        add_test_bin_bcast(GGML_TYPE_F32, {4096, 4096, 1, 1}, {2, 2, 2, 1});
-        add_test_bin_bcast(GGML_TYPE_F32, {4096, 4096, 1, 1}, {2, 2, 2, 2});
+        // A[1280, 1, 1, 1] B[1280, 1, 1, 1]
+        add_test_bin_bcast(GGML_TYPE_F32, {1280, 1, 1, 1}, {1, 1, 1, 1});
+        // A[1280, 16, 16, 1] B[1280, 1, 1, 1]
+        add_test_bin_bcast(GGML_TYPE_F32, {1280, 16, 16, 1}, {1, 1, 1, 1});
+        // A[1280, 16, 16, 1] B[1280, 16, 16, 1]
+        add_test_bin_bcast(GGML_TYPE_F32, {1280, 16, 16, 1}, {1, 1, 1, 1});
+        // A[1280, 256, 1, 1] B[1280, 1, 1, 1]
+        add_test_bin_bcast(GGML_TYPE_F32, {1280, 1, 1, 1}, {1, 256, 1, 1});
+        // A[16, 16, 1280, 1] B[1, 1, 1280, 1]
+        add_test_bin_bcast(GGML_TYPE_F32, {1, 1, 1280, 1}, {16, 16, 1, 1});
+        // A[16, 16, 1280, 1] B[16, 16, 1280, 1]
+        add_test_bin_bcast(GGML_TYPE_F32, {16, 16, 1280, 1}, {1, 1, 1, 1});
+        // A[16, 16, 1920, 1] B[1, 1, 1920, 1]
+        add_test_bin_bcast(GGML_TYPE_F32, {1, 1, 1920, 1}, {16, 16, 1, 1});
+        // A[16, 16, 2560, 1] B[1, 1, 2560, 1]
+        add_test_bin_bcast(GGML_TYPE_F32, {1, 1, 2560, 1}, {16, 16, 1, 1});
+        // A[32, 32, 1280, 1] B[1, 1, 1280, 1]
+        add_test_bin_bcast(GGML_TYPE_F32, {1, 1, 1280, 1}, {32, 32, 1, 1});
+        // A[32, 32, 1920, 1] B[1, 1, 1920, 1]
+        add_test_bin_bcast(GGML_TYPE_F32, {1, 1, 1920, 1}, {32, 32, 1, 1});
+        // A[32, 32, 640, 1] B[1, 1, 640, 1]
+        add_test_bin_bcast(GGML_TYPE_F32, {1, 1, 640, 1}, {32, 32, 1, 1});
+        // A[5120, 256, 1, 1] B[5120, 1, 1, 1]
+        add_test_bin_bcast(GGML_TYPE_F32, {5120, 1, 1, 1}, {1, 256, 1, 1});
+        // A[640, 1, 1, 1] B[640, 1, 1, 1]
+        add_test_bin_bcast(GGML_TYPE_F32, {640, 1, 1, 1}, {1, 1, 1, 1});
+    } else {
+        add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 1, 1}, {1, 1, 1, 1});
+        add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 1}, {1, 1, 1, 1});
+        add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 1, 1});
+        add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 1, 1, 1});
+        add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 2, 1, 1});
+        add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 2, 1});
+        add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 1, 2});
+        add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 1, 2, 2});
+        add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {1, 2, 2, 2});
+        add_test_bin_bcast(GGML_TYPE_F32, {16, 10, 10, 10}, {2, 2, 2, 2});
     }
 
     test_cases.emplace_back(new test_scale());
