@@ -1276,7 +1276,7 @@ kernel void kernel_alibi_f32(
     } else {
         m_k = pow(m1, 2 * (k - n_heads_log2_floor) + 1);
     }
-    
+
     device       char * dst_row = (device char *) dst + i3*nb3 + i2*nb2 + i1*nb1;
     device const char * src_row = (device char *) src0 + i03*nb03 + i02*nb02 + i01*nb01;
     for (int64_t i00 = tpitg.x; i00 < ne00; i00 += ntg.x) {
@@ -2966,7 +2966,8 @@ void kernel_mul_mm_impl(device const  uchar * src0,
                           constant    int64_t & nb12,
                           constant    int64_t & ne0,
                           constant    int64_t & ne1,
-                          constant       uint & gqa,
+                          constant       uint & r2,
+                          constant       uint & r3,
                           threadgroup   uchar * shared_memory [[threadgroup(0)]],
                           uint3                 tgpig[[threadgroup_position_in_grid]],
                           uint                  tiitg[[thread_index_in_threadgroup]],
@@ -2996,7 +2997,10 @@ void kernel_mul_mm_impl(device const  uchar * src0,
 
     short il = (tiitg % THREAD_PER_ROW);
 
-    uint   offset0 = im/gqa*nb02;
+    const uint i12 = im%ne12;
+    const uint i13 = im/ne12;
+
+    uint   offset0 = (i12/r2)*nb02 + (i13/r3)*nb12;
     ushort offset1 = il/nl;
 
     device const block_q * x = (device const block_q *)(src0 + (r0 * BLOCK_SIZE_M + thread_row) * nb01 + offset0) + offset1;
@@ -3094,7 +3098,8 @@ kernel void kernel_mul_mm(device const  uchar * src0,
                           constant    int64_t & nb12,
                           constant    int64_t & ne0,
                           constant    int64_t & ne1,
-                          constant       uint & gqa,
+                          constant       uint & r2,
+                          constant       uint & r3,
                           threadgroup   uchar * shared_memory [[threadgroup(0)]],
                           uint3                 tgpig[[threadgroup_position_in_grid]],
                           uint                  tiitg[[thread_index_in_threadgroup]],
@@ -3113,7 +3118,8 @@ kernel void kernel_mul_mm(device const  uchar * src0,
         nb12,
         ne0,
         ne1,
-        gqa,
+        r2,
+        r3,
         shared_memory,
         tgpig,
         tiitg,
@@ -3135,7 +3141,8 @@ kernel void kernel_mul_mm_id(
         constant     int64_t & nb12,
         constant     int64_t & ne0,
         constant     int64_t & ne1,
-        constant        uint & gqa,
+        constant        uint & r2,
+        constant        uint & r3,
         constant         int & idx,
         device const   uchar * src00,
         device const   uchar * src01,
@@ -3165,7 +3172,8 @@ kernel void kernel_mul_mm_id(
         nb12,
         ne0,
         ne1,
-        gqa,
+        r2,
+        r3,
         shared_memory,
         tgpig,
         tiitg,
@@ -3214,7 +3222,8 @@ typedef void (mat_mm_t)(
         constant    int64_t & nb12,
         constant    int64_t & ne0,
         constant    int64_t & ne1,
-        constant       uint & gqa,
+        constant       uint & r2,
+        constant       uint & r3,
         threadgroup   uchar *,
         uint3, uint, uint);
 
@@ -3245,7 +3254,8 @@ typedef void (mat_mm_id_t)(
         constant     int64_t & nb12,
         constant     int64_t & ne0,
         constant     int64_t & ne1,
-        constant        uint & gqa,
+        constant        uint & r2,
+        constant        uint & r3,
         constant         int & idx,
         device const   uchar * src00,
         device const   uchar * src01,

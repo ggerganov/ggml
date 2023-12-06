@@ -823,9 +823,6 @@ static bool ggml_metal_supports_op(const struct ggml_tensor * op) {
                     a = op->src[2];
                     b = op->src[1];
                 }
-                if (a->ne[3] != 1) {
-                    return false;
-                }
                 if (ggml_is_quantized(a->type) && a->ne[2] != 1) {
                     return false;
                 }
@@ -1222,9 +1219,12 @@ void ggml_metal_graph_compute(
                     case GGML_OP_MUL_MAT:
                         {
                             GGML_ASSERT(ne00 == ne10);
-                            GGML_ASSERT(ne03 == ne13);
 
-                            const uint gqa = ne12/ne02;
+                            GGML_ASSERT(ne12 % ne02 == 0);
+                            GGML_ASSERT(ne13 % ne03 == 0);
+
+                            const uint r2 = ne12/ne02;
+                            const uint r3 = ne13/ne03;
 
                             // find the break-even point where the matrix-matrix kernel becomes more efficient compared
                             // to the matrix-vector kernel
@@ -1289,9 +1289,10 @@ void ggml_metal_graph_compute(
                                 [encoder setBytes:&nb12    length:sizeof(nb12) atIndex:10];
                                 [encoder setBytes:&ne0     length:sizeof(ne0)  atIndex:11];
                                 [encoder setBytes:&ne1     length:sizeof(ne1)  atIndex:12];
-                                [encoder setBytes:&gqa     length:sizeof(gqa)  atIndex:13];
+                                [encoder setBytes:&r2      length:sizeof(r2)   atIndex:13];
+                                [encoder setBytes:&r3      length:sizeof(r3)   atIndex:14];
                                 [encoder setThreadgroupMemoryLength:8192 atIndex:0];
-                                [encoder dispatchThreadgroups:MTLSizeMake( (ne11 + 31)/32, (ne01 + 63)/64, ne12) threadsPerThreadgroup:MTLSizeMake(128, 1, 1)];
+                                [encoder dispatchThreadgroups:MTLSizeMake( (ne11 + 31)/32, (ne01 + 63)/64, ne12*ne13) threadsPerThreadgroup:MTLSizeMake(128, 1, 1)];
                             } else {
                                 int nth0 = 32;
                                 int nth1 = 1;
@@ -1439,7 +1440,7 @@ void ggml_metal_graph_compute(
                                 [encoder setBytes:&nb12 length:sizeof(nb12) atIndex:14];
                                 [encoder setBytes:&ne0  length:sizeof(ne0)  atIndex:15];
                                 [encoder setBytes:&ne1  length:sizeof(ne1)  atIndex:16];
-                                [encoder setBytes:&gqa  length:sizeof(gqa)  atIndex:17];
+                                [encoder setBytes:&r2   length:sizeof(r2)   atIndex:17];
 
                                 if (src0t == GGML_TYPE_Q4_0 || src0t == GGML_TYPE_Q4_1 ||
                                     src0t == GGML_TYPE_Q5_0 || src0t == GGML_TYPE_Q5_1 || src0t == GGML_TYPE_Q8_0 ||
@@ -1501,7 +1502,8 @@ void ggml_metal_graph_compute(
                             //GGML_ASSERT(ne20 >= 64);
                             GGML_ASSERT(src1t == GGML_TYPE_F32);
 
-                            const uint gqa = ne12/ne22;
+                            const uint r2 = ne12/ne22;
+                            const uint r3 = ne13/ne23;
 
                             // find the break-even point where the matrix-matrix kernel becomes more efficient compared
                             // to the matrix-vector kernel
@@ -1541,8 +1543,9 @@ void ggml_metal_graph_compute(
                                 [encoder setBytes:&nb12    length:sizeof(nb12) atIndex:10];
                                 [encoder setBytes:&ne0     length:sizeof(ne0)  atIndex:11];
                                 [encoder setBytes:&ne1     length:sizeof(ne1)  atIndex:12];
-                                [encoder setBytes:&gqa     length:sizeof(gqa)  atIndex:13];
-                                [encoder setBytes:&idx     length:sizeof(idx)  atIndex:14];
+                                [encoder setBytes:&r2      length:sizeof(r2)   atIndex:13];
+                                [encoder setBytes:&r3      length:sizeof(r3)   atIndex:14];
+                                [encoder setBytes:&idx     length:sizeof(idx)  atIndex:15];
                                 // TODO: how to make this an array? read Metal docs
                                 for (int j = 0; j < n_as; ++j) {
                                     struct ggml_tensor * src_cur = dst->src[2 + j];
@@ -1554,7 +1557,7 @@ void ggml_metal_graph_compute(
                                 }
 
                                 [encoder setThreadgroupMemoryLength:8192 atIndex:0];
-                                [encoder dispatchThreadgroups:MTLSizeMake( (ne11 + 31)/32, (ne21 + 63)/64, ne12) threadsPerThreadgroup:MTLSizeMake(128, 1, 1)];
+                                [encoder dispatchThreadgroups:MTLSizeMake( (ne11 + 31)/32, (ne21 + 63)/64, ne12*ne13) threadsPerThreadgroup:MTLSizeMake(128, 1, 1)];
                             }
                         } break;
                     case GGML_OP_GET_ROWS:
