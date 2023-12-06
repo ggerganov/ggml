@@ -1259,7 +1259,7 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
 static void usage(char ** argv) {
     printf("Usage: %s [mode] [-o op] [-b backend]\n", argv[0]);
     printf("  valid modes are: test (compare with CPU backend for correctness) or perf (performance evaluation)\n");
-    printf("  op names are as given ggml_op_desc()\n");
+    printf("  op names are as given by ggml_op_desc()\n");
 }
 
 int main(int argc, char ** argv) {
