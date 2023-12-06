@@ -53,11 +53,16 @@ int main(void) {
     };
 
     bool passed = true;
-    printf("\nResult:\n");
+    if(debug){
+        printf("\nResult:\n");
+    }
     for (int i = 0; i < 5; ++i) {
         for (int j = 0; j < 5; ++j) {
             float val = ggml_get_f32_1d(padded_a, i * 5 + j);
-            printf("%4.1f ", val);
+
+            if(debug){
+                printf("%4.1f ", val);
+            }
             if (val != expected[i][j]) {
                 passed = false;
             }
