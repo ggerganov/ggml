@@ -1132,7 +1132,7 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
         // A[1280, 1, 1, 1] B[1280, 1, 1, 1]
         add_test_bin_bcast(GGML_TYPE_F32, {1280, 1, 1, 1}, {1, 1, 1, 1});
         // A[1280, 16, 16, 1] B[1280, 1, 1, 1]
-        add_test_bin_bcast(GGML_TYPE_F32, {1280, 16, 16, 1}, {1, 1, 1, 1});
+        add_test_bin_bcast(GGML_TYPE_F32, {1280, 1, 1, 1}, {1, 16, 16, 1});
         // A[1280, 16, 16, 1] B[1280, 16, 16, 1]
         add_test_bin_bcast(GGML_TYPE_F32, {1280, 16, 16, 1}, {1, 1, 1, 1});
         // A[1280, 256, 1, 1] B[1280, 1, 1, 1]
