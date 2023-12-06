@@ -4869,15 +4869,17 @@ struct bin_bcast_cuda {
         size_t s12 = nb12 / sizeof(src1_t);
         size_t s13 = nb13 / sizeof(src1_t);
 
-        static const int64_t block_size = 128;
+        static const int block_size = 128;
+
+        int64_t hne0 = std::max(ne0/2LL, 1LL);
 
         dim3 block_dims;
-        block_dims.x = std::min<unsigned int>(ne0/2, block_size);
+        block_dims.x = std::min<unsigned int>(hne0, block_size);
         block_dims.y = std::min<unsigned int>(ne1, block_size / block_dims.x);
         block_dims.z = std::min<unsigned int>(ne2*ne3, block_size / block_dims.x / block_dims.y);
 
         dim3 block_nums(
-            (ne0/2 + block_dims.x - 1) / block_dims.x,
+            (hne0 + block_dims.x - 1) / block_dims.x,
             (ne1 + block_dims.y - 1) / block_dims.y,
             (ne2*ne3 + block_dims.z - 1) / block_dims.z
         );
