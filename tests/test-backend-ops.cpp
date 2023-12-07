@@ -1179,6 +1179,29 @@ struct test_acc : public test_case {
     }
 };
 
+// GGML_OP_PAD
+struct test_pad : public test_case {
+    const ggml_type type;
+    const std::array<int64_t, 4> ne_a;
+    const int pad_0;
+    const int pad_1;
+
+    std::string vars() override {
+        return VARS_TO_STR4(type, ne_a, pad_0, pad_1);
+    }
+
+    test_pad(ggml_type type = GGML_TYPE_F32,
+            std::array<int64_t, 4> ne_a = {512, 512, 1, 1},
+            int pad_0 = 1, int pad_1 = 1)
+        : type(type), ne_a(ne_a), pad_0(pad_0), pad_1(pad_1)  {}
+
+    ggml_tensor * build_graph(ggml_context * ctx) override {
+        ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne_a.data());
+        ggml_tensor * out = ggml_pad(ctx, a, pad_0, pad_1, 0, 0);
+        return out;
+    }
+};
+
 enum test_mode {
     MODE_TEST,
     MODE_PERF,
@@ -1324,6 +1347,7 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
     test_cases.emplace_back(new test_upscale());
     test_cases.emplace_back(new test_group_norm());
     test_cases.emplace_back(new test_acc());
+    test_cases.emplace_back(new test_pad());
 
     // run tests
     if (mode == MODE_TEST) {

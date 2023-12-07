@@ -682,7 +682,7 @@ static __global__ void relu_f32(const float * x, float * dst, const int k) {
     dst[i] = fmaxf(x[i], 0);
 }
 
-static __global__ void leaky_relu_f32(const float *x, float *dst, int k, float negative_slope) {
+static __global__ void leaky_relu_f32(const float *x, float *dst, const int k, const float negative_slope) {
     const int i  = blockDim.x*blockIdx.x + threadIdx.x;
     if(i >= k) {
         return;
@@ -735,7 +735,7 @@ static __global__ void norm_f32(const float * x, float * dst, const int ncols, c
     }
 }
 
-static __global__ void concat_f32(const float  *x,const float  *y, float *dst, int ne0, int ne02) {
+static __global__ void concat_f32(const float  *x,const float  *y, float *dst, const int ne0, const int ne02) {
     int nidx = threadIdx.x + blockIdx.x * blockDim.x;
     if(nidx >= ne0) {
         return;
@@ -760,7 +760,7 @@ static __global__ void concat_f32(const float  *x,const float  *y, float *dst, i
 	}
 }
 
-static __global__ void upscale_f32(const float  *x, float *dst, int ne00, int nb02, int scale_factor) {
+static __global__ void upscale_f32(const float  *x, float *dst, const int ne00, const int nb02, const int scale_factor) {
     int ne0 = ne00 * scale_factor;
     int nidx = threadIdx.x + blockIdx.x * blockDim.x;
     if(nidx >= ne0) {
@@ -780,7 +780,7 @@ static __global__ void upscale_f32(const float  *x, float *dst, int ne00, int nb
 	dst[offset_dst] = x[offset_src];
 }
 
-static __global__ void pad_f32(const float  *x, float *dst, int ne0, int ne00, int ne01, int ne02) {
+static __global__ void pad_f32(const float  *x, float *dst, const int ne0, const int ne00, const int ne01, const int ne02) {
     int nidx = threadIdx.x + blockIdx.x * blockDim.x;
     if(nidx >= ne0) {
         return;
@@ -802,10 +802,9 @@ static __global__ void pad_f32(const float  *x, float *dst, int ne0, int ne00, i
 }
 
 template <int block_size>
-static __global__ void group_norm_f32(const float  *x,float *dst, int group_size, int ne_elements) {
+static __global__ void group_norm_f32(const float  *x,float *dst, const int group_size, const int ne_elements, const float eps) {
     int start = blockIdx.x * group_size;
     int end = start + group_size;
-    const float eps = 1e-6f;
 
     start += threadIdx.x;
 
@@ -5414,12 +5413,13 @@ static void norm_f32_cuda(const float * x, float * dst, const int ncols, const i
 }
 
 static void group_norm_f32_cuda(const float * x, float * dst, const int num_groups, const int group_size, const int ne_elements, cudaStream_t stream) {
+    static const float eps = 1e-6f;
     if (group_size < 1024) {
         const dim3 block_dims(WARP_SIZE, 1, 1);
-        group_norm_f32<WARP_SIZE><<<num_groups, block_dims, 0, stream>>>(x, dst, group_size, ne_elements);
+        group_norm_f32<WARP_SIZE><<<num_groups, block_dims, 0, stream>>>(x, dst, group_size, ne_elements, eps);
     } else {
         const dim3 block_dims(1024, 1, 1);
-        group_norm_f32<1024><<<num_groups, block_dims, 0, stream>>>(x, dst, group_size, ne_elements);
+        group_norm_f32<1024><<<num_groups, block_dims, 0, stream>>>(x, dst, group_size, ne_elements, eps);
     }
 }
 

@@ -12199,6 +12199,67 @@ static void ggml_compute_forward_upscale(
     }
 }
 
+// ggml_compute_forward_pad
+
+static void ggml_compute_forward_pad_f32(
+    const struct ggml_compute_params * params,
+    const struct ggml_tensor * src0,
+    struct ggml_tensor * dst) {
+
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+        return;
+    }
+
+    GGML_ASSERT(src0->nb[0] == sizeof(float));
+    GGML_ASSERT(dst->nb[0] == sizeof(float));
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    GGML_TENSOR_UNARY_OP_LOCALS
+
+    const int padding_factor = dst->op_params[0];
+
+    float* src0_ptr = (float*)src0->data;
+    float* dst_ptr = (float*)dst->data;
+
+    const so2 = ne00 * ne01;
+    const so3 = ne00 * ne01 * ne02;
+    const do2 = ne0 * ne1;
+    const do3 = ne0 * ne1 * ne2;
+
+    for (int j = 0; j < ne2; j ++) {
+        for (int k = ith; k < ne1; k += nth) {
+            for (int l = 0; l < ne0; l++) {
+                for (int i = 0; i < ne3; i++) {
+                    int dst_idx = i * do3 + j * do2 + k * ne0 + l;
+                    if (l < ne00 && k < ne01  && j < ne02 && i < ne03) {
+                        dst_ptr[dst_idx] = src0_ptr[i * so3 + j * so2 + k * ne00 + l];
+                    } else {
+                        dst_ptr[dst_idx] = 0;
+                    }
+                }
+            }
+        }
+    }
+}
+
+static void ggml_compute_forward_pad(
+    const struct ggml_compute_params * params,
+    const struct ggml_tensor * src0,
+    struct ggml_tensor * dst) {
+    switch (src0->type) {
+        case GGML_TYPE_F32:
+            {
+                ggml_compute_forward_pad_f32(params, src0, dst);
+            } break;
+        default:
+            {
+                GGML_ASSERT(false);
+            } break;
+    }
+}
+
 // ggml_compute_forward_argsort
 
 static void ggml_compute_forward_argsort_f32(
@@ -14191,6 +14252,10 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_upscale(params, tensor->src[0], tensor);
             } break;
+        case GGML_OP_PAD:
+            {
+                ggml_compute_forward_pad(params, tensor->src[0], tensor);
+            } break;
         case GGML_OP_ARGSORT:
             {
                 ggml_compute_forward_argsort(params, tensor->src[0], tensor);
@@ -15187,6 +15252,10 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             {
                 GGML_ASSERT(false); // TODO: not implemented
             } break;
+        case GGML_OP_PAD:
+            {
+                GGML_ASSERT(false); // TODO: not implemented
+            } break;
         case GGML_OP_ARGSORT:
             {
                 GGML_ASSERT(false); // TODO: not implemented
@@ -15924,6 +15993,10 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
                 n_tasks = 1;
             } break;
         case GGML_OP_UPSCALE:
+            {
+                n_tasks = n_threads;
+            } break;
+        case GGML_OP_PAD:
             {
                 n_tasks = n_threads;
             } break;

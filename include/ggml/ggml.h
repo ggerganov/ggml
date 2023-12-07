@@ -1550,6 +1550,14 @@ extern "C" {
             struct ggml_tensor  * a,
             int                   scale_factor);
 
+    GGML_API struct ggml_tensor * ggml_pad(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            int                  p0,
+            int                  p1,
+            int                  p2,
+            int                  p3);
+
     // sort rows
     enum ggml_sort_order {
         GGML_SORT_ASC,
