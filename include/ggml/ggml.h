@@ -244,11 +244,10 @@
 #define GGML_ASSERT(x) \
     do { \
         if (!(x)) { \
-            fprintf(stderr, "GGML_ASSERT: %s:%d: %s\n", __FILE__, __LINE__, #x); \
-            fflush(stderr); \
             fflush(stdout); \
+            fprintf(stderr, "GGML_ASSERT: %s:%d: %s\n", __FILE__, __LINE__, #x); \
             ggml_print_backtrace(); \
-            exit(1); \
+            abort(); \
         } \
     } while (0)
 
@@ -1312,6 +1311,14 @@ extern "C" {
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
 
+    // fused soft_max(a*scale + mask)
+    // mask is optional
+    GGML_API struct ggml_tensor * ggml_soft_max_ext(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * mask,
+            float                 scale);
+
     GGML_API struct ggml_tensor * ggml_soft_max_back(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
@@ -2090,6 +2097,7 @@ extern "C" {
     GGML_API double       gguf_get_val_f64 (const struct gguf_context * ctx, int key_id);
     GGML_API bool         gguf_get_val_bool(const struct gguf_context * ctx, int key_id);
     GGML_API const char * gguf_get_val_str (const struct gguf_context * ctx, int key_id);
+    GGML_API const void * gguf_get_val_data(const struct gguf_context * ctx, int key_id);
     GGML_API int          gguf_get_arr_n   (const struct gguf_context * ctx, int key_id);
     GGML_API const void * gguf_get_arr_data(const struct gguf_context * ctx, int key_id);
     GGML_API const char * gguf_get_arr_str (const struct gguf_context * ctx, int key_id, int i);
