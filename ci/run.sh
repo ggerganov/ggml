@@ -375,6 +375,11 @@ ret=0
 
 test $ret -eq 0 && gg_run ctest_debug
 test $ret -eq 0 && gg_run ctest_release
+
+if [ ! -z ${GG_BUILD_METAL} ]; then
+    export GGML_METAL_PATH_RESOURCES="${SRC}/build-ci-release/bin"
+fi
+
 test $ret -eq 0 && gg_run gpt_2
 test $ret -eq 0 && gg_run mnist
 test $ret -eq 0 && gg_run whisper
