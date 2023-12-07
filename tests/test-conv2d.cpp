@@ -21,6 +21,13 @@
 #include <string>
 #include <vector>
 
+static void ggml_log_callback_default(ggml_log_level level, const char * text, void * user_data) {
+    (void) level;
+    (void) user_data;
+    fputs(text, stderr);
+    fflush(stderr);
+}
+
 struct test_model {
     struct ggml_tensor * a;
     struct ggml_tensor * b;
@@ -71,7 +78,7 @@ void load_model(test_model & model, bool use_gpu = false) {
 #ifdef GGML_USE_CUBLAS
     if (use_gpu) {
         fprintf(stderr, "%s: using CUDA backend\n", __func__);
-        model.backend = ggml_backend_cuda_init();
+        model.backend = ggml_backend_cuda_init(0);
         if (!model.backend) {
             fprintf(stderr, "%s: ggml_backend_cuda_init() failed\n", __func__);
         }

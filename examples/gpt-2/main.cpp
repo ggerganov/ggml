@@ -26,6 +26,8 @@
 #pragma warning(disable: 4244 4267) // possible loss of data
 #endif
 
+#define GPT2_MAX_NODES 4096
+
 static void ggml_log_callback_default(ggml_log_level level, const char * text, void * user_data) {
     (void) level;
     (void) user_data;
@@ -107,7 +109,7 @@ void init_backends(gpt2_model & model, const gpt_params & params) {
 #ifdef GGML_USE_CUBLAS
     if (params.n_gpu_layers > 0) {
         fprintf(stderr, "%s: using CUDA backend\n", __func__);
-        gpu_backend = ggml_backend_cuda_init();
+        gpu_backend = ggml_backend_cuda_init(0);
         if (!gpu_backend) {
             fprintf(stderr, "%s: ggml_backend_cuda_init() failed\n", __func__);
         }
@@ -553,7 +555,7 @@ struct ggml_cgraph * gpt2_graph(
     const int n_head  = hparams.n_head;
 
     // since we are using ggml-alloc, this buffer only needs enough space to hold the ggml_tensor and ggml_cgraph structs, but not the tensor data
-    static size_t buf_size = ggml_tensor_overhead()*GGML_DEFAULT_GRAPH_SIZE + ggml_graph_overhead();
+    static size_t buf_size = ggml_tensor_overhead()*GPT2_MAX_NODES + ggml_graph_overhead_custom(GPT2_MAX_NODES, false);
     static std::vector<uint8_t> buf(buf_size);
 
     struct ggml_init_params params = {
@@ -564,7 +566,7 @@ struct ggml_cgraph * gpt2_graph(
 
     struct ggml_context * ctx0 = ggml_init(params);
 
-    struct ggml_cgraph  * gf = ggml_new_graph(ctx0);
+    struct ggml_cgraph  * gf = ggml_new_graph_custom(ctx0, GPT2_MAX_NODES, false);
 
     struct ggml_tensor * embd = ggml_view_1d(ctx0, model.embd, N, 0);
 

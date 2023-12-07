@@ -75,7 +75,7 @@ struct llama_buffer {
     void resize(size_t len) {
 #ifdef GGML_USE_METAL
         free(addr);
-        int result = posix_memalign((void **) &addr, getpagesize(), len);
+        int result = posix_memalign((void **) &addr, sysconf(_SC_PAGESIZE), len);
         if (result == 0) {
             memset(addr, 0, len);
         }
