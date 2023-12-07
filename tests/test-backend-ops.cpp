@@ -276,10 +276,13 @@ struct test_case {
             return true;
         }
 
+        printf("  %s(%s): ", ggml_op_desc(out), vars().c_str());
+        fflush(stdout);
+
         // check if backends support op
         for (ggml_backend_t backend : {backend1, backend2}) {
             if (!ggml_backend_supports_op(backend, out)) {
-                printf("  %s: not supported\n", ggml_op_desc(out));
+                printf("not supported\n");
                 ggml_free(ctx);
                 return true;
             }
@@ -314,7 +317,7 @@ struct test_case {
             for (size_t i = 0; i < f1.size(); i++) {
                 // check for nans
                 if (std::isnan(f1[i]) || std::isnan(f2[i])) {
-                    printf("    Error: %s: NaN at index %zu\n", ggml_op_desc(t1), i);
+                    printf("NaN at index %zu ", i);
                     ud->ok = false;
                     return true;
                 }
@@ -322,12 +325,12 @@ struct test_case {
                 if (isinf_or_max(f1[i]) || isinf_or_max(f2[i])) {
                     if (isinf_or_max(f1[i]) && isinf_or_max(f2[i])) {
                         if (std::signbit(f1[i]) != std::signbit(f2[i])) {
-                            printf("    Error: %s: inf sign mismatch: %f %f\n", ggml_op_desc(t1), f1[i], f2[i]);
+                            printf("inf sign mismatch: %f %f ", f1[i], f2[i]);
                             ud->ok = false;
                             return true;
                         }
                     } else {
-                        printf("    Error: %s: inf mismatch: %f %f\n", ggml_op_desc(t1), f1[i], f2[i]);
+                        printf("inf mismatch: %f %f ", f1[i], f2[i]);
                         ud->ok = false;
                         return true;
                     }
@@ -336,7 +339,7 @@ struct test_case {
 
             double err = nmse(f1.data(), f2.data(), f1.size());
             if (err > ud->max_err) {
-                printf("    Error: %s: NMSE = %f\n", ggml_op_desc(t1), err);
+                printf("NMSE = %f ", err);
                 ud->ok = false;
             }
             return true;
@@ -344,7 +347,6 @@ struct test_case {
 
         ggml_backend_compare_graph_backend(backend1, backend2, gf, callback, &ud);
 
-        printf("  %s(%s): ", ggml_op_desc(out), vars().c_str());
         if (ud.ok) {
             printf("\033[1;32mOK\033[0m\n");
         } else {
@@ -377,6 +379,7 @@ struct test_case {
         }
 
         int len = printf("  %s(%s): ", ggml_op_desc(out), vars().c_str());
+        fflush(stdout);
 
         // check if backends support op
         if (!ggml_backend_supports_op(backend, out)) {
@@ -403,6 +406,9 @@ struct test_case {
         // build graph
         ggml_cgraph * gf = ggml_new_graph_custom(ctx, graph_nodes, false);
         ggml_build_forward_expand(gf, out);
+
+        // warmup run
+        ggml_backend_graph_compute(backend, gf);
 
         // duplicate the op
         size_t target_size = ggml_backend_is_cpu(backend) ? 1ULL << 33 : 1ULL << 35; // 8 GB CPU, 32 GB GPU
@@ -1153,6 +1159,8 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
     add_test_bin_bcast(GGML_TYPE_F32, {1, 1, 640, 1}, {32, 32, 1, 1});
     add_test_bin_bcast(GGML_TYPE_F32, {5120, 1, 1, 1}, {1, 256, 1, 1});
     add_test_bin_bcast(GGML_TYPE_F32, {640, 1, 1, 1}, {1, 1, 1, 1});
+    add_test_bin_bcast(GGML_TYPE_F32, {3, 3, 2560, 1280}, {1, 1, 1, 1});
+    add_test_bin_bcast(GGML_TYPE_F32, {3, 3, 2560, 1280}, {2, 1, 1, 1});
 
     test_cases.emplace_back(new test_scale());
 
