@@ -38,3 +38,4 @@ __pycache__/
 
 # Model files
 ggml-model-f16.bin
+*.bat
