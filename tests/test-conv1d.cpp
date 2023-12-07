@@ -196,7 +196,6 @@ struct ggml_cgraph* compute_graph(const test_model & model, struct ggml_allocr *
 
     //ggml_graph_print(gf);
 
-    // in this case, the output tensor is the last one in the graph
     return gf;
 }
 

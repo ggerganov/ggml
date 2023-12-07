@@ -476,6 +476,9 @@ struct test_unary : public test_case {
     ggml_tensor * build_graph(ggml_context * ctx) override {
         ggml_tensor * in = ggml_new_tensor(ctx, type, 4, ne.data());
         ggml_tensor * out = ggml_unary(ctx, in, op);
+        if(op == GGML_UNARY_OP_LEAKY_RELU) {
+            ((int32_t *)(out->op_params))[1] = (int32_t)(0.1f /* negative slope*/ * 100.0f);
+        }
         return out;
     }
 };
@@ -1109,6 +1112,73 @@ struct test_sum_rows : public test_case {
     }
 };
 
+// GGML_OP_UPSCALE
+struct test_upscale : public test_case {
+    const ggml_type type;
+    const std::array<int64_t, 4> ne;
+    const int32_t scale_factor;
+
+    std::string vars() override {
+        return VARS_TO_STR3(type, ne, scale_factor);
+    }
+
+    test_upscale(ggml_type type = GGML_TYPE_F32,
+            std::array<int64_t, 4> ne = {512, 512, 3, 1},
+            int32_t scale_factor = 2)
+        : type(type), ne(ne), scale_factor(scale_factor) {}
+
+    ggml_tensor * build_graph(ggml_context * ctx) override {
+        ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne.data());
+        ggml_tensor * out = ggml_upscale(ctx, a, scale_factor);
+        return out;
+    }
+};
+
+// GGML_OP_GROUP_NORM
+struct test_group_norm : public test_case {
+    const ggml_type type;
+    const std::array<int64_t, 4> ne;
+    const int32_t num_groups;
+
+    std::string vars() override {
+        return VARS_TO_STR3(type, ne, num_groups);
+    }
+
+    test_group_norm(ggml_type type = GGML_TYPE_F32,
+            std::array<int64_t, 4> ne = {64, 64, 320, 1},
+            int32_t num_groups = 32)
+        : type(type), ne(ne), num_groups(num_groups) {}
+
+    ggml_tensor * build_graph(ggml_context * ctx) override {
+        ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne.data());
+        ggml_tensor * out = ggml_group_norm(ctx, a, num_groups);
+        return out;
+    }
+};
+
+// GGML_OP_ACC
+struct test_acc : public test_case {
+    const ggml_type type;
+    const std::array<int64_t, 4> ne_a;
+    const std::array<int64_t, 4> ne_b;
+
+    std::string vars() override {
+        return VARS_TO_STR3(type, ne_a, ne_b);
+    }
+
+    test_acc(ggml_type type = GGML_TYPE_F32,
+            std::array<int64_t, 4> ne_a = {1024, 577, 1, 1},
+            std::array<int64_t, 4> ne_b = {1024, 576, 1, 1})
+        : type(type), ne_a(ne_a), ne_b(ne_b) {}
+
+    ggml_tensor * build_graph(ggml_context * ctx) override {
+        ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne_a.data());
+        ggml_tensor * b = ggml_new_tensor(ctx, type, 4, ne_b.data());
+        ggml_tensor * out = ggml_acc(ctx, a, b, a->nb[1], a->nb[2], a->nb[3], b->nb[1]);
+        return out;
+    }
+};
+
 enum test_mode {
     MODE_TEST,
     MODE_PERF,
@@ -1251,6 +1321,9 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
     }
 
     test_cases.emplace_back(new test_sum_rows());
+    test_cases.emplace_back(new test_upscale());
+    test_cases.emplace_back(new test_group_norm());
+    test_cases.emplace_back(new test_acc());
 
     // run tests
     if (mode == MODE_TEST) {

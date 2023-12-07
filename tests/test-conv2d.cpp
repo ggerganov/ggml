@@ -171,7 +171,6 @@ struct ggml_cgraph * build_graph(const test_model& model, struct ggml_allocr * a
     ggml_set_name(conv2d_res, "conv2d_res");
     ggml_build_forward_expand(gf, conv2d_res);
 
-    // delete the temporally context used to build the graph
     ggml_free(ctx0);
     return gf;
 }
@@ -200,7 +199,6 @@ struct ggml_cgraph * compute_graph(const test_model & model, struct ggml_allocr 
 
     //ggml_graph_print(gf);
 
-    // in this case, the output tensor is the last one in the graph
     return gf;
 }
 
