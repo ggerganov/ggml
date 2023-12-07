@@ -465,7 +465,7 @@ extern "C" {
         GGML_UNARY_OP_GELU,
         GGML_UNARY_OP_GELU_QUICK,
         GGML_UNARY_OP_SILU,
-        GGML_UNARY_OP_LEAKY,
+        GGML_UNARY_OP_LEAKY_RELU,
 
         GGML_UNARY_OP_COUNT,
     };
@@ -959,9 +959,9 @@ extern "C" {
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
 
-    GGML_API struct ggml_tensor * ggml_leaky(
+    GGML_API struct ggml_tensor * ggml_leaky_relu(
             struct ggml_context * ctx,
-            struct ggml_tensor  * a);
+            struct ggml_tensor  * a, float negative_slope, bool inplace);
 
     GGML_API struct ggml_tensor * ggml_relu_inplace(
             struct ggml_context * ctx,

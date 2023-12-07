@@ -140,7 +140,7 @@ static ggml_tensor * apply_conv2d(ggml_context * ctx, ggml_tensor * input, const
     }
     result = ggml_add(ctx, result, ggml_repeat(ctx, layer.biases, result));
     if (layer.activate) {
-        result = ggml_leaky(ctx, result);
+        result = ggml_leaky_relu(ctx, result, 0.1f, true);
     }
     return result;
 }
