@@ -451,7 +451,7 @@ static_assert(sizeof(block_q6_K) == sizeof(ggml_fp16_t) + 13*QK_K/16, "wrong q6_
 #define CUDA_UPSCALE_BLOCK_SIZE 256
 #define CUDA_CONCAT_BLOCK_SIZE 256
 #define CUDA_PAD_BLOCK_SIZE 256
-
+#define CUDA_ACC_BLOCK_SIZE 256
 
 // dmmv = dequantize_mul_mat_vec
 #ifndef GGML_CUDA_DMMV_X
@@ -505,21 +505,8 @@ static size_t g_scratch_offset = 0;
 
 static cublasHandle_t g_cublas_handles[GGML_CUDA_MAX_DEVICES] = {nullptr};
 
-static __global__ void acc_f32(const float * x, const float * y, float * dst, const int ne,
-    const int ne10, const int ne11, const int ne12,
-    const int nb1, const int nb2) {
-    const int i = blockDim.x*blockIdx.x + threadIdx.x;
-    if (i >= ne) {
-        return;
-    }
-    int oz = i / nb2;
-    int oy = (i - (oz * nb2)) / nb1;
-    int ox = i % nb1;
-    if(ox < ne10 && oy < ne11 && oz < ne12) {
-        dst[i] = x[i] + y[ox + oy * ne10 + oz * ne10 * ne11];
-    } else {
-        dst[i] = x[i];
-    }
+static __device__ __forceinline__ float op_repeat(const float a, const float b) {
+    return b;
 }
 
 static __device__ __forceinline__ float op_add(const float a, const float b) {
@@ -599,6 +586,23 @@ static __global__ void k_bin_bcast_unravel(const src0_t * src0, const src1_t * s
 
     const int i10 = i0 % ne10;
     dst_row[i0] = (dst_t)bin_op(src0 ? (float)src0_row[i0] : 0.0f, (float)src1_row[i10]);
+}
+
+static __global__ void acc_f32(const float * x, const float * y, float * dst, const int ne,
+    const int ne10, const int ne11, const int ne12,
+    const int nb1, const int nb2) {
+    const int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if (i >= ne) {
+        return;
+    }
+    int oz = i / nb2;
+    int oy = (i - (oz * nb2)) / nb1;
+    int ox = i % nb1;
+    if(ox < ne10 && oy < ne11 && oz < ne12) {
+        dst[i] = x[i] + y[ox + oy * ne10 + oz * ne10 * ne11];
+    } else {
+        dst[i] = x[i];
+    }
 }
 
 static __global__ void gelu_f32(const float * x, float * dst, const int k) {
@@ -5034,13 +5038,6 @@ static void get_rows_cuda(const void * x, const int32_t * y, float * dst, const 
     k_get_rows<qk, qr, dq><<<block_nums, block_dims, 0, stream>>>(x, y, dst, ncols);
 }
 
-static void acc_f32_cuda(const float * x, const float * y, float * dst, const int n_elements,
-    const int ne10, const int ne11, const int ne12,
-    const int nb1, const int nb2, cudaStream_t stream) {
-    int num_blocks = (n_elements + CUDA_ADD_BLOCK_SIZE - 1) / CUDA_ADD_BLOCK_SIZE;
-    acc_f32<<<num_blocks, CUDA_ADD_BLOCK_SIZE, 0, stream>>>(x, y, dst, n_elements, ne10, ne11, ne12, nb1, nb2);
-}
-
 template<float (*bin_op)(const float, const float)>
 struct bin_bcast_cuda {
     template<typename src0_t, typename src1_t, typename dst_t>
@@ -5154,6 +5151,13 @@ struct bin_bcast_cuda {
         }
     }
 };
+
+static void acc_f32_cuda(const float * x, const float * y, float * dst, const int n_elements,
+    const int ne10, const int ne11, const int ne12,
+    const int nb1, const int nb2, cudaStream_t stream) {
+    int num_blocks = (n_elements + CUDA_ACC_BLOCK_SIZE - 1) / CUDA_ACC_BLOCK_SIZE;
+    acc_f32<<<num_blocks, CUDA_ACC_BLOCK_SIZE, 0, stream>>>(x, y, dst, n_elements, ne10, ne11, ne12, nb1, nb2);
+}
 
 static void gelu_f32_cuda(const float * x, float * dst, const int k, cudaStream_t stream) {
     const int num_blocks = (k + CUDA_GELU_BLOCK_SIZE - 1) / CUDA_GELU_BLOCK_SIZE;
