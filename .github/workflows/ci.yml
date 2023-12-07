@@ -45,6 +45,7 @@ jobs:
         llvm-profdata merge -sparse tests/*.profraw -o ggml.profdata
         llvm-cov      report ./bin/test-grad0 -instr-profile=ggml.profdata
         llvm-cov      report ./bin/test-opt   -instr-profile=ggml.profdata
+
   test-macos-metal:
     runs-on: macos-13
     env:
