@@ -616,7 +616,7 @@ struct test_cont : public test_case {
 // GGML_OP_MUL
 // GGML_OP_DIV
 struct test_bin_bcast : public test_case {
-    using op_t = std::function<ggml_tensor * (ggml_context *, ggml_tensor *, ggml_tensor *)>;
+    using op_t = ggml_tensor * (*) (ggml_context *, ggml_tensor *, ggml_tensor *);
     op_t op;
     const ggml_type type;
     const std::array<int64_t, 4> ne;
@@ -640,6 +640,17 @@ struct test_bin_bcast : public test_case {
         ggml_tensor * b = ggml_new_tensor(ctx, type, 4, ne.data());
         ggml_tensor * out = op(ctx, a, b);
         return out;
+    }
+
+    void initialize_tensors(ggml_context * ctx) override {
+        for (ggml_tensor * t = ggml_get_first_tensor(ctx); t != NULL; t = ggml_get_next_tensor(ctx, t)) {
+            if (op == ggml_div) {
+                // avoid division by zero
+                init_tensor_uniform(t, 1.0f, 2.0f);
+            } else {
+                init_tensor_uniform(t);
+            }
+        }
     }
 };
 
