@@ -452,6 +452,7 @@ static_assert(sizeof(block_q6_K) == sizeof(ggml_fp16_t) + 13*QK_K/16, "wrong q6_
 #define CUDA_CONCAT_BLOCK_SIZE 256
 #define CUDA_PAD_BLOCK_SIZE 256
 #define CUDA_ACC_BLOCK_SIZE 256
+#define CUDA_IM2COL_BLOCK_SIZE 256
 
 // dmmv = dequantize_mul_mat_vec
 #ifndef GGML_CUDA_DMMV_X
@@ -715,48 +716,6 @@ static __global__ void norm_f32(const float * x, float * dst, const int ncols, c
     }
 }
 
-static __global__ void group_norm_f32(const float  *x,float *dst, int n_channels, int n_channels_per_group, int ne00, int ne01, int nb02) {
-    int start = threadIdx.x * n_channels_per_group;
-    const float eps = 1e-6f;
-    int end = start + n_channels_per_group;
-    if (end > n_channels) {
-        end = n_channels;
-    }
-    if(start == end) {
-        return;
-    }
-    int step = end - start;
-    float sum = 0.0f;
-    for (int j = start; j < end; j++) {
-        for (int i = 0; i < ne01; i++) {
-            for (int k = 0; k < ne00; k++) {
-                sum += x[k + i * ne00 + j * nb02];
-            }
-        }
-    }
-    float mean = sum / (nb02 * step);
-    float sum2 = 0.0f;
-    for (int j = start; j < end; j++) {
-        for (int i = 0; i < ne01; i++) {
-            for (int k = 0; k < ne00; k++) {
-                int index = k + i * ne00 + j * nb02;
-                float v = x[index] - mean;
-                dst[index] = v;
-                sum2 += v * v;
-            }
-        }
-    }
-    float variance = sum2 / (nb02 * step);
-    const float scale = 1.0f / sqrtf(variance + eps);
-    for (int j = start; j < end; j++) {
-        for (int i = 0; i < ne01; i++) {
-            for (int k = 0; k < ne00; k++) {
-                dst[k + i * ne00 + j * nb02] *= scale;
-            }
-        }
-    }
-}
-
 static __global__ void concat_f32(const float  *x,const float  *y, float *dst, int ne0, int ne02) {
     int nidx = threadIdx.x + blockIdx.x * blockDim.x;
     if(nidx >= ne0) {
@@ -829,6 +788,66 @@ static __device__ __forceinline__ float warp_reduce_sum(float x) {
         x += __shfl_xor_sync(0xffffffff, x, mask, 32);
     }
     return x;
+}
+
+template <int block_size>
+static __global__ void group_norm_f32(const float  *x,float *dst, int group_size, int ne_elements) {
+    int start = blockIdx.x * group_size;
+    int end = start + group_size;
+    const float eps = 1e-6f;
+
+    start += threadIdx.x;
+
+    if(end >= ne_elements) {
+        end = ne_elements;
+    }
+
+    float tmp = 0.0f; // partial sum for thread in warp
+
+    for (int j = start; j < end; j += block_size) {
+        tmp += x[j];
+    }
+
+    tmp = warp_reduce_sum(tmp);
+    if (block_size > WARP_SIZE) {
+        __shared__ float s_sum[32];
+        int warp_id = threadIdx.x / WARP_SIZE;
+        int lane_id = threadIdx.x % WARP_SIZE;
+        if (lane_id == 0) {
+            s_sum[warp_id] = tmp;
+        }
+        __syncthreads();
+        tmp = s_sum[lane_id];
+        tmp = warp_reduce_sum(tmp);
+    }
+
+    float mean = tmp / group_size;
+    tmp = 0.0f;
+
+    for (int j = start; j < end; j += block_size) {
+        float xi = x[j] - mean;
+        dst[j] = xi;
+        tmp += xi * xi;
+    }
+
+    tmp = warp_reduce_sum(tmp);
+    if (block_size > WARP_SIZE) {
+        __shared__ float s_sum[32];
+        int warp_id = threadIdx.x / WARP_SIZE;
+        int lane_id = threadIdx.x % WARP_SIZE;
+        if (lane_id == 0) {
+            s_sum[warp_id] = tmp;
+        }
+        __syncthreads();
+        tmp = s_sum[lane_id];
+        tmp = warp_reduce_sum(tmp);
+    }
+
+    float variance = tmp / group_size;
+    float scale = rsqrtf(variance + eps);
+    for (int j = start; j < end; j += block_size) {
+        dst[j] *= scale;
+    }
 }
 
 template <int block_size>
@@ -5013,19 +5032,30 @@ static __global__ void clamp_f32(const float * x, float * dst, const float min, 
 
 static  __global__ void im2col_f32_f16(
         const float * x, half * dst,
-        int ofs0, int ofs1, int IW, int IH, int CHW,
+        int offset_delta, int IW, int IH, int OW, int KW, int KH, int pelements, int CHW,
         int s0, int s1, int p0, int p1, int d0, int d1) {
-    const int iiw = blockIdx.z * s0 + threadIdx.z * d0 - p0;
-    const int iih = blockIdx.y * s1 + threadIdx.y * d1 - p1;
+    const int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if(i >= pelements) {
+        return;
+    }
+
+    const int ksize = OW * (KH > 1 ? KW : 1);
+    const int kx = i / ksize;
+    const int kd = kx * ksize;
+    const int ky = (i - kd) / OW;
+    const int ix = i % OW;
+
+    const int iiw = ix * s0 + kx * d0 - p0;
+    const int iih = blockIdx.y * s1 + ky * d1 - p1;
 
     const int offset_dst =
-        (threadIdx.x * gridDim.y * gridDim.z + blockIdx.y * gridDim.z + blockIdx.z) * CHW +
-        (blockIdx.x * (blockDim.y * blockDim.z) + threadIdx.y * blockDim.z + threadIdx.z);
+        (blockIdx.y * OW + ix) * CHW +
+        (blockIdx.z * (KW * KH) + ky * KW + kx);
 
     if (iih < 0 || iih >= IH || iiw < 0 || iiw >= IW) {
         dst[offset_dst] = __float2half(0.0f);
     } else {
-        const int offset_src =  threadIdx.x * ofs0 + blockIdx.x * ofs1;
+        const int offset_src = blockIdx.z * offset_delta;
         dst[offset_dst] = __float2half(x[offset_src + iih * IW + iiw]);
     }
 }
@@ -5200,8 +5230,14 @@ static void norm_f32_cuda(const float * x, float * dst, const int ncols, const i
     }
 }
 
-static void group_norm_f32_cuda(const float * x, float * dst, const int num_groups, int num_channels, const int n_channels_per_group, int ne00, int ne01, int nb02, cudaStream_t stream) {
-    group_norm_f32<<<1, num_groups, 0, stream>>>(x, dst, num_channels, n_channels_per_group, ne00, ne01, nb02);
+static void group_norm_f32_cuda(const float * x, float * dst, const int num_groups, const int group_size, const int ne_elements, cudaStream_t stream) {
+    if (group_size < 1024) {
+        const dim3 block_dims(WARP_SIZE, 1, 1);
+        group_norm_f32<WARP_SIZE><<<num_groups, block_dims, 0, stream>>>(x, dst, group_size, ne_elements);
+    } else {
+        const dim3 block_dims(1024, 1, 1);
+        group_norm_f32<1024><<<num_groups, block_dims, 0, stream>>>(x, dst, group_size, ne_elements);
+    }
 }
 
 static void concat_f32_cuda(const float * x, const float * y, float * dst, const int ne0, int ne1, int ne2, int ne02, cudaStream_t stream) {
@@ -6146,13 +6182,14 @@ static void soft_max_f32_cuda(const float * x, float * dst, const int ncols_x, c
     soft_max_f32<<<block_nums, block_dims, 0, stream>>>(x, dst, ncols_x);
 }
 
-static void im2col_f32_f16_cuda(const float * x, half * dst,
-    int OH, int IW, int IH, int OW, int IC,
-    int KH, int KW, int N,  int ofs0, int ofs1,
-    int s0, int s1, int p0, int p1, int d0, int d1, cudaStream_t stream) {
-    dim3 block_nums(IC, OH, OW);
-    dim3 block_dims(N,  KH, KW);
-    im2col_f32_f16<<<block_nums, block_dims, 0, stream>>>(x, dst, ofs0, ofs1, IW, IH, (IC * KH * KW), s0, s1, p0, p1, d0, d1);
+static void im2col_f32_f16_cuda(const float* x, half* dst,
+    int IW, int IH, int OW, int OH, int KW, int KH, int IC,
+    int offset_delta,
+    int s0,int s1,int p0,int p1,int d0,int d1, cudaStream_t stream) {
+    const int parallel_elements = OW * KW * KH;
+    const int num_blocks = (parallel_elements + CUDA_IM2COL_BLOCK_SIZE - 1) / CUDA_IM2COL_BLOCK_SIZE;
+    dim3 block_nums(num_blocks, OH, IC);
+    im2col_f32_f16<<<block_nums, CUDA_IM2COL_BLOCK_SIZE, 0, stream>>>(x, dst, offset_delta, IW, IH, OW, KW, KH, parallel_elements, (IC * KH * KW), s0, s1, p0, p1, d0, d1);
 }
 
 // buffer pool for cuda
@@ -6645,10 +6682,8 @@ inline void ggml_cuda_op_group_norm(
     GGML_ASSERT( dst->type == GGML_TYPE_F32);
 
     int num_groups = dst->op_params[0];
-    int n_channels = src0->ne[2];
-    int n_channels_per_group = ((n_channels + num_groups - 1) / num_groups);
-
-    group_norm_f32_cuda(src0_dd, dst_dd, num_groups, n_channels, n_channels_per_group, src0->ne[0], src0->ne[1], src0->ne[0] * src0->ne[1], main_stream);
+    int group_size = src0->ne[0] * src0->ne[1] * ((src0->ne[2] + num_groups - 1) / num_groups);
+    group_norm_f32_cuda(src0_dd, dst_dd, num_groups, group_size, src0->ne[0] * src0->ne[1] * src0->ne[2], main_stream);
 
     (void) src1;
     (void) dst;
@@ -7212,7 +7247,6 @@ inline void ggml_cuda_op_im2col(
 
     const bool is_2D = ((const int32_t*)(dst->op_params))[6] == 1;
 
-    const int64_t N  = src1->ne[is_2D ? 3 : 2];
     const int64_t IC = src1->ne[is_2D ? 2 : 1];
     const int64_t IH = is_2D ? src1->ne[1] : 1;
     const int64_t IW =         src1->ne[0];
@@ -7223,12 +7257,9 @@ inline void ggml_cuda_op_im2col(
     const int64_t OH = is_2D ? dst->ne[2] : 1;
     const int64_t OW =         dst->ne[1];
 
-    const size_t ofs0 = src1->nb[is_2D ? 3 : 2] / 4; // nb is byte offset, src is type float32
-    const size_t ofs1 = src1->nb[is_2D ? 2 : 1] / 4; // nb is byte offset, src is type float32
+    const size_t delta_offset = src1->nb[is_2D ? 2 : 1] / 4; // nb is byte offset, src is type float32
 
-    im2col_f32_f16_cuda(src1_dd, (half*) dst_dd,
-        OH, IW, IH, OW, IC, KH, KW, N,
-        ofs0, ofs1, s0, s1, p0, p1, d0, d1, main_stream);
+    im2col_f32_f16_cuda(src1_dd, (half*) dst_dd, IW, IH, OW, OH, KW, KH, IC, delta_offset, s0, s1, p0, p1, d0, d1, main_stream);
 
     (void) src0;
     (void) src0_dd;
