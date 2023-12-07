@@ -24,3 +24,4 @@ cp -rpv ../llama.cpp/tests/test-opt.cpp           tests/test-opt.cpp
 cp -rpv ../llama.cpp/tests/test-grad0.cpp         tests/test-grad0.cpp
 cp -rpv ../llama.cpp/tests/test-quantize-fns.cpp  tests/test-quantize-fns.cpp
 cp -rpv ../llama.cpp/tests/test-quantize-perf.cpp tests/test-quantize-perf.cpp
+cp -rpv ../llama.cpp/tests/test-backend-ops.cpp   tests/test-backend-ops.cpp
