@@ -1649,7 +1649,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS",
     "CROSS_ENTROPY_LOSS_BACK",
 
-    "CIRCULAR_PADDING"
+    "PAD_CIRCULAR"
 };
 
 static_assert(GGML_OP_COUNT == 71, "GGML_OP_COUNT != 71");
@@ -1735,7 +1735,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "cross_entropy_loss(x,y)",
     "cross_entropy_loss_back(x,y)",
 
-    "circular_pad(x)"
+    "pad_circular(x)"
 };
 
 static_assert(GGML_OP_COUNT == 71, "GGML_OP_COUNT != 71");
@@ -6307,9 +6307,9 @@ struct ggml_tensor * ggml_cross_entropy_loss_back(
     return result;
 }
 
-//GGML_CIRCULAR_PADDING
+//GGML_PAD_CIRCULAR
 
-static struct ggml_tensor * ggml_circular_padding_impl(
+static struct ggml_tensor * ggml_pad_circular_impl(
     struct ggml_context * ctx,
     struct ggml_tensor * a,
     int padding) {
@@ -6328,7 +6328,7 @@ static struct ggml_tensor * ggml_circular_padding_impl(
             new_width,
             a->ne[2], a->ne[3]);
 
-    result->op = GGML_OP_CIRCULAR_PADDING;
+    result->op = GGML_OP_PAD_CIRCULAR;
     result->op_params[0] = padding;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
@@ -6337,11 +6337,11 @@ static struct ggml_tensor * ggml_circular_padding_impl(
     return result;
 }
 
-struct ggml_tensor * ggml_circular_padding(
+struct ggml_tensor * ggml_pad_circular(
     struct ggml_context * ctx,
     struct ggml_tensor * a,
     int padding) {
-    return ggml_circular_padding_impl(ctx, a, padding);
+    return ggml_pad_circular_impl(ctx, a, padding);
 }
 
 
@@ -13876,9 +13876,9 @@ static void ggml_compute_forward_cross_entropy_loss_back(
     }
 }
 
-// ggml_compute_cicular_padding
+// ggml_compute_pad_circular
 
-static void ggml_compute_forward_circular_padding_f16(
+static void ggml_compute_forward_pad_circular_f16(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src,
         struct ggml_tensor * dst) {
@@ -13913,7 +13913,7 @@ static void ggml_compute_forward_circular_padding_f16(
     }
 }
 
-static void ggml_compute_forward_circular_padding_f32(
+static void ggml_compute_forward_pad_circular_f32(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src,
         struct ggml_tensor * dst) {
@@ -13950,7 +13950,7 @@ static void ggml_compute_forward_circular_padding_f32(
 }
 
 // TODO: Make sure this works i am not familiar with quantization.
-static void ggml_compute_forward_circular_padding_q_f32(
+static void ggml_compute_forward_pad_circular_q_f32(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src,
         struct ggml_tensor * dst) {
@@ -13987,7 +13987,7 @@ static void ggml_compute_forward_circular_padding_q_f32(
 
 }
 
-static void ggml_compute_forward_circular_padding(
+static void ggml_compute_forward_pad_circular(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src,
         struct ggml_tensor * dst) {
@@ -13996,10 +13996,10 @@ static void ggml_compute_forward_circular_padding(
 
     switch (src->type) {
         case GGML_TYPE_F32:
-            ggml_compute_forward_circular_padding_f32(params, src, dst);
+            ggml_compute_forward_pad_circular_f32(params, src, dst);
             break;
         case GGML_TYPE_F16:
-            ggml_compute_forward_circular_padding_f16(params, src, dst);
+            ggml_compute_forward_pad_circular_f16(params, src, dst);
             break;
         case GGML_TYPE_Q4_0:
         case GGML_TYPE_Q4_1:
@@ -14012,7 +14012,7 @@ static void ggml_compute_forward_circular_padding(
         case GGML_TYPE_Q5_K:
         case GGML_TYPE_Q6_K:
             {
-                ggml_compute_forward_circular_padding_q_f32(params, src,dst);
+                ggml_compute_forward_pad_circular_q_f32(params, src,dst);
             } break;
         default:
             {
@@ -14343,9 +14343,9 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
                 ggml_compute_forward_cross_entropy_loss_back(params, tensor->src[0], tensor->src[1], tensor->src[2], tensor);
             }
             break;
-        case GGML_OP_CIRCULAR_PADDING:
+        case GGML_OP_PAD_CIRCULAR:
             {
-                ggml_compute_forward_circular_padding(params, tensor->src[0], tensor);
+                ggml_compute_forward_pad_circular(params, tensor->src[0], tensor);
             }
             break;
         case GGML_OP_NONE:
@@ -15413,7 +15413,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             {
                 GGML_ASSERT(false); // not supported
             } break;
-        case GGML_OP_CIRCULAR_PADDING:
+        case GGML_OP_PAD_CIRCULAR:
             {
                 GGML_ASSERT(false); // TODO: not implemented
             } break;
@@ -16045,7 +16045,7 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
             {
                 n_tasks = n_threads;
             } break;
-        case GGML_OP_CIRCULAR_PADDING:
+        case GGML_OP_PAD_CIRCULAR:
             {
                 n_tasks=n_threads;
             };
