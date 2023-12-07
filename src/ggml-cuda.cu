@@ -800,14 +800,6 @@ static __global__ void pad_f32(const float  *x, float *dst, int ne0, int ne00, i
     }
 }
 
-static __device__ __forceinline__ float warp_reduce_sum(float x) {
-#pragma unroll
-    for (int mask = 16; mask > 0; mask >>= 1) {
-        x += __shfl_xor_sync(0xffffffff, x, mask, 32);
-    }
-    return x;
-}
-
 template <int block_size>
 static __global__ void group_norm_f32(const float  *x,float *dst, int group_size, int ne_elements) {
     int start = blockIdx.x * group_size;

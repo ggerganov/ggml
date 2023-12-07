@@ -3851,6 +3851,8 @@ struct ggml_tensor * ggml_leaky_relu(
     result->op   = GGML_OP_UNARY;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
+
+    return result;
 }
 
 // ggml_gelu
