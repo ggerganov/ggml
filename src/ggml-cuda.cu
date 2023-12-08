@@ -6772,8 +6772,9 @@ inline void ggml_cuda_op_acc(
     GGML_ASSERT( dst->type == GGML_TYPE_F32);
     GGML_ASSERT(dst->ne[3] == 1); // just 3D tensors supported
 
-    int nb1 = dst->nb[1] / 4; // 4 bytes of float32
-    int nb2 = dst->nb[2] / 4; // 4 bytes of float32
+    int nb1 = dst->op_params[0] / 4; // 4 bytes of float32
+    int nb2 = dst->op_params[1] / 4; // 4 bytes of float32
+    // int nb3 = dst->op_params[2] / 4; // 4 bytes of float32 - unused
     int offset = dst->op_params[3] / 4; // offset in bytes
 
     acc_f32_cuda(src0_dd, src1_dd, dst_dd, ggml_nelements(dst), src1->ne[0], src1->ne[1], src1->ne[2], nb1, nb2, offset, main_stream);
