@@ -627,7 +627,7 @@ static __global__ void acc_f32(const float * x, const float * y, float * dst, co
     int oz = src1_idx / nb2;
     int oy = (src1_idx - (oz * nb2)) / nb1;
     int ox = src1_idx % nb1;
-    if(src1_idx >= 0 && ox < ne10 && oy < ne11 && oz < ne12) {
+    if (src1_idx >= 0 && ox < ne10 && oy < ne11 && oz < ne12) {
         dst[i] = x[i] + y[ox + oy * ne10 + oz * ne10 * ne11];
     } else {
         dst[i] = x[i];
@@ -659,7 +659,7 @@ static __global__ void silu_f32(const float * x, float * dst, const int k) {
 static __global__ void gelu_quick_f32(const float *x, float *dst, int k) {
     const float GELU_QUICK_COEF = -1.702f;
     const int i  = blockDim.x*blockIdx.x + threadIdx.x;
-    if(i >= k) {
+    if (i >= k) {
         return;
     }
     dst[i] = x[i] * (1.0f / (1.0f + expf(GELU_QUICK_COEF * x[i])));
@@ -667,7 +667,7 @@ static __global__ void gelu_quick_f32(const float *x, float *dst, int k) {
 
 static __global__ void tanh_f32(const float *x, float *dst, int k) {
     const int i  = blockDim.x*blockIdx.x + threadIdx.x;
-    if(i >= k) {
+    if (i >= k) {
         return;
     }
     dst[i] = tanhf(x[i]);
@@ -684,7 +684,7 @@ static __global__ void relu_f32(const float * x, float * dst, const int k) {
 
 static __global__ void leaky_relu_f32(const float *x, float *dst, const int k, const float negative_slope) {
     const int i  = blockDim.x*blockIdx.x + threadIdx.x;
-    if(i >= k) {
+    if (i >= k) {
         return;
     }
     dst[i] = fmaxf(x[i], 0) + fminf(x[i], 0.0f) * negative_slope;
@@ -737,65 +737,66 @@ static __global__ void norm_f32(const float * x, float * dst, const int ncols, c
 
 static __global__ void concat_f32(const float  *x,const float  *y, float *dst, const int ne0, const int ne02) {
     int nidx = threadIdx.x + blockIdx.x * blockDim.x;
-    if(nidx >= ne0) {
+    if (nidx >= ne0) {
         return;
     }
     // operation
-	int offset_dst =
+    int offset_dst =
         nidx +
         blockIdx.y * ne0 +
         blockIdx.z * ne0 * gridDim.y;
-	if (blockIdx.z < ne02) { // src0
-		int offset_src =
+    if (blockIdx.z < ne02) { // src0
+        int offset_src =
             nidx +
             blockIdx.y * ne0 +
             blockIdx.z * ne0 * gridDim.y;
             dst[offset_dst] = x[offset_src];
-	} else {
-		int offset_src =
+    } else {
+        int offset_src =
             nidx +
             blockIdx.y * ne0 +
             (blockIdx.z - ne02) * ne0 *  gridDim.y;
             dst[offset_dst] = y[offset_src];
-	}
+    }
 }
 
 static __global__ void upscale_f32(const float  *x, float *dst, const int ne00, const int nb02, const int scale_factor) {
     int ne0 = ne00 * scale_factor;
     int nidx = threadIdx.x + blockIdx.x * blockDim.x;
-    if(nidx >= ne0) {
+    if (nidx >= ne0) {
         return;
     }
-	// operation
-	int i00 = nidx / scale_factor;
+    // operation
+    int i00 = nidx / scale_factor;
     int i01 = blockIdx.y / scale_factor;
-	int offset_src =
+    int offset_src =
         i00 +
         i01 * ne00 +
         blockIdx.z * nb02;
-	int offset_dst =
+    int offset_dst =
         nidx +
         blockIdx.y * ne0 +
         blockIdx.z * ne0 * gridDim.y;
-	dst[offset_dst] = x[offset_src];
+    dst[offset_dst] = x[offset_src];
 }
 
 static __global__ void pad_f32(const float  *x, float *dst, const int ne0, const int ne00, const int ne01, const int ne02) {
     int nidx = threadIdx.x + blockIdx.x * blockDim.x;
-    if(nidx >= ne0) {
+    if (nidx >= ne0) {
         return;
     }
-	// operation
-	int offset_dst =
+
+    // operation
+    int offset_dst =
         nidx +
         blockIdx.y * ne0 +
         blockIdx.z * ne0 * gridDim.y;
-    if(nidx < ne00 && blockIdx.y < ne01 && blockIdx.z < ne02) {
+    if (nidx < ne00 && blockIdx.y < ne01 && blockIdx.z < ne02) {
         int offset_src =
-        nidx +
-        blockIdx.y * ne00 +
-        blockIdx.z * ne00 * ne01;
-        dst[offset_dst] = x[offset_src];
+            nidx +
+            blockIdx.y * ne00 +
+            blockIdx.z * ne00 * ne01;
+            dst[offset_dst] = x[offset_src];
     } else {
         dst[offset_dst] = 0.0f;
     }
@@ -808,7 +809,7 @@ static __global__ void group_norm_f32(const float  *x,float *dst, const int grou
 
     start += threadIdx.x;
 
-    if(end >= ne_elements) {
+    if (end >= ne_elements) {
         end = ne_elements;
     }
 
@@ -5212,7 +5213,7 @@ static  __global__ void im2col_f32_f16(
         int offset_delta, int IW, int IH, int OW, int KW, int KH, int pelements, int CHW,
         int s0, int s1, int p0, int p1, int d0, int d1) {
     const int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i >= pelements) {
+    if (i >= pelements) {
         return;
     }
 
@@ -6871,7 +6872,7 @@ inline void ggml_cuda_op_leaky_relu(
     GGML_ASSERT(src0->type == GGML_TYPE_F32);
     GGML_ASSERT( dst->type == GGML_TYPE_F32);
 
-    float negative_slope = dst->op_params[1] / 100.0f;
+    float negative_slope = dst->op_params[0] / 1000.0f;
 
     leaky_relu_f32_cuda(src0_dd, dst_dd, ggml_nelements(src0), negative_slope, main_stream);
 
@@ -9104,9 +9105,6 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
                 case GGML_UNARY_OP_RELU:
                     func = ggml_cuda_relu;
                     break;
-                case GGML_UNARY_OP_LEAKY_RELU:
-                    func = ggml_cuda_leaky_relu;
-                    break;
                 default:
                     return false;
             }
@@ -9126,6 +9124,9 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
         case GGML_OP_PAD:
             func = ggml_cuda_pad;
             break;
+        case GGML_OP_LEAKY_RELU:
+                    func = ggml_cuda_leaky_relu;
+                    break;
         case GGML_OP_RMS_NORM:
             func = ggml_cuda_rms_norm;
             break;
@@ -9580,7 +9581,6 @@ static bool ggml_backend_cuda_supports_op(ggml_backend_t backend, const ggml_ten
                 case GGML_UNARY_OP_RELU:
                 case GGML_UNARY_OP_GELU_QUICK:
                 case GGML_UNARY_OP_TANH:
-                case GGML_UNARY_OP_LEAKY_RELU:
                     return true;
                 default:
                     return false;
@@ -9633,6 +9633,7 @@ static bool ggml_backend_cuda_supports_op(ggml_backend_t backend, const ggml_ten
         case GGML_OP_GROUP_NORM:
         case GGML_OP_UPSCALE:
         case GGML_OP_PAD:
+        case GGML_OP_LEAKY_RELU:
             return true;
         default:
             return false;

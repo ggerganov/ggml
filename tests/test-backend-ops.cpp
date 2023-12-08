@@ -476,9 +476,6 @@ struct test_unary : public test_case {
     ggml_tensor * build_graph(ggml_context * ctx) override {
         ggml_tensor * in = ggml_new_tensor(ctx, type, 4, ne.data());
         ggml_tensor * out = ggml_unary(ctx, in, op);
-        if(op == GGML_UNARY_OP_LEAKY_RELU) {
-            ((int32_t *)(out->op_params))[1] = (int32_t)(0.1f /* negative slope*/ * 100.0f);
-        }
         return out;
     }
 };
@@ -1202,6 +1199,28 @@ struct test_pad : public test_case {
     }
 };
 
+// GGML_OP_LEAKY_RELU
+struct test_leaky_relu : public test_case {
+    const ggml_type type;
+    const std::array<int64_t, 4> ne_a;
+    const float negative_slope;
+
+    std::string vars() override {
+        return VARS_TO_STR3(type, ne_a, negative_slope);
+    }
+
+    test_leaky_relu(ggml_type type = GGML_TYPE_F32,
+            std::array<int64_t, 4> ne_a = {10, 10, 10, 10},
+            float negative_slope = 0.1f)
+        : type(type), ne_a(ne_a), negative_slope(negative_slope)  {}
+
+    ggml_tensor * build_graph(ggml_context * ctx) override {
+        ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne_a.data());
+        ggml_tensor * out = ggml_leaky_relu(ctx, a, negative_slope, true);
+        return out;
+    }
+};
+
 enum test_mode {
     MODE_TEST,
     MODE_PERF,
@@ -1348,6 +1367,7 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
     test_cases.emplace_back(new test_group_norm());
     test_cases.emplace_back(new test_acc());
     test_cases.emplace_back(new test_pad());
+    test_cases.emplace_back(new test_leaky_relu());
 
     // run tests
     if (mode == MODE_TEST) {
