@@ -9747,6 +9747,12 @@ static void ggml_compute_forward_mul_mat_id(
         const struct ggml_tensor * src1,
               struct ggml_tensor * dst) {
 
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+        // during GGML_TASK_INIT the entire src1 is converted to vec_dot_type
+        ggml_compute_forward_mul_mat(params, dst->src[2], src1, dst, 0, dst->ne[1]);
+        return;
+    }
+
     const struct ggml_tensor * ids = src0;
     const int id = ggml_get_op_params_i32(dst, 0);
 
