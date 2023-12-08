@@ -9617,7 +9617,7 @@ static void ggml_compute_forward_mul_mat(
                 }
 
                 cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
-                        one11, ne01, ne10,
+                         cne1, ne01, ne10,
                          1.0f,    y, ne10,
                                   x, ne00,
                          0.0f,    d, ne01);
