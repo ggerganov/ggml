@@ -1553,6 +1553,7 @@ extern "C" {
             struct ggml_tensor  * a,
             int                   scale_factor);
 
+    // pad each dimension with zeros: [x, ..., x] -> [x, ..., x, 0, ..., 0]
     GGML_API struct ggml_tensor * ggml_pad(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,

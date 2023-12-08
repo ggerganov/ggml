@@ -5550,12 +5550,12 @@ struct ggml_tensor * ggml_pad(
     struct ggml_tensor * result = ggml_new_tensor_4d(ctx, a->type,
             a->ne[0] + p0,
             a->ne[1] + p1,
-            a->ne[2] + p2, a->ne[3] + p3);
+            a->ne[2] + p2,
+            a->ne[3] + p3);
 
     result->op = GGML_OP_PAD;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
-    result->src[1] = NULL;
 
     return result;
 }
@@ -12206,37 +12206,34 @@ static void ggml_compute_forward_upscale(
 static void ggml_compute_forward_pad_f32(
     const struct ggml_compute_params * params,
     const struct ggml_tensor * src0,
-    struct ggml_tensor * dst) {
+          struct ggml_tensor * dst) {
 
     if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
         return;
     }
 
     GGML_ASSERT(src0->nb[0] == sizeof(float));
-    GGML_ASSERT(dst->nb[0] == sizeof(float));
+    GGML_ASSERT( dst->nb[0] == sizeof(float));
 
     const int ith = params->ith;
     const int nth = params->nth;
 
     GGML_TENSOR_UNARY_OP_LOCALS
 
-    const int padding_factor = dst->op_params[0];
+    float * dst_ptr = (float *) dst->data;
 
-    float* src0_ptr = (float*)src0->data;
-    float* dst_ptr = (float*)dst->data;
+    // TODO: optimize
 
-    const so2 = ne00 * ne01;
-    const so3 = ne00 * ne01 * ne02;
-    const do2 = ne0 * ne1;
-    const do3 = ne0 * ne1 * ne2;
+    for (int64_t i2 = 0; i2 < ne2; ++i2) {
+        for (int64_t i1 = ith; i1 < ne1; i1 += nth) {
+            for (int64_t i0 = 0; i0 < ne0; ++i0) {
+                for (int64_t i3 = 0; i3 < ne3; ++i3) {
+                    const int64_t dst_idx = i3*(ne0*ne1*ne2) + i2*(ne0*ne1) + i1*ne0 + i0;
 
-    for (int j = 0; j < ne2; j ++) {
-        for (int k = ith; k < ne1; k += nth) {
-            for (int l = 0; l < ne0; l++) {
-                for (int i = 0; i < ne3; i++) {
-                    int dst_idx = i * do3 + j * do2 + k * ne0 + l;
-                    if (l < ne00 && k < ne01  && j < ne02 && i < ne03) {
-                        dst_ptr[dst_idx] = src0_ptr[i * so3 + j * so2 + k * ne00 + l];
+                    const float * src_ptr = (const float *)((char *) src0->data + i3*nb03 + i2*nb02 + i1*nb01 + i0*nb00);
+
+                    if (i0 < ne00 && i1 < ne01 && i2 < ne02 && i3 < ne03) {
+                        dst_ptr[dst_idx] = *src_ptr;
                     } else {
                         dst_ptr[dst_idx] = 0;
                     }
