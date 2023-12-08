@@ -177,6 +177,8 @@ static void ggml_metal_log(enum ggml_log_level level, const char * format, ...){
             ggml_metal_log_callback(level, buffer, ggml_metal_log_user_data);
         } else {
             char* buffer2 = malloc(len+1);
+            va_end(args);
+            va_start(args, format);
             vsnprintf(buffer2, len+1, format, args);
             buffer2[len] = 0;
             ggml_metal_log_callback(level, buffer2, ggml_metal_log_user_data);
@@ -1193,7 +1195,9 @@ void ggml_metal_graph_compute(
                             const float scale = ((float *) dst->op_params)[0];
 
                             [encoder setBuffer:id_src0 offset:offs_src0   atIndex:0];
-                            [encoder setBuffer:id_src1 offset:offs_src1   atIndex:1];
+                            if (id_src1) {
+                                [encoder setBuffer:id_src1 offset:offs_src1   atIndex:1];
+                            }
                             [encoder setBuffer:id_dst  offset:offs_dst    atIndex:2];
                             [encoder setBytes:&ne00  length:sizeof(ne00)  atIndex:3];
                             [encoder setBytes:&ne01  length:sizeof(ne01)  atIndex:4];
