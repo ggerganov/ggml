@@ -3845,7 +3845,7 @@ struct ggml_tensor * ggml_leaky_relu(
     }
 
     struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
-    ggml_set_op_params_i32(result, 0, (int32_t) (negative_slope * 1000.0f));
+    ggml_set_op_params(result, &negative_slope, sizeof(negative_slope));
 
     result->op   = GGML_OP_LEAKY_RELU;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
@@ -9039,7 +9039,8 @@ static void ggml_compute_forward_leaky_relu_f32(
     const int n  = ggml_nrows(src0);
     const int nc = src0->ne[0];
 
-    float negative_slope = dst->op_params[0] / 1000.0f;
+    float negative_slope;
+    memcpy(&negative_slope, dst->op_params, sizeof(float));
 
     assert(dst->nb[0]  == sizeof(float));
     assert(src0->nb[0] == sizeof(float));

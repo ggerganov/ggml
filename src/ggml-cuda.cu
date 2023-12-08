@@ -6873,7 +6873,8 @@ inline void ggml_cuda_op_leaky_relu(
     GGML_ASSERT(src0->type == GGML_TYPE_F32);
     GGML_ASSERT( dst->type == GGML_TYPE_F32);
 
-    float negative_slope = dst->op_params[0] / 1000.0f;
+    float negative_slope;
+    memcpy(&negative_slope, dst->op_params, sizeof(float));
 
     leaky_relu_f32_cuda(src0_dd, dst_dd, ggml_nelements(src0), negative_slope, main_stream);
 
