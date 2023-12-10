@@ -9127,8 +9127,8 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
             func = ggml_cuda_pad;
             break;
         case GGML_OP_LEAKY_RELU:
-                    func = ggml_cuda_leaky_relu;
-                    break;
+            func = ggml_cuda_leaky_relu;
+            break;
         case GGML_OP_RMS_NORM:
             func = ggml_cuda_rms_norm;
             break;
@@ -9151,9 +9151,6 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
             func = ggml_cuda_sqr;
             break;
         case GGML_OP_CLAMP:
-            if (!any_on_device) {
-                return false;
-            }
             func = ggml_cuda_clamp;
             break;
         case GGML_OP_CPY:
