@@ -803,7 +803,7 @@ static __global__ void pad_f32(const float  *x, float *dst, const int ne0, const
 }
 
 template <int block_size>
-static __global__ void group_norm_f32(const float  *x,float *dst, const int group_size, const int ne_elements, const float eps) {
+static __global__ void group_norm_f32(const float * x, float * dst, const int group_size, const int ne_elements, const float eps) {
     int start = blockIdx.x * group_size;
     int end = start + group_size;
 

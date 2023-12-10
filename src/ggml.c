@@ -4038,8 +4038,9 @@ static struct ggml_tensor * ggml_group_norm_impl(
 
     struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
 
-    result->op = GGML_OP_GROUP_NORM;
     result->op_params[0] = n_groups;
+
+    result->op = GGML_OP_GROUP_NORM;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = NULL; // TODO: maybe store epsilon here?

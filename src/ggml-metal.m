@@ -88,6 +88,7 @@ struct ggml_metal_context {
     GGML_METAL_DECL_KERNEL(get_rows_q5_K);
     GGML_METAL_DECL_KERNEL(get_rows_q6_K);
     GGML_METAL_DECL_KERNEL(rms_norm);
+    GGML_METAL_DECL_KERNEL(group_norm);
     GGML_METAL_DECL_KERNEL(norm);
     GGML_METAL_DECL_KERNEL(mul_mv_f32_f32);
     GGML_METAL_DECL_KERNEL(mul_mv_f16_f16);
@@ -345,6 +346,7 @@ struct ggml_metal_context * ggml_metal_init(int n_cb) {
         GGML_METAL_ADD_KERNEL(get_rows_q5_K);
         GGML_METAL_ADD_KERNEL(get_rows_q6_K);
         GGML_METAL_ADD_KERNEL(rms_norm);
+        GGML_METAL_ADD_KERNEL(group_norm);
         GGML_METAL_ADD_KERNEL(norm);
         GGML_METAL_ADD_KERNEL(mul_mv_f32_f32);
         GGML_METAL_ADD_KERNEL(mul_mv_f16_f16);
@@ -450,6 +452,7 @@ void ggml_metal_free(struct ggml_metal_context * ctx) {
     GGML_METAL_DEL_KERNEL(get_rows_q5_K);
     GGML_METAL_DEL_KERNEL(get_rows_q6_K);
     GGML_METAL_DEL_KERNEL(rms_norm);
+    GGML_METAL_DEL_KERNEL(group_norm);
     GGML_METAL_DEL_KERNEL(norm);
     GGML_METAL_DEL_KERNEL(mul_mv_f32_f32);
     GGML_METAL_DEL_KERNEL(mul_mv_f16_f16);
@@ -834,6 +837,7 @@ static bool ggml_metal_supports_op(const struct ggml_tensor * op) {
         case GGML_OP_SUM_ROWS:
         case GGML_OP_SOFT_MAX:
         case GGML_OP_RMS_NORM:
+        case GGML_OP_GROUP_NORM:
         case GGML_OP_NORM:
         case GGML_OP_ALIBI:
         case GGML_OP_ROPE:
@@ -1723,6 +1727,38 @@ void ggml_metal_graph_compute(
                             const int64_t nrows = ggml_nrows(src0);
 
                             [encoder dispatchThreadgroups:MTLSizeMake(nrows, 1, 1) threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
+                        } break;
+                    case GGML_OP_GROUP_NORM:
+                        {
+                            GGML_ASSERT(ne00 % 4 == 0);
+
+                            //float eps;
+                            //memcpy(&eps, dst->op_params, sizeof(float));
+
+                            const float eps = 1e-6f; // TODO: temporarily hardcoded
+
+                            const int32_t n_groups = ((int32_t *) dst->op_params)[0];
+
+                            int nth = 32; // SIMD width
+
+                            //while (nth < ne00/4 && nth < 1024) {
+                            //    nth *= 2;
+                            //}
+
+                            [encoder setComputePipelineState:ctx->pipeline_group_norm];
+                            [encoder setBuffer:id_src0  offset:offs_src0        atIndex:0];
+                            [encoder setBuffer:id_dst   offset:offs_dst         atIndex:1];
+                            [encoder setBytes:&ne00     length:sizeof( int64_t) atIndex:2];
+                            [encoder setBytes:&ne01     length:sizeof( int64_t) atIndex:3];
+                            [encoder setBytes:&ne02     length:sizeof( int64_t) atIndex:4];
+                            [encoder setBytes:&nb00     length:sizeof(uint64_t) atIndex:5];
+                            [encoder setBytes:&nb01     length:sizeof(uint64_t) atIndex:6];
+                            [encoder setBytes:&nb02     length:sizeof(uint64_t) atIndex:7];
+                            [encoder setBytes:&n_groups length:sizeof( int32_t) atIndex:8];
+                            [encoder setBytes:&eps      length:sizeof(   float) atIndex:9];
+                            [encoder setThreadgroupMemoryLength:32*sizeof(float) atIndex:0];
+
+                            [encoder dispatchThreadgroups:MTLSizeMake(n_groups, 1, 1) threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
                         } break;
                     case GGML_OP_NORM:
                         {
