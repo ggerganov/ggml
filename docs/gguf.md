@@ -285,6 +285,8 @@ In the following, `[llm]` is used to fill in for the name of a specific LLM arch
 - `[llm].tensor_data_layout: string`: When a model is converted to GGUF, tensors may be rearranged to improve performance. This key describes the layout of the tensor data. This is not required; if not present, it is assumed to be `reference`.
   - `reference`: tensors are laid out in the same order as the original model
   - further options can be found for each architecture in their respective sections
+- `[llm].expert_count: uint32` Mixture-of-Experts: Number of experts in the model.
+- `[llm].expert_used_count: uint32` Mixture-of-Experts: Number of experts per token.
 
 #### Attention
 
@@ -341,6 +343,8 @@ The following sections describe the metadata for each model architecture. Each k
                     .swapaxes(1, 2)
                     .reshape(weights.shape))
     ```
+- `llama.expert_count`
+- `llama.expert_used_count`
 
 ##### MPT
 
