@@ -553,6 +553,10 @@ where N signifies the block number a layer belongs to, and where `BB` could be:
 - `ffn_up`: Feed-forward network "up" layer
 - `ffn_gate`: Feed-forward network "gate" layer
 - `ffn_down`: Feed-forward network "down" layer
+- `ffn_gate_inp`: Feed-forward network "gate" input layer
+- `ffn_gate_exp`: Feed-forward network "gate" expert layer
+- `ffn_gate_exp`: Feed-forward network "down" expert layer
+- `ffn_gate_exp`: Feed-forward network "up" expert layer
 
 ## Version History
 
