@@ -855,8 +855,8 @@ static bool ggml_metal_supports_op(const struct ggml_tensor * op) {
         case GGML_OP_DIAG_MASK_INF:
         case GGML_OP_GET_ROWS:
             {
-                return op->ne[0] % 4 == 0;
-            }
+                return op->ne[3] == 1;
+            } break;
         default:
             return false;
     }
@@ -931,7 +931,10 @@ void ggml_metal_graph_compute(
                         } break;
                 }
 
-                GGML_ASSERT(ggml_metal_supports_op(dst));
+                if (!ggml_metal_supports_op(dst)) {
+                    GGML_METAL_LOG_ERROR("%s: error: unsupported op '%s'\n", __func__, ggml_op_desc(dst));
+                    GGML_ASSERT(!"unsupported op");
+                }
 
                 const int64_t  ne00 = src0 ? src0->ne[0] : 0;
                 const int64_t  ne01 = src0 ? src0->ne[1] : 0;
@@ -1326,6 +1329,8 @@ void ggml_metal_graph_compute(
                             [encoder setBuffer:id_src0 offset:offs_src0   atIndex:0];
                             if (id_src1) {
                                 [encoder setBuffer:id_src1 offset:offs_src1   atIndex:1];
+                            } else {
+                                [encoder setBuffer:id_src0 offset:offs_src0   atIndex:1];
                             }
                             [encoder setBuffer:id_dst  offset:offs_dst    atIndex:2];
                             [encoder setBytes:&ne00  length:sizeof(ne00)  atIndex:3];
