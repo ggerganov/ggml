@@ -1648,9 +1648,11 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
 
     "CROSS_ENTROPY_LOSS",
     "CROSS_ENTROPY_LOSS_BACK",
+
+    "PAD_CIRCULAR"
 };
 
-static_assert(GGML_OP_COUNT == 70, "GGML_OP_COUNT != 70");
+static_assert(GGML_OP_COUNT == 71, "GGML_OP_COUNT != 71");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -1732,9 +1734,11 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
 
     "cross_entropy_loss(x,y)",
     "cross_entropy_loss_back(x,y)",
+
+    "pad_circular(x)"
 };
 
-static_assert(GGML_OP_COUNT == 70, "GGML_OP_COUNT != 70");
+static_assert(GGML_OP_COUNT == 71, "GGML_OP_COUNT != 71");
 
 static_assert(GGML_OP_POOL_COUNT == 2, "GGML_OP_POOL_COUNT != 2");
 
@@ -6324,6 +6328,44 @@ struct ggml_tensor * ggml_cross_entropy_loss_back(
 
     return result;
 }
+
+//GGML_PAD_CIRCULAR
+
+static struct ggml_tensor * ggml_pad_circular_impl(
+    struct ggml_context * ctx,
+    struct ggml_tensor * a,
+    int padding) {
+    bool is_node = false;
+
+    if (a->grad) {
+        GGML_ASSERT(false);
+        is_node = true;
+    }
+
+    int new_height = a->ne[0] + 2 * padding;
+    int new_width = a->ne[1] + 2 * padding;
+
+    struct ggml_tensor * result = ggml_new_tensor_4d(ctx, a->type,
+            new_height,
+            new_width,
+            a->ne[2], a->ne[3]);
+
+    result->op = GGML_OP_PAD_CIRCULAR;
+    result->op_params[0] = padding;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->src[0] = a;
+    result->src[1] = NULL;
+
+    return result;
+}
+
+struct ggml_tensor * ggml_pad_circular(
+    struct ggml_context * ctx,
+    struct ggml_tensor * a,
+    int padding) {
+    return ggml_pad_circular_impl(ctx, a, padding);
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -13928,6 +13970,152 @@ static void ggml_compute_forward_cross_entropy_loss_back(
     }
 }
 
+// ggml_compute_pad_circular
+
+static void ggml_compute_forward_pad_circular_f16(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src,
+        struct ggml_tensor * dst) {
+
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+        return;
+    }
+    const int padding = dst->op_params[0];
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    ggml_fp16_t * src_data = (ggml_fp16_t *) src->data;
+    ggml_fp16_t * dst_data = (ggml_fp16_t *) dst->data;
+
+    const int64_t orig_height = src->ne[0];
+    const int64_t orig_width = src->ne[1];
+    const int64_t new_height = orig_height + 2 * padding;
+    const int64_t new_width = orig_width + 2 * padding;
+
+    int64_t total_elements = new_height * new_width;
+    int64_t start_index = ith * (total_elements / nth);
+    int64_t end_index = (ith + 1) == nth ? total_elements : (ith + 1) * (total_elements / nth);
+
+    for (int64_t idx = start_index; idx < end_index; ++idx) {
+        int64_t i = idx / new_width;
+        int64_t j = idx % new_width;
+
+        int64_t orig_i = (i - padding + orig_height) % orig_height;
+        int64_t orig_j = (j - padding + orig_width) % orig_width;
+
+        dst_data[i * new_width + j] = src_data[orig_i * orig_width + orig_j];
+    }
+}
+
+static void ggml_compute_forward_pad_circular_f32(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src,
+        struct ggml_tensor * dst) {
+
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+        return;
+    }
+
+    const int padding = dst->op_params[0];
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int64_t orig_height = src->ne[0];
+    const int64_t orig_width = src->ne[1];
+    const int64_t new_height = orig_height + 2 * padding;
+    const int64_t new_width = orig_width + 2 * padding;
+
+    float * src_data = (float *) src->data;
+    float * dst_data = (float *) dst->data;
+
+    int64_t total_elements = new_height * new_width;
+    int64_t start_index = ith * (total_elements / nth);
+    int64_t end_index = (ith + 1) == nth ? total_elements : (ith + 1) * (total_elements / nth);
+
+    for (int64_t idx = start_index; idx < end_index; ++idx) {
+        int64_t i = idx / new_width;
+        int64_t j = idx % new_width;
+
+        int64_t orig_i = (i - padding + orig_height) % orig_height;
+        int64_t orig_j = (j - padding + orig_width) % orig_width;
+
+        dst_data[i * new_width + j] = src_data[orig_i * orig_width + orig_j];
+    }
+}
+
+// TODO: Make sure this works i am not familiar with quantization.
+static void ggml_compute_forward_pad_circular_q_f32(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src,
+        struct ggml_tensor * dst) {
+
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+        return;
+    }
+
+    const int padding = dst->op_params[0];
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int64_t orig_height = src->ne[0];
+    const int64_t orig_width = src->ne[1];
+    const int64_t new_height = orig_height + 2 * padding;
+    const int64_t new_width = orig_width + 2 * padding;
+
+    float * src_data = (float *) src->data;
+    float * dst_data = (float *) dst->data;
+
+    int64_t total_elements = new_height * new_width;
+    int64_t start_index = ith * (total_elements / nth);
+    int64_t end_index = (ith + 1) == nth ? total_elements : (ith + 1) * (total_elements / nth);
+
+    for (int64_t idx = start_index; idx < end_index; ++idx) {
+        int64_t i = idx / new_width;
+        int64_t j = idx % new_width;
+
+        int64_t orig_i = (i - padding + orig_height) % orig_height;
+        int64_t orig_j = (j - padding + orig_width) % orig_width;
+
+        dst_data[i * new_width + j] = src_data[orig_i * orig_width + orig_j];
+    }
+
+}
+
+static void ggml_compute_forward_pad_circular(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src,
+        struct ggml_tensor * dst) {
+
+    int padding = dst->op_params[0];
+
+    switch (src->type) {
+        case GGML_TYPE_F32:
+            ggml_compute_forward_pad_circular_f32(params, src, dst);
+            break;
+        case GGML_TYPE_F16:
+            ggml_compute_forward_pad_circular_f16(params, src, dst);
+            break;
+        case GGML_TYPE_Q4_0:
+        case GGML_TYPE_Q4_1:
+        case GGML_TYPE_Q5_0:
+        case GGML_TYPE_Q5_1:
+        case GGML_TYPE_Q8_0:
+        case GGML_TYPE_Q2_K:
+        case GGML_TYPE_Q3_K:
+        case GGML_TYPE_Q4_K:
+        case GGML_TYPE_Q5_K:
+        case GGML_TYPE_Q6_K:
+            {
+                ggml_compute_forward_pad_circular_q_f32(params, src,dst);
+            } break;
+        default:
+            {
+                GGML_ASSERT(false);
+            } break;
+    }
+}
+
+
 /////////////////////////////////
 
 static void ggml_compute_forward(struct ggml_compute_params * params, struct ggml_tensor * tensor) {
@@ -14247,6 +14435,11 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
         case GGML_OP_CROSS_ENTROPY_LOSS_BACK:
             {
                 ggml_compute_forward_cross_entropy_loss_back(params, tensor->src[0], tensor->src[1], tensor->src[2], tensor);
+            }
+            break;
+        case GGML_OP_PAD_CIRCULAR:
+            {
+                ggml_compute_forward_pad_circular(params, tensor->src[0], tensor);
             }
             break;
         case GGML_OP_NONE:
@@ -15314,6 +15507,10 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             {
                 GGML_ASSERT(false); // not supported
             } break;
+        case GGML_OP_PAD_CIRCULAR:
+            {
+                GGML_ASSERT(false); // TODO: not implemented
+            } break;
         case GGML_OP_NONE:
             {
                 // nop
@@ -15945,6 +16142,10 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
             {
                 n_tasks = n_threads;
             } break;
+        case GGML_OP_PAD_CIRCULAR:
+            {
+                n_tasks=n_threads;
+            };
         case GGML_OP_NONE:
             {
                 n_tasks = 1;

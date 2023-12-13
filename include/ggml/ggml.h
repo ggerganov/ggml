@@ -449,6 +449,8 @@ extern "C" {
         GGML_OP_CROSS_ENTROPY_LOSS,
         GGML_OP_CROSS_ENTROPY_LOSS_BACK,
 
+        GGML_OP_PAD_CIRCULAR,
+
         GGML_OP_COUNT,
     };
 
@@ -1784,6 +1786,13 @@ extern "C" {
             struct ggml_tensor          * a,
             struct ggml_tensor          * b,
             struct ggml_tensor          * c);
+
+    // Circular Padding
+
+    GGML_API struct ggml_tensor * ggml_pad_circular(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            int                   padding);
 
     //
     // automatic differentiation
