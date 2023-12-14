@@ -4767,7 +4767,10 @@ struct ggml_tensor * ggml_get_rows(
     }
 
     // TODO: implement non F32 return
-    struct ggml_tensor * result = ggml_new_tensor_4d(ctx, a->type, a->ne[0], b->ne[0], b->ne[1], b->ne[2]);
+    enum ggml_type type = GGML_TYPE_F32;
+    if (a->type == GGML_TYPE_I32)
+        type = a->type;
+    struct ggml_tensor * result = ggml_new_tensor_4d(ctx, type, a->ne[0], b->ne[0], b->ne[1], b->ne[2]);
 
     result->op   = GGML_OP_GET_ROWS;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
@@ -7101,12 +7104,10 @@ static void ggml_compute_forward_dup(
 
     switch (src0->type) {
         case GGML_TYPE_F16:
-        case GGML_TYPE_I16:
             {
                 ggml_compute_forward_dup_f16(params, src0, dst);
             } break;
         case GGML_TYPE_F32:
-        case GGML_TYPE_I32:
             {
                 ggml_compute_forward_dup_f32(params, src0, dst);
             } break;
@@ -10828,7 +10829,6 @@ static void ggml_compute_forward_get_rows(
                 ggml_compute_forward_get_rows_q(params, src0, src1, dst);
             } break;
         case GGML_TYPE_F16:
-        case GGML_TYPE_I16:
             {
                 ggml_compute_forward_get_rows_f16(params, src0, src1, dst);
             } break;

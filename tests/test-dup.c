@@ -45,6 +45,7 @@ int main(int argc, const char ** argv) {
             struct ggml_tensor * src = ggml_new_tensor_2d(ctx, src_type, 10, 11);
             arange(src);
             struct ggml_tensor * dst = ggml_new_tensor_2d(ctx, dst_type, 10, 11);
+            ggml_set_i32(dst, 0);
 
             // 2nd-row: [20, 21, ..., 29]
             struct ggml_tensor* src_cont = ggml_view_1d(ctx, src, 10, src->nb[1] * 2);
