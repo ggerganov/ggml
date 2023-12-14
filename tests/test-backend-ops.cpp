@@ -1306,7 +1306,7 @@ struct test_pad : public test_case {
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
         ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne_a.data());
-        ggml_tensor * out = ggml_pad(ctx, a, pad_0, pad_1, 0, 0);
+        ggml_tensor * out = ggml_pad(ctx, a, pad_0, pad_1, 0, 0, false);
         return out;
     }
 };

@@ -782,7 +782,7 @@ static __global__ void upscale_f32(const float  *x, float *dst, const int ne00, 
     dst[offset_dst] = x[offset_src];
 }
 
-static __global__ void pad_f32(const float  *x, float *dst, const int ne0, const int ne00, const int ne01, const int ne02) {
+static __global__ void pad_f32(const float  *x, float *dst, const int ne0, const int ne00, const int ne01, const int ne02, const int p0, const int p1, const int p2, const bool asymmetric) {
     int nidx = threadIdx.x + blockIdx.x * blockDim.x;
     if (nidx >= ne0) {
         return;
@@ -793,11 +793,12 @@ static __global__ void pad_f32(const float  *x, float *dst, const int ne0, const
         nidx +
         blockIdx.y * ne0 +
         blockIdx.z * ne0 * gridDim.y;
-    if (nidx < ne00 && blockIdx.y < ne01 && blockIdx.z < ne02) {
+    if ((asymmetric || nidx >= p0 && blockIdx.y >= p1 && blockIdx.z >= p2) &&
+        nidx < (ne00 + p0) && blockIdx.y < (ne01 + p1) && blockIdx.z < (ne02 + p2)) {
         int offset_src =
-            nidx +
-            blockIdx.y * ne00 +
-            blockIdx.z * ne00 * ne01;
+            (nidx - p0) +
+            (blockIdx.y - p1) * ne00 +
+            (blockIdx.z - p2) * ne00 * ne01;
             dst[offset_dst] = x[offset_src];
     } else {
         dst[offset_dst] = 0.0f;
@@ -5534,10 +5535,10 @@ static void upscale_f32_cuda(const float * x, float * dst, const int ne00, const
 
 static void pad_f32_cuda(const float * x, float * dst,
     const int ne00, const int ne01, const int ne02,
-    const int ne0, const int ne1, const int ne2, cudaStream_t stream) {
+    const int ne0, const int ne1, const int ne2, const int p0, const int p1, const int p2,const bool asymmetric, cudaStream_t stream) {
     int num_blocks = (ne0 + CUDA_PAD_BLOCK_SIZE - 1) / CUDA_PAD_BLOCK_SIZE;
     dim3 gridDim(num_blocks, ne1, ne2);
-    pad_f32<<<gridDim, CUDA_PAD_BLOCK_SIZE, 0, stream>>>(x, dst, ne0, ne00, ne01, ne02);
+    pad_f32<<<gridDim, CUDA_PAD_BLOCK_SIZE, 0, stream>>>(x, dst, ne0, ne00, ne01, ne02, p0, p1, p2, asymmetric);
 }
 
 static void rms_norm_f32_cuda(const float * x, float * dst, const int ncols, const int nrows, const float eps, cudaStream_t stream) {
@@ -7067,9 +7068,14 @@ inline void ggml_cuda_op_pad(
     GGML_ASSERT(dst->type == GGML_TYPE_F32);
     GGML_ASSERT(src0->ne[3] == 1 && dst->ne[3] == 1); // just 3D tensors
 
+    bool asymmetric = dst->op_params[0] == 1;
+    int p0 = asymmetric ? 0 : (dst->ne[0] - src0->ne[0]) / 2;
+    int p1 = asymmetric ? 0 : (dst->ne[1] - src0->ne[1]) / 2;
+    int p2 = asymmetric ? 0 : (dst->ne[2] - src0->ne[2]) / 2;
+
     pad_f32_cuda(src0_dd, dst_dd,
         src0->ne[0], src0->ne[1], src0->ne[2],
-        dst->ne[0], dst->ne[1], dst->ne[2], main_stream);
+        dst->ne[0], dst->ne[1], dst->ne[2], p0, p1, p2, asymmetric, main_stream);
 
     (void) src1;
     (void) dst;

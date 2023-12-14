@@ -426,6 +426,7 @@ extern "C" {
         GGML_OP_PAD,
         GGML_OP_ARGSORT,
         GGML_OP_LEAKY_RELU,
+        GGML_OP_WINOGRAD,
 
         GGML_OP_FLASH_ATTN,
         GGML_OP_FLASH_FF,
@@ -1561,7 +1562,8 @@ extern "C" {
             int                  p0,
             int                  p1,
             int                  p2,
-            int                  p3);
+            int                  p3,
+            bool        asymmetric);
 
     // sort rows
     enum ggml_sort_order {
