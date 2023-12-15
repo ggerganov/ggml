@@ -457,6 +457,7 @@ static_assert(sizeof(block_q6_K) == sizeof(ggml_fp16_t) + 13*QK_K/16, "wrong q6_
 #define CUDA_PAD_BLOCK_SIZE 256
 #define CUDA_ACC_BLOCK_SIZE 256
 #define CUDA_IM2COL_BLOCK_SIZE 256
+#define CUDA_WINOGRAD_BLOCK_SIZE 256
 
 // dmmv = dequantize_mul_mat_vec
 #ifndef GGML_CUDA_DMMV_X
@@ -5275,6 +5276,178 @@ static  __global__ void im2col_f32_f16(
     }
 }
 
+static __global__ void winograd_kernel_f16(const half * x, half * dst, int kernel_block, int output_block, int channels) {
+    const int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= channels) {
+        return;
+    }
+
+    int o_idx = i * output_block;
+    int k_idx = i * kernel_block;
+
+    float g1 = __half2float(x[k_idx]);
+    float g2 = __half2float(x[k_idx + 1]);
+    float g3 = __half2float(x[k_idx + 2]);
+    float g4 = __half2float(x[k_idx + 3]);
+    float g5 = __half2float(x[k_idx + 4]);
+    float g6 = __half2float(x[k_idx + 5]);
+    float g7 = __half2float(x[k_idx + 6]);
+    float g8 = __half2float(x[k_idx + 7]);
+    float g9 = __half2float(x[k_idx + 8]);
+
+    dst[o_idx] = x[k_idx];
+    dst[o_idx + 1] = __float2half((g1 + g2 + g3) / 2.f);
+    dst[o_idx + 2] = __float2half((g1 - g2 + g3) / 2.f);
+    dst[o_idx + 3] = x[k_idx + 2];
+
+    float temp1 = g1 + g4 + g7;
+    float temp2 = g2 + g5 + g8;
+    float temp3 = g3 + g6 + g9;
+
+    dst[o_idx + 4] = __float2half(temp1 / 2.f);
+    dst[o_idx + 5] = __float2half((temp1 + temp2 + temp3) / 4.f);
+    dst[o_idx + 6] = __float2half((temp1 - temp2 + temp3) / 4.f);
+    dst[o_idx + 7] = __float2half(temp3 / 2.f);
+
+    float temp4 = g1 - g4 + g7;
+    float temp5 = g2 - g5 + g8;
+    float temp6 = g3 - g6 + g9;
+
+    dst[o_idx + 8] = __float2half((temp4) / 2.f);
+    dst[o_idx + 9] = __float2half((temp4 + temp5 + temp6) / 4.f);
+    dst[o_idx + 10] = __float2half((temp4 - temp5 + temp6) / 4.f);
+    dst[o_idx + 11] = __float2half((temp6) / 2.f);
+
+    dst[o_idx + 12] = x[k_idx + 6];
+    dst[o_idx + 13] = __float2half((g7 + g8 + g9) / 2.f);
+    dst[o_idx + 14] = __float2half((g7 - g8 + g9) / 2.f);
+    dst[o_idx + 15] = x[k_idx + 8];
+}
+
+static __device__ __forceinline__ float4 warp_reduce_sum(float4 a) {
+#pragma unroll
+    for (int mask = 16; mask > 0; mask >>= 1) {
+        a.x += __shfl_xor_sync(0xffffffff, a.x, mask, 32);
+        a.y += __shfl_xor_sync(0xffffffff, a.y, mask, 32);
+        a.z += __shfl_xor_sync(0xffffffff, a.z, mask, 32);
+        a.w += __shfl_xor_sync(0xffffffff, a.w, mask, 32);
+    }
+    return a;
+}
+
+template<int block_size>
+static __global__ void winograd_apply_f16_f32(const float * x, const half * y, float* dst, int input_width, int kernel_size, int kernel_stride, int image_stride, int image_block, int input_channels) {
+    int r_idx = blockIdx.x * 2;
+    int c_idx = blockIdx.y * 2;
+    int ro_idx0 = r_idx * gridDim.y * 2;
+    int ro_idx1 = ro_idx0 + gridDim.y * 2;
+    int ot_idx1 = blockIdx.z * image_stride + c_idx + ro_idx0;
+    int ot_idx3 = blockIdx.z * image_stride + c_idx + ro_idx1;
+    int r_idx0 = r_idx * input_width;
+    int r_idx1 = r_idx0 + input_width;
+    int r_idx2 = r_idx1 + input_width;
+    int r_idx3 = r_idx2 + input_width;
+    int k_offset = blockIdx.z * kernel_stride;
+
+    float4 tmp = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+    for (int i = threadIdx.x; i < input_channels; i += block_size)
+    {
+        int img_channel = i * image_block;
+        int k_idx = i * kernel_size + k_offset; // U idex
+
+        int t_idx1 = img_channel + r_idx0 + c_idx;
+        int t_idx2 = img_channel + r_idx1 + c_idx;
+        int t_idx3 = img_channel + r_idx2 + c_idx;
+        int t_idx4 = img_channel + r_idx3 + c_idx;
+
+        float d1 = x[t_idx1];
+        float d2 = x[t_idx1 + 1];
+        float d3 = x[t_idx1 + 2];
+        float d4 = x[t_idx1 + 3];
+
+        float d5 = x[t_idx2];
+        float d6 = x[t_idx2 + 1];
+        float d7 = x[t_idx2 + 2];
+        float d8 = x[t_idx2 + 3];
+
+        float d9 = x[t_idx3];
+        float d10 = x[t_idx3 + 1];
+        float d11 = x[t_idx3 + 2];
+        float d12 = x[t_idx3 + 3];
+
+        float d13 = x[t_idx4];
+        float d14 = x[t_idx4 + 1];
+        float d15 = x[t_idx4 + 2];
+        float d16 = x[t_idx4 + 3];
+
+        float dd1 = d11 - (d3);
+        float dd2 = d2 - (d10);
+        float dd3 = d7 + (d11);
+        float dd4 = d6 + (d10);
+        float dd5 = d7 - (d11);
+        float dd6 = d10 - (d6);
+        float dd7 = d15 - (d7);
+        float dd8 = d6 - (d14);
+
+        float v1 = d1 - d9 + dd1;
+        float v2 = dd2 - dd1;  //
+        float v3 = -dd1 - dd2; //
+        float v4 = dd2 - d4 + d12;
+
+        float v5 = d5 + d9 - dd3;
+        float v6 = dd4 + dd3;
+        float v7 = dd3 - dd4;
+        float v8 = dd4 - d8 - d12;
+
+        float v9 = d9 - d5 + dd5;
+        float v10 = dd6 - dd5;
+        float v11 = -(dd6 + dd5);
+        float v12 = dd6 + d8 - d12;
+
+        float v13 = d5 - d13 + dd7;
+        float v14 = dd8 - dd7;
+        float v15 = -dd7 - dd8;
+        float v16 = dd8 - d8 + d16;
+
+        // U . V
+        float m1 = v1 * __half2float(y[k_idx]);
+        float m2 = v2 * __half2float(y[k_idx + 1]);
+        float m3 = v3 * __half2float(y[k_idx + 2]);
+        float m4 = v4 * __half2float(y[k_idx + 3]);
+        float m5 = v5 * __half2float(y[k_idx + 4]);
+        float m6 = v6 * __half2float(y[k_idx + 5]);
+        float m7 = v7 * __half2float(y[k_idx + 6]);
+        float m8 = v8 * __half2float(y[k_idx + 7]);
+        float m9 = v9 * __half2float(y[k_idx + 8]);
+        float m10 = v10 * __half2float(y[k_idx + 9]);
+        float m11 = v11 * __half2float(y[k_idx + 10]);
+        float m12 = v12 * __half2float(y[k_idx + 11]);
+        float m13 = v13 * __half2float(y[k_idx + 12]);
+        float m14 = v14 * __half2float(y[k_idx + 13]);
+        float m15 = v15 * __half2float(y[k_idx + 14]);
+        float m16 = v16 * __half2float(y[k_idx + 15]);
+
+        float sub_y1 = m2 + m6 + m10;
+        float sub_y2 = m3 + m7 + m11;
+        float sub_y3 = m6 - m10 - m14;
+        float sub_y4 = m7 - m11 - m15;
+
+        tmp.x += m1 + m5 + m9 + sub_y1 + sub_y2;
+        tmp.y += sub_y1 - sub_y2 - m4 - m8 - m12;
+        tmp.z += m5 - m9 - m13 + sub_y3 + sub_y4;
+        tmp.w += sub_y3 - sub_y4 - m8 + m12 + m16;
+    }
+
+    tmp = warp_reduce_sum(tmp);
+    if(threadIdx.x == 0) {
+        dst[ot_idx1] = tmp.x;
+        dst[ot_idx1 + 1] = tmp.y;
+        dst[ot_idx3] = tmp.z;
+        dst[ot_idx3 + 1] = tmp.w;
+    }
+}
+
+
 template<int qk, int qr, dequantize_kernel_t dq>
 static void get_rows_cuda(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
                             const void * src0_dd, const int32_t * src1_dd, float * dst_dd, cudaStream_t stream) {
@@ -6513,6 +6686,20 @@ static void im2col_f32_f16_cuda(const float* x, half* dst,
     im2col_f32_f16<<<block_nums, CUDA_IM2COL_BLOCK_SIZE, 0, stream>>>(x, dst, offset_delta, IW, IH, OW, KW, KH, parallel_elements, (IC * KH * KW), s0, s1, p0, p1, d0, d1);
 }
 
+static void winograd_kernel_f16_cuda(const half* x, half* dst, int kernel_block, int output_block, int k_kernels, cudaStream_t stream) {
+    const int num_blocks = (k_kernels + CUDA_WINOGRAD_BLOCK_SIZE - 1) / CUDA_WINOGRAD_BLOCK_SIZE;
+    dim3 block_nums(num_blocks, 1, 1);
+    winograd_kernel_f16<<<block_nums, CUDA_WINOGRAD_BLOCK_SIZE, 0, stream>>>(x, dst, kernel_block, output_block, k_kernels);
+}
+
+static void winograd_apply_f16_f32_cuda(const float* x, const half* y, float* dst,
+    const int IW, const int IH, const int IC, const int OC, const int kernel_size, cudaStream_t stream) {
+    const int half_rows = (IH / 2) - 1;
+	const int half_cols = (IW / 2) - 1;
+    dim3 block_nums(half_rows, half_cols, OC);
+    winograd_apply_f16_f32<WARP_SIZE><<<block_nums, WARP_SIZE, 0, stream>>>(x, y, dst, IW, kernel_size, IC * kernel_size, half_rows * half_cols * 4, IH * IW, IC);
+}
+
 // buffer pool for cuda
 #define MAX_CUDA_BUFFERS 256
 
@@ -7608,6 +7795,53 @@ inline void ggml_cuda_op_im2col(
     const size_t delta_offset = src1->nb[is_2D ? 2 : 1] / 4; // nb is byte offset, src is type float32
 
     im2col_f32_f16_cuda(src1_dd, (half*) dst_dd, IW, IH, OW, OH, KW, KH, IC, delta_offset, s0, s1, p0, p1, d0, d1, main_stream);
+
+    (void) src0;
+    (void) src0_dd;
+}
+
+inline void ggml_cuda_op_winograd_stage0(
+    const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
+    const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F16);
+    GGML_ASSERT( dst->type == GGML_TYPE_F16);
+
+    const int64_t OC = src0->ne[3];
+    const int64_t IC = src0->ne[2];
+    const int64_t KH = src0->ne[1];
+    const int64_t KW = src0->ne[0];
+
+    // process along output and input channels
+    int channels = OC * IC;
+    int kernel_block = KW * KH;
+    int output_block = dst->ne[0];
+
+    GGML_ASSERT(kernel_block == 9 && output_block == 16);
+
+    winograd_kernel_f16_cuda((half*)src0_dd, (half*) dst_dd, kernel_block, output_block, channels, main_stream);
+
+    (void) src0;
+    (void) src0_dd;
+}
+
+inline void ggml_cuda_op_winograd_stage1(
+    const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
+    const float * src0_dd, const float * src1_dd, float * dst_dd, const cudaStream_t & main_stream) {
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT(src1->type == GGML_TYPE_F16);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+
+    // channels
+    const int64_t OC = src1->ne[2];
+    const int64_t IC = src1->ne[1];
+
+    // input dimens
+    const int64_t IH = src0->ne[1];
+    const int64_t IW = src0->ne[0];
+
+    winograd_apply_f16_f32_cuda(src0_dd, (half*)src1_dd, dst_dd, IW, IH, IC, OC, src1->ne[0], main_stream);
 
     (void) src0;
     (void) src0_dd;
@@ -8888,6 +9122,14 @@ static void ggml_cuda_im2col(const ggml_tensor * src0, const ggml_tensor * src1,
     ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_im2col);
 }
 
+static void ggml_cuda_winograd_stage0(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+    ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_winograd_stage0);
+}
+
+static void ggml_cuda_winograd_stage1(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+    ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_winograd_stage1);
+}
+
 static void ggml_cuda_sum_rows(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     GGML_ASSERT(ggml_is_contiguous(src0));
     ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_sum_rows);
@@ -9319,6 +9561,12 @@ bool ggml_cuda_compute_forward(struct ggml_compute_params * params, struct ggml_
             break;
         case GGML_OP_ARGSORT:
             func = ggml_cuda_argsort;
+            break;
+        case GGML_OP_WINOGRAD_STAGE0:
+            func = ggml_cuda_winograd_stage0;
+            break;
+        case GGML_OP_WINOGRAD_STAGE1:
+            func = ggml_cuda_winograd_stage1;
             break;
         default:
             return false;
@@ -9804,6 +10052,8 @@ static bool ggml_backend_cuda_supports_op(ggml_backend_t backend, const ggml_ten
         case GGML_OP_UPSCALE:
         case GGML_OP_PAD:
         case GGML_OP_LEAKY_RELU:
+        case GGML_OP_WINOGRAD_STAGE0:
+        case GGML_OP_WINOGRAD_STAGE1:
             return true;
         default:
             return false;

@@ -426,7 +426,8 @@ extern "C" {
         GGML_OP_PAD,
         GGML_OP_ARGSORT,
         GGML_OP_LEAKY_RELU,
-        GGML_OP_WINOGRAD,
+        GGML_OP_WINOGRAD_STAGE0,
+        GGML_OP_WINOGRAD_STAGE1,
 
         GGML_OP_FLASH_ATTN,
         GGML_OP_FLASH_FF,
