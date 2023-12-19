@@ -18639,14 +18639,12 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
                 info->ne[j] = 1;
             }
 
-            ok = ok && gguf_fread_str(file, &info->name,                          &offset);
             if (strlen(info->name.data) > GGML_MAX_NAME - 1) {
                 fprintf(stderr, "%s: tensor name '%s' is too long (maximum length: %d characters)\n", __func__, info->name.data, GGML_MAX_NAME - 1);
-                fclose(file);
-                gguf_free(ctx);
-                return NULL;
+                ok = false;
             }
             
+            ok = ok && gguf_fread_str(file, &info->name,                          &offset);
             ok = ok && gguf_fread_el (file, &info->n_dims, sizeof(info->n_dims),  &offset);
             for (uint32_t j = 0; j < info->n_dims; ++j) {
                 ok = ok && gguf_fread_el(file, &info->ne[j], sizeof(info->ne[j]), &offset);
