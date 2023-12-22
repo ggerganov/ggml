@@ -487,8 +487,8 @@ static size_t whisper_allocr_size(struct whisper_allocr & allocr) {
 
 // measure the memory usage of a graph and prepare the allocr's internal data buffer
 static void whisper_allocr_graph_init(struct whisper_allocr & allocr, ggml_backend_t backend, std::function<struct ggml_cgraph *()> && get_graph) {
-    auto & alloc  = allocr.alloc;
-    auto & meta   = allocr.meta;
+    auto & alloc = allocr.alloc;
+    auto & meta  = allocr.meta;
 
     alloc = ggml_allocr_new_measure_from_backend(backend);
 
@@ -6110,7 +6110,7 @@ WHISPER_API const char * whisper_bench_memcpy_str(int n_threads) {
 
     // multi-thread
 
-    for (uint32_t k = 1; k <= n_threads; k++) {
+    for (int32_t k = 1; k <= n_threads; k++) {
         char * src = (char *) malloc(size);
         char * dst = (char *) malloc(size);
 
@@ -6134,13 +6134,13 @@ WHISPER_API const char * whisper_bench_memcpy_str(int n_threads) {
         const int64_t t0 = ggml_time_us();
 
         std::vector<std::thread> threads(k - 1);
-        for (uint32_t th = 0; th < k - 1; ++th) {
+        for (int32_t th = 0; th < k - 1; ++th) {
             threads[th] = std::thread(helper, th);
         }
 
         helper(k - 1);
 
-        for (uint32_t th = 0; th < k - 1; ++th) {
+        for (int32_t th = 0; th < k - 1; ++th) {
             threads[th].join();
         }
 
