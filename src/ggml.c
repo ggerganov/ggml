@@ -4768,8 +4768,9 @@ struct ggml_tensor * ggml_get_rows(
 
     // TODO: implement non F32 return
     enum ggml_type type = GGML_TYPE_F32;
-    if (a->type == GGML_TYPE_I32)
+    if (a->type == GGML_TYPE_I32) {
         type = a->type;
+    }
     struct ggml_tensor * result = ggml_new_tensor_4d(ctx, type, a->ne[0], b->ne[0], b->ne[1], b->ne[2]);
 
     result->op   = GGML_OP_GET_ROWS;
@@ -7000,10 +7001,10 @@ static void ggml_compute_forward_dup_bytes(
 
         if (nb00 == type_size) {
             // src0 is contigous on first dimension, copy by rows
-            for (int i03 = 0; i03 < ne03; i03++) {
-                for (int i02 = 0; i02 < ne02; i02++) {
+            for (int64_t i03 = 0; i03 < ne03; i03++) {
+                for (int64_t i02 = 0; i02 < ne02; i02++) {
                     id += rs * ir0;
-                    for (int i01 = ir0; i01 < ir1; i01++) {
+                    for (int64_t i01 = ir0; i01 < ir1; i01++) {
                         const char * src0_ptr = (char *) src0->data + i01*nb01 + i02*nb02 + i03*nb03;
                         memcpy(dst_ptr + id, src0_ptr, rs);
                         id += rs;
@@ -7014,11 +7015,11 @@ static void ggml_compute_forward_dup_bytes(
         } else {
             //printf("%s: this is not optimal - fix me\n", __func__);
 
-            for (int i03 = 0; i03 < ne03; i03++) {
-                for (int i02 = 0; i02 < ne02; i02++) {
+            for (int64_t i03 = 0; i03 < ne03; i03++) {
+                for (int64_t i02 = 0; i02 < ne02; i02++) {
                     id += rs * ir0;
-                    for (int i01 = ir0; i01 < ir1; i01++) {
-                        for (int i00 = 0; i00 < ne00; i00++) {
+                    for (int64_t i01 = ir0; i01 < ir1; i01++) {
+                        for (int64_t i00 = 0; i00 < ne00; i00++) {
                             const char * src0_ptr = (char *) src0->data + i00*nb00 + i01*nb01 + i02*nb02 + i03*nb03;
                             memcpy(dst_ptr + id, src0_ptr, type_size);
 
