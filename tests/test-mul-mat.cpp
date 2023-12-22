@@ -39,8 +39,8 @@ struct test_model {
 void load_model(test_model & model, float* a, float* b, int M, int N, int K, bool use_gpu = false) {
     size_t buffer_size = 0;
     {
-        buffer_size += (M * N) * ggml_type_sizef(GGML_TYPE_F32); // tensor a
-        buffer_size += (N * K) * ggml_type_sizef(GGML_TYPE_F32); // tensor b
+        buffer_size += (M * N) * ggml_type_size(GGML_TYPE_F32); // tensor a
+        buffer_size += (N * K) * ggml_type_size(GGML_TYPE_F32); // tensor b
         buffer_size += 1024; // overhead
     }
 

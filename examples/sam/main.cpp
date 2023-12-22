@@ -568,56 +568,56 @@ bool sam_model_load(const sam_params & params, sam_model & model) {
 
         // image encoder
         {
-            ctx_size += n_enc_state*n_img_embd*n_img_embd*ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_state*n_img_embd*n_img_embd*ggml_type_size(GGML_TYPE_F32);
 
-            ctx_size += n_enc_state*3*n_patch_size*n_patch_size*ggml_type_sizef(GGML_TYPE_F16);
-            ctx_size += n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_state*3*n_patch_size*n_patch_size*ggml_type_size(GGML_TYPE_F16);
+            ctx_size += n_enc_state*ggml_type_size(GGML_TYPE_F32);
 
-            ctx_size +=     n_enc_state*n_enc_out_chans*1*1*ggml_type_sizef(GGML_TYPE_F16);
-            ctx_size += n_enc_out_chans*n_enc_out_chans*3*3*ggml_type_sizef(GGML_TYPE_F16);
+            ctx_size +=     n_enc_state*n_enc_out_chans*1*1*ggml_type_size(GGML_TYPE_F16);
+            ctx_size += n_enc_out_chans*n_enc_out_chans*3*3*ggml_type_size(GGML_TYPE_F16);
 
-            ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
-            ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_out_chans*ggml_type_size(GGML_TYPE_F32);
+            ctx_size += n_enc_out_chans*ggml_type_size(GGML_TYPE_F32);
 
-            ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
-            ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_out_chans*ggml_type_size(GGML_TYPE_F32);
+            ctx_size += n_enc_out_chans*ggml_type_size(GGML_TYPE_F32);
         }
 
         // image encoder layers
         {
-            ctx_size += n_enc_layer*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
-            ctx_size += n_enc_layer*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_layer*n_enc_state*ggml_type_size(GGML_TYPE_F32);
+            ctx_size += n_enc_layer*n_enc_state*ggml_type_size(GGML_TYPE_F32);
 
-            ctx_size += n_enc_layer_global*n_enc_head_dim*(2*n_img_embd - 1)*ggml_type_sizef(GGML_TYPE_F16);
-            ctx_size += n_enc_layer_global*n_enc_head_dim*(2*n_img_embd - 1)*ggml_type_sizef(GGML_TYPE_F16);
+            ctx_size += n_enc_layer_global*n_enc_head_dim*(2*n_img_embd - 1)*ggml_type_size(GGML_TYPE_F16);
+            ctx_size += n_enc_layer_global*n_enc_head_dim*(2*n_img_embd - 1)*ggml_type_size(GGML_TYPE_F16);
 
-            ctx_size += n_enc_layer_local*n_enc_head_dim*(2*n_window_size - 1)*ggml_type_sizef(GGML_TYPE_F16);
-            ctx_size += n_enc_layer_local*n_enc_head_dim*(2*n_window_size - 1)*ggml_type_sizef(GGML_TYPE_F16);
+            ctx_size += n_enc_layer_local*n_enc_head_dim*(2*n_window_size - 1)*ggml_type_size(GGML_TYPE_F16);
+            ctx_size += n_enc_layer_local*n_enc_head_dim*(2*n_window_size - 1)*ggml_type_size(GGML_TYPE_F16);
 
-            ctx_size += n_enc_layer*3*n_enc_state*n_enc_state*ggml_type_sizef(GGML_TYPE_F16);
-            ctx_size += n_enc_layer*3*n_enc_state*            ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_layer*3*n_enc_state*n_enc_state*ggml_type_size(GGML_TYPE_F16);
+            ctx_size += n_enc_layer*3*n_enc_state*            ggml_type_size(GGML_TYPE_F32);
 
-            ctx_size += n_enc_layer*n_enc_state*n_enc_state*ggml_type_sizef(GGML_TYPE_F16);
-            ctx_size += n_enc_layer*n_enc_state*            ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_layer*n_enc_state*n_enc_state*ggml_type_size(GGML_TYPE_F16);
+            ctx_size += n_enc_layer*n_enc_state*            ggml_type_size(GGML_TYPE_F32);
 
-            ctx_size += n_enc_layer*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
-            ctx_size += n_enc_layer*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_layer*n_enc_state*ggml_type_size(GGML_TYPE_F32);
+            ctx_size += n_enc_layer*n_enc_state*ggml_type_size(GGML_TYPE_F32);
 
-            ctx_size += n_enc_layer*4*n_enc_state*n_enc_state*ggml_type_sizef(GGML_TYPE_F16);
-            ctx_size += n_enc_layer*4*n_enc_state*            ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_layer*4*n_enc_state*n_enc_state*ggml_type_size(GGML_TYPE_F16);
+            ctx_size += n_enc_layer*4*n_enc_state*            ggml_type_size(GGML_TYPE_F32);
 
-            ctx_size += n_enc_layer*4*n_enc_state*n_enc_state*ggml_type_sizef(GGML_TYPE_F16);
-            ctx_size += n_enc_layer*4*n_enc_state*            ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_layer*4*n_enc_state*n_enc_state*ggml_type_size(GGML_TYPE_F16);
+            ctx_size += n_enc_layer*4*n_enc_state*            ggml_type_size(GGML_TYPE_F32);
         }
 
         ctx_size += (8 + 14*n_enc_layer)*ggml_tensor_overhead();
 
         // prompt encoder
         {
-            ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16); // 2*(n_enc_out_chans/2)
+            ctx_size += n_enc_out_chans*ggml_type_size(GGML_TYPE_F16); // 2*(n_enc_out_chans/2)
 
-            ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
-            ctx_size += n_pt_embd*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_out_chans*ggml_type_size(GGML_TYPE_F32);
+            ctx_size += n_pt_embd*n_enc_out_chans*ggml_type_size(GGML_TYPE_F32);
         }
 
         ctx_size += (2 + n_pt_embd)*ggml_tensor_overhead();
@@ -632,62 +632,62 @@ bool sam_model_load(const sam_params & params, sam_model & model) {
                 const int n_hypernet_mpls_count = 4;
 
                 // self_attn
-                ctx_size += tfm_layers_count*qkv_count*n_enc_state*n_enc_state*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += tfm_layers_count*qkv_count*n_enc_state*            ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += tfm_layers_count*n_enc_state*                      ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*qkv_count*n_enc_state*n_enc_state*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += tfm_layers_count*qkv_count*n_enc_state*            ggml_type_size(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*n_enc_state*                      ggml_type_size(GGML_TYPE_F32);
 
                 // all norms
-                ctx_size += tfm_layers_count*norm_count*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += tfm_layers_count*norm_count*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*norm_count*n_enc_state*ggml_type_size(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*norm_count*n_enc_state*ggml_type_size(GGML_TYPE_F32);
 
                 // cross_attn_token_to_img
-                ctx_size += tfm_layers_count*qkv_count*n_enc_state*(n_enc_state/2)*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += tfm_layers_count*qkv_count*(n_enc_state/2)*            ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += tfm_layers_count*n_enc_state*                          ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*qkv_count*n_enc_state*(n_enc_state/2)*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += tfm_layers_count*qkv_count*(n_enc_state/2)*            ggml_type_size(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*n_enc_state*                          ggml_type_size(GGML_TYPE_F32);
 
                 // mlp
-                ctx_size += tfm_layers_count*8*n_enc_out_chans*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += tfm_layers_count*8*n_enc_out_chans*                ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += tfm_layers_count*n_enc_out_chans*8*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += tfm_layers_count*n_enc_out_chans*                  ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*8*n_enc_out_chans*n_enc_out_chans*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += tfm_layers_count*8*n_enc_out_chans*                ggml_type_size(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*n_enc_out_chans*8*n_enc_out_chans*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += tfm_layers_count*n_enc_out_chans*                  ggml_type_size(GGML_TYPE_F32);
 
                 // cross_attn_img_to_token
-                ctx_size += tfm_layers_count*qkv_count*n_enc_state*(n_enc_state/2)*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += tfm_layers_count*qkv_count*(n_enc_state/2)*            ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += tfm_layers_count*n_enc_state*                          ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*qkv_count*n_enc_state*(n_enc_state/2)*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += tfm_layers_count*qkv_count*(n_enc_state/2)*            ggml_type_size(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*n_enc_state*                          ggml_type_size(GGML_TYPE_F32);
 
                 // transformer_final_attn_token_to_img
-                ctx_size += qkv_count*n_enc_state*(n_enc_state/2)*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += qkv_count*(n_enc_state/2)*            ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += n_enc_state*                          ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += qkv_count*n_enc_state*(n_enc_state/2)*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += qkv_count*(n_enc_state/2)*            ggml_type_size(GGML_TYPE_F32);
+                ctx_size += n_enc_state*                          ggml_type_size(GGML_TYPE_F32);
 
                 // transformer_norm_final
-                ctx_size += norm_count*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += norm_count*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += norm_count*n_enc_state*ggml_type_size(GGML_TYPE_F32);
+                ctx_size += norm_count*n_enc_state*ggml_type_size(GGML_TYPE_F32);
 
                 // output_upscaling
-                ctx_size += n_enc_out_chans*n_img_embd*2*2*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += 3*n_img_embd*                  ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += n_enc_out_chans*n_img_embd*(n_img_embd/2)*2*2*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += (n_img_embd/2)*                               ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += n_enc_out_chans*n_img_embd*2*2*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += 3*n_img_embd*                  ggml_type_size(GGML_TYPE_F32);
+                ctx_size += n_enc_out_chans*n_img_embd*(n_img_embd/2)*2*2*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += (n_img_embd/2)*                               ggml_type_size(GGML_TYPE_F32);
 
                 // output_hypernetworks_mlps
-                ctx_size += n_hypernet_mpls_count*2*n_enc_out_chans*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += n_hypernet_mpls_count*2*n_enc_out_chans*                ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += n_hypernet_mpls_count*n_enc_out_chans*(n_img_embd/2)*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += n_hypernet_mpls_count*(n_img_embd/2)*                ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += n_hypernet_mpls_count*2*n_enc_out_chans*n_enc_out_chans*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += n_hypernet_mpls_count*2*n_enc_out_chans*                ggml_type_size(GGML_TYPE_F32);
+                ctx_size += n_hypernet_mpls_count*n_enc_out_chans*(n_img_embd/2)*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += n_hypernet_mpls_count*(n_img_embd/2)*                ggml_type_size(GGML_TYPE_F32);
 
                 // iou_prediction_head
-                ctx_size += 2*n_enc_out_chans*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += 2*n_enc_out_chans*                ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += n_pt_embd*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += n_pt_embd*                ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += 2*n_enc_out_chans*n_enc_out_chans*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += 2*n_enc_out_chans*                ggml_type_size(GGML_TYPE_F32);
+                ctx_size += n_pt_embd*n_enc_out_chans*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += n_pt_embd*                ggml_type_size(GGML_TYPE_F32);
 
                 // iou_token_w
-                ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += n_enc_out_chans*ggml_type_size(GGML_TYPE_F32);
 
                 // mask_tokens_w
-                ctx_size += n_pt_embd*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += n_pt_embd*n_enc_out_chans*ggml_type_size(GGML_TYPE_F32);
             }
         }
         fprintf(stderr, "%s: ggml ctx size = %6.2f MB\n", __func__, ctx_size/(1024.0*1024.0));
@@ -1137,7 +1137,7 @@ struct ggml_tensor * sam_fill_dense_pe(
 
     struct ggml_tensor * cur = ggml_mul_mat(ctx0, ggml_cont(ctx0, ggml_transpose(ctx0, enc.pe)), xy_embed_stacked);
 
-    cur = ggml_scale(ctx0, cur, ggml_new_f32(ctx0, float(2.0*M_PI)));
+    cur = ggml_scale(ctx0, cur, float(2.0*M_PI));
 
     // concat
     // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/modeling/prompt_encoder.py#L192
@@ -1307,8 +1307,7 @@ struct ggml_cgraph  * sam_encode_image(
             struct ggml_tensor * KQ_scaled =
                 ggml_scale_inplace(ctx0,
                         KQ,
-                        ggml_new_f32(ctx0, 1.0f/sqrtf(n_enc_head_dim))
-                        );
+                        1.0f/sqrtf(n_enc_head_dim));
 
             struct ggml_tensor * rw = ggml_get_rel_pos(ctx0, layer.rel_pos_w, W, W);
             struct ggml_tensor * rh = ggml_get_rel_pos(ctx0, layer.rel_pos_h, H, H);
@@ -1455,7 +1454,7 @@ prompt_encoder_result sam_encode_prompt(
 
     struct ggml_tensor * cur = ggml_mul_mat(ctx0, ggml_cont(ctx0, ggml_transpose(ctx0, enc.pe)), inp);
 
-    cur = ggml_scale(ctx0, cur, ggml_new_f32(ctx0, float(2.0*M_PI)));
+    cur = ggml_scale(ctx0, cur, float(2.0*M_PI));
 
     // concat
     // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/modeling/prompt_encoder.py#L192
@@ -1537,10 +1536,7 @@ struct ggml_tensor* sam_decode_mask_transformer_attn(
     // Q * K
     struct ggml_tensor * KQ = ggml_mul_mat(ctx0, K, Q);
 
-    struct ggml_tensor * KQ_scaled =
-        ggml_scale_inplace(ctx0,
-                KQ,
-                ggml_new_f32(ctx0, 1.0f/sqrt(float(Q->ne[0]))));
+    struct ggml_tensor * KQ_scaled = ggml_scale_inplace(ctx0, KQ, 1.0f/sqrt(float(Q->ne[0])));
 
     struct ggml_tensor * KQ_soft_max = ggml_soft_max_inplace(ctx0, KQ_scaled);
 
