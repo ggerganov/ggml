@@ -59,8 +59,8 @@ void load_model(test_model & model, bool use_gpu = false) {
 
     size_t buffer_size = 0;
     {
-        buffer_size += KW * KH * IC * OC * ggml_type_sizef(GGML_TYPE_F16); // tensor a
-        buffer_size += IW * IH * IC * N * ggml_type_sizef(GGML_TYPE_F32); // tensor b
+        buffer_size += KW * KH * IC * OC * ggml_type_size(GGML_TYPE_F16); // tensor a
+        buffer_size += IW * IH * IC * N  * ggml_type_size(GGML_TYPE_F32); // tensor b
         buffer_size += 1024; // overhead
     }
 

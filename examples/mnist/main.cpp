@@ -65,11 +65,11 @@ bool mnist_model_load(const std::string & fname, mnist_model & model) {
         const int n_hidden  = hparams.n_hidden;
         const int n_classes = hparams.n_classes;
 
-        ctx_size += n_input * n_hidden * ggml_type_sizef(GGML_TYPE_F32); // fc1 weight
-        ctx_size +=           n_hidden * ggml_type_sizef(GGML_TYPE_F32); // fc1 bias
+        ctx_size += n_input * n_hidden * ggml_type_size(GGML_TYPE_F32); // fc1 weight
+        ctx_size +=           n_hidden * ggml_type_size(GGML_TYPE_F32); // fc1 bias
 
-        ctx_size += n_hidden * n_classes * ggml_type_sizef(GGML_TYPE_F32); // fc2 weight
-        ctx_size +=            n_classes * ggml_type_sizef(GGML_TYPE_F32); // fc2 bias
+        ctx_size += n_hidden * n_classes * ggml_type_size(GGML_TYPE_F32); // fc2 weight
+        ctx_size +=            n_classes * ggml_type_size(GGML_TYPE_F32); // fc2 bias
 
         printf("%s: ggml ctx size = %6.2f MB\n", __func__, ctx_size/(1024.0*1024.0));
     }
