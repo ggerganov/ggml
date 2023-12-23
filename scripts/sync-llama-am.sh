@@ -37,8 +37,6 @@ cd $SRC_GGML
 cat llama-am.patch | sed -e 's/^Subject: \(.*\) (#\([0-9]*\))/Subject: \1 (llama\/\2)/' > llama-am.patch.tmp
 mv llama-am.patch.tmp llama-am.patch
 
-exit
-
 git am -p1 --directory src llama-am.patch
 
 # update last commit
