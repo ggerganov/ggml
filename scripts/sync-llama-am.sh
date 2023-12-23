@@ -32,10 +32,12 @@ git format-patch $lc --stdout -- ggml* > $SRC_GGML/llama-am.patch
 cd $SRC_GGML
 
 # replace PR numbers
-# Subject: [PATCH] some text (#1234)
-# Subject: [PATCH] some text (llama/1234)
-cat llama-am.patch | sed -e 's/^Subject: \[PATCH\] \(.*\) (#\([0-9]*\))/Subject: [PATCH] \1 (llama\/\2)/' > llama-am.patch.tmp
+# Subject: some text (#1234)
+# Subject: some text (llama/1234)
+cat llama-am.patch | sed -e 's/^Subject: \(.*\) (#\([0-9]*\))/Subject: \1 (llama\/\2)/' > llama-am.patch.tmp
 mv llama-am.patch.tmp llama-am.patch
+
+exit
 
 git am -p1 --directory src llama-am.patch
 
