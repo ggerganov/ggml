@@ -134,6 +134,42 @@ cmake -DGGML_CUBLAS=ON -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.1/bin/nvcc ..
 ```bash
 cmake -DGGML_CLBLAST=ON ..
 ```
+## Compiling for Android
+
+Download and uzip the NDK from this download [page](https://developer.android.com/ndk/downloads). Set the NDK_ROOT_PATH environment variable or provide the absolute path to the CMAKE_ANDROID_NDK in the command below.
+
+```bash
+cmake .. \
+   -DCMAKE_SYSTEM_NAME=Android \
+   -DCMAKE_SYSTEM_VERSION=33 \
+   -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a \
+   -DCMAKE_ANDROID_NDK=$NDK_ROOT_PATH
+   -DCMAKE_ANDROID_STL_TYPE=c++_shared 
+```
+
+```bash
+# Create directories
+adb shell 'mkdir /data/local/tmp/bin'
+adb shell 'mkdir /data/local/tmp/models'
+
+# Push the compiled binaries to the folder
+adb push bin/* /data/local/tmp/bin/
+
+# Push the ggml library
+adb push src/libggml.so /data/local/tmp/
+
+# Push model files
+adb push models/gpt-2-117M/ggml-model.bin /data/local/tmp/models/
+
+
+# Now lets do some inference ...
+adb shell
+
+# Now we are in shell
+cd /data/local/tmp
+export LD_LIBRARY_PATH=/data/local/tmp
+./bin/gpt-2-backend -m models/ggml-model.bin -p "this is an example"
+```
 
 ## Resources
 
