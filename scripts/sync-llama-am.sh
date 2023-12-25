@@ -57,6 +57,9 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     cat llama-src.patch | sed -e 's/^Subject: \(.*\) (#\([0-9]*\))/Subject: \1 (llama\/\2)/' > llama-src.patch.tmp
     mv llama-src.patch.tmp llama-src.patch
 
+    cat llama-src.patch | sed -e 's/^\(.*\) (#\([0-9]*\))$/\1 (llama\/\2)/' > llama-src.patch.tmp
+    mv llama-src.patch.tmp llama-src.patch
+
     # replace filenames:
     #
     # ggml.c              -> src/ggml.c
