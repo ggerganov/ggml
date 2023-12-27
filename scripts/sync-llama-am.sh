@@ -89,30 +89,30 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     # tests/test-backend-ops.cpp   -> tests/test-backend-ops.cpp
 
     cat llama-src.patch | sed \
-        -e 's/\/ggml\.c/\/src\/ggml.c/' \
-        -e 's/\/ggml-alloc\.c/\/src\/ggml-alloc.c/' \
-        -e 's/\/ggml-backend-impl\.h/\/src\/ggml-backend-impl.h/' \
-        -e 's/\/ggml-backend\.c/\/src\/ggml-backend.c/' \
-        -e 's/\/ggml-cuda\.cu/\/src\/ggml-cuda.cu/' \
-        -e 's/\/ggml-cuda\.h/\/src\/ggml-cuda.h/' \
-        -e 's/\/ggml-impl\.h/\/src\/ggml-impl.h/' \
-        -e 's/\/ggml-metal\.h/\/src\/ggml-metal.h/' \
-        -e 's/\/ggml-metal\.m/\/src\/ggml-metal.m/' \
-        -e 's/\/ggml-metal\.metal/\/src\/ggml-metal.metal/' \
-        -e 's/\/ggml-mpi\.h/\/src\/ggml-mpi.h/' \
-        -e 's/\/ggml-mpi\.c/\/src\/ggml-mpi.c/' \
-        -e 's/\/ggml-opencl\.cpp/\/src\/ggml-opencl.cpp/' \
-        -e 's/\/ggml-opencl\.h/\/src\/ggml-opencl.h/' \
-        -e 's/\/ggml-quants\.c/\/src\/ggml-quants.c/' \
-        -e 's/\/ggml-quants\.h/\/src\/ggml-quants.h/' \
-        -e 's/\/ggml\.h/\/include\/ggml\/ggml.h/' \
-        -e 's/\/ggml-alloc\.h/\/include\/ggml\/ggml-alloc.h/' \
-        -e 's/\/ggml-backend\.h/\/include\/ggml\/ggml-backend.h/' \
-        -e 's/\/tests\/test-opt\.cpp/\/tests\/test-opt.cpp/' \
-        -e 's/\/tests\/test-grad0\.cpp/\/tests\/test-grad0.cpp/' \
-        -e 's/\/tests\/test-quantize-fns\.cpp/\/tests\/test-quantize-fns.cpp/' \
-        -e 's/\/tests\/test-quantize-perf\.cpp/\/tests\/test-quantize-perf.cpp/' \
-        -e 's/\/tests\/test-backend-ops\.cpp/\/tests\/test-backend-ops.cpp/' \
+        -e 's/\/ggml\.c/\/src\/ggml.c/g' \
+        -e 's/\/ggml-alloc\.c/\/src\/ggml-alloc.c/g' \
+        -e 's/\/ggml-backend-impl\.h/\/src\/ggml-backend-impl.h/g' \
+        -e 's/\/ggml-backend\.c/\/src\/ggml-backend.c/g' \
+        -e 's/\/ggml-cuda\.cu/\/src\/ggml-cuda.cu/g' \
+        -e 's/\/ggml-cuda\.h/\/src\/ggml-cuda.h/g' \
+        -e 's/\/ggml-impl\.h/\/src\/ggml-impl.h/g' \
+        -e 's/\/ggml-metal\.h/\/src\/ggml-metal.h/g' \
+        -e 's/\/ggml-metal\.m/\/src\/ggml-metal.m/g' \
+        -e 's/\/ggml-metal\.metal/\/src\/ggml-metal.metal/g' \
+        -e 's/\/ggml-mpi\.h/\/src\/ggml-mpi.h/g' \
+        -e 's/\/ggml-mpi\.c/\/src\/ggml-mpi.c/g' \
+        -e 's/\/ggml-opencl\.cpp/\/src\/ggml-opencl.cpp/g' \
+        -e 's/\/ggml-opencl\.h/\/src\/ggml-opencl.h/g' \
+        -e 's/\/ggml-quants\.c/\/src\/ggml-quants.c/g' \
+        -e 's/\/ggml-quants\.h/\/src\/ggml-quants.h/g' \
+        -e 's/\/ggml\.h/\/include\/ggml\/ggml.h/g' \
+        -e 's/\/ggml-alloc\.h/\/include\/ggml\/ggml-alloc.h/g' \
+        -e 's/\/ggml-backend\.h/\/include\/ggml\/ggml-backend.h/g' \
+        -e 's/\/tests\/test-opt\.cpp/\/tests\/test-opt.cpp/g' \
+        -e 's/\/tests\/test-grad0\.cpp/\/tests\/test-grad0.cpp/g' \
+        -e 's/\/tests\/test-quantize-fns\.cpp/\/tests\/test-quantize-fns.cpp/g' \
+        -e 's/\/tests\/test-quantize-perf\.cpp/\/tests\/test-quantize-perf.cpp/g' \
+        -e 's/\/tests\/test-backend-ops\.cpp/\/tests\/test-backend-ops.cpp/g' \
         > llama-src.patch.tmp
     mv llama-src.patch.tmp llama-src.patch
 
