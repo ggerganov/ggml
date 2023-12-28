@@ -7614,8 +7614,7 @@ static void ggml_cuda_op_mul_mat_cublas(
 
         const to_fp32_cuda_t to_fp32_cuda = ggml_get_to_fp32_cuda(GGML_TYPE_F16);
         to_fp32_cuda(dst_f16.get(), dst_dd_i, row_diff*src1_ncols, stream);
-    }
-    else {        
+    } else {
         cuda_pool_alloc<float> src0_ddq_as_f32;
         cuda_pool_alloc<float> src1_ddq_as_f32;
 
@@ -7628,7 +7627,7 @@ static void ggml_cuda_op_mul_mat_cublas(
         if (src1->type != GGML_TYPE_F32) {
             const to_fp32_cuda_t to_fp32_cuda = ggml_get_to_fp32_cuda(src1->type);
             GGML_ASSERT(to_fp32_cuda != nullptr);
-            src1_ddq_as_f32.alloc(src1_ncols*ne10);            
+            src1_ddq_as_f32.alloc(src1_ncols*ne10);
             to_fp32_cuda(src1_ddf_i, src1_ddq_as_f32.get(), src1_ncols*ne10, stream);
         }
 
@@ -7642,9 +7641,9 @@ static void ggml_cuda_op_mul_mat_cublas(
         CUBLAS_CHECK(
             cublasSgemm(g_cublas_handles[id], CUBLAS_OP_T, CUBLAS_OP_N,
                     row_diff, src1_ncols, ne10,
-                    &alpha, src0_ddf_i, ne00,
+                    &alpha, src0_ddf_i,  ne00,
                             src1_ddf1_i, ne10,
-                    &beta,  dst_dd_i,   ldc));
+                    &beta,  dst_dd_i,    ldc));
     }
 
     (void) dst;
