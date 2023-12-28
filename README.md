@@ -77,7 +77,7 @@ git clone https://github.com/ggerganov/ggml
 cd ggml
 mkdir build && cd build
 cmake ..
-make -j4 gpt-2 gpt-j
+make -j4 gpt-2-backend gpt-j
 
 # Run the GPT-2 small 117M model
 ../examples/gpt-2/download-ggml-model.sh 117M
