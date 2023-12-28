@@ -7432,7 +7432,9 @@ inline void ggml_cuda_op_mul_mat_cublas(
     }
     else {
         float * src0_ddq_as_f32 = nullptr;
+        float * src1_ddq_as_f32 = nullptr;
         size_t src0_as = 0;
+        size_t src1_as = 0;
 
         if (src0->type != GGML_TYPE_F32) {
             const to_fp32_cuda_t to_fp32_cuda = ggml_get_to_fp32_cuda(src0->type);
@@ -7440,7 +7442,15 @@ inline void ggml_cuda_op_mul_mat_cublas(
             src0_ddq_as_f32 = (float *) ggml_cuda_pool_malloc(row_diff*ne00 * sizeof(float), &src0_as); // NOLINT
             to_fp32_cuda(src0_dd_i, src0_ddq_as_f32, row_diff*ne00, stream);
         }
+        if (src1->type != GGML_TYPE_F32) {
+            const to_fp32_cuda_t to_fp32_cuda = ggml_get_to_fp32_cuda(src1->type);
+            GGML_ASSERT(to_fp32_cuda != nullptr);
+            src1_ddq_as_f32 = (float *) ggml_cuda_pool_malloc(src1_ncols*ne10 * sizeof(float), &src1_as); // NOLINT
+            to_fp32_cuda(src1_ddf_i, src1_ddq_as_f32, src1_ncols*ne10, stream);
+        }
+
         const float * src0_ddf_i = src0->type == GGML_TYPE_F32 ? (const float *) src0_dd_i : src0_ddq_as_f32;
+        const float * src1_ddf1_i = src1->type == GGML_TYPE_F32 ? (const float *) src1_ddf_i : src1_ddq_as_f32;
 
         const float alpha = 1.0f;
         const float beta = 0.0f;
@@ -7450,11 +7460,14 @@ inline void ggml_cuda_op_mul_mat_cublas(
             cublasSgemm(g_cublas_handles[id], CUBLAS_OP_T, CUBLAS_OP_N,
                     row_diff, src1_ncols, ne10,
                     &alpha, src0_ddf_i, ne00,
-                            src1_ddf_i, ne10,
+                            src1_ddf1_i, ne10,
                     &beta,  dst_dd_i,   ldc));
 
         if (src0_as != 0) {
             ggml_cuda_pool_free(src0_ddq_as_f32, src0_as);
+        }
+        if (src1_as != 0) {
+            ggml_cuda_pool_free(src1_ddq_as_f32, src1_as);
         }
     }
 
