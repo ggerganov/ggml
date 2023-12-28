@@ -99,7 +99,6 @@ struct gpt2_model {
     // inputs/constants
     struct ggml_tensor * embd;
     struct ggml_tensor * position;
-    struct ggml_tensor * KQ_scale;
 };
 
 void init_backends(gpt2_model & model, const gpt_params & params) {
@@ -511,14 +510,12 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
     {
         model.embd = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, model.hparams.n_ctx);
         model.position = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, model.hparams.n_ctx);
-        model.KQ_scale = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 1); // FIXME: should be in backend_kv, but also shouldn't matter
 
         ggml_set_name(model.embd, "in/embd");
         ggml_set_name(model.position, "in/position");
-        ggml_set_name(model.KQ_scale, "KQ_scale");
 
         // add input tensors to cpu backend
-        size_t input_size = ggml_nbytes(model.embd) + ggml_nbytes(model.position) + ggml_nbytes(model.KQ_scale);
+        size_t input_size = ggml_nbytes(model.embd) + ggml_nbytes(model.position);
 
         // FIXME: use cpu backend after sched impl
         ggml_backend_t backend_input = params.n_gpu_layers >= model.hparams.n_layer ? backend_gpu : backend_cpu;
@@ -529,12 +526,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         ggml_allocr * alloc = ggml_allocr_new_from_buffer(model.buffer_input);
         ggml_allocr_alloc(alloc, model.embd);
         ggml_allocr_alloc(alloc, model.position);
-        ggml_allocr_alloc(alloc, model.KQ_scale);
         ggml_allocr_free(alloc);
-
-        // initialize KQ_scale
-        float s = 1.0f/sqrtf(float(model.hparams.n_embd)/model.hparams.n_head);
-        ggml_backend_tensor_set(model.KQ_scale, &s, 0, sizeof(s));
     }
 
     return true;
@@ -588,7 +580,7 @@ struct ggml_cgraph * gpt2_graph(
         }
     //}
 
-    struct ggml_tensor * KQ_scale = model.KQ_scale;
+    const float KQ_scale = 1.0f/sqrtf(float(model.hparams.n_embd)/model.hparams.n_head);
 
     // wte + wpe
     struct ggml_tensor * inpL =
@@ -697,10 +689,7 @@ struct ggml_cgraph * gpt2_graph(
 
             // KQ_scaled = KQ / sqrt(n_embd/n_head)
             // [n_past + N, N, 12]
-            struct ggml_tensor * KQ_scaled =
-                ggml_scale(ctx0,
-                        KQ,
-                        KQ_scale);
+            struct ggml_tensor * KQ_scaled = ggml_scale(ctx0, KQ, KQ_scale);
             ggml_format_name(KQ_scaled, "l%d.KQ_scaled", il);
 
             // KQ_masked = mask_past(KQ_scaled)

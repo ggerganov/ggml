@@ -188,33 +188,33 @@ bool starcoder_model_load(const std::string & fname, starcoder_model & model, gp
         const int kv_heads = hparams.n_head; // 1 if MQA else hparams.n_head
         const int kv_dim   = kv_heads * head_dim;
 
-        ctx_size += n_embd*ggml_type_sizef(GGML_TYPE_F32); // ln_f_g
-        ctx_size += n_embd*ggml_type_sizef(GGML_TYPE_F32); // ln_f_b
+        ctx_size += ggml_row_size(GGML_TYPE_F32, n_embd); // ln_f_g
+        ctx_size += ggml_row_size(GGML_TYPE_F32, n_embd); // ln_f_b
 
-        ctx_size += n_vocab*n_embd*ggml_type_sizef(wtype);         // wte
-        ctx_size +=   n_ctx*n_embd*ggml_type_sizef(GGML_TYPE_F32); // wpe
-        ctx_size += n_vocab*n_embd*ggml_type_sizef(wtype);         // lm_head
+        ctx_size += n_vocab*ggml_row_size(wtype,         n_embd); // wte
+        ctx_size +=   n_ctx*ggml_row_size(GGML_TYPE_F32, n_embd); // wpe
+        ctx_size += n_vocab*ggml_row_size(wtype,         n_embd); // lm_head
 
-        ctx_size += n_layer*(n_embd*ggml_type_sizef(GGML_TYPE_F32)); // ln_1_g
-        ctx_size += n_layer*(n_embd*ggml_type_sizef(GGML_TYPE_F32)); // ln_1_b
+        ctx_size += n_layer*(ggml_row_size(GGML_TYPE_F32, n_embd)); // ln_1_g
+        ctx_size += n_layer*(ggml_row_size(GGML_TYPE_F32, n_embd)); // ln_1_b
 
-        ctx_size += n_layer*(n_embd*ggml_type_sizef(GGML_TYPE_F32)); // ln_2_g
-        ctx_size += n_layer*(n_embd*ggml_type_sizef(GGML_TYPE_F32)); // ln_2_b
+        ctx_size += n_layer*(ggml_row_size(GGML_TYPE_F32, n_embd)); // ln_2_g
+        ctx_size += n_layer*(ggml_row_size(GGML_TYPE_F32, n_embd)); // ln_2_b
 
-        ctx_size += n_layer*((n_embd + 2*kv_dim)*n_embd*ggml_type_sizef(wtype));         // c_attn_attn_w // TODO:
-        ctx_size += n_layer*(       (n_embd + 2*kv_dim)*ggml_type_sizef(GGML_TYPE_F32)); // c_attn_attn_b
+        ctx_size += n_layer*((n_embd + 2*kv_dim)*ggml_row_size(wtype,         n_embd)); // c_attn_attn_w // TODO:
+        ctx_size += n_layer*((n_embd + 2*kv_dim)*ggml_row_size(GGML_TYPE_F32, 1));      // c_attn_attn_b
 
-        ctx_size += n_layer*(n_embd*n_embd*ggml_type_sizef(wtype));           // c_attn_proj_w
-        ctx_size += n_layer*(       n_embd*ggml_type_sizef(GGML_TYPE_F32));   // c_attn_proj_b
+        ctx_size += n_layer*(ggml_row_size(wtype,         n_embd*n_embd)); // c_attn_proj_w
+        ctx_size += n_layer*(ggml_row_size(GGML_TYPE_F32, n_embd));        // c_attn_proj_b
 
-        ctx_size += n_layer*(4*n_embd*n_embd*ggml_type_sizef(wtype));         // c_mlp_fc_w
-        ctx_size += n_layer*(       4*n_embd*ggml_type_sizef(GGML_TYPE_F32)); // c_mlp_fc_b
+        ctx_size += n_layer*(ggml_row_size(wtype,         4*n_embd*n_embd)); // c_mlp_fc_w
+        ctx_size += n_layer*(ggml_row_size(GGML_TYPE_F32, 4*n_embd));        // c_mlp_fc_b
 
-        ctx_size += n_layer*(4*n_embd*n_embd*ggml_type_sizef(wtype));         // c_mlp_proj_w
-        ctx_size += n_layer*(         n_embd*ggml_type_sizef(GGML_TYPE_F32)); // c_mlp_proj_b
+        ctx_size += n_layer*(ggml_row_size(wtype,         4*n_embd*n_embd));         // c_mlp_proj_w
+        ctx_size += n_layer*(ggml_row_size(GGML_TYPE_F32,   n_embd)); // c_mlp_proj_b
 
-        ctx_size += n_ctx*n_layer*n_embd*ggml_type_sizef(GGML_TYPE_F32); // memory_k
-        ctx_size += n_ctx*n_layer*n_embd*ggml_type_sizef(GGML_TYPE_F32); // memory_v
+        ctx_size += n_ctx*n_layer*ggml_row_size(GGML_TYPE_F32, n_embd); // memory_k
+        ctx_size += n_ctx*n_layer*ggml_row_size(GGML_TYPE_F32, n_embd); // memory_v
 
         ctx_size += (6 + 12*n_layer)*512; // object overhead
 
@@ -569,10 +569,7 @@ bool starcoder_eval(
             // KQ_scaled = KQ / sqrt(n_embd/n_head)
             // [n_past + N, N, 12]
             struct ggml_tensor * KQ_scaled =
-                ggml_scale_inplace(ctx0,
-                        KQ,
-                        ggml_new_f32(ctx0, 1.0f/sqrt(float(n_embd)/n_head))
-                        );
+                ggml_scale_inplace(ctx0, KQ, 1.0f/sqrt(float(n_embd)/n_head));
 
             // KQ_masked = mask_past(KQ_scaled)
             // [n_past + N, N, 12]

@@ -484,13 +484,6 @@ struct ggml_cgraph * gpt2_graph(
         }
     }
 
-    struct ggml_tensor * KQ_scale = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, 1);
-    ggml_allocr_alloc(allocr, KQ_scale);
-    if (!ggml_allocr_is_measure(allocr)) {
-        float s = 1.0f/sqrtf(float(n_embd)/n_head);
-        ggml_backend_tensor_set(KQ_scale, &s, 0, sizeof(s));
-    }
-
     // wte + wpe
     struct ggml_tensor * inpL =
         ggml_add(ctx0,
@@ -586,7 +579,7 @@ struct ggml_cgraph * gpt2_graph(
             struct ggml_tensor * KQ_scaled =
                 ggml_scale(ctx0,
                         KQ,
-                        KQ_scale);
+                        1.0f/sqrtf(float(n_embd)/n_head));
 
             // KQ_masked = mask_past(KQ_scaled)
             // [n_past + N, N, 12]

@@ -274,18 +274,21 @@ bool mpt_model_load(const std::string & fname, mpt_model & model, gpt_vocab & vo
         const size_t n_layer = hparams.n_layers;
         const size_t n_vocab = hparams.n_vocab;
 
-        ctx_size += n_embd * n_vocab * ggml_type_sizef(wtype); // wte_weight
-        ctx_size += n_embd * ggml_type_sizef(GGML_TYPE_F32);   // norm_f_weight
+        ctx_size += ggml_row_size(wtype,         n_embd * n_vocab); // wte_weight
+        ctx_size += ggml_row_size(GGML_TYPE_F32, n_embd);           // norm_f_weight
 
-        ctx_size += n_layer * (n_embd * ggml_type_sizef(GGML_TYPE_F32));      // ln_1_weight
-        ctx_size += n_layer * (3 * n_embd * n_embd * ggml_type_sizef(wtype)); // attn_Wqkv_weight
-        ctx_size += n_layer * (n_embd * n_embd * ggml_type_sizef(wtype));     // attn_out_proj_weight
-        ctx_size += n_layer * (n_embd * ggml_type_sizef(GGML_TYPE_F32));      // ln_2_weight
-        ctx_size += n_layer * (4 * n_embd * n_embd * ggml_type_sizef(wtype)); // mlp_mlp_up_weight
-        ctx_size += n_layer * (n_embd * n_embd * 4 * ggml_type_sizef(wtype)); // mlp_mlp_down_weight
+        ctx_size += n_layer * (ggml_row_size(GGML_TYPE_F32, n_embd)); // ln_1_weight
 
-        ctx_size += n_ctx * n_layer * n_embd * ggml_type_sizef(GGML_TYPE_F16); // memory_k
-        ctx_size += n_ctx * n_layer * n_embd * ggml_type_sizef(GGML_TYPE_F16); // memory_v
+        ctx_size += n_layer * (ggml_row_size(wtype, 3 * n_embd * n_embd)); // attn_Wqkv_weight
+        ctx_size += n_layer * (ggml_row_size(wtype,     n_embd * n_embd)); // attn_out_proj_weight
+
+        ctx_size += n_layer * (ggml_row_size(GGML_TYPE_F32, n_embd)); // ln_2_weight
+
+        ctx_size += n_layer * (ggml_row_size(wtype, 4 * n_embd * n_embd)); // mlp_mlp_up_weight
+        ctx_size += n_layer * (ggml_row_size(wtype, 4 * n_embd * n_embd)); // mlp_mlp_down_weight
+
+        ctx_size += n_ctx * n_layer * ggml_row_size(GGML_TYPE_F16, n_embd); // memory_k
+        ctx_size += n_ctx * n_layer * ggml_row_size(GGML_TYPE_F16, n_embd); // memory_v
 
         ctx_size += (1 + 6 * n_layer) * 512; // object overhead
 
@@ -568,7 +571,7 @@ bool mpt_eval(const mpt_model & model, const int n_threads, const int n_past,
 
             // KQ_scaled = KQ / sqrt(n_embd/n_head)
             struct ggml_tensor * KQ_scaled =
-                ggml_scale(ctx0, KQ, ggml_new_f32(ctx0, 1.0f / sqrt(float(n_embd) / n_head)));
+                ggml_scale(ctx0, KQ, 1.0f / sqrt(float(n_embd) / n_head));
 
             struct ggml_tensor * KQ_scaled_alibi =
                 ggml_alibi(ctx0, KQ_scaled, n_past, n_head, model.hparams.alibi_bias_max);
