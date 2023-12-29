@@ -26,6 +26,7 @@ echo "Syncing llama.cpp changes since commit $lc"
 
 cd $SRC_LLAMA
 
+git log --oneline $lc..HEAD
 git log --oneline $lc..HEAD | grep -v "(ggml/[0-9]*)" | cut -d' ' -f1 > $SRC_GGML/llama-commits
 
 if [ ! -s $SRC_GGML/llama-commits ]; then
