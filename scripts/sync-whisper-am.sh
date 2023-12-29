@@ -26,9 +26,20 @@ echo "Syncing whisper.cpp changes since commit $lc"
 
 cd $SRC_WHISPER
 
-git log --oneline $lc..HEAD
+git log --oneline $lc..HEAD | grep -v "(ggml/[0-9]*)" | cut -d' ' -f1 > $SRC_GGML/whisper-commits
 
-git format-patch $lc --stdout -- \
+if [ ! -s $SRC_GGML/whisper-commits ]; then
+    rm -v $SRC_GGML/whisper-commits
+    echo "No new commits"
+    exit 0
+fi
+
+if [ -f $SRC_GGML/whisper-src.patch ]; then
+    rm -v $SRC_GGML/whisper-src.patch
+fi
+
+while read c; do
+    git format-patch -k $c..$c --stdout -- \
     ggml*.h \
     ggml*.c \
     ggml*.cpp \
@@ -43,7 +54,10 @@ git format-patch $lc --stdout -- \
     examples/common-ggml.cpp \
     examples/main/main.cpp \
     examples/quantize/quantize.cpp \
-    > $SRC_GGML/whisper-src.patch
+    >> $SRC_GGML/whisper-src.patch
+done < $SRC_GGML/whisper-commits
+
+rm -v $SRC_GGML/whisper-commits
 
 # delete files if empty
 if [ ! -s $SRC_GGML/whisper-src.patch ]; then

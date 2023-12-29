@@ -26,21 +26,35 @@ echo "Syncing llama.cpp changes since commit $lc"
 
 cd $SRC_LLAMA
 
-git log --oneline $lc..HEAD
+git log --oneline $lc..HEAD | grep -v "(ggml/[0-9]*)" | cut -d' ' -f1 > $SRC_GGML/llama-commits
 
-git format-patch $lc --stdout -- \
-    ggml*.h \
-    ggml*.c \
-    ggml*.cpp \
-    ggml*.m \
-    ggml*.metal \
-    ggml*.cu \
-    tests/test-opt.cpp \
-    tests/test-grad0.cpp \
-    tests/test-quantize-fns.cpp \
-    tests/test-quantize-perf.cpp \
-    tests/test-backend-ops.cpp \
-    > $SRC_GGML/llama-src.patch
+if [ ! -s $SRC_GGML/llama-commits ]; then
+    rm -v $SRC_GGML/llama-commits
+    echo "No new commits"
+    exit 0
+fi
+
+if [ -f $SRC_GGML/llama-src.patch ]; then
+    rm -v $SRC_GGML/llama-src.patch
+fi
+
+while read c; do
+    git format-patch -k $c..$c --stdout -- \
+        ggml*.h \
+        ggml*.c \
+        ggml*.cpp \
+        ggml*.m \
+        ggml*.metal \
+        ggml*.cu \
+        tests/test-opt.cpp \
+        tests/test-grad0.cpp \
+        tests/test-quantize-fns.cpp \
+        tests/test-quantize-perf.cpp \
+        tests/test-backend-ops.cpp \
+        >> $SRC_GGML/llama-src.patch
+done < $SRC_GGML/llama-commits
+
+rm -v $SRC_GGML/llama-commits
 
 # delete files if empty
 if [ ! -s $SRC_GGML/llama-src.patch ]; then
