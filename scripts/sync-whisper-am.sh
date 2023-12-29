@@ -27,7 +27,7 @@ echo "Syncing whisper.cpp changes since commit $lc"
 cd $SRC_WHISPER
 
 git log --oneline $lc..HEAD
-git log --oneline $lc..HEAD | grep -v "(ggml/[0-9]*)" | cut -d' ' -f1 > $SRC_GGML/whisper-commits
+git log --oneline $lc..HEAD | grep -v "(ggml/[0-9]*)" | grep -v "(llama/[0-9]*)" | cut -d' ' -f1 > $SRC_GGML/whisper-commits
 
 if [ ! -s $SRC_GGML/whisper-commits ]; then
     rm -v $SRC_GGML/whisper-commits
