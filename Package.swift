@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 5.5
 
 import PackageDescription
 
@@ -19,16 +19,16 @@ let package = Package(
             path: ".",
             exclude: [],
             sources: [
-                "ggml.c",
-                "ggml-alloc.c",
-                "ggml-backend.c",
-                "ggml-quants.c",
-                "ggml-metal.m",
+                "src/ggml.c",
+                "src/ggml-alloc.c",
+                "src/ggml-backend.c",
+                "src/ggml-quants.c",
+                "src/ggml-metal.m",
             ],
             resources: [
-                .process("ggml-metal.metal")
+                .process("src/ggml-metal.metal")
             ],
-            publicHeadersPath: "spm-headers",
+            publicHeadersPath: "include/ggml",
             cSettings: [
                 .unsafeFlags(["-Wno-shorten-64-to-32", "-O3", "-DNDEBUG"]),
                 .define("GGML_USE_ACCELERATE"),
