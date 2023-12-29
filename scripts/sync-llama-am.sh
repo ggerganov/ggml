@@ -39,7 +39,7 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
 fi
 
 while read c; do
-    git format-patch -k $c..$c --stdout -- \
+    git format-patch -k $c~1..$c --stdout -- \
         ggml*.h \
         ggml*.c \
         ggml*.cpp \
