@@ -8529,6 +8529,7 @@ static void ggml_cuda_mul_mat_mat_batched_cublas(const ggml_tensor * src0, const
     if (src1->type != GGML_TYPE_F16) {
         const to_fp16_cuda_t to_fp16_cuda = ggml_get_to_fp16_cuda(src1->type);
         const int64_t ne_src1 = ggml_nelements(src1);
+        GGML_ASSERT(ne_src1 == ggml_nbytes(src1)/ggml_type_size(src1->type));
         src1_f16_alloc.alloc(ne_src1);
         GGML_ASSERT(to_fp16_cuda != nullptr);
         to_fp16_cuda(src1_ddf, src1_f16_alloc.get(), ne_src1, main_stream);
