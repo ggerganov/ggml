@@ -296,6 +296,8 @@ In the following, `[llm]` is used to fill in for the name of a specific LLM arch
 - `[llm].attention.clamp_kqv: float32`: Value (`C`) to clamp the values of the `Q`, `K`, and `V` tensors between (`[-C, C]`).
 - `[llm].attention.layer_norm_epsilon: float32`: Layer normalization epsilon.
 - `[llm].attention.layer_norm_rms_epsilon: float32`: Layer RMS normalization epsilon.
+- `[llm].attention.key_length: uint64`: The optional size of a key head, $d_k$. If not specified, it will be `n_embd / n_head`.
+- `[llm].attention.value_length: uint64`: The optional size of a value head, $d_v$. If not specified, it will be `n_embd / n_head`.
 
 #### RoPE
 
