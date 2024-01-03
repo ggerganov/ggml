@@ -5,7 +5,7 @@
 # Usage:
 #
 #   $ cd /path/to/ggml
-#   $ ./scripts/sync-whisper-am.sh
+#   $ ./scripts/sync-whisper-am.sh -skip hash0,hash1,hash2...
 #
 
 set -e
@@ -24,6 +24,11 @@ fi
 lc=$(cat $SRC_GGML/scripts/sync-whisper.last)
 echo "Syncing whisper.cpp changes since commit $lc"
 
+to_skip=""
+if [ "$1" == "-skip" ]; then
+    to_skip=$2
+fi
+
 cd $SRC_WHISPER
 
 git log --oneline $lc..HEAD
@@ -40,6 +45,13 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
 fi
 
 while read c; do
+    if [ -n "$to_skip" ]; then
+        if [[ $to_skip == *"$c"* ]]; then
+            echo "Skipping $c"
+            continue
+        fi
+    fi
+
     git format-patch -k $c~1..$c --stdout -- \
     ggml*.h \
     ggml*.c \
