@@ -263,7 +263,7 @@ if (GGML_HIPBLAS)
     if (${hipblas_FOUND} AND ${hip_FOUND})
         message(STATUS "HIP and hipBLAS found")
 
-        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CUBLAS)
+        add_compile_definitions(GGML_USE_HIPBLAS GGML_USE_CUBLAS)
 
         add_library(ggml-rocm OBJECT ggml-cuda.cu ggml-cuda.h)
         if (BUILD_SHARED_LIBS)
