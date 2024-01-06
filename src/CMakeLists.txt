@@ -263,7 +263,7 @@ if (GGML_HIPBLAS)
     if (${hipblas_FOUND} AND ${hip_FOUND})
         message(STATUS "HIP and hipBLAS found")
 
-        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CUBLAS)
+        add_compile_definitions(GGML_USE_HIPBLAS GGML_USE_CUBLAS)
 
         add_library(ggml-rocm OBJECT ggml-cuda.cu ggml-cuda.h)
         if (BUILD_SHARED_LIBS)
@@ -343,11 +343,12 @@ target_include_directories(${TARGET} PUBLIC
     ${GGML_EXTRA_INCS}
     )
 
-if (MSVC)
-    target_link_libraries(${TARGET} PUBLIC ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
-else()
-    target_link_libraries(${TARGET} PUBLIC m ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
+find_library(MATH_LIBRARY m)
+if (MATH_LIBRARY)
+    target_link_libraries(${TARGET} PUBLIC ${MATH_LIBRARY})
 endif()
+
+target_link_libraries(${TARGET} PUBLIC ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
 if (BUILD_SHARED_LIBS)
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
