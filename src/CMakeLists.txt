@@ -343,14 +343,10 @@ target_include_directories(${TARGET} PUBLIC
     ${GGML_EXTRA_INCS}
     )
 
-if (MSVC)
+if (WIN32)
     target_link_libraries(${TARGET} PUBLIC ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 else()
-    if (WIN32 AND GGML_HIPBLAS)
-        target_link_libraries(${TARGET} PUBLIC ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
-    else()
-        target_link_libraries(${TARGET} PUBLIC m ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
-    endif()
+    target_link_libraries(${TARGET} PUBLIC m ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
 if (BUILD_SHARED_LIBS)
