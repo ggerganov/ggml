@@ -1396,6 +1396,8 @@ inline static void ggml_vec_scale_f32(const int n, float * y, const float   v) {
 #endif
 }
 
+#define ggml_memcpy_opt(dst, src, type) do { *(type *)(dst) = *(type *)(src); } while (0)
+
 inline static void ggml_vec_norm_f32 (const int n, float * s, const float * x) { ggml_vec_dot_f32(n, s, x, x); *s = sqrtf(*s);   }
 inline static void ggml_vec_sqr_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = x[i]*x[i];   }
 inline static void ggml_vec_sqrt_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = sqrtf(x[i]); }
@@ -1428,7 +1430,7 @@ inline static void ggml_vec_gelu_f32(const int n, float * y, const float * x) {
     uint16_t t;
     for (int i = 0; i < n; ++i) {
         ggml_fp16_t fp16 = GGML_FP32_TO_FP16(x[i]);
-        memcpy(&t, &fp16, sizeof(uint16_t));
+        ggml_memcpy_opt(&t, &fp16, uint16_t);
         y[i] = GGML_FP16_TO_FP32(ggml_table_gelu_f16[t]);
     }
 }
@@ -1456,7 +1458,7 @@ inline static void ggml_vec_gelu_quick_f32(const int n, float * y, const float *
     uint16_t t;
     for (int i = 0; i < n; ++i) {
         ggml_fp16_t fp16 = GGML_FP32_TO_FP16(x[i]);
-        memcpy(&t, &fp16, sizeof(uint16_t));
+        ggml_memcpy_opt(&t, &fp16, uint16_t);
         y[i] = GGML_FP16_TO_FP32(ggml_table_gelu_quick_f16[t]);
     }
 }
@@ -1485,7 +1487,7 @@ inline static void ggml_vec_silu_f32(const int n, float * y, const float * x) {
     uint16_t t;
     for (int i = 0; i < n; ++i) {
         ggml_fp16_t fp16 = GGML_FP32_TO_FP16(x[i]);
-        memcpy(&t, &fp16, sizeof(uint16_t));
+        ggml_memcpy_opt(&t, &fp16, uint16_t);
         y[i] = GGML_FP16_TO_FP32(ggml_table_silu_f16[t]);
     }
 }
@@ -2238,7 +2240,7 @@ struct ggml_context * ggml_init(struct ggml_init_params params) {
             ggml_fp16_t ii;
             for (int i = 0; i < (1 << 16); ++i) {
                 uint16_t ui = i;
-                memcpy(&ii, &ui, sizeof(ii));
+                ggml_memcpy_opt(&ii, &ui, ggml_fp16_t);
                 const float f = ggml_table_f32_f16[i] = GGML_COMPUTE_FP16_TO_FP32(ii);
                 ggml_table_gelu_f16[i] = GGML_FP32_TO_FP16(ggml_gelu_f32(f));
                 ggml_table_gelu_quick_f16[i] = GGML_FP32_TO_FP16(ggml_gelu_quick_f32(f));
@@ -5044,14 +5046,14 @@ static struct ggml_tensor * ggml_rope_impl(
     struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
 
     int32_t params[13] = { /*n_past*/ 0, n_dims, mode, n_ctx, n_orig_ctx };
-    memcpy(params +  5, &freq_base,    sizeof(float));
-    memcpy(params +  6, &freq_scale,   sizeof(float));
-    memcpy(params +  7, &ext_factor,   sizeof(float));
-    memcpy(params +  8, &attn_factor,  sizeof(float));
-    memcpy(params +  9, &beta_fast,    sizeof(float));
-    memcpy(params + 10, &beta_slow,    sizeof(float));
-    memcpy(params + 11, &xpos_base,    sizeof(float));
-    memcpy(params + 12, &xpos_down,    sizeof(bool));
+    ggml_memcpy_opt(params +  5, &freq_base,    float);
+    ggml_memcpy_opt(params +  6, &freq_scale,   float);
+    ggml_memcpy_opt(params +  7, &ext_factor,   float);
+    ggml_memcpy_opt(params +  8, &attn_factor,  float);
+    ggml_memcpy_opt(params +  9, &beta_fast,    float);
+    ggml_memcpy_opt(params + 10, &beta_slow,    float);
+    ggml_memcpy_opt(params + 11, &xpos_base,    float);
+    ggml_memcpy_opt(params + 12, &xpos_down,    bool);
     ggml_set_op_params(result, params, sizeof(params));
 
     result->op   = GGML_OP_ROPE;
@@ -5169,14 +5171,14 @@ struct ggml_tensor * ggml_rope_back(
     struct ggml_tensor * result = ggml_dup_tensor(ctx, a);
 
     int32_t params[13] = { /*n_past*/ 0, n_dims, mode, n_ctx, n_orig_ctx };
-    memcpy(params +  5, &freq_base,    sizeof(float));
-    memcpy(params +  6, &freq_scale,   sizeof(float));
-    memcpy(params +  7, &ext_factor,   sizeof(float));
-    memcpy(params +  8, &attn_factor,  sizeof(float));
-    memcpy(params +  9, &beta_fast,    sizeof(float));
-    memcpy(params + 10, &beta_slow,    sizeof(float));
-    memcpy(params + 11, &xpos_base,    sizeof(float));
-    memcpy(params + 12, &xpos_down,    sizeof(bool));
+    ggml_memcpy_opt(params +  5, &freq_base,    float);
+    ggml_memcpy_opt(params +  6, &freq_scale,   float);
+    ggml_memcpy_opt(params +  7, &ext_factor,   float);
+    ggml_memcpy_opt(params +  8, &attn_factor,  float);
+    ggml_memcpy_opt(params +  9, &beta_fast,    float);
+    ggml_memcpy_opt(params + 10, &beta_slow,    float);
+    ggml_memcpy_opt(params + 11, &xpos_base,    float);
+    ggml_memcpy_opt(params + 12, &xpos_down,    bool);
     ggml_set_op_params(result, params, sizeof(params));
 
     result->op   = GGML_OP_ROPE_BACK;
@@ -5208,7 +5210,7 @@ struct ggml_tensor * ggml_alibi(
     struct ggml_tensor * result = ggml_view_tensor(ctx, a);
 
     int32_t op_params[3] = { n_past, n_head };
-    memcpy(op_params + 2, &bias_max, sizeof(float));
+    ggml_memcpy_opt(op_params + 2, &bias_max, float);
     ggml_set_op_params(result, op_params, sizeof(op_params));
 
     result->op   = GGML_OP_ALIBI;
@@ -6616,7 +6618,7 @@ static void ggml_compute_forward_dup_f16(
                         const char * src0_ptr = ((char *) src0->data + i00*nb00 + i01*nb01 + i02*nb02 + i03*nb03);
                               char * dst_ptr  = ((char *)  dst->data + i10*nb0  + i11*nb1  + i12*nb2  + i13*nb3);
 
-                        memcpy(dst_ptr, src0_ptr, sizeof(ggml_fp16_t));
+                        ggml_memcpy_opt(dst_ptr, src0_ptr, ggml_fp16_t);
 
                         if (++i10 == ne00) {
                             i10 = 0;
@@ -6865,7 +6867,7 @@ static void ggml_compute_forward_dup_f32(
                         const char * src0_ptr = ((char *) src0->data + i00*nb00 + i01*nb01 + i02*nb02 + i03*nb03);
                               char * dst_ptr  = ((char *)  dst->data + i10*nb0  + i11*nb1  + i12*nb2  + i13*nb3);
 
-                        memcpy(dst_ptr, src0_ptr, sizeof(float));
+                        ggml_memcpy_opt(dst_ptr, src0_ptr, float);
 
                         if (++i10 == ne0) {
                             i10 = 0;
@@ -9219,7 +9221,7 @@ static void ggml_compute_forward_leaky_relu_f32(
     const int nc = src0->ne[0];
 
     float negative_slope;
-    memcpy(&negative_slope, dst->op_params, sizeof(float));
+    ggml_memcpy_opt(&negative_slope, dst->op_params, float);
 
     assert(dst->nb[0]  == sizeof(float));
     assert(src0->nb[0] == sizeof(float));
@@ -9331,7 +9333,7 @@ static void ggml_compute_forward_norm_f32(
     GGML_TENSOR_UNARY_OP_LOCALS
 
     float eps;
-    memcpy(&eps, dst->op_params, sizeof(float));
+    ggml_memcpy_opt(&eps, dst->op_params, float);
 
     GGML_ASSERT(eps > 0.0f);
 
@@ -9402,7 +9404,7 @@ static void ggml_compute_forward_rms_norm_f32(
     GGML_TENSOR_UNARY_OP_LOCALS
 
     float eps;
-    memcpy(&eps, dst->op_params, sizeof(float));
+    ggml_memcpy_opt(&eps, dst->op_params, float);
 
     GGML_ASSERT(eps > 0.0f);
 
@@ -9469,7 +9471,7 @@ static void ggml_compute_forward_rms_norm_back_f32(
     GGML_TENSOR_BINARY_OP_LOCALS
 
     float eps;
-    memcpy(&eps, dst->op_params, sizeof(float));
+    ggml_memcpy_opt(&eps, dst->op_params, float);
 
     // TODO: optimize
     for (int64_t i03 = 0; i03 < ne03; i03++) {
@@ -10506,7 +10508,7 @@ static void ggml_compute_forward_scale_f32(
 
     // scale factor
     float v;
-    memcpy(&v, dst->op_params, sizeof(float));
+    ggml_memcpy_opt(&v, dst->op_params, float);
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -11144,7 +11146,7 @@ static void ggml_compute_forward_soft_max_f32(
     }
 
     float scale = 1.0f;
-    memcpy(&scale, (float *) dst->op_params + 0, sizeof(float));
+    ggml_memcpy_opt(&scale, (float *) dst->op_params + 0, float);
 
     // TODO: handle transposed/permuted matrices
 
@@ -11197,7 +11199,7 @@ static void ggml_compute_forward_soft_max_f32(
             } else {
                 // const float val = (wp[i] == -INFINITY) ? 0.0 : exp(wp[i] - max);
                 ggml_fp16_t s = GGML_FP32_TO_FP16(wp[i] - max);
-                memcpy(&scvt, &s, sizeof(scvt));
+                ggml_memcpy_opt(&scvt, &s, uint16_t);
                 const float val = GGML_FP16_TO_FP32(ggml_table_exp_f16[scvt]);
                 sum += (ggml_float)val;
                 dp[i] = val;
@@ -11346,7 +11348,7 @@ static void ggml_compute_forward_alibi_f32(
     //const int n_past = ((int32_t *) dst->op_params)[0];
     const int n_head = ((int32_t *) dst->op_params)[1];
     float max_bias;
-    memcpy(&max_bias, (int32_t *) dst->op_params + 2, sizeof(float));
+    ggml_memcpy_opt(&max_bias, (int32_t *) dst->op_params + 2, float);
 
     const int64_t ne0 = src0->ne[0]; // all_seq_len = n_past + ne1
     const int64_t ne1 = src0->ne[1]; // seq_len_without_past
@@ -11405,7 +11407,7 @@ static void ggml_compute_forward_alibi_f16(
     //const int n_past = ((int32_t *) dst->op_params)[0];
     const int n_head = ((int32_t *) dst->op_params)[1];
     float max_bias;
-    memcpy(&max_bias, (int32_t *) dst->op_params + 2, sizeof(float));
+    ggml_memcpy_opt(&max_bias, (int32_t *) dst->op_params + 2, float);
 
     const int ne0 = src0->ne[0]; // all_seq_len = n_past + ne1
     const int ne1 = src0->ne[1]; // seq_len_without_past
@@ -11503,8 +11505,8 @@ static void ggml_compute_forward_clamp_f32(
 
     float min;
     float max;
-    memcpy(&min, (float *) dst->op_params + 0, sizeof(float));
-    memcpy(&max, (float *) dst->op_params + 1, sizeof(float));
+    ggml_memcpy_opt(&min, (float *) dst->op_params + 0, float);
+    ggml_memcpy_opt(&max, (float *) dst->op_params + 1, float);
 
     const int ith = params->ith;
     const int nth = params->nth;
@@ -11627,14 +11629,14 @@ static void ggml_compute_forward_rope_f32(
     const int n_ctx      = ((int32_t *) dst->op_params)[3];
     const int n_orig_ctx = ((int32_t *) dst->op_params)[4];
 
-    memcpy(&freq_base,   (int32_t *) dst->op_params +  5, sizeof(float));
-    memcpy(&freq_scale,  (int32_t *) dst->op_params +  6, sizeof(float));
-    memcpy(&ext_factor,  (int32_t *) dst->op_params +  7, sizeof(float));
-    memcpy(&attn_factor, (int32_t *) dst->op_params +  8, sizeof(float));
-    memcpy(&beta_fast,   (int32_t *) dst->op_params +  9, sizeof(float));
-    memcpy(&beta_slow,   (int32_t *) dst->op_params + 10, sizeof(float));
-    memcpy(&xpos_base,   (int32_t *) dst->op_params + 11, sizeof(float));
-    memcpy(&xpos_down,   (int32_t *) dst->op_params + 12, sizeof(bool));
+    ggml_memcpy_opt(&freq_base,   (int32_t *) dst->op_params +  5, float);
+    ggml_memcpy_opt(&freq_scale,  (int32_t *) dst->op_params +  6, float);
+    ggml_memcpy_opt(&ext_factor,  (int32_t *) dst->op_params +  7, float);
+    ggml_memcpy_opt(&attn_factor, (int32_t *) dst->op_params +  8, float);
+    ggml_memcpy_opt(&beta_fast,   (int32_t *) dst->op_params +  9, float);
+    ggml_memcpy_opt(&beta_slow,   (int32_t *) dst->op_params + 10, float);
+    ggml_memcpy_opt(&xpos_base,   (int32_t *) dst->op_params + 11, float);
+    ggml_memcpy_opt(&xpos_down,   (int32_t *) dst->op_params + 12, bool);
 
     GGML_TENSOR_UNARY_OP_LOCALS
 
@@ -11797,12 +11799,12 @@ static void ggml_compute_forward_rope_f16(
     const int mode       = ((int32_t *) dst->op_params)[2];
     const int n_ctx      = ((int32_t *) dst->op_params)[3];
     const int n_orig_ctx = ((int32_t *) dst->op_params)[4];
-    memcpy(&freq_base,   (int32_t *) dst->op_params +  5, sizeof(float));
-    memcpy(&freq_scale,  (int32_t *) dst->op_params +  6, sizeof(float));
-    memcpy(&ext_factor,  (int32_t *) dst->op_params +  7, sizeof(float));
-    memcpy(&attn_factor, (int32_t *) dst->op_params +  8, sizeof(float));
-    memcpy(&beta_fast,   (int32_t *) dst->op_params +  9, sizeof(float));
-    memcpy(&beta_slow,   (int32_t *) dst->op_params + 10, sizeof(float));
+    ggml_memcpy_opt(&freq_base,   (int32_t *) dst->op_params +  5, float);
+    ggml_memcpy_opt(&freq_scale,  (int32_t *) dst->op_params +  6, float);
+    ggml_memcpy_opt(&ext_factor,  (int32_t *) dst->op_params +  7, float);
+    ggml_memcpy_opt(&attn_factor, (int32_t *) dst->op_params +  8, float);
+    ggml_memcpy_opt(&beta_fast,   (int32_t *) dst->op_params +  9, float);
+    ggml_memcpy_opt(&beta_slow,   (int32_t *) dst->op_params + 10, float);
 
     GGML_TENSOR_UNARY_OP_LOCALS
 
@@ -12873,7 +12875,7 @@ static void ggml_compute_forward_flash_attn_f32(
                             const float val = expf(SS[j] - max);
 #else
                             ggml_fp16_t s = GGML_FP32_TO_FP16(SS[j] - max);
-                            memcpy(&scvt[j], &s, sizeof(uint16_t));
+                            ggml_memcpy_opt(&scvt[j], &s, uint16_t);
                             const float val = GGML_FP16_TO_FP32(ggml_table_exp_f16[scvt[j]]);
 #endif
                             sump[j] += (ggml_float)val;
@@ -13075,7 +13077,7 @@ static void ggml_compute_forward_flash_attn_f16(
                             SS[j] = 0.0f;
                         } else {
                             ggml_fp16_t s = GGML_FP32_TO_FP16(SS[j] - max);
-                            memcpy(&scvt[j], &s, sizeof(uint16_t));
+                            ggml_memcpy_opt(&scvt[j], &s, uint16_t);
                             const float val = GGML_FP16_TO_FP32(ggml_table_exp_f16[scvt[j]]);
                             sump[j] += (ggml_float)val;
                             SS[j] = val;
@@ -13526,7 +13528,7 @@ static void ggml_compute_forward_flash_attn_back_f32(
                                     const float val = expf(SR[j] - max);
 #else
                                     ggml_fp16_t s = GGML_FP32_TO_FP16(SR[j] - max);
-                                    memcpy(&scvt[j], &s, sizeof(uint16_t));
+                                    ggml_memcpy_opt(&scvt[j], &s, uint16_t);
                                     const float val = GGML_FP16_TO_FP32(ggml_table_exp_f16[scvt[j]]);
 #endif
                                     sump[j] += (ggml_float)val;
@@ -14276,7 +14278,7 @@ static void ggml_compute_forward_cross_entropy_loss_f32(
                     const float val = expf(s);
 #else
                     ggml_fp16_t s = GGML_FP32_TO_FP16(s0[i] - max);
-                    memcpy(&scvt, &s, sizeof(scvt));
+                    ggml_memcpy_opt(&scvt, &s, uint16_t);
                     const float val = GGML_FP16_TO_FP32(ggml_table_exp_f16[scvt]);
 #endif
                     sum += (ggml_float)val;
@@ -14390,7 +14392,7 @@ static void ggml_compute_forward_cross_entropy_loss_back_f32(
                     const float val = expf(s);
 #else
                     ggml_fp16_t s = GGML_FP32_TO_FP16(s0[i] - max);
-                    memcpy(&scvt, &s, sizeof(scvt));
+                    ggml_memcpy_opt(&scvt, &s, uint16_t);
                     const float val = GGML_FP16_TO_FP32(ggml_table_exp_f16[scvt]);
 #endif
                     sum += (ggml_float)val;
@@ -14707,35 +14709,35 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
         case GGML_OP_MAP_UNARY:
             {
                 ggml_unary_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
+                ggml_memcpy_opt(&fun, tensor->op_params, ggml_unary_op_f32_t);
                 ggml_compute_forward_map_unary(params, tensor->src[0], tensor, fun);
             }
             break;
         case GGML_OP_MAP_BINARY:
             {
                 ggml_binary_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
+                ggml_memcpy_opt(&fun, tensor->op_params, ggml_binary_op_f32_t);
                 ggml_compute_forward_map_binary(params, tensor->src[0], tensor->src[1], tensor, fun);
             }
             break;
         case GGML_OP_MAP_CUSTOM1_F32:
             {
                 ggml_custom1_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
+                ggml_memcpy_opt(&fun, tensor->op_params, ggml_custom1_op_f32_t);
                 ggml_compute_forward_map_custom1_f32(params, tensor->src[0], tensor, fun);
             }
             break;
         case GGML_OP_MAP_CUSTOM2_F32:
             {
                 ggml_custom2_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
+                ggml_memcpy_opt(&fun, tensor->op_params, ggml_custom2_op_f32_t);
                 ggml_compute_forward_map_custom2_f32(params, tensor->src[0], tensor->src[1], tensor, fun);
             }
             break;
         case GGML_OP_MAP_CUSTOM3_F32:
             {
                 ggml_custom3_op_f32_t fun;
-                memcpy(&fun, tensor->op_params, sizeof(fun));
+                ggml_memcpy_opt(&fun, tensor->op_params, ggml_custom3_op_f32_t);
                 ggml_compute_forward_map_custom3_f32(params, tensor->src[0], tensor->src[1], tensor->src[2], tensor, fun);
             }
             break;
@@ -15242,7 +15244,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                 // necessary for llama
                 if (src0->grad) {
                     float eps;
-                    memcpy(&eps, tensor->op_params, sizeof(float));
+                    ggml_memcpy_opt(&eps, tensor->op_params, float);
 
                     src0->grad = ggml_add_or_set(ctx,
                             src0->grad,
@@ -15329,7 +15331,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                 // necessary for llama
                 if (src0->grad) {
                     float s;
-                    memcpy(&s, tensor->op_params, sizeof(float));
+                    ggml_memcpy_opt(&s, tensor->op_params, float);
 
                     src0->grad =
                         ggml_add_or_set(ctx,
@@ -15424,7 +15426,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                 if (src0->grad) {
                     size_t offset;
 
-                    memcpy(&offset, tensor->op_params, sizeof(offset));
+                    ggml_memcpy_opt(&offset, tensor->op_params, size_t);
 
                     size_t nb1     = tensor->nb[1];
                     size_t nb2     = tensor->nb[2];
@@ -15555,14 +15557,14 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                     const int n_orig_ctx = ((int32_t *) tensor->op_params)[4];
                     float freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow, xpos_base, xpos_down;
 
-                    memcpy(&freq_base,   (int32_t *) tensor->op_params +  5, sizeof(float));
-                    memcpy(&freq_scale,  (int32_t *) tensor->op_params +  6, sizeof(float));
-                    memcpy(&ext_factor,  (int32_t *) tensor->op_params +  7, sizeof(float));
-                    memcpy(&attn_factor, (int32_t *) tensor->op_params +  8, sizeof(float));
-                    memcpy(&beta_fast,   (int32_t *) tensor->op_params +  9, sizeof(float));
-                    memcpy(&beta_slow,   (int32_t *) tensor->op_params + 10, sizeof(float));
-                    memcpy(&xpos_base,   (int32_t *) tensor->op_params + 11, sizeof(float));
-                    memcpy(&xpos_down,   (int32_t *) tensor->op_params + 12, sizeof(bool));
+                    ggml_memcpy_opt(&freq_base,   (int32_t *) tensor->op_params +  5, float);
+                    ggml_memcpy_opt(&freq_scale,  (int32_t *) tensor->op_params +  6, float);
+                    ggml_memcpy_opt(&ext_factor,  (int32_t *) tensor->op_params +  7, float);
+                    ggml_memcpy_opt(&attn_factor, (int32_t *) tensor->op_params +  8, float);
+                    ggml_memcpy_opt(&beta_fast,   (int32_t *) tensor->op_params +  9, float);
+                    ggml_memcpy_opt(&beta_slow,   (int32_t *) tensor->op_params + 10, float);
+                    ggml_memcpy_opt(&xpos_base,   (int32_t *) tensor->op_params + 11, float);
+                    ggml_memcpy_opt(&xpos_down,   (int32_t *) tensor->op_params + 12, bool);
 
                     src0->grad = ggml_add_or_set(ctx,
                             src0->grad,
@@ -15594,14 +15596,14 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                     const int n_orig_ctx = ((int32_t *) tensor->op_params)[4];
                     float freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow, xpos_base, xpos_down;
 
-                    memcpy(&freq_base,   (int32_t *) tensor->op_params +  5, sizeof(float));
-                    memcpy(&freq_scale,  (int32_t *) tensor->op_params +  6, sizeof(float));
-                    memcpy(&ext_factor,  (int32_t *) tensor->op_params +  7, sizeof(float));
-                    memcpy(&attn_factor, (int32_t *) tensor->op_params +  8, sizeof(float));
-                    memcpy(&beta_fast,   (int32_t *) tensor->op_params +  9, sizeof(float));
-                    memcpy(&beta_slow,   (int32_t *) tensor->op_params + 10, sizeof(float));
-                    memcpy(&xpos_base,   (int32_t *) tensor->op_params + 11, sizeof(float));
-                    memcpy(&xpos_down,   (int32_t *) tensor->op_params + 12, sizeof(bool));
+                    ggml_memcpy_opt(&freq_base,   (int32_t *) tensor->op_params +  5, float);
+                    ggml_memcpy_opt(&freq_scale,  (int32_t *) tensor->op_params +  6, float);
+                    ggml_memcpy_opt(&ext_factor,  (int32_t *) tensor->op_params +  7, float);
+                    ggml_memcpy_opt(&attn_factor, (int32_t *) tensor->op_params +  8, float);
+                    ggml_memcpy_opt(&beta_fast,   (int32_t *) tensor->op_params +  9, float);
+                    ggml_memcpy_opt(&beta_slow,   (int32_t *) tensor->op_params + 10, float);
+                    ggml_memcpy_opt(&xpos_base,   (int32_t *) tensor->op_params + 11, float);
+                    ggml_memcpy_opt(&xpos_down,   (int32_t *) tensor->op_params + 12, bool);
 
                     src0->grad = ggml_add_or_set(ctx,
                             src0->grad,
@@ -17318,7 +17320,7 @@ struct ggml_cgraph * ggml_graph_import(const char * fname, struct ggml_context *
                             tensor = ggml_view_4d(*ctx_eval, args[0], ne[0], ne[1], ne[2], ne[3], 0, 0, 0, 0);
 
                             size_t offs;
-                            memcpy(&offs, ptr_op_params, sizeof(offs));
+                            ggml_memcpy_opt(&offs, ptr_op_params, size_t);
 
                             tensor->data = ((char *) tensor->data) + offs;
                         } break;
@@ -18535,7 +18537,7 @@ size_t ggml_quantize_q5_0(const float * src, void * dst, int n, int k, int64_t *
 
         for (int i = 0; i < nb; i++) {
             uint32_t qh;
-            memcpy(&qh, &y[i].qh, sizeof(qh));
+            ggml_memcpy_opt(&qh, &y[i].qh, uint32_t);
 
             for (int j = 0; j < QK5_0; j += 2) {
                 const uint8_t vh0 = ((qh & (1u << (j/2 + 0 ))) >> (j/2 + 0 )) << 4;
@@ -18565,7 +18567,7 @@ size_t ggml_quantize_q5_1(const float * src, void * dst, int n, int k, int64_t *
 
         for (int i = 0; i < nb; i++) {
             uint32_t qh;
-            memcpy(&qh, &y[i].qh, sizeof(qh));
+            ggml_memcpy_opt(&qh, &y[i].qh, uint32_t);
 
             for (int j = 0; j < QK5_1; j += 2) {
                 const uint8_t vh0 = ((qh & (1u << (j/2 + 0 ))) >> (j/2 + 0 )) << 4;

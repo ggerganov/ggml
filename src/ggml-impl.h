@@ -8,7 +8,6 @@
 #include <stdlib.h> // load `stdlib.h` before other headers to work around MinGW bug: https://sourceforge.net/p/mingw-w64/bugs/192/
 #include <stddef.h>
 #include <stdbool.h>
-#include <string.h> // memcpy
 #include <math.h>   // fabsf
 
 #ifdef __cplusplus
@@ -215,9 +214,7 @@ extern float ggml_table_f32_f16[1 << 16];
 #if !defined(GGML_FP16_TO_FP32) || !defined(GGML_FP32_TO_FP16)
 
 inline static float ggml_lookup_fp16_to_fp32(ggml_fp16_t f) {
-    uint16_t s;
-    memcpy(&s, &f, sizeof(uint16_t));
-    return ggml_table_f32_f16[s];
+    return ggml_table_f32_f16[*(uint16_t *)(&f)];
 }
 
 #define GGML_FP16_TO_FP32(x) ggml_lookup_fp16_to_fp32(x)
