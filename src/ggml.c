@@ -4007,7 +4007,7 @@ inline static void ggml_vec_argmax_f32(const int n, int * s, const float * x) {
 // data types
 //
 
-static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
+static const char * GGML_OP_NAME[76] = {
     "NONE",
 
     "DUP",
@@ -4099,7 +4099,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
 
 static_assert(GGML_OP_COUNT == 74, "GGML_OP_COUNT != 74");
 
-static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
+static const char * GGML_OP_SYMBOL[76] = {
     "none",
 
     "x",
