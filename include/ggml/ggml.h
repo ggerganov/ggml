@@ -679,6 +679,7 @@ extern "C" {
     GGML_API bool ggml_is_vector    (const struct ggml_tensor * tensor);
     GGML_API bool ggml_is_matrix    (const struct ggml_tensor * tensor);
     GGML_API bool ggml_is_3d        (const struct ggml_tensor * tensor);
+    GGML_API bool ggml_is_4d        (const struct ggml_tensor * tensor);
     GGML_API int  ggml_n_dims       (const struct ggml_tensor * tensor); // returns 1 for scalars
 
     GGML_API bool ggml_are_same_shape(const struct ggml_tensor * t0, const struct ggml_tensor * t1);

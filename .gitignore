@@ -11,18 +11,21 @@ out/
 tmp/
 models/
 models-mnt
+cmake-build-debug/
 
 compile_commands.json
 CMakeSettings.json
 .vs/
 .vscode/
 .clangd
+.idea
 
 .exrc
 .cache
 .DS_Store
 .stablelm
 .gpt-2
+
 
 src/arm_neon.h
 tests/arm_neon.h

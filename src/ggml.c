@@ -2081,6 +2081,10 @@ bool ggml_is_3d(const struct ggml_tensor * tensor) {
     return tensor->ne[3] == 1;
 }
 
+bool ggml_is_4d(const struct ggml_tensor * tensor) {
+  return tensor->ne[3] > 1;
+}
+
 int ggml_n_dims(const struct ggml_tensor * tensor) {
     for (int i = GGML_MAX_DIMS - 1; i >= 1; --i) {
         if (tensor->ne[i] > 1) {
