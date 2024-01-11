@@ -37,6 +37,7 @@ struct ggml_metal_buffer {
 
 struct ggml_metal_context {
     int n_cb;
+    bool should_capture_next_compute;
 
     id<MTLDevice>       device;
     id<MTLCommandQueue> queue;
@@ -1011,6 +1012,20 @@ bool ggml_metal_graph_compute(
 
     const int n_cb = ctx->n_cb;
 
+    const bool should_capture = ctx->should_capture_next_compute;
+    if (should_capture) {
+        ctx->should_capture_next_compute = false;
+
+        MTLCaptureDescriptor *descriptor = [MTLCaptureDescriptor new];
+        descriptor.captureObject = ctx->queue;
+
+        NSError *error = nil;
+        if (![[MTLCaptureManager sharedCaptureManager] startCaptureWithDescriptor:descriptor error:&error]) {
+            GGML_METAL_LOG_ERROR("%s: error: unable to start capture '%s'\n", __func__, [[error localizedDescription] UTF8String]);
+            GGML_ASSERT(!"capture failed");
+        }
+    }
+
     for (int i = 0; i < n_cb; ++i) {
         ctx->command_buffers[i] = [ctx->queue commandBuffer];
 
@@ -1067,7 +1082,10 @@ bool ggml_metal_graph_compute(
                     GGML_ASSERT(!"unsupported op");
                 }
 
-                [encoder pushDebugGroup:[NSString stringWithCString:ggml_op_desc(dst)]];
+                if (should_capture) {
+                    [encoder pushDebugGroup:[NSString stringWithCString:ggml_op_desc(dst)
+                                                               encoding:NSUTF8StringEncoding]];
+                }
 
                 const int64_t  ne00 = src0 ? src0->ne[0] : 0;
                 const int64_t  ne01 = src0 ? src0->ne[1] : 0;
@@ -2426,7 +2444,9 @@ bool ggml_metal_graph_compute(
                         }
                 }
 
-                [encoder popDebugGroup];
+                if (should_capture) {
+                    [encoder popDebugGroup];
+                }
             }
 
             if (encoder != nil) {
@@ -2451,6 +2471,10 @@ bool ggml_metal_graph_compute(
             GGML_METAL_LOG_INFO("%s: command buffer %d failed with status %lu\n", __func__, i, status);
             return false;
         }
+    }
+
+    if (should_capture) {
+        [[MTLCaptureManager sharedCaptureManager] stopCapture];
     }
 
     return true;
@@ -2796,6 +2820,13 @@ bool ggml_backend_metal_supports_family(ggml_backend_t backend, int family) {
     struct ggml_metal_context * ctx = (struct ggml_metal_context *)backend->context;
 
     return [ctx->device supportsFamily:(MTLGPUFamilyApple1 + family - 1)];
+}
+
+void ggml_backend_metal_capture_next_compute(ggml_backend_t backend) {
+    GGML_ASSERT(ggml_backend_is_metal(backend));
+
+    struct ggml_metal_context * ctx = (struct ggml_metal_context *)backend->context;
+    ctx->should_capture_next_compute = true;
 }
 
 ggml_backend_t ggml_backend_reg_metal_init(const char * params, void * user_data); // silence warning
