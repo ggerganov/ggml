@@ -506,15 +506,6 @@ class lib:
                 struct ggml_tensor  * a);
     """
     ...
-  def ggml_cont_inplace(ctx: ffi.CData, a: ffi.CData) -> ffi.CData:
-    """
-    make contiguous, in-place
-
-        GGML_API struct ggml_tensor * ggml_cont_inplace(
-                struct ggml_context * ctx,
-                struct ggml_tensor  * a);
-    """
-    ...
   def ggml_conv_1d(ctx: ffi.CData, a: ffi.CData, b: ffi.CData, s0: int, p0: int, d0: int) -> ffi.CData:
     """
         GGML_API struct ggml_tensor * ggml_conv_1d(
@@ -609,16 +600,6 @@ class lib:
     a -> b, return view(b)
 
         GGML_API struct ggml_tensor * ggml_cpy(
-                struct ggml_context * ctx,
-                struct ggml_tensor  * a,
-                struct ggml_tensor  * b);
-    """
-    ...
-  def ggml_cpy_inplace(ctx: ffi.CData, a: ffi.CData, b: ffi.CData) -> ffi.CData:
-    """
-    a -> b, in-place, return view(b)
-
-        GGML_API struct ggml_tensor * ggml_cpy_inplace(
                 struct ggml_context * ctx,
                 struct ggml_tensor  * a,
                 struct ggml_tensor  * b);
@@ -1202,7 +1183,7 @@ class lib:
     - you don't need to keep the host memory buffer allocated as it is never accessed by Metal
     - max_size specifies the maximum size of a tensor and is used to create shared views such
     that it is guaranteed that the tensor will fit in at least one of the views
-    
+
 
     bool ggml_metal_add_buffer(
             struct ggml_metal_context * ctx,
