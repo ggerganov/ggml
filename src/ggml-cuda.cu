@@ -10073,6 +10073,9 @@ static bool ggml_backend_cuda_supports_op(ggml_backend_t backend, const ggml_ten
                 if (src0_type == GGML_TYPE_F16 && src1_type == GGML_TYPE_F16) {
                     return true;
                 }
+                if (src0_type == GGML_TYPE_F16 && src1_type == GGML_TYPE_F32) {
+                    return true;
+                }
                 return false;
             } break;
         case GGML_OP_DUP:

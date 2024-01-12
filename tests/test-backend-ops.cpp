@@ -1492,6 +1492,13 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
        test_cases.emplace_back(new test_cpy(GGML_TYPE_F32, type, {256, 10, 10, 1}));
     }
 
+    test_cases.emplace_back(new test_cpy(GGML_TYPE_F16, GGML_TYPE_F32, {256, 10, 10, 1}));
+
+
+    //to make sure we can copy tensors with ne[3] > 1
+    test_cases.emplace_back(new test_cpy(GGML_TYPE_F32, GGML_TYPE_F32, {4, 4, 4, 4}));
+
+
     test_cases.emplace_back(new test_cont());
 
     auto add_test_bin_bcast = [&](ggml_type type, std::array<int64_t, 4> ne, std::array<int, 4> nr) {
