@@ -1497,6 +1497,9 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
 
     //to make sure we can copy tensors with ne[3] > 1
     test_cases.emplace_back(new test_cpy(GGML_TYPE_F32, GGML_TYPE_F32, {4, 4, 4, 4}));
+    test_cases.emplace_back(new test_cpy(GGML_TYPE_F32, GGML_TYPE_F16, {4, 4, 4, 4}));
+
+
 
 
     test_cases.emplace_back(new test_cont());
