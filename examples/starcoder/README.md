@@ -34,7 +34,7 @@ options:
   -m FNAME, --model FNAME
                         model path (default: models/starcoder-117M/ggml-model.bin)
 
-$ ./bin/starcoder -m ../models/bigcode/gpt_bigcode-santacoder-ggml-q4_1.bin -p "def fibonnaci(" -t 4 --top_k 0 --top_p 0.95 --temp 0.2      
+$ ./bin/starcoder -m ../models/bigcode/gpt_bigcode-santacoder-ggml-q4_1.bin -p "def fibonnaci(" -t 4 --top_k 0 --top_p 0.95 --temp 0.2
 main: seed = 1683881276
 starcoder_model_load: loading model from '../models/bigcode/gpt_bigcode-santacoder-ggml-q4_1.bin'
 starcoder_model_load: n_vocab = 49280
@@ -47,7 +47,7 @@ starcoder_model_load: ggml ctx size = 1794.90 MB
 starcoder_model_load: memory size =   768.00 MB, n_mem = 49152
 starcoder_model_load: model size  =  1026.83 MB
 main: prompt: 'def fibonnaci('
-main: number of tokens in prompt = 7, first 8 tokens: 563 24240 78 2658 64 2819 7 
+main: number of tokens in prompt = 7, first 8 tokens: 563 24240 78 2658 64 2819 7
 
 def fibonnaci(n):
     if n == 0:
