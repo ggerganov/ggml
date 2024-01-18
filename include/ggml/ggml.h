@@ -245,11 +245,9 @@
 
 #define GGML_ASSERT(x) \
     do { \
-        if (!(x)) { \
-            fflush(stdout); \
-            fprintf(stderr, "GGML_ASSERT: %s:%d: %s\n", __FILE__, __LINE__, #x); \
-            ggml_print_backtrace(); \
-            abort(); \
+        if (!(x)) {    \
+         ggml_assert_behaviour_t fn = ggml_get_assert_behaviour(); \
+         fn(__FILE__, __LINE__,#x) ;             \
         } \
     } while (0)
 
@@ -312,6 +310,12 @@ extern "C" {
 #else
     typedef uint16_t ggml_fp16_t;
 #endif
+
+    typedef void (*ggml_assert_behaviour_t) (const char* filename, int64_t line, const char* code);
+
+    // a hook to change GGML_ASSERT behaviour, default is abort.
+    GGML_API void ggml_set_assert_behaviour(ggml_assert_behaviour_t assert_func);
+    GGML_API ggml_assert_behaviour_t ggml_get_assert_behaviour(void);
 
     // convert FP16 <-> FP32
     GGML_API float       ggml_fp16_to_fp32(ggml_fp16_t x);
