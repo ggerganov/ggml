@@ -391,6 +391,31 @@ int64_t ggml_cycles_per_ms(void) {
 
 static const size_t CACHE_LINE_SIZE_F32 = CACHE_LINE_SIZE/sizeof(float);
 
+//
+// ggml assert hook
+//
+
+static ggml_assert_behaviour_t ggml_assert_behaviour = NULL;
+
+void ggml_set_assert_behaviour(ggml_assert_behaviour_t assert_func){
+    ggml_assert_behaviour = assert_func;
+}
+
+static void ggml_default_behaviour(const char* filename, int64_t line, const char* code){
+    fflush(stdout);
+    fprintf(stderr, "GGML_ASSERT: %s:%lld: %s\n", filename, line, code);
+    ggml_print_backtrace();
+    abort();
+}
+
+ggml_assert_behaviour_t ggml_get_assert_behaviour(void){
+    if (ggml_assert_behaviour != NULL){
+        return ggml_assert_behaviour;
+    }
+    ggml_assert_behaviour = &ggml_default_behaviour;
+    return ggml_assert_behaviour;
+}
+
 static void ggml_vec_dot_f32(const int n, float * restrict s, const float * restrict x, const float * restrict y);
 static void ggml_vec_dot_f16(const int n, float * restrict s, ggml_fp16_t * restrict x, ggml_fp16_t * restrict y);
 
