@@ -1,0 +1,7 @@
+module ggml [system] {
+  header "ggml.h"
+  header "ggml-alloc.h"
+  header "ggml-backend.h"
+
+  export *
+}
