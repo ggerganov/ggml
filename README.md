@@ -49,6 +49,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [X] Example of Qwen inference [QwenLM/qwen.cpp](https://github.com/QwenLM/qwen.cpp)
 - [X] Example of YOLO inference [examples/yolo](https://github.com/ggerganov/ggml/tree/master/examples/yolo)
 - [X] Example of ViT inference [staghado/vit.cpp](https://github.com/staghado/vit.cpp)
+- [X] Example of multiple LLMs inference [foldl/chatllm.cpp](https://github.com/foldl/chatllm.cpp)
 - [X] SeamlessM4T inference *(in development)* https://github.com/facebookresearch/seamless_communication/tree/main/ggml
 
 ## Whisper inference (example)

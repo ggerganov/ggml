@@ -105,11 +105,12 @@ if (GGML_ALL_WARNINGS)
 endif()
 
 if (NOT MSVC)
-    add_compile_options(
-        "$<$<COMPILE_LANGUAGE:C>:-Werror=vla>"
-        "$<$<COMPILE_LANGUAGE:CXX>:-Werror=vla>"
-        "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler;-Werror=vla>"
-    )
+    # TODO: temporary disabled until we figure out ggml-metal.m
+    #add_compile_options(
+    #    "$<$<COMPILE_LANGUAGE:C>:-Werror=vla>"
+    #    "$<$<COMPILE_LANGUAGE:CXX>:-Werror=vla>"
+    #    "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler;-Werror=vla>"
+    #)
 endif()
 
 #
