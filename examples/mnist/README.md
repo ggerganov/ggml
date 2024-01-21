@@ -3,7 +3,7 @@
 These are simple examples of how to use GGML for inferencing.
 The first example uses convolutional neural network (CNN), the second one uses fully connected neural network.
 
-## Environment setup and build the examples
+## Python environment setup and build the examples
 
 ```bash
 git clone https://github.com/ggerganov/ggml
