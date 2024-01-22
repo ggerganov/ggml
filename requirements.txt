@@ -6,3 +6,5 @@ torchaudio==2.0.2
 torchvision==0.15.2
 transformers==4.29.2
 gguf==0.4.5
+tensorflow==2.15.0
+keras==2.15.0
