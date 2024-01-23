@@ -414,6 +414,7 @@ extern "C" {
         GGML_OP_CONCAT,
         GGML_OP_SILU_BACK,
         GGML_OP_NORM, // normalize
+        GGML_OP_BATCH_NORM, 
         GGML_OP_RMS_NORM,
         GGML_OP_RMS_NORM_BACK,
         GGML_OP_GROUP_NORM,
@@ -446,6 +447,9 @@ extern "C" {
         GGML_OP_CONV_TRANSPOSE_2D,
         GGML_OP_POOL_1D,
         GGML_OP_POOL_2D,
+        GGML_OP_DEPTHWISE_CONV_STAGE_0,  // internal
+        GGML_OP_DEPTHWISE_CONV_STAGE_1,  // internal
+        GGML_OP_DEPTHWISE_CONV_STAGE_2,  // internal
         GGML_OP_UPSCALE, // nearest interpolate
         GGML_OP_PAD,
         GGML_OP_ARGSORT,
@@ -489,6 +493,7 @@ extern "C" {
         GGML_UNARY_OP_GELU,
         GGML_UNARY_OP_GELU_QUICK,
         GGML_UNARY_OP_SILU,
+        GGML_UNARY_OP_GLU,
 
         GGML_UNARY_OP_COUNT,
     };
@@ -1032,6 +1037,10 @@ extern "C" {
             struct ggml_tensor  * a,
             struct ggml_tensor  * b);
 
+    GGML_API struct ggml_tensor * ggml_glu(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
     // normalize along rows
     GGML_API struct ggml_tensor * ggml_norm(
             struct ggml_context * ctx,
@@ -1042,6 +1051,15 @@ extern "C" {
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             float                 eps);
+    
+    GGML_API struct ggml_tensor * ggml_batch_norm(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * gamma,
+            struct ggml_tensor  * beta,
+            struct ggml_tensor  * running_mean,
+            struct ggml_tensor  * running_var,
+            float eps);
 
     GGML_API struct ggml_tensor * ggml_rms_norm(
             struct ggml_context * ctx,
@@ -1482,6 +1500,12 @@ extern "C" {
             int                  d0,
             int                  d1,
             bool                 is_2D);
+
+    GGML_API struct ggml_tensor * ggml_depthwise_conv(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        struct ggml_tensor  * b,
+        int                   p0);
 
     GGML_API struct ggml_tensor * ggml_conv_1d(
             struct ggml_context * ctx,

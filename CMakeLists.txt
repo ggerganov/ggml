@@ -4,6 +4,7 @@ project(ggml VERSION 0.1.0)
 set(CMAKE_EXPORT_COMPILE_COMMANDS "on")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(GGML_STANDALONE ON)
@@ -167,11 +168,19 @@ endif()
 # dependencies
 
 set(CMAKE_C_STANDARD   11)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 
 find_package(Threads REQUIRED)
 
 # main
+# message(STATUS "Current directory is: ${CMAKE_CURRENT_SOURCE_DIR}/examples/kaldi-native-fbank/csrc/")
+file(GLOB KALDI_NATIVE_FBANK_SOURCES
+     "${CMAKE_CURRENT_SOURCE_DIR}/examples/kaldi-native-fbank/csrc/*"
+)
+add_library(kaldi-native-fbank STATIC ${KALDI_NATIVE_FBANK_SOURCES})
+target_include_directories(kaldi-native-fbank PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/kaldi-native-fbank/csrc
+)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
