@@ -178,25 +178,25 @@ if (GGML_OPENBLAS)
 endif()
 
 if (GGML_CLBLAST)
-	set(CLBLAST_INCLUDE_SEARCH_PATHS
+    set(CLBLAST_INCLUDE_SEARCH_PATHS
         /usr/include
         /usr/local/include
-	    $ENV{CLBLAST_HOME}
-	    $ENV{CLBLAST_HOME}/include
+        $ENV{CLBLAST_HOME}
+        $ENV{CLBLAST_HOME}/include
         )
-	find_path(CLBLAST_INC NAMES clblast.h PATHS ${CLBLAST_INCLUDE_SEARCH_PATHS})
-	find_library(CLBLAST_LIB NAMES clblast)
-	find_library(OPENCL_LIB NAMES OpenCL)
-	if (CLBLAST_LIB AND OPENCL_LIB AND CLBLAST_INC)
-		message(STATUS "clBLAST found")
+    find_path(CLBLAST_INC NAMES clblast.h PATHS ${CLBLAST_INCLUDE_SEARCH_PATHS})
+    find_library(CLBLAST_LIB NAMES clblast)
+    find_library(OPENCL_LIB NAMES OpenCL)
+    if (CLBLAST_LIB AND OPENCL_LIB AND CLBLAST_INC)
+        message(STATUS "clBLAST found")
 
-		set(GGML_EXTRA_INCS  ${GGML_EXTRA_INCS}  ${CLBLAST_INC})
-		set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${CLBLAST_LIB}  ${OPENCL_LIB})
-		set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CLBLAST)
+        set(GGML_EXTRA_INCS  ${GGML_EXTRA_INCS}  ${CLBLAST_INC})
+        set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${CLBLAST_LIB}  ${OPENCL_LIB})
+        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CLBLAST)
 
-		set(GGML_OPENCL_SOURCES ggml-opencl.cpp ggml-opencl.h)
+        set(GGML_OPENCL_SOURCES ggml-opencl.cpp ggml-opencl.h)
 
-		link_libraries("-Wl,--copy-dt-needed-entries")
+        link_libraries("-Wl,--copy-dt-needed-entries")
     else()
         message(WARNING "clBLAST not found")
     endif()
