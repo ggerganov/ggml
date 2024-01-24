@@ -223,41 +223,6 @@ export LD_LIBRARY_PATH=/system/vendor/lib64/egl:/data/local/tmp
 ./bin/gpt-2-backend -m models/ggml-model.bin -n 64 -p "Pepperoni pizza"
 ```
 
-<details><summary>Output</summary>
-```
-main: seed = 1706101586
-gpt2_model_load: loading model from 'models/ggml-model.bin'
-gpt2_model_load: n_vocab = 50257
-gpt2_model_load: n_ctx   = 1024
-gpt2_model_load: n_embd  = 768
-gpt2_model_load: n_head  = 12
-gpt2_model_load: n_layer = 12
-gpt2_model_load: ftype   = 1
-gpt2_model_load: qntvr   = 0
-ggml_opencl: selecting platform: 'ARM Platform'
-ggml_opencl: selecting device: 'Mali-G710 r0p0'
-ggml_opencl: device FP16 support: true
-gpt2_model_load: using CPU backend
-gpt2_model_load: ggml tensor size    = 368 bytes
-gpt2_model_load: backend buffer size = 312.70 MB
-gpt2_model_load: memory size =   144.00 MB, n_mem = 24576
-gpt2_model_load: model size  =   239.08 MB
-extract_tests_from_file : No test file found.
-test_gpt_tokenizer : 0 tests failed out of 0 tests.
-main: compute buffer size: 6.87 MB
-main: prompt: 'Pepperoni pizza'
-main: number of tokens in prompt = 4, first 8 tokens: 6435 2848 14651 14256 
-
-Pepperoni pizza is a staple at most restaurants in the US. This is the most popular pizza style in the country, so they are famous for their pepperoni pizzas, which are usually made from scratch, and have a variety of toppings such as chili pepper, tomato paste, mustard and pepperoni. They also sell pepperoni
-
-main:     load time =   486.01 ms
-main:   sample time =    23.21 ms
-main:  predict time =  2166.68 ms / 32.34 ms per token
-main:    total time =  2680.16 ms
-```
-</details>
-
-
 ## Resources
 
 - [GGML - Large Language Models for Everyone](https://github.com/rustformers/llm/blob/main/crates/ggml/README.md): a description of the GGML format provided by the maintainers of the `llm` Rust crate, which provides Rust bindings for GGML
