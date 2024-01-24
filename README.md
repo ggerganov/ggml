@@ -177,6 +177,7 @@ export LD_LIBRARY_PATH=/data/local/tmp
 Build CLBlast.
 
 ```bash
+# In CLBlast/build
 $ANDROID_SDK_PATH/cmake/3.22.1/bin/cmake .. \
     -DCMAKE_SYSTEM_NAME=Android \
     -DCMAKE_SYSTEM_VERSION=33 \
@@ -199,6 +200,7 @@ Build ggml with CLBlast.
 export OPENCL_ROOT=$(readlink -f ../../OpenCL-Headers)
 export CLBLAST_HOME=$(readlink -f ../../CLBlast)
 
+# In ggml/build
 $ANDROID_SDK_PATH/cmake/3.22.1/bin/cmake .. \
     -DGGML_CLBLAST=ON \
     -DCMAKE_SYSTEM_NAME=Android \
