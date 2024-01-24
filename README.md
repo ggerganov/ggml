@@ -233,6 +233,10 @@ export LD_LIBRARY_PATH=/system/vendor/lib64/egl:/data/local/tmp
 ./bin/gpt-2-backend -m models/ggml-model.bin -n 64 -p "Pepperoni pizza"
 ```
 
+OpenCL does not have the same level of support as CUDA or Metal. In the
+`gpt-2-backend` example (or any other really), OpenCL will only be used for the
+matrix multiplications when evaluating large prompts.
+
 ## Resources
 
 - [GGML - Large Language Models for Everyone](https://github.com/rustformers/llm/blob/main/crates/ggml/README.md): a description of the GGML format provided by the maintainers of the `llm` Rust crate, which provides Rust bindings for GGML
