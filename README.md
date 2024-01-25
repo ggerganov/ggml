@@ -177,9 +177,6 @@ export LD_LIBRARY_PATH=/data/local/tmp
 Build CLBlast.
 
 ```bash
-# Set paths to OpenCL headers
-export OPENCL_ROOT=$(readlink -f ../../OpenCL-Headers)
-
 # In CLBlast/build
 $ANDROID_SDK_PATH/cmake/3.22.1/bin/cmake .. \
     -DCMAKE_SYSTEM_NAME=Android \
@@ -206,9 +203,6 @@ adb pull /system/vendor/lib64/egl/libGLES_mali.so arm64-v8a/libOpenCL.so
 Build ggml with CLBlast.
 
 ```bash
-# Set paths to CLBlast
-export CLBLAST_HOME=$(readlink -f ../../CLBlast)
-
 # In ggml/build
 cd build
 $ANDROID_SDK_PATH/cmake/3.22.1/bin/cmake .. \
@@ -220,6 +214,7 @@ $ANDROID_SDK_PATH/cmake/3.22.1/bin/cmake .. \
     -DCMAKE_ANDROID_STL_TYPE=c++_shared \
     -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH \
     -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH \
+    -DCLBLAST_HOME=$(readlink -f ../../CLBlast) \
     -DOPENCL_LIB=$(readlink -f ../arm64-v8a/libOpenCL.so)
 
 # Run make, adb push, etc.
