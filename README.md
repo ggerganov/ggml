@@ -228,9 +228,7 @@ export LD_LIBRARY_PATH=/system/vendor/lib64/egl:/data/local/tmp
 ./bin/gpt-2-backend -m models/ggml-model.bin -n 64 -p "Pepperoni pizza"
 ```
 
-OpenCL does not have the same level of support as CUDA or Metal. In the
-`gpt-2-backend` example (or any other really), OpenCL will only be used for the
-matrix multiplications when evaluating large prompts.
+OpenCL does not have the same level of support in `ggml-backend` as CUDA or Metal. In the `gpt-2-backend` example, OpenCL will only be used for the matrix multiplications when evaluating large prompts.
 
 ## Resources
 
