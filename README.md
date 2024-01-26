@@ -172,6 +172,64 @@ export LD_LIBRARY_PATH=/data/local/tmp
 ./bin/gpt-2-backend -m models/ggml-model.bin -p "this is an example"
 ```
 
+### CLBlast for Android
+
+Build CLBlast.
+
+```bash
+# In CLBlast/build
+$ANDROID_SDK_PATH/cmake/3.22.1/bin/cmake .. \
+    -DCMAKE_SYSTEM_NAME=Android \
+    -DCMAKE_SYSTEM_VERSION=33 \
+    -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a \
+    -DCMAKE_ANDROID_NDK=$ANDROID_NDK_PATH \
+    -DCMAKE_ANDROID_STL_TYPE=c++_static \
+    -DOPENCL_ROOT=$(readlink -f ../../OpenCL-Headers) \
+    -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH \
+    -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH
+
+# Build libclblast.so
+make -j4
+```
+
+Pull `libGLES_mali.so` to `libOpenCL.so`.
+
+```bash
+# In ggml project root.
+mkdir arm64-v8a
+adb pull /system/vendor/lib64/egl/libGLES_mali.so arm64-v8a/libOpenCL.so
+```
+
+Build ggml with CLBlast.
+
+```bash
+# In ggml/build
+cd build
+$ANDROID_SDK_PATH/cmake/3.22.1/bin/cmake .. \
+    -DGGML_CLBLAST=ON \
+    -DCMAKE_SYSTEM_NAME=Android \
+    -DCMAKE_SYSTEM_VERSION=33 \
+    -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a \
+    -DCMAKE_ANDROID_NDK=$ANDROID_NDK_PATH \
+    -DCMAKE_ANDROID_STL_TYPE=c++_shared \
+    -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH \
+    -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH \
+    -DCLBLAST_HOME=$(readlink -f ../../CLBlast) \
+    -DOPENCL_LIB=$(readlink -f ../arm64-v8a/libOpenCL.so)
+
+# Run make, adb push, etc.
+```
+
+Then in `adb shell`...
+
+```bash
+cd /data/local/tmp
+export LD_LIBRARY_PATH=/system/vendor/lib64/egl:/data/local/tmp
+./bin/gpt-2-backend -m models/ggml-model.bin -n 64 -p "Pepperoni pizza"
+```
+
+OpenCL does not have the same level of support in `ggml-backend` as CUDA or Metal. In the `gpt-2-backend` example, OpenCL will only be used for the matrix multiplications when evaluating large prompts.
+
 ## Resources
 
 - [GGML - Large Language Models for Everyone](https://github.com/rustformers/llm/blob/main/crates/ggml/README.md): a description of the GGML format provided by the maintainers of the `llm` Rust crate, which provides Rust bindings for GGML
