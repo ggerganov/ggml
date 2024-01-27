@@ -19227,8 +19227,17 @@ static bool gguf_fread_str(FILE * file, struct gguf_str * p, size_t * offset) {
 
     bool ok = true;
 
-    ok = ok && gguf_fread_el(file, &p->n,    sizeof(p->n), offset); p->data = calloc(p->n + 1, 1);
-    ok = ok && gguf_fread_el(file,  p->data, p->n,         offset);
+    ok = ok && gguf_fread_el(file, &p->n, sizeof(p->n), offset);
+
+    // early exit if string length is invalid, prevents from integer overflow
+    if (p->n == SIZE_MAX) {
+        fprintf(stderr, "%s: invalid string length (%" PRIu64 ")\n", __func__, p->n);
+        return false;
+    }
+
+    p->data = calloc(p->n + 1, 1);
+
+    ok = ok && gguf_fread_el(file,  p->data, p->n, offset);
 
     return ok;
 }
@@ -19300,6 +19309,13 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
             return NULL;
         }
 
+        // sanity-checks to prevent from integer/buffer overflows
+        // - sizeof(struct gguf_tensor_info)*n_tensors < SIZE_MAX
+        // - sizeof(struct gguf_kv)*n_kv               < SIZE_MAX
+
+        ok = ok && (ctx->header.n_tensors < SIZE_MAX/sizeof(struct gguf_tensor_info));
+        ok = ok && (ctx->header.n_kv      < SIZE_MAX/sizeof(struct gguf_kv));
+
         if (!ok) {
             fprintf(stderr, "%s: failed to read header\n", __func__);
             fclose(file);
@@ -19338,7 +19354,7 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
                 case GGUF_TYPE_ARRAY:
                     {
                         ok = ok && gguf_fread_el(file, &kv->value.arr.type, sizeof(kv->value.arr.type), &offset);
-                        ok = ok && gguf_fread_el(file, &kv->value.arr.n,    sizeof(kv->value.arr.n), &offset);
+                        ok = ok && gguf_fread_el(file, &kv->value.arr.n,    sizeof(kv->value.arr.n),    &offset);
 
                         switch (kv->value.arr.type) {
                             case GGUF_TYPE_UINT8:
@@ -19353,12 +19369,30 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
                             case GGUF_TYPE_FLOAT64:
                             case GGUF_TYPE_BOOL:
                                 {
+                                    // prevent from integer overflow in the malloc below
+                                    if (kv->value.arr.n < SIZE_MAX/GGUF_TYPE_SIZE[kv->value.arr.type]) {
+                                        fprintf(stderr, "%s: array size is too large (%" PRIu64 ")\n", __func__, kv->value.arr.n);
+                                        fclose(file);
+                                        gguf_free(ctx);
+                                        return NULL;
+                                    }
+
                                     kv->value.arr.data = malloc(kv->value.arr.n * GGUF_TYPE_SIZE[kv->value.arr.type]);
+
                                     ok = ok && gguf_fread_el(file, kv->value.arr.data, kv->value.arr.n * GGUF_TYPE_SIZE[kv->value.arr.type], &offset);
                                 } break;
                             case GGUF_TYPE_STRING:
                                 {
+                                    // prevent from integer overflow in the malloc below
+                                    if (kv->value.arr.n < SIZE_MAX/sizeof(struct gguf_str)) {
+                                        fprintf(stderr, "%s: array size is too large (%" PRIu64 ")\n", __func__, kv->value.arr.n);
+                                        fclose(file);
+                                        gguf_free(ctx);
+                                        return NULL;
+                                    }
+
                                     kv->value.arr.data = malloc(kv->value.arr.n * sizeof(struct gguf_str));
+
                                     for (uint64_t j = 0; j < kv->value.arr.n; ++j) {
                                         ok = ok && gguf_fread_str(file, &((struct gguf_str *) kv->value.arr.data)[j], &offset);
                                     }
