@@ -137,7 +137,6 @@ void model_loader::load_vocab(llama_vocab& vocab, std::ifstream &fin)
     if (vocab_size == 0) {
         return;
     }
-    printf("load vocab 0\n");
 
     vocab.token_to_id.reserve(vocab_size);
     vocab.id_to_token.reserve(vocab_size);
@@ -145,17 +144,11 @@ void model_loader::load_vocab(llama_vocab& vocab, std::ifstream &fin)
     std::string packed_vocab = get_name(fin);
     std::int64_t ctx_size = vocab_size * sizeof(float) + vocab_size + 2 * ggml_tensor_overhead();
     ctx_size *= 2;
-    printf("load vocab 1\n");
     ggml_context* ctx = ggml_init(ggml_init_params{static_cast<size_t>(ctx_size), nullptr, false});
-    printf("load vocab 1.1\n");
     ggml_tensor* lengths_tensor = load_tensor_value(fin, ctx, true);
-    printf("load vocab 1.2\n");
     std::int8_t* lengths = (std::int8_t*)lengths_tensor->data;
-    printf("load vocab 1.3\n");
     ggml_tensor* scores_tensor = load_tensor_value(fin, ctx, true);
-    printf("load vocab 1.4\n");
     float* scores = ggml_get_data_f32(scores_tensor);
-    printf("load vocab 2\n");
 
     int64_t offset = 0;
     for (int i = 0; i < vocab_size; ++i) {
@@ -165,7 +158,6 @@ void model_loader::load_vocab(llama_vocab& vocab, std::ifstream &fin)
         vocab.id_to_token.push_back({word, scores[i], LLAMA_TOKEN_TYPE_NORMAL});
         offset += lengths[i] + 1;
     }
-    printf("load vocab 3\n");
     // Since we copied lengths and scores, we don't need the context anymore.
     ggml_free(ctx);
 
@@ -224,22 +216,14 @@ model_loader::get_name(std::ifstream& fin)
 
 extern "C" int load_fairseq2_ggml_file(fairseq2_model& model, const char* fname) {
     model_loader loader;
-    printf("here 1\n");
     assert_endianness();
-    printf("here 2\n");
     auto fin = open_ggml_file(fname);
-    printf("here 3\n");
     loader.load_hparams(model.hparams, fin);
-    printf("here 4\n");
     loader.load_hparams(model.layer_config, fin);
-    printf("here 4.2\n");
     loader.load_vocab(model.vocab, fin);
-    printf("here 4.7\n");
     loader.load_model_weights(model, fin);
-    printf("here 5\n");
     
     // load optional target vocabulary in cases of bilingual models
     loader.load_vocab(model.tgt_vocab, fin);
-    printf("here 6\n");
     return 0;
 }

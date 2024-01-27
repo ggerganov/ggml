@@ -450,6 +450,10 @@ extern "C" {
         GGML_OP_DEPTHWISE_CONV_STAGE_0,  // internal
         GGML_OP_DEPTHWISE_CONV_STAGE_1,  // internal
         GGML_OP_DEPTHWISE_CONV_STAGE_2,  // internal
+
+        GGML_OP_CONV_1D_GENERIC_STAGE_0,
+        GGML_OP_CONV_1D_GENERIC_STAGE_1,  
+        
         GGML_OP_UPSCALE, // nearest interpolate
         GGML_OP_PAD,
         GGML_OP_ARGSORT,

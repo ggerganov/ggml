@@ -810,14 +810,22 @@ extern "C" ggml_tensor* StandardConformerEncoderAdaptorLayer_forward(
     ggml_tensor* residual = seqs;
     residual = LayerNorm_forward(model, prefix + ".residual_layer_norm", residual);
     residual = ggml_dup(ctx, ggml_permute(ctx, residual, 1, 0, 2, 3));
-    residual = ggml_conv_1d(ctx, model.tensors[prefix + ".residual_conv.weight"], residual, 8, 4, 1);
+    ggml_tensor* residual_conv_weight = model.tensors[prefix + ".residual_conv.weight"];
+    // ggml_tensor* from = model.tensors[prefix + ".residual_conv.weight"];
+    // FORCE_ALLOC(residual_conv_weight, ctx, ggml_new_tensor_3d(ctx, GGML_TYPE_F16, from->ne[0], from->ne[1], from->ne[2]));
+    // ggml_fp32_to_fp16_row((float*)model.tensors[prefix + ".residual_conv.weight"]->data, (ggml_fp16_t*)residual_conv_weight->data, from->ne[0] * from->ne[1] * from->ne[2]);
+    residual = ggml_conv_1d(ctx, residual_conv_weight, residual, 8, 4, 1);
     residual = ggml_dup(ctx, ggml_permute(ctx, residual, 1, 0, 2, 3));
     residual = ggml_add_inplace(ctx, ggml_repeat(ctx, model.tensors[prefix + ".residual_conv.bias"], residual), residual);
     residual = ggml_glu(ctx, residual);
 
     seqs = LayerNorm_forward(model, prefix + ".self_attn_layer_norm", seqs);
     seqs = ggml_dup(ctx, ggml_permute(ctx, seqs, 1, 0, 2, 3));
-    seqs = ggml_conv_1d(ctx, model.tensors[prefix + ".self_attn_conv.weight"], seqs, 8, 4, 1);
+    ggml_tensor* self_attn_conv_weight = model.tensors[prefix + ".self_attn_conv.weight"];
+    // from = model.tensors[prefix + ".self_attn_conv.weight"];
+    // FORCE_ALLOC(self_attn_conv_weight, ctx, ggml_new_tensor_3d(ctx, GGML_TYPE_F16, from->ne[0], from->ne[1], from->ne[2]));
+    // ggml_fp32_to_fp16_row((float*)model.tensors[prefix + ".self_attn_conv.weight"]->data, (ggml_fp16_t*)residual_conv_weight->data, from->ne[0] * from->ne[1] * from->ne[2]);
+    seqs = ggml_conv_1d(ctx, self_attn_conv_weight, seqs, 8, 4, 1);
     seqs = ggml_dup(ctx, ggml_permute(ctx, seqs, 1, 0, 2, 3));
     seqs = ggml_add_inplace(ctx, seqs, ggml_repeat(ctx, model.tensors[prefix + ".self_attn_conv.bias"], seqs));
     seqs = ggml_glu(ctx, seqs);

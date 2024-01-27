@@ -68,7 +68,7 @@ extern "C" Result unity_eval_speech(fairseq2_model& model, std::vector<float>& d
     Result result;
     // The ctx_size_mb mostly depends of input length and model dim.
     int ctx_size_mb = opts.mem_mb;
-    auto encoder_buf = std::vector<uint8_t>(8 * 1024 * 1024);  // this is only for tensor metadata, it can be small
+    auto encoder_buf = std::vector<uint8_t>(80 * 1024 * 1024);  // this is only for tensor metadata, it can be small
     auto encoder_fwd_buf = std::vector<uint8_t>(ctx_size_mb * 1024 * 1024);
     ggml_allocr* fwd_alloc = ggml_allocr_new(encoder_fwd_buf.data(), encoder_fwd_buf.capacity(), 8);
     int tgt_lang_idx;
@@ -97,6 +97,11 @@ extern "C" Result unity_eval_speech(fairseq2_model& model, std::vector<float>& d
     ggml_graph_compute_with_ctx(model.ctx, gf, n_threads);
     // encoder_output is valid until we call `ggml_allocr_reset(fwd_alloc)`
     ggml_tensor* encoder_output = gf->nodes[gf->n_nodes - 1];
+    // for(int i = 0; i < 100; i++) {
+    //     float* ptr = static_cast<float*>(encoder_output->data);
+    //     printf("%4f ", ptr[i]);
+    // }
+    // exit(0);
 
     // Beam search decoding
     const Hypothesis* hypo = unity_decode(model, opts, tgt_lang_idx, encoder_output, n_threads);

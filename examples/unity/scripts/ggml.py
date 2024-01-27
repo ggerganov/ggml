@@ -55,14 +55,14 @@ import sys
 import ctypes
 import pathlib
 import importlib.resources
-from typing import Callable, List, Optional, Sequence, Union
+from pathlib import Path
+from typing import List, Optional, Sequence, Union, Callable
 from typing_extensions import TypeAlias
 
 
 # Load the library
-def load_shared_library(module_name: str, lib_base_name: str):
+def load_shared_library(base_path: Path, lib_base_name: str):
     # Construct the paths to the possible shared library names
-    base_path = pathlib.Path(__file__).parent.resolve()
     # Searching for the library in the current directory under the name "libggml" (default name
     # for ggml) and "ggml" (default name for this repo)
     lib_names: List[str] = [
@@ -71,41 +71,30 @@ def load_shared_library(module_name: str, lib_base_name: str):
         f"{lib_base_name}.dll",
     ]
 
-    path: Optional[pathlib.Path] = None
-
-    for lib_name in lib_names:
-        try:
-            print(module_name)
-            print(lib_name)
-            with importlib.resources.path(module_name, lib_name) as p:
-                if os.path.exists(p):
-                    path = p
-                    break
-        except FileNotFoundError:
-            pass
-
-    if path is None:
-        raise FileNotFoundError(
-            f"Shared library with base name '{lib_base_name}' not found"
-        )
-
     cdll_args = dict()  # type: ignore
     # Add the library directory to the DLL search path on Windows (if needed)
     if sys.platform == "win32" and sys.version_info >= (3, 8):
         os.add_dll_directory(str(base_path))
         cdll_args["winmode"] = 0
 
-    # Try to load the shared library, handling potential errors
-    try:
-        return ctypes.CDLL(str(path), **cdll_args)
-    except Exception as e:
-        raise RuntimeError(f"Failed to load shared library '{path}': {e}")
+    for lib_name in lib_names:
+        # Try to load the shared library, handling potential errors
+        path = base_path / lib_name
+        if not path.exists():
+            continue
+        try:
+            return ctypes.CDLL(str(path), **cdll_args)
+        except Exception as e:
+            raise RuntimeError(f"Failed to load shared library '{path}': {e}")
+
+    raise FileNotFoundError(
+        f"Shared library with base name '{lib_base_name}' not found in {base_path}"
+    )
 
 
-module_name = "ggml"
-lib_base_name = "ggml"
-lib = load_shared_library(module_name, lib_base_name)
-
+base_path = pathlib.Path(__file__).parent.resolve() / "../../../build/examples/unity"
+lib_base_name = "fairseq2_cpp"
+lib = load_shared_library(base_path, lib_base_name)
 
 #####################################################
 # GGML Utility Types
@@ -230,7 +219,6 @@ lib.ggml_fp32_to_fp16_row.argtypes = [
     ctypes.c_int,
 ]
 lib.ggml_fp32_to_fp16_row.restype = None
-
 
 # struct ggml_context;
 ggml_context_p = ctypes.c_void_p
@@ -7330,29 +7318,29 @@ lib.ggml_quantize_chunk.restype = ctypes.c_size_t
 
 # // These are needed for IQ2_XS and IQ2_XXS quantizations
 # GGML_API void ggml_init_iq2_quantization(enum ggml_type type);
-def ggml_init_iq2_quantization(
-    type: Union[ctypes.c_int, int],
-):
-    return lib.ggml_init_iq2_quantization(type)
+# def ggml_init_iq2_quantization(
+#     type: Union[ctypes.c_int, int],
+# ):
+#     return lib.ggml_init_iq2_quantization(type)
 
 
-lib.ggml_init_iq2_quantization.argtypes = [
-    ctypes.c_int,
-]
-lib.ggml_init_iq2_quantization.restype = None
+# lib.ggml_init_iq2_quantization.argtypes = [
+#     ctypes.c_int,
+# ]
+# lib.ggml_init_iq2_quantization.restype = None
 
 
 # GGML_API void ggml_deinit_iq2_quantization(enum ggml_type type);
-def ggml_deinit_iq2_quantization(
-    type: Union[ctypes.c_int, int],
-):
-    return lib.ggml_deinit_iq2_quantization(type)
+# def ggml_deinit_iq2_quantization(
+#     type: Union[ctypes.c_int, int],
+# ):
+#     return lib.ggml_deinit_iq2_quantization(type)
 
 
-lib.ggml_deinit_iq2_quantization.argtypes = [
-    ctypes.c_int,
-]
-lib.ggml_deinit_iq2_quantization.restype = None
+# lib.ggml_deinit_iq2_quantization.argtypes = [
+#     ctypes.c_int,
+# ]
+# lib.ggml_deinit_iq2_quantization.restype = None
 
 # //
 # // Importance matrix
@@ -7364,18 +7352,18 @@ ggml_collect_imatrix_t = ctypes.CFUNCTYPE(
 
 
 # GGML_API void ggml_set_imatrix_collection(ggml_collect_imatrix_t imatrix_collect);
-def ggml_set_imatrix_collection(
-    imatrix_collect: Callable[
-        [ggml_tensor_p, ggml_tensor_p], None
-    ]  # TODO: Fix type signature here
-):
-    return lib.ggml_set_imatrix_collection(imatrix_collect)
+# def ggml_set_imatrix_collection(
+#     imatrix_collect: Callable[
+#         [ggml_tensor_p, ggml_tensor_p], None
+#     ]  # TODO: Fix type signature here
+# ):
+#     return lib.ggml_set_imatrix_collection(imatrix_collect)
 
 
-lib.ggml_set_imatrix_collection.argtypes = [
-    ggml_collect_imatrix_t,
-]
-lib.ggml_set_imatrix_collection.restype = None
+# lib.ggml_set_imatrix_collection.argtypes = [
+#     ggml_collect_imatrix_t,
+# ]
+# lib.ggml_set_imatrix_collection.restype = None
 
 # //
 # // gguf

@@ -99,22 +99,21 @@ int main(int argc, char ** argv) {
 
     // The ctx_size_mb mostly depends of input length and model dim.
     int ctx_size_mb = params.opts.mem_mb;
-    auto encoder_buf = std::vector<uint8_t>(8 * 1024 * 1024); // Only tensor metadata goes in there
     auto encoder_fwd_buf = std::vector<uint8_t>(ctx_size_mb * 1024 * 1024 / 2);
 
     while (true) {
         // S2ST
         if (!params.text) {
-            std::string input;
-            std::cout << "\nEnter audio_path and tgt_lang, separated by space (or 'exit' to quit):\n";
-            std::getline(std::cin, input);
-            if (input == "exit") {
-                break;
-            }
-            std::istringstream iss(input);
-            std::string audio_path;
-            std::string tgt_lang;
-            iss >> audio_path >> tgt_lang;
+            // std::string input;
+            // std::cout << "\nEnter audio_path and tgt_lang, separated by space (or 'exit' to quit):\n";
+            // std::getline(std::cin, input);
+            // if (input == "exit") {
+            //     break;
+            // }
+            // std::istringstream iss(input);
+            std::string audio_path = "/private/home/yilinyang/tmp/LJ037-0171_sr16k.wav";
+            std::string tgt_lang = "eng";
+            // iss >> audio_path >> tgt_lang;
             if (audio_path == "-") {
                 audio_path = "/proc/self/fd/0";
             }
