@@ -47,7 +47,6 @@ void load_model(simple_model & model, float* a, float* b) {
 }
 
 // build the compute graph to perform a matrix multiplication
-
 struct ggml_cgraph * build_graph(const simple_model& model) {
     struct ggml_cgraph  * gf = ggml_new_graph(model.ctx);
 
@@ -60,7 +59,6 @@ struct ggml_cgraph * build_graph(const simple_model& model) {
 
 // compute with backend
 struct ggml_tensor* compute(const simple_model & model) {
-    // reset the allocator to free all the memory allocated during the previous inference
     struct ggml_cgraph * gf = build_graph(model);
 
     int n_threads = 1; // number of threads to perform some operations with multi-threading
@@ -75,7 +73,7 @@ int main(void)
 {
     ggml_time_init();
 
-    // initialize data of matrices to perfom matrix multiplication
+    // initialize data of matrices to perform matrix multiplication
 
     float matrix_A[4] = {
         2, 8,
@@ -91,7 +89,7 @@ int main(void)
     simple_model model;
     load_model(model, matrix_A, matrix_B);
 
-    // perform computation just in cpu
+    // perform computation in cpu
     struct ggml_tensor * result = compute(model);
 
     // get the result data pointer as a float array to print

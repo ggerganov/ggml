@@ -83,7 +83,6 @@ void load_model(simple_model & model, float* a, float* b) {
 }
 
 // build the compute graph to perform a matrix multiplication
-
 struct ggml_cgraph * build_graph(const simple_model& model, struct ggml_allocr * allocr) {
     static size_t buf_size = ggml_tensor_overhead()*GGML_DEFAULT_GRAPH_SIZE + ggml_graph_overhead();
     static std::vector<uint8_t> buf(buf_size);
@@ -142,7 +141,7 @@ int main(void)
 {
     ggml_time_init();
 
-    // initialize data of matrices to perfom matrix multiplication
+    // initialize data of matrices to perform matrix multiplication
 
     float matrix_A[4] = {
         2, 8,
