@@ -218,6 +218,7 @@ inline static void * ggml_aligned_malloc(size_t size) {
                 break;
         }
         GGML_PRINT("%s: %s (attempted to allocate %6.2f MB)\n", __func__, error_desc, size/(1024.0*1024.0));
+        GGML_ASSERT(false);
         return NULL;
     }
     return aligned_memory;
@@ -229,6 +230,38 @@ inline static void * ggml_aligned_malloc(size_t size) {
 #define GGML_ALIGNED_FREE(ptr)    free(ptr)
 #endif
 #endif
+
+inline static void * ggml_malloc(size_t size) {
+    if (size == 0) {
+        GGML_PRINT("WARNING: Behavior may be unexpected when allocating 0 bytes for ggml_malloc!\n");
+        return NULL;
+    }
+    void * result = malloc(size);
+    if (result == NULL) {
+        GGML_PRINT("%s: failed to allocate %6.2f MB\n", __func__, size/(1024.0*1024.0));
+        GGML_ASSERT(false);
+    }
+    return result;
+}
+
+// calloc
+inline static void * ggml_calloc(size_t num, size_t size) {
+    if (num == 0 || size == 0) {
+        GGML_PRINT("WARNING: Behavior may be unexpected when allocating 0 bytes for ggml_calloc!\n");
+        return NULL;
+    }
+    void * result = calloc(num, size);
+    if (result == NULL) {
+        GGML_PRINT("%s: failed to allocate %6.2f MB\n", __func__, size/(1024.0*1024.0));
+        GGML_ASSERT(false);
+    }
+    return result;
+}
+
+#define GGML_MALLOC(size)      ggml_malloc(size)
+#define GGML_CALLOC(num, size) ggml_calloc(num, size)
+
+#define GGML_FREE(ptr) free(ptr)
 
 #define UNUSED GGML_UNUSED
 #define SWAP(x, y, T) do { T SWAP = x; x = y; y = SWAP; } while (0)
@@ -15129,13 +15162,13 @@ struct ggml_hash_set ggml_hash_set_new(size_t size) {
     size = ggml_hash_size(size);
     struct ggml_hash_set result;
     result.size = size;
-    result.keys = malloc(sizeof(struct ggml_tensor *) * size);
+    result.keys = GGML_MALLOC(sizeof(struct ggml_tensor *) * size);
     memset(result.keys, 0, sizeof(struct ggml_tensor *) * size);
     return result;
 }
 
 static void ggml_hash_set_free(struct ggml_hash_set hash_set) {
-    free(hash_set.keys);
+    GGML_FREE(hash_set.keys);
 }
 
 struct hash_map {
@@ -15144,17 +15177,17 @@ struct hash_map {
 };
 
 static struct hash_map * ggml_new_hash_map(size_t size) {
-    struct hash_map * result = malloc(sizeof(struct hash_map));
+    struct hash_map * result = GGML_MALLOC(sizeof(struct hash_map));
     result->set = ggml_hash_set_new(size);
-    result->vals = malloc(sizeof(struct ggml_tensor *) * result->set.size);
+    result->vals = GGML_MALLOC(sizeof(struct ggml_tensor *) * result->set.size);
     memset(result->vals, 0, sizeof(struct ggml_tensor *) * result->set.size);
     return result;
 }
 
 static void ggml_hash_map_free(struct hash_map * map) {
     ggml_hash_set_free(map->set);
-    free(map->vals);
-    free(map);
+    GGML_FREE(map->vals);
+    GGML_FREE(map);
 }
 
 // gradient checkpointing
@@ -19240,7 +19273,7 @@ static bool gguf_fread_str(FILE * file, struct gguf_str * p, size_t * offset) {
         return false;
     }
 
-    p->data = calloc(p->n + 1, 1);
+    p->data = GGML_CALLOC(p->n + 1, 1);
 
     ok = ok && gguf_fread_el(file,  p->data, p->n, offset);
 
@@ -19331,7 +19364,7 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
 
     // read the kv pairs
     {
-        ctx->kv = malloc(ctx->header.n_kv * sizeof(struct gguf_kv));
+        ctx->kv = GGML_MALLOC(ctx->header.n_kv * sizeof(struct gguf_kv));
 
         for (uint64_t i = 0; i < ctx->header.n_kv; ++i) {
             struct gguf_kv * kv = &ctx->kv[i];
@@ -19382,7 +19415,7 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
                                         return NULL;
                                     }
 
-                                    kv->value.arr.data = malloc(kv->value.arr.n * gguf_type_size(kv->value.arr.type));
+                                    kv->value.arr.data = GGML_MALLOC(kv->value.arr.n * gguf_type_size(kv->value.arr.type));
 
                                     ok = ok && gguf_fread_el(file, kv->value.arr.data, kv->value.arr.n * gguf_type_size(kv->value.arr.type), &offset);
                                 } break;
@@ -19396,7 +19429,7 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
                                         return NULL;
                                     }
 
-                                    kv->value.arr.data = malloc(kv->value.arr.n * sizeof(struct gguf_str));
+                                    kv->value.arr.data = GGML_MALLOC(kv->value.arr.n * sizeof(struct gguf_str));
 
                                     for (uint64_t j = 0; j < kv->value.arr.n; ++j) {
                                         ok = ok && gguf_fread_str(file, &((struct gguf_str *) kv->value.arr.data)[j], &offset);
@@ -19424,7 +19457,7 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
 
     // read the tensor infos
     {
-        ctx->infos = malloc(ctx->header.n_tensors * sizeof(struct gguf_tensor_info));
+        ctx->infos = GGML_MALLOC(ctx->header.n_tensors * sizeof(struct gguf_tensor_info));
 
         for (uint64_t i = 0; i < ctx->header.n_tensors; ++i) {
             struct gguf_tensor_info * info = &ctx->infos[i];
@@ -19600,12 +19633,12 @@ void gguf_free(struct gguf_context * ctx) {
             struct gguf_kv * kv = &ctx->kv[i];
 
             if (kv->key.data) {
-                free(kv->key.data);
+                GGML_FREE(kv->key.data);
             }
 
             if (kv->type == GGUF_TYPE_STRING) {
                 if (kv->value.str.data) {
-                    free(kv->value.str.data);
+                    GGML_FREE(kv->value.str.data);
                 }
             }
 
@@ -19615,16 +19648,16 @@ void gguf_free(struct gguf_context * ctx) {
                         for (uint64_t j = 0; j < kv->value.arr.n; ++j) {
                             struct gguf_str * str = &((struct gguf_str *) kv->value.arr.data)[j];
                             if (str->data) {
-                                free(str->data);
+                                GGML_FREE(str->data);
                             }
                         }
                     }
-                    free(kv->value.arr.data);
+                    GGML_FREE(kv->value.arr.data);
                 }
             }
         }
 
-        free(ctx->kv);
+        GGML_FREE(ctx->kv);
     }
 
     if (ctx->infos) {
@@ -19632,11 +19665,11 @@ void gguf_free(struct gguf_context * ctx) {
             struct gguf_tensor_info * info = &ctx->infos[i];
 
             if (info->name.data) {
-                free(info->name.data);
+                GGML_FREE(info->name.data);
             }
         }
 
-        free(ctx->infos);
+        GGML_FREE(ctx->infos);
     }
 
     GGML_ALIGNED_FREE(ctx);
@@ -19937,7 +19970,7 @@ void gguf_set_arr_data(struct gguf_context * ctx, const char * key, enum gguf_ty
     ctx->kv[idx].type           = GGUF_TYPE_ARRAY;
     ctx->kv[idx].value.arr.type = type;
     ctx->kv[idx].value.arr.n    = n;
-    ctx->kv[idx].value.arr.data = malloc(n*gguf_type_size(type));
+    ctx->kv[idx].value.arr.data = GGML_MALLOC(n*gguf_type_size(type));
     memcpy(ctx->kv[idx].value.arr.data, data, n*gguf_type_size(type));
 }
 
@@ -19947,7 +19980,7 @@ void gguf_set_arr_str(struct gguf_context * ctx, const char * key, const char **
     ctx->kv[idx].type           = GGUF_TYPE_ARRAY;
     ctx->kv[idx].value.arr.type = GGUF_TYPE_STRING;
     ctx->kv[idx].value.arr.n    = n;
-    ctx->kv[idx].value.arr.data = malloc(n*sizeof(struct gguf_str));
+    ctx->kv[idx].value.arr.data = GGML_MALLOC(n*sizeof(struct gguf_str));
     for (int i = 0; i < n; i++) {
         struct gguf_str * str = &((struct gguf_str *)ctx->kv[idx].value.arr.data)[i];
         str->n    = strlen(data[i]);
@@ -19974,12 +20007,12 @@ void gguf_set_kv(struct gguf_context * ctx, struct gguf_context * src) {
             case GGUF_TYPE_ARRAY:
                 {
                     if (src->kv[i].value.arr.type == GGUF_TYPE_STRING) {
-                        const char ** data = malloc(src->kv[i].value.arr.n*sizeof(char *));
+                        const char ** data = GGML_MALLOC(src->kv[i].value.arr.n*sizeof(char *));
                         for (uint32_t j = 0; j < src->kv[i].value.arr.n; j++) {
                             data[j] = ((struct gguf_str *)src->kv[i].value.arr.data)[j].data;
                         }
                         gguf_set_arr_str(ctx, src->kv[i].key.data, data, src->kv[i].value.arr.n);
-                        free((void *)data);
+                        GGML_FREE((void *)data);
                     } else if (src->kv[i].value.arr.type == GGUF_TYPE_ARRAY) {
                         GGML_ASSERT(false && "nested arrays not supported");
                     } else {
@@ -20062,7 +20095,7 @@ struct gguf_buf {
 
 static struct gguf_buf gguf_buf_init(size_t size) {
     struct gguf_buf buf = {
-        /*buf.data   =*/ size == 0 ? NULL : malloc(size),
+        /*buf.data   =*/ size == 0 ? NULL : GGML_MALLOC(size),
         /*buf.size   =*/ size,
         /*buf.offset =*/ 0,
     };
@@ -20072,7 +20105,7 @@ static struct gguf_buf gguf_buf_init(size_t size) {
 
 static void gguf_buf_free(struct gguf_buf buf) {
     if (buf.data) {
-        free(buf.data);
+        GGML_FREE(buf.data);
     }
 }
 
