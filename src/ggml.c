@@ -19215,6 +19215,11 @@ struct gguf_context {
     void * data;
 };
 
+static size_t gguf_type_size(enum gguf_type type) {
+    GGML_ASSERT(0 <= type && type < GGUF_TYPE_COUNT);
+    return GGUF_TYPE_SIZE[type];
+}
+
 static bool gguf_fread_el(FILE * file, void * dst, size_t size, size_t * offset) {
     const size_t n = fread(dst, 1, size, file);
     *offset += n;
@@ -19370,16 +19375,16 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
                             case GGUF_TYPE_BOOL:
                                 {
                                     // prevent from integer overflow in the malloc below
-                                    if (kv->value.arr.n < SIZE_MAX/GGUF_TYPE_SIZE[kv->value.arr.type]) {
+                                    if (kv->value.arr.n < SIZE_MAX/gguf_type_size(kv->value.arr.type)) {
                                         fprintf(stderr, "%s: array size is too large (%" PRIu64 ")\n", __func__, kv->value.arr.n);
                                         fclose(file);
                                         gguf_free(ctx);
                                         return NULL;
                                     }
 
-                                    kv->value.arr.data = malloc(kv->value.arr.n * GGUF_TYPE_SIZE[kv->value.arr.type]);
+                                    kv->value.arr.data = malloc(kv->value.arr.n * gguf_type_size(kv->value.arr.type));
 
-                                    ok = ok && gguf_fread_el(file, kv->value.arr.data, kv->value.arr.n * GGUF_TYPE_SIZE[kv->value.arr.type], &offset);
+                                    ok = ok && gguf_fread_el(file, kv->value.arr.data, kv->value.arr.n * gguf_type_size(kv->value.arr.type), &offset);
                                 } break;
                             case GGUF_TYPE_STRING:
                                 {
@@ -19440,7 +19445,7 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
             ok = ok && gguf_fread_el (file, &info->type,   sizeof(info->type),    &offset);
             ok = ok && gguf_fread_el (file, &info->offset, sizeof(info->offset),  &offset);
 
-            ok = ok && (info->type < GGML_TYPE_COUNT);
+            ok = ok && (0 <= info->type && info->type < GGML_TYPE_COUNT);
 
             if (!ok) {
                 fprintf(stderr, "%s: failed to read tensor info\n", __func__);
@@ -19932,8 +19937,8 @@ void gguf_set_arr_data(struct gguf_context * ctx, const char * key, enum gguf_ty
     ctx->kv[idx].type           = GGUF_TYPE_ARRAY;
     ctx->kv[idx].value.arr.type = type;
     ctx->kv[idx].value.arr.n    = n;
-    ctx->kv[idx].value.arr.data = malloc(n*GGUF_TYPE_SIZE[type]);
-    memcpy(ctx->kv[idx].value.arr.data, data, n*GGUF_TYPE_SIZE[type]);
+    ctx->kv[idx].value.arr.data = malloc(n*gguf_type_size(type));
+    memcpy(ctx->kv[idx].value.arr.data, data, n*gguf_type_size(type));
 }
 
 void gguf_set_arr_str(struct gguf_context * ctx, const char * key, const char ** data, int n) {
@@ -20148,7 +20153,7 @@ static void gguf_write_to_buf(const struct gguf_context * ctx, struct gguf_buf *
                         case GGUF_TYPE_FLOAT64:
                         case GGUF_TYPE_BOOL:
                             {
-                                gguf_bwrite_el(buf, kv->value.arr.data, kv->value.arr.n * GGUF_TYPE_SIZE[kv->value.arr.type]);
+                                gguf_bwrite_el(buf, kv->value.arr.data, kv->value.arr.n * gguf_type_size(kv->value.arr.type));
                             } break;
                         case GGUF_TYPE_STRING:
                             {
