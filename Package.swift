@@ -28,7 +28,7 @@ let package = Package(
             resources: [
                 .process("src/ggml-metal.metal")
             ],
-            publicHeadersPath: "include/ggml",
+            publicHeadersPath: "spm-headers",
             cSettings: [
                 .unsafeFlags(["-Wno-shorten-64-to-32", "-O3", "-DNDEBUG"]),
                 .define("GGML_USE_ACCELERATE"),
