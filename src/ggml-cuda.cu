@@ -4973,7 +4973,7 @@ static __global__ void cpy_f32_q(const char * cx, char * cdst, const int ne,
     const int i12 = (i - i13*ne10*ne11*ne12) / (ne10*ne11);
     const int i11 = (i - i13*ne10*ne11*ne12 - i12*ne10*ne11) / ne10;
     const int i10 = i - i13*ne10*ne11*ne12 - i12*ne10*ne11 - i11*ne10;
-    const int dst_offset = i10*nb10 + i11*nb11 + i12*nb12 + i13 * nb13;
+    const int dst_offset = (i10/qk)*nb10 + i11*nb11 + i12*nb12 + i13*nb13;
 
     cpy_blck(cx + x_offset, cdst + dst_offset);
 }
