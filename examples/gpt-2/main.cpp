@@ -118,7 +118,7 @@ void init_backends(gpt2_model & model, const gpt_params & params) {
 #ifdef GGML_USE_METAL
     if (params.n_gpu_layers > 0) {
         fprintf(stderr, "%s: using Metal backend\n", __func__);
-        ggml_metal_log_set_callback(ggml_log_callback_default, nullptr);
+        ggml_backend_metal_log_set_callback(ggml_log_callback_default, nullptr);
         gpu_backend = ggml_backend_metal_init();
         if (!gpu_backend) {
             fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
@@ -947,7 +947,7 @@ int main(int argc, char ** argv) {
     ggml_backend_sched_t sched;
     {
         // initialize the scheduler
-        sched = ggml_backend_sched_new(model.backends.data(), model.backends.size());
+        sched = ggml_backend_sched_new(model.backends.data(), NULL, model.backends.size(), GPT2_MAX_NODES);
 
         // create the worst case graph for memory usage estimation
         int n_tokens = std::min(model.hparams.n_ctx, params.n_batch);

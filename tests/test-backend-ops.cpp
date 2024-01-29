@@ -16,39 +16,37 @@
 #include <vector>
 
 static void init_tensor_uniform(ggml_tensor * tensor, float min = -1.0f, float max = 1.0f) {
+    // static RNG initialization (revisit if n_threads stops being constant)
+    static const size_t n_threads = std::thread::hardware_concurrency();
+    static std::vector<std::default_random_engine> generators = []() {
+        std::random_device rd;
+        std::vector<std::default_random_engine> vec;
+        vec.reserve(n_threads);
+        //for (size_t i = 0; i < n_threads; i++) { vec.emplace_back(1234 + i); } // fixed seed
+        for (size_t i = 0; i < n_threads; i++) { vec.emplace_back(rd()); }
+        return vec;
+    }();
+
     size_t size = ggml_nelements(tensor);
     std::vector<float> data(size);
 
-#if 0
-    static std::default_random_engine generator(1234);
-    std::uniform_real_distribution<float> distribution(min, max);
-
-    for (size_t i = 0; i < size; i++) {
-        data[i] = distribution(generator);
-    }
-#else
-    auto init_thread = [&](size_t start, size_t end) {
-        std::random_device rd;
-        std::default_random_engine generator(rd());
+    auto init_thread = [&](size_t ith, size_t start, size_t end) {
         std::uniform_real_distribution<float> distribution(min, max);
-
         for (size_t i = start; i < end; i++) {
-            data[i] = distribution(generator);
+            data[i] = distribution(generators[ith]);
         }
     };
 
-    size_t n_threads = std::thread::hardware_concurrency();
     std::vector<std::thread> threads;
     threads.reserve(n_threads);
     for (size_t i = 0; i < n_threads; i++) {
         size_t start =     i*size/n_threads;
         size_t end   = (i+1)*size/n_threads;
-        threads.emplace_back(init_thread, start, end);
+        threads.emplace_back(init_thread, i, start, end);
     }
     for (auto & t : threads) {
         t.join();
     }
-#endif
 
     if (tensor->type == GGML_TYPE_F32 || tensor->type == GGML_TYPE_I32) {
         ggml_backend_tensor_set(tensor, data.data(), 0, size * sizeof(float));
@@ -56,7 +54,16 @@ static void init_tensor_uniform(ggml_tensor * tensor, float min = -1.0f, float m
         GGML_ASSERT(size % ggml_blck_size(tensor->type) == 0);
         std::vector<uint8_t> dataq(ggml_row_size(tensor->type, size));
         int64_t hist[16];
-        ggml_quantize_chunk(tensor->type, data.data(), dataq.data(), 0, size, hist);
+        std::vector<float> imatrix(tensor->ne[0], 1.0f); // dummy importance matrix
+        const float * im = imatrix.data();
+        if (!ggml_quantize_requires_imatrix(tensor->type)) {
+            // when the imatrix is optional, we want to test both quantization with and without imatrix
+            // use one of the random numbers to decide
+            if (data[0] > 0.5f*(min + max)) {
+                im = nullptr;
+            }
+        }
+        ggml_quantize_chunk(tensor->type, data.data(), dataq.data(), 0, size/tensor->ne[0], tensor->ne[0], hist, im);
         ggml_backend_tensor_set(tensor, dataq.data(), 0, dataq.size());
     } else if (tensor->type == GGML_TYPE_I8 || tensor->type == GGML_TYPE_I16 || tensor->type == GGML_TYPE_I32) {
         // This is going to create some weird integers though.
@@ -95,7 +102,6 @@ static std::vector<float> tensor_to_float(const ggml_tensor * t) {
                     } else if (t->type == GGML_TYPE_I8) {
                         tv.push_back((float)*(int8_t *) &buf[i]);
                     } else if (quantized) {
-                        std::vector<float> vq(ggml_blck_size(t->type));
                         tt.to_float(&buf[i], vq.data(), ggml_blck_size(t->type));
                         tv.insert(tv.end(), vq.begin(), vq.end());
                     } else {
@@ -233,10 +239,17 @@ static std::string var_to_str(ggml_type type) {
 #define VARS_TO_STR10(a, b, c, d, e, f, g, h, i, j) VAR_TO_STR(a) + "," + VARS_TO_STR9(b, c, d, e, f, g, h, i, j)
 #define VARS_TO_STR11(a, b, c, d, e, f, g, h, i, j, k) VAR_TO_STR(a) + "," + VARS_TO_STR10(b, c, d, e, f, g, h, i, j, k)
 
+#ifdef GGML_USE_SYCL
+static bool inline _isinf(float f) {
+    return (*(uint32_t *)&f & 0x7fffffff) == 0x7f800000;
+}
+#else
+static bool inline _isinf(float f) { return std::isinf(f); }
+#endif
 
 // accept FLT_MAX as infinity
 static bool isinf_or_max(float f) {
-    return std::isinf(f) || f == FLT_MAX || f == -FLT_MAX;
+    return _isinf(f) || f == FLT_MAX || f == -FLT_MAX;
 }
 
 static bool ggml_is_view_op(enum ggml_op op) {
@@ -376,6 +389,11 @@ struct test_case {
 
         // allocate
         ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors(ctx, backend1);
+        if (buf == NULL) {
+            printf("failed to allocate tensors [%s] ", ggml_backend_name(backend1));
+            ggml_free(ctx);
+            return false;
+        }
 
         // build graph
         ggml_build_forward_expand(gf, out);
@@ -450,7 +468,7 @@ struct test_case {
 
             double err = nmse(f1.data(), f2.data(), f1.size());
             if (err > ud->max_err) {
-                printf("[%s] NMSE = %f ", ggml_op_desc(t1), err);
+                printf("[%s] NMSE = %.9f > %.9f ", ggml_op_desc(t1), err, ud->max_err);
                 //for (int i = 0; i < (int) f1.size(); i++) {
                 //    printf("%5d %9.6f %9.6f, diff = %9.6f\n", i, f1[i], f2[i], f1[i] - f2[i]);
                 //}
@@ -463,19 +481,23 @@ struct test_case {
             GGML_UNUSED(index);
         };
 
-        ggml_backend_compare_graph_backend(backend1, backend2, gf, callback, &ud);
+        const bool cmp_ok = ggml_backend_compare_graph_backend(backend1, backend2, gf, callback, &ud);
 
-        if (ud.ok) {
-            printf("\033[1;32mOK\033[0m\n");
-        } else {
-            printf("\033[1;31mFAIL\033[0m\n");
+        if (!cmp_ok) {
+            printf("compare failed ");
         }
 
         ggml_backend_buffer_free(buf);
 
         ggml_free(ctx);
 
-        return ud.ok;
+        if (ud.ok && cmp_ok) {
+            printf("\033[1;32mOK\033[0m\n");
+            return true;
+        }
+
+        printf("\033[1;31mFAIL\033[0m\n");
+        return false;
     }
 
     bool eval_perf(ggml_backend_t backend, const char * op_name) {
@@ -519,6 +541,11 @@ struct test_case {
 
         // allocate
         ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors(ctx, backend);
+        if (buf == NULL) {
+            printf("failed to allocate tensors\n");
+            ggml_free(ctx);
+            return false;
+        }
 
         // randomize tensors
         initialize_tensors(ctx);
@@ -1449,6 +1476,7 @@ struct test_moe : public test_case {
 
 static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op_name) {
     std::vector<std::unique_ptr<test_case>> test_cases;
+    std::default_random_engine rng(0);
 
     const ggml_type all_types[] = {
         GGML_TYPE_F32, GGML_TYPE_F16,
@@ -1457,7 +1485,8 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
         GGML_TYPE_Q8_0,
         GGML_TYPE_Q2_K, GGML_TYPE_Q3_K,
         GGML_TYPE_Q4_K, GGML_TYPE_Q5_K,
-        GGML_TYPE_Q6_K
+        GGML_TYPE_Q6_K,
+        GGML_TYPE_IQ2_XXS, GGML_TYPE_IQ2_XS,
     };
 
     // unary ops
@@ -1583,7 +1612,19 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
     test_cases.emplace_back(new test_diag_mask_inf(GGML_TYPE_F32, {10, 10, 10,  1}, 5));
     test_cases.emplace_back(new test_diag_mask_inf(GGML_TYPE_F32, {10, 10, 10, 10}, 5));
 
-    test_cases.emplace_back(new test_soft_max());
+    std::uniform_int_distribution<> dist_ne1(1, 50);
+    int exponent = 1;
+    while (exponent < (1 << 17)) {
+        std::uniform_int_distribution<> dist_ne0(exponent, 2*exponent);
+
+        for (int n = 0; n < 10; ++n) {
+            int64_t ne0 = dist_ne0(rng);
+            int64_t ne1 = dist_ne1(rng);
+            test_cases.emplace_back(new test_soft_max(GGML_TYPE_F32, {ne0, ne1, 1, 1}));
+        }
+
+        exponent <<= 1;
+    }
 
     for (ggml_type type : {GGML_TYPE_F32, GGML_TYPE_F16}) {
         test_cases.emplace_back(new test_rope(type, {128,  32, 10, 1}, 128, 0, 512)); // llama 7B
@@ -1724,6 +1765,8 @@ int main(int argc, char ** argv) {
         printf("\033[1;31mFAIL\033[0m\n");
         return 1;
     }
+
+    ggml_quantize_free();
 
     printf("\033[1;32mOK\033[0m\n");
     return 0;
