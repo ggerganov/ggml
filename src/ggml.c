@@ -19348,10 +19348,9 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
         }
 
         // sanity-checks to prevent from integer/buffer overflows
-        // - sizeof(struct gguf_tensor_info)*n_tensors < SIZE_MAX
-        // - sizeof(struct gguf_kv)*n_kv               < SIZE_MAX
 
         ok = ok && (ctx->header.n_tensors < SIZE_MAX/sizeof(struct gguf_tensor_info));
+        ok = ok && (ctx->header.n_tensors < SIZE_MAX/ggml_tensor_overhead());
         ok = ok && (ctx->header.n_kv      < SIZE_MAX/sizeof(struct gguf_kv));
 
         if (!ok) {
