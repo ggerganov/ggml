@@ -78,14 +78,8 @@ void load_model(simple_model & model, float* a, float* b) {
     model.buffer = ggml_backend_alloc_ctx_tensors(model.ctx, model.backend);
 
     // load data from cpu memory to backend buffer
-    if(ggml_backend_buffer_is_host(model.buffer)) {
-        memcpy(model.a->data, a, ggml_nbytes(model.a));
-        memcpy(model.b->data, b, ggml_nbytes(model.b));
-    } else {
-        // CUDA backend requires copy the data directly to device
-        ggml_backend_tensor_set(model.a, a, 0, ggml_nbytes(model.a));
-        ggml_backend_tensor_set(model.b, b, 0, ggml_nbytes(model.b));
-    }
+    ggml_backend_tensor_set(model.a, a, 0, ggml_nbytes(model.a));
+    ggml_backend_tensor_set(model.b, b, 0, ggml_nbytes(model.b));
 }
 
 // build the compute graph to perform a matrix multiplication
@@ -108,6 +102,7 @@ struct ggml_cgraph * build_graph(const simple_model& model, struct ggml_allocr *
     // result = a*b^T
     struct ggml_tensor* result = ggml_mul_mat(ctx0, model.a, model.b);
 
+    // build operations nodes
     ggml_build_forward_expand(gf, result);
 
     // delete the temporally context used to build the graph
@@ -164,12 +159,10 @@ int main(void)
     load_model(model, matrix_A, matrix_B);
 
     // calculate the temporaly memory required to compute
-    ggml_backend_buffer_t buf_compute;
     struct ggml_allocr * allocr = NULL;
 
     {
-        size_t align = ggml_backend_get_alignment(model.backend);
-        allocr = ggml_allocr_new_measure(align);
+        allocr = ggml_allocr_new_measure_from_backend(model.backend);
 
         //create the worst case graph for memory usage estimation
         struct ggml_cgraph * gf = build_graph(model, allocr);
@@ -177,8 +170,7 @@ int main(void)
         ggml_allocr_free(allocr);
 
         // compute the required memory
-        buf_compute = ggml_backend_alloc_buffer(model.backend, mem_size);
-        allocr = ggml_allocr_new_from_buffer(buf_compute);
+        allocr = ggml_allocr_new_from_backend(model.backend, mem_size);
         fprintf(stderr, "%s: compute buffer size: %.4f KB\n", __func__, mem_size/1024.0);
     }
 
@@ -191,12 +183,13 @@ int main(void)
     // bring the data from the backend memory
     ggml_backend_tensor_get(result, out_data, 0, ggml_nbytes(result));
 
-    // expected result: 92.00 59.00 82.00 34.00
-    printf("mult mat:\n%.2f %.2f %.2f %.2f\n",
+    // expected result:
+    // [92.00, 59.00, 82.00, 34.00]
+    printf("mult mat:\n[%.2f, %.2f, %.2f, %.2f]\n",
                 out_data[0], out_data[1], out_data[2], out_data[3]);
 
     // release backend memory used for computation
-    ggml_backend_buffer_free(buf_compute);
+    ggml_allocr_free(allocr);
 
     // free memory
     ggml_free(model.ctx);
