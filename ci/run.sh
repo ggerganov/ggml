@@ -287,8 +287,8 @@ function gg_sum_sam {
 function gg_run_yolo {
     cd ${SRC}
 
-    gg_wget models-mnt/yolo/ https://pjreddie.com/media/files/yolov3-tiny.weights
-    gg_wget models-mnt/yolo/ https://raw.githubusercontent.com/pjreddie/darknet/master/data/dog.jpg
+    gg_wget models-mnt/yolo/ https://huggingface.co/ggml-org/models/resolve/main/yolo/yolov3-tiny.weights
+    gg_wget models-mnt/yolo/ https://huggingface.co/ggml-org/models/resolve/main/yolo/dog.jpg
 
     cd build-ci-release
     cp -r ../examples/yolo/data .
