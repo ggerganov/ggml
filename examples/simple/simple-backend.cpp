@@ -35,7 +35,7 @@ struct simple_model {
 };
 
 // initialize the tensors of the model in this case two matrices 2x2
-void load_model(simple_model & model, float* a, float* b) {
+void load_model(simple_model & model, float* a, float* b, int rows_A,int cols_A, int rows_B, int cols_B) {
     // initialize the backend
 #ifdef GGML_USE_CUBLAS
     fprintf(stderr, "%s: using CUDA backend\n", __func__);
@@ -71,8 +71,8 @@ void load_model(simple_model & model, float* a, float* b) {
     model.ctx = ggml_init(params);
 
     // create tensors
-    model.a = ggml_new_tensor_2d(model.ctx, GGML_TYPE_F32, 2, 2);
-    model.b = ggml_new_tensor_2d(model.ctx, GGML_TYPE_F32, 2, 2);
+    model.a = ggml_new_tensor_2d(model.ctx, GGML_TYPE_F32, cols_A, rows_A);
+    model.b = ggml_new_tensor_2d(model.ctx, GGML_TYPE_F32, cols_B, rows_B);
 
     // create a backend buffer (backend memory) and alloc the tensors from the context
     model.buffer = ggml_backend_alloc_ctx_tensors(model.ctx, model.backend);
@@ -142,20 +142,27 @@ int main(void)
     ggml_time_init();
 
     // initialize data of matrices to perform matrix multiplication
+    const int rows_A = 3, cols_A = 2;
 
-    float matrix_A[4] = {
+    float matrix_A[rows_A * cols_A] = {
         2, 8,
-        5, 1
+        5, 1,
+        4, 2
     };
 
-    // transpose of [10, 5, 9, 9]
-    float matrix_B[4] = {
-        10, 9,
-        5, 9
+    const int rows_B = 3, cols_B = 2;
+    /* Transpose([
+        10, 9, 5,
+        5, 9, 4
+    ]) 2 rows, 3 cols */
+    float matrix_B[rows_B * cols_B] = {
+        10, 5,
+        9, 9,
+        5, 4
     };
 
     simple_model model;
-    load_model(model, matrix_A, matrix_B);
+    load_model(model, matrix_A, matrix_B, rows_A, cols_A, rows_B, cols_B);
 
     // calculate the temporaly memory required to compute
     struct ggml_allocr * allocr = NULL;
@@ -177,15 +184,23 @@ int main(void)
     struct ggml_tensor * result = compute(model, allocr);
 
     // create a array to print result
-    float* out_data = new float[2 * 2];
+    float* out_data = new float[ggml_nelements(result)];
 
     // bring the data from the backend memory
     ggml_backend_tensor_get(result, out_data, 0, ggml_nbytes(result));
 
     // expected result:
-    // [92.00, 59.00, 82.00, 34.00]
-    printf("mult mat:\n[%.2f, %.2f, %.2f, %.2f]\n",
-                out_data[0], out_data[1], out_data[2], out_data[3]);
+    // [ 60.00 90.00 42.00
+    //  55.00 54.00 29.00
+    //  50.00 54.00 28.00]
+    printf("mult mat (transposed result):\n[");
+    for(int j = 0; j < result->ne[1] /* rows */; j++) {
+        for(int i = 0; i < result->ne[0] /* cols */; i++) {
+            printf(" %.2f", out_data[i * result->ne[1] + j]);
+        }
+        printf("\n");
+    }
+    printf("]");
 
     // release backend memory used for computation
     ggml_allocr_free(allocr);

@@ -6,16 +6,18 @@ $$
 \begin{bmatrix}
 2 & 8 \\
 5 & 1 \\
+4 & 2 \\
 \end{bmatrix}
 \times
 \begin{bmatrix}
-10 & 9 \\
-5 & 9 \\
+10 & 9 & 5 \\
+5 & 9 & 4 \\
 \end{bmatrix}
 \=
 \begin{bmatrix}
-92 & 59 \\
-82 & 34 \\
+60 & 90 & 42 \\
+55 & 54 & 29 \\
+50 & 54 & 28 \\
 \end{bmatrix}
 $$
 
