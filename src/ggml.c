@@ -19253,6 +19253,20 @@ static size_t gguf_type_size(enum gguf_type type) {
     return GGUF_TYPE_SIZE[type];
 }
 
+static void gguf_tensor_info_sanitize(struct gguf_tensor_info * info) {
+    GGML_ASSERT(info->n_dims <= GGML_MAX_DIMS);
+    GGML_ASSERT(0 <= info->type && info->type < GGML_TYPE_COUNT);
+
+    for (uint32_t i = 0; i < info->n_dims; ++i) {
+        GGML_ASSERT(info->ne[i] > 0);
+    }
+
+    // prevent overflow for total number of elements
+    GGML_ASSERT(INT64_MAX/info->ne[1] > info->ne[0]);
+    GGML_ASSERT(INT64_MAX/info->ne[2] > info->ne[0]*info->ne[1]);
+    GGML_ASSERT(INT64_MAX/info->ne[3] > info->ne[0]*info->ne[1]*info->ne[2]);
+}
+
 static bool gguf_fread_el(FILE * file, void * dst, size_t size, size_t * offset) {
     const size_t n = fread(dst, 1, size, file);
     *offset += n;
@@ -19477,7 +19491,7 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
             ok = ok && gguf_fread_el (file, &info->type,   sizeof(info->type),    &offset);
             ok = ok && gguf_fread_el (file, &info->offset, sizeof(info->offset),  &offset);
 
-            ok = ok && (0 <= info->type && info->type < GGML_TYPE_COUNT);
+            gguf_tensor_info_sanitize(info);
 
             if (!ok) {
                 fprintf(stderr, "%s: failed to read tensor info\n", __func__);
