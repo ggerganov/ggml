@@ -248,6 +248,129 @@ ggml_tensor* mul_mat(ggml_context* ctx, ggml_tensor* a, ggml_tensor* b) {
 }
 
 
+// TODO: Merge convolution with ggml master im2col implementation
+// static void ggml_conv_1d_generic_stage_0(
+//         const struct ggml_compute_params * params,
+//         const struct ggml_tensor * src0,
+//         const struct ggml_tensor * src1,
+//               struct ggml_tensor * dst) {
+
+//     GGML_TENSOR_BINARY_OP_LOCALS;
+
+//     const int64_t N  = ne12;
+//     const int64_t IC = ne11;
+//     const int64_t IL = ne10;
+
+//     const int64_t K = ne00;
+
+//     const int64_t OL = ne1;
+
+//     const int ith = params->ith;
+//     const int nth = params->nth;
+
+//     const int32_t s0 = ((const int32_t*)(dst->op_params))[0];
+//     const int32_t p0 = ((const int32_t*)(dst->op_params))[1];
+//     const int32_t d0 = ((const int32_t*)(dst->op_params))[2];
+
+//     GGML_ASSERT(nb00 == sizeof(float));
+//     GGML_ASSERT(nb10 == sizeof(float));
+
+//     if (params->type == GGML_TASK_INIT) {
+//         memset(dst->data, 0, ggml_nbytes(dst));
+//         return;
+//     }
+
+//     if (params->type == GGML_TASK_FINALIZE) {
+//         return;
+//     }
+
+//     // im2col: [N, IC, IL] => [N, OL, IC*K]
+//     {
+//         float * const wdata = (float *) dst->data;
+
+//         for (int64_t in = 0; in < N; in++) {
+//             for (int64_t iol = 0; iol < OL; iol++) {
+//                 for (int64_t iic = ith; iic < IC; iic+=nth) {
+
+//                     // micro kernel
+//                     float * dst_data = wdata + (in*OL + iol)*(IC*K); // [IC, K]
+//                     const float * const src_data = (float *)((char *) src1->data + in*nb12 + iic*nb11); // [IL]
+
+//                     for (int64_t ik = 0; ik < K; ik++) {
+//                         const int64_t iil = iol*s0 + ik*d0 - p0;
+
+//                         if (!(iil < 0 || iil >= IL)) {
+//                             dst_data[iic*K + ik] = src_data[iil];
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
+
+// static void ggml_conv_1d_generic_stage_1(
+//         const struct ggml_compute_params * params,
+//         const struct ggml_tensor * src0,
+//         const struct ggml_tensor * src1,
+//               struct ggml_tensor * dst) {
+//     GGML_ASSERT(src0->type == GGML_TYPE_F32);
+//     GGML_ASSERT(src1->type == GGML_TYPE_F32);
+//     GGML_ASSERT( dst->type == GGML_TYPE_F32);
+
+//     int64_t t0 = ggml_perf_time_us();
+//     UNUSED(t0);
+
+//     if (params->type == GGML_TASK_INIT) {
+//         return;
+//     }
+
+//     if (params->type == GGML_TASK_FINALIZE) {
+//         return;
+//     }
+
+//     GGML_TENSOR_BINARY_OP_LOCALS;
+
+//     GGML_ASSERT(nb00 == sizeof(float));
+//     GGML_ASSERT(nb10 == sizeof(float));
+//     GGML_ASSERT(nb0  == sizeof(float));
+
+//     const int N = ne12;
+//     const int OL = ne11;
+
+//     const int OC = ne02;
+//     const int IC = ne01;
+//     const int K  = ne00;
+
+//     const int ith = params->ith;
+//     const int nth = params->nth;
+
+//     int64_t m = OC;
+//     int64_t n = OL;
+//     int64_t k = IC * K;
+
+//     // [N, OC, OL] = [OC, IC * K] x [N*OL, IC * K]
+//     for (int i = 0; i < N; i++) {
+//         float * A = (float *)src0->data; // [m, k]
+//         float * B = (float *)src1->data + i * m * k; // [n, k]
+//         float * C = (float *)dst->data + i * m * n; // [m, n]
+
+//         gemm_f16_out_f32(m, n, k, A, B, C, ith, nth);
+//     }
+// }
+
+// GGML_API struct ggml_tensor * ggml_conv_1d(
+//         struct ggml_context * ctx,
+//         struct ggml_tensor  * a,
+//         struct ggml_tensor  * b,
+//         int                   s0,
+//         int                   p0,
+//         int                   d0) {
+//     struct ggml_tensor * result = ggml_conv_1d_generic_stage_0(ctx, a, b, s0, p0, d0);
+//     result = ggml_conv_1d_generic_stage_1(ctx, a, result);
+// }
+
+
 extern "C" ggml_tensor* Linear_forward(
     fairseq2_model& model,
     const std::string &prefix,
@@ -791,6 +914,7 @@ extern "C" ggml_tensor* StandardConformerEncoder_forward(
         seqs = StandardConformerEncoderAdaptorLayer_forward(
             model, layer_name, seqs, padding_mask
         );
+        return seqs;
         ggml_set_name(seqs, ("x_ada_" + std::to_string(layer_idx)).c_str());
         layer_idx += 1;
         layer_name = prefix + ".adaptor_layers." + std::to_string(layer_idx);
@@ -810,19 +934,22 @@ extern "C" ggml_tensor* StandardConformerEncoderAdaptorLayer_forward(
     ggml_tensor* residual = seqs;
     residual = LayerNorm_forward(model, prefix + ".residual_layer_norm", residual);
     residual = ggml_dup(ctx, ggml_permute(ctx, residual, 1, 0, 2, 3));
-    ggml_tensor* residual_conv_weight = model.tensors[prefix + ".residual_conv.weight"];
-    // ggml_tensor* from = model.tensors[prefix + ".residual_conv.weight"];
-    // FORCE_ALLOC(residual_conv_weight, ctx, ggml_new_tensor_3d(ctx, GGML_TYPE_F16, from->ne[0], from->ne[1], from->ne[2]));
-    // ggml_fp32_to_fp16_row((float*)model.tensors[prefix + ".residual_conv.weight"]->data, (ggml_fp16_t*)residual_conv_weight->data, from->ne[0] * from->ne[1] * from->ne[2]);
+    // ggml_tensor* residual_conv_weight = model.tensors[prefix + ".residual_conv.weight"];
+    ggml_tensor* from = model.tensors[prefix + ".residual_conv.weight"];
+    FORCE_ALLOC(residual_conv_weight, ctx, ggml_new_tensor_3d(ctx, GGML_TYPE_F16, from->ne[0], from->ne[1], from->ne[2]));
+    ggml_fp32_to_fp16_row((float*)model.tensors[prefix + ".residual_conv.weight"]->data, (ggml_fp16_t*)residual_conv_weight->data, from->ne[0] * from->ne[1] * from->ne[2]);
     residual = ggml_conv_1d(ctx, residual_conv_weight, residual, 8, 4, 1);
+    printf("residual dim: %d %d %d %d\n", residual->ne[0], residual->ne[1], residual->ne[2], residual->ne[3]);
+    return residual;
     residual = ggml_dup(ctx, ggml_permute(ctx, residual, 1, 0, 2, 3));
     residual = ggml_add_inplace(ctx, ggml_repeat(ctx, model.tensors[prefix + ".residual_conv.bias"], residual), residual);
     residual = ggml_glu(ctx, residual);
+    
 
     seqs = LayerNorm_forward(model, prefix + ".self_attn_layer_norm", seqs);
     seqs = ggml_dup(ctx, ggml_permute(ctx, seqs, 1, 0, 2, 3));
     ggml_tensor* self_attn_conv_weight = model.tensors[prefix + ".self_attn_conv.weight"];
-    // from = model.tensors[prefix + ".self_attn_conv.weight"];
+    // ggml_tensor* from = model.tensors[prefix + ".self_attn_conv.weight"];
     // FORCE_ALLOC(self_attn_conv_weight, ctx, ggml_new_tensor_3d(ctx, GGML_TYPE_F16, from->ne[0], from->ne[1], from->ne[2]));
     // ggml_fp32_to_fp16_row((float*)model.tensors[prefix + ".self_attn_conv.weight"]->data, (ggml_fp16_t*)residual_conv_weight->data, from->ne[0] * from->ne[1] * from->ne[2]);
     seqs = ggml_conv_1d(ctx, self_attn_conv_weight, seqs, 8, 4, 1);
@@ -1464,6 +1591,7 @@ extern "C" Hypothesis* generate_sequence(
     printf_mem_usage(search_ctx, "search_ctx");
 
     for (int step_nr = start_step; step_nr < max_seq_len - 1; ++step_nr) {
+        printf("Generating sequence step %d\n", step_nr);
         model.ctx = step_ctx;
         ggml_set_no_alloc(step_ctx, true); // Use allocr for the model forward pass
         int p = 0;

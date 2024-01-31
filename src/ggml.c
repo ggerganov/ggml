@@ -24,9 +24,11 @@
 #include <stdarg.h>
 #include <signal.h>
 
+
 #ifdef GGML_USE_METAL
 #include <unistd.h>
 #endif
+
 
 #if defined(_MSC_VER)
 // disable "possible loss of data" to avoid hundreds of casts
@@ -259,6 +261,12 @@ typedef double ggml_float;
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+#define FORCE_ALLOC(name, ctx, ggml_new_tensor)\
+    bool name ## _save_no_alloc_ = ggml_get_no_alloc(ctx); \
+    ggml_set_no_alloc(ctx, false); \
+    struct ggml_tensor* name = ggml_new_tensor; \
+    ggml_set_no_alloc(ctx, name ## _save_no_alloc_);
+
 //
 // global data
 //
@@ -290,6 +298,9 @@ ggml_fp16_t ggml_fp32_to_fp16(float x) {
 
 void ggml_fp16_to_fp32_row(const ggml_fp16_t * x, float * y, int n) {
     for (int i = 0; i < n; i++) {
+        printf("i:%d\n", i);
+        printf("y:%f\n", y[i]);
+        printf("x:%f\n", (float)x[i]);
         y[i] = GGML_FP16_TO_FP32(x[i]);
     }
 }
@@ -5737,7 +5748,10 @@ GGML_API struct ggml_tensor * ggml_conv_1d(
         int                   s0,
         int                   p0,
         int                   d0) {
-    // struct ggml_tensor * im2col = ggml_im2col(ctx, a, b, s0, 0, p0, 0, d0, 0, false); // [N, OL, IC * K]
+    struct ggml_tensor * im2col = ggml_im2col(ctx, a, b, s0, 0, p0, 0, d0, 0, false); // [N, OL, IC * K]
+    // printf("im2col: %d %d %d\n", im2col->ne[0], im2col->ne[1], im2col->ne[2]);
+    // printf("b: %d %d %d\n", b->ne[0], b->ne[1], b->ne[2]);
+    // printf("a: %d %d %d\n", a->ne[0], a->ne[1], a->ne[2]);
 
     // struct ggml_tensor * result =
     //     ggml_mul_mat(ctx,
@@ -5746,10 +5760,10 @@ GGML_API struct ggml_tensor * ggml_conv_1d(
 
     // result = ggml_reshape_3d(ctx, result, im2col->ne[1], a->ne[2], im2col->ne[2]); // [N, OC, OL]
 
-    struct ggml_tensor * result = ggml_conv_1d_generic_stage_0(ctx, a, b, s0, p0, d0);
-    result = ggml_conv_1d_generic_stage_1(ctx, a, result);
-
-    return result;
+    // struct ggml_tensor * result = ggml_conv_1d_generic_stage_0(ctx, a, b, s0, p0, d0);
+    // result = ggml_conv_1d_generic_stage_1(ctx, a, result);
+    
+    return im2col;
 }
 
 // ggml_conv_1d_ph
@@ -5847,7 +5861,7 @@ struct ggml_tensor * ggml_im2col(
         is_2D ?      b->ne[3] : 1,
     };
 
-    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F16, 4, ne);
+    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
     int32_t params[] = { s0, s1, p0, p1, d0, d1, (is_2D ? 1 : 0) };
     ggml_set_op_params(result, params, sizeof(params));
 
@@ -12981,7 +12995,7 @@ static void ggml_compute_forward_im2col_f16(
               struct ggml_tensor * dst) {
     GGML_ASSERT(src0->type == GGML_TYPE_F16);
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
-    GGML_ASSERT( dst->type == GGML_TYPE_F16);
+    // GGML_ASSERT( dst->type == GGML_TYPE_F16);
 
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
@@ -13026,7 +13040,7 @@ static void ggml_compute_forward_im2col_f16(
 
     // im2col: [N, IC, IH, IW] => [N, OH, OW, IC*KH*KW]
     {
-        ggml_fp16_t * const wdata = (ggml_fp16_t *) dst->data;
+        float * const wdata = (float *) dst->data;
 
         for (int64_t in = 0; in < N; in++) {
             for (int64_t ioh = 0; ioh < OH; ioh++) { // 1
@@ -13034,7 +13048,7 @@ static void ggml_compute_forward_im2col_f16(
                     for (int64_t iic = ith; iic < IC; iic += nth) {
 
                         // micro kernel
-                        ggml_fp16_t * dst_data = wdata + (in*OH*OW + ioh*OW + iow)*(IC*KH*KW); // [IC, KH, KW]
+                        float * dst_data = wdata + (in*OH*OW + ioh*OW + iow)*(IC*KH*KW); // [IC, KH, KW]
                         const float * const src_data = (float *)((char *) src1->data + in*ofs0 + iic*ofs1); // [IH, IW]
 
                         for (int64_t ikh = 0; ikh < KH; ikh++) {  // 1
@@ -13045,7 +13059,7 @@ static void ggml_compute_forward_im2col_f16(
                                 if (iih < 0 || iih >= IH || iiw < 0 || iiw >= IW) {
                                     dst_data[iic*(KH*KW) + ikh*KW + ikw] = 0;
                                 } else {
-                                    dst_data[iic*(KH*KW) + ikh*KW + ikw] = GGML_FP32_TO_FP16(src_data[iih*IW + iiw]);
+                                    dst_data[iic*(KH*KW) + ikh*KW + ikw] = src_data[iih*IW + iiw];
                                 }
                             }
                         }
@@ -13065,10 +13079,13 @@ static void ggml_compute_forward_im2col(
         case GGML_TYPE_F16:
             {
                 ggml_compute_forward_im2col_f16(params, src0, src1, dst);
+                // printf("dst dim: %d %d %d %d\n", dst->ne[0], dst->ne[1], dst->ne[2], dst->ne[3]); // 8192, 48, 1, 1
             } break;
         case GGML_TYPE_F32:
             {
-                GGML_ASSERT(false);
+                // FORCE_ALLOC(
+                // ggml_compute_forward_im2col_f16(params, src0, src1, dst);
+                
             } break;
         default:
             {

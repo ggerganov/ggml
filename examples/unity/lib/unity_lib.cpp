@@ -95,13 +95,14 @@ extern "C" Result unity_eval_speech(fairseq2_model& model, std::vector<float>& d
     ggml_cgraph* gf = unity_speech_encoder(model, seqs);
     ggml_allocr_alloc_graph(fwd_alloc, gf);
     ggml_graph_compute_with_ctx(model.ctx, gf, n_threads);
+    printf("Finish eval encoder\n");
     // encoder_output is valid until we call `ggml_allocr_reset(fwd_alloc)`
     ggml_tensor* encoder_output = gf->nodes[gf->n_nodes - 1];
-    // for(int i = 0; i < 100; i++) {
-    //     float* ptr = static_cast<float*>(encoder_output->data);
-    //     printf("%4f ", ptr[i]);
-    // }
-    // exit(0);
+    for(int i = 0; i < 100; i++) {
+        ggml_fp16_t* ptr = static_cast<ggml_fp16_t*>(encoder_output->data);
+        printf("%4f ", float(ptr[i]));
+    }
+    exit(0);
 
     // Beam search decoding
     const Hypothesis* hypo = unity_decode(model, opts, tgt_lang_idx, encoder_output, n_threads);
