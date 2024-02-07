@@ -68,7 +68,7 @@ struct gpt2_model {
     struct ggml_tensor * memory_v;
 
     //
-    struct ggml_context * ctx;
+    struct ggml_context * ctx_w;
     std::map<std::string, struct ggml_tensor *> tensors;
 };
 
@@ -152,7 +152,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         return false;
     }
 
-    auto & ctx = model.ctx;
+    auto & ctx = model.ctx_w;
 
     size_t ctx_size = 0;
 
@@ -206,8 +206,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             /*.no_alloc   =*/ false,
         };
 
-        model.ctx = ggml_init(params);
-        if (!model.ctx) {
+        model.ctx_w = ggml_init(params);
+        if (!model.ctx_w) {
             fprintf(stderr, "%s: ggml_init() failed\n", __func__);
             return false;
         }
@@ -834,7 +834,7 @@ int main(int argc, char ** argv) {
         printf("%s:    total time = %8.2f ms\n", __func__, (t_main_end_us - t_main_start_us)/1000.0f);
     }
 
-    ggml_free(model.ctx);
+    ggml_free(model.ctx_w);
 
     return 0;
 }

@@ -1,5 +1,6 @@
 #include "ggml/ggml.h"
 #include "ggml/ggml-alloc.h"
+#include "ggml/ggml-backend.h"
 
 #include "common.h"
 #include "common-ggml.h"
@@ -69,7 +70,7 @@ struct gpt2_model {
     struct ggml_tensor * memory_v;
 
     //
-    struct ggml_context * ctx;
+    struct ggml_context * ctx_w;
     std::map<std::string, struct ggml_tensor *> tensors;
 };
 
@@ -153,7 +154,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         return false;
     }
 
-    auto & ctx = model.ctx;
+    auto & ctx = model.ctx_w;
 
     size_t ctx_size = 0;
 
@@ -207,8 +208,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             /*.no_alloc   =*/ false,
         };
 
-        model.ctx = ggml_init(params);
-        if (!model.ctx) {
+        model.ctx_w = ggml_init(params);
+        if (!model.ctx_w) {
             fprintf(stderr, "%s: ggml_init() failed\n", __func__);
             return false;
         }
@@ -385,10 +386,9 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 // build the computation graph
 struct ggml_cgraph * gpt2_graph(
         const gpt2_model & model,
-        struct ggml_allocr * allocr,
         const int n_past,
-        const std::vector<gpt_vocab::id> & embd_inp) {
-    const int N = embd_inp.size();
+        const int n_tokens) {
+    const int N = n_tokens;
 
     const auto & hparams = model.hparams;
 
@@ -404,7 +404,7 @@ struct ggml_cgraph * gpt2_graph(
     struct ggml_init_params params = {
         /*.mem_size   =*/ buf_size,
         /*.mem_buffer =*/ buf.data(),
-        /*.no_alloc   =*/ true, // the tensors will be allocated later by ggml_allocr_alloc_graph()
+        /*.no_alloc   =*/ true, // the tensors will be allocated later by ggml_gallocr_alloc_graph()
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
@@ -412,20 +412,16 @@ struct ggml_cgraph * gpt2_graph(
     struct ggml_cgraph  * gf = ggml_new_graph(ctx0);
 
     struct ggml_tensor * embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
-    ggml_allocr_alloc(allocr, embd);
-
-    // avoid writing to tensors if we are only measuring the memory usage
-    if (!ggml_allocr_is_measure(allocr)) {
-        memcpy(embd->data, embd_inp.data(), N*ggml_element_size(embd));
-    }
+    // at this point, the tensor data is not allocated yet and cannot be set
+    // we will find the tensor after the graph is allocated by its name, and set the data then
+    ggml_set_name(embd, "embd");
+    // setting a tensor as an input will ensure that it is allocated at the beginning of the graph
+    // this is important to ensure that the input tensors are not overwritten before they are used
+    ggml_set_input(embd);
 
     struct ggml_tensor * position = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
-    ggml_allocr_alloc(allocr, position);
-    if (!ggml_allocr_is_measure(allocr)) {
-        for (int i = 0; i < N; ++i) {
-            ((int32_t *) position->data)[i] = n_past + i;
-        }
-    }
+    ggml_set_name(position, "position");
+    ggml_set_input(position);
 
     // wte + wpe
     struct ggml_tensor * inpL =
@@ -655,6 +651,9 @@ struct ggml_cgraph * gpt2_graph(
     // [ 768, 50257] - model.lm_head
     // [ 768, N]     - inpL
     inpL = ggml_mul_mat(ctx0, model.lm_head, inpL);
+    ggml_set_name(inpL, "logits");
+    // setting a tensor as the output will ensure that it is not overwritten by subsequent operations
+    ggml_set_output(inpL);
 
     // logits -> probs
     //inpL = ggml_soft_max(ctx0, inpL);
@@ -669,7 +668,7 @@ struct ggml_cgraph * gpt2_graph(
 // evaluate the transformer
 //
 //   - model:     the model
-//   - allocr:    ggml_allocr to use to allocate the compute buffer
+//   - allocr:    ggml_gallocr to use to allocate the compute buffer
 //   - n_threads: number of threads to use
 //   - n_past:    the context size so far
 //   - embd_inp:  the embeddings of the tokens in the context
@@ -677,7 +676,7 @@ struct ggml_cgraph * gpt2_graph(
 //
 bool gpt2_eval(
         const gpt2_model & model,
-        struct ggml_allocr * allocr,
+        ggml_gallocr_t allocr,
         const int n_threads,
         const int n_past,
         const std::vector<gpt_vocab::id> & embd_inp,
@@ -688,13 +687,19 @@ bool gpt2_eval(
 
     const int n_vocab = hparams.n_vocab;
 
-    // reset the allocator to free all the memory allocated during the previous inference
-    ggml_allocr_reset(allocr);
+    struct ggml_cgraph * gf = gpt2_graph(model, n_past, embd_inp.size());
 
-    struct ggml_cgraph * gf = gpt2_graph(model, allocr, n_past, embd_inp);
+    // allocate the graph tensors
+    ggml_gallocr_alloc_graph(allocr, gf);
 
-    // allocate tensors
-    ggml_allocr_alloc_graph(allocr, gf);
+    // set the graph inputs
+    struct ggml_tensor * embd = ggml_graph_get_tensor(gf, "embd");
+    memcpy(embd->data, embd_inp.data(), N*ggml_element_size(embd));
+
+    struct ggml_tensor * position = ggml_graph_get_tensor(gf, "position");
+    for (int i = 0; i < N; ++i) {
+        ((int32_t *) position->data)[i] = n_past + i;
+    }
 
     // run the computation
     struct ggml_cplan plan = ggml_graph_plan(gf, n_threads);
@@ -708,15 +713,15 @@ bool gpt2_eval(
     //    ggml_graph_dump_dot(&gf, NULL, "gpt-2.dot");
     //}
 
-    // in this case, the output tensor is the last one in the graph
-    struct ggml_tensor * inpL = gf->nodes[gf->n_nodes - 1];
+    // get the graph outputs
+    struct ggml_tensor * logits = ggml_graph_get_tensor(gf, "logits");
 
     //embd_w.resize(n_vocab*N);
-    //memcpy(embd_w.data(), ggml_get_data(inpL), sizeof(float)*n_vocab*N);
+    //memcpy(embd_w.data(), ggml_get_data(logits), sizeof(float)*n_vocab*N);
 
     // return result just for the last token
     embd_w.resize(n_vocab);
-    memcpy(embd_w.data(), (float *) ggml_get_data(inpL) + (n_vocab*(N-1)), sizeof(float)*n_vocab);
+    memcpy(embd_w.data(), (float *) ggml_get_data(logits) + (n_vocab*(N-1)), sizeof(float)*n_vocab);
 
     return true;
 }
@@ -763,27 +768,19 @@ int main(int argc, char ** argv) {
         test_gpt_tokenizer(vocab, params.token_test);
     }
 
-    // keep this buffer alive while evaluating the model
-    std::vector<uint8_t> compute_buffer;
-
-    struct ggml_allocr * allocr = NULL;
+    ggml_gallocr_t allocr = NULL;
     // allocate the compute buffer
     {
-        allocr = ggml_allocr_new_measure(GGML_MEM_ALIGN);
+        allocr = ggml_gallocr_new(ggml_backend_cpu_buffer_type());
 
         // create the worst case graph for memory usage estimation
         int n_tokens = std::min(model.hparams.n_ctx, params.n_batch);
         int n_past = model.hparams.n_ctx - n_tokens;
-        struct ggml_cgraph * gf = gpt2_graph(model, allocr, n_past, std::vector<gpt_vocab::id>(n_tokens, 0));
+        struct ggml_cgraph * gf = gpt2_graph(model, n_past, n_tokens);
 
-        // compute the required memory
-        size_t mem_size = ggml_allocr_alloc_graph(allocr, gf) + GGML_MEM_ALIGN;
-
-        // recreate the allocator with the required memory
-        ggml_allocr_free(allocr);
-        compute_buffer.resize(mem_size);
-        allocr = ggml_allocr_new(compute_buffer.data(), mem_size, GGML_MEM_ALIGN);
-
+        // pre-allocate the compute buffer for the worst case (optional)
+        ggml_gallocr_reserve(allocr, gf);
+        size_t mem_size =  ggml_gallocr_get_buffer_size(allocr, 0);
         fprintf(stderr, "%s: compute buffer size: %.2f MB\n", __func__, mem_size/1024.0/1024.0);
     }
 
@@ -880,7 +877,7 @@ int main(int argc, char ** argv) {
         printf("%s:    total time = %8.2f ms\n", __func__, (t_main_end_us - t_main_start_us)/1000.0f);
     }
 
-    ggml_free(model.ctx);
+    ggml_free(model.ctx_w);
 
     return 0;
 }
