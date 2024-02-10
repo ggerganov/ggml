@@ -1405,27 +1405,10 @@ prompt_encoder_result sam_encode_prompt(
         const sam_model     & model,
         struct ggml_context * ctx0,
         struct ggml_cgraph  * gf,
-                  sam_state & state,
-                        int   nx,
-                        int   ny,
-                  sam_point   point) {
+                  sam_state & state) {
 
     const auto & hparams = model.hparams;
     const auto & enc = model.enc_prompt;
-
-    // transform points
-    // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/automatic_mask_generator.py#L276
-    {
-        const int nmax = std::max(nx, ny);
-
-        const float scale = hparams.n_img_size() / (float) nmax;
-
-        const int nx_new = int(nx*scale + 0.5f);
-        const int ny_new = int(ny*scale + 0.5f);
-
-        point.x = point.x*(float(nx_new)/nx) + 0.5f;
-        point.y = point.y*(float(ny_new)/ny) + 0.5f;
-    }
 
     struct ggml_tensor * inp = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, 2, 2);
     ggml_set_name(inp, "prompt_input");
@@ -1964,7 +1947,7 @@ struct ggml_cgraph  * sam_build_fast_graph(
     struct ggml_context * ctx0   = ggml_init(ggml_params);
     struct ggml_cgraph  * gf     = ggml_new_graph(ctx0);
 
-    prompt_encoder_result enc_res = sam_encode_prompt(model, ctx0, gf, state, nx, ny, point);
+    prompt_encoder_result enc_res = sam_encode_prompt(model, ctx0, gf, state);
     if (!enc_res.embd_prompt_sparse || !enc_res.embd_prompt_dense) {
         fprintf(stderr, "%s: failed to encode prompt (%f, %f)\n", __func__, point.x, point.y);
         return {};
@@ -1987,6 +1970,20 @@ struct ggml_cgraph  * sam_build_fast_graph(
 
     // from sam_encode_prompt
     {
+        // transform points
+        // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/automatic_mask_generator.py#L276
+        {
+            const int nmax = std::max(nx, ny);
+
+            const float scale = model.hparams.n_img_size() / (float) nmax;
+
+            const int nx_new = int(nx*scale + 0.5f);
+            const int ny_new = int(ny*scale + 0.5f);
+
+            point.x = point.x*(float(nx_new)/nx) + 0.5f;
+            point.y = point.y*(float(ny_new)/ny) + 0.5f;
+        }
+
         struct ggml_tensor * inp = ggml_graph_get_tensor(gf, "prompt_input");
         // set the input by converting the [0, 1] coordinates to [-1, 1]
         float * data = (float *) inp->data;
@@ -2016,7 +2013,6 @@ struct ggml_cgraph  * sam_build_fast_graph(
             }
         }
     }
-
 
     return gf;
 }
