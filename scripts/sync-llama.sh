@@ -7,6 +7,8 @@ cp -rpv ../llama.cpp/ggml-backend.c      src/ggml-backend.c
 cp -rpv ../llama.cpp/ggml-cuda.cu        src/ggml-cuda.cu
 cp -rpv ../llama.cpp/ggml-cuda.h         src/ggml-cuda.h
 cp -rpv ../llama.cpp/ggml-impl.h         src/ggml-impl.h
+cp -rpv ../llama.cpp/ggml-kompute.cpp    src/ggml-kompute.cpp
+cp -rpv ../llama.cpp/ggml-kompute.h      src/ggml-kompute.h
 cp -rpv ../llama.cpp/ggml-metal.h        src/ggml-metal.h
 cp -rpv ../llama.cpp/ggml-metal.m        src/ggml-metal.m
 cp -rpv ../llama.cpp/ggml-metal.metal    src/ggml-metal.metal
@@ -16,6 +18,10 @@ cp -rpv ../llama.cpp/ggml-opencl.cpp     src/ggml-opencl.cpp
 cp -rpv ../llama.cpp/ggml-opencl.h       src/ggml-opencl.h
 cp -rpv ../llama.cpp/ggml-quants.c       src/ggml-quants.c
 cp -rpv ../llama.cpp/ggml-quants.h       src/ggml-quants.h
+cp -rpv ../llama.cpp/ggml-sycl.cpp       src/ggml-sycl.cpp
+cp -rpv ../llama.cpp/ggml-sycl.h         src/ggml-sycl.h
+cp -rpv ../llama.cpp/ggml-vulkan.cpp     src/ggml-vulkan.cpp
+cp -rpv ../llama.cpp/ggml-vulkan.h       src/ggml-vulkan.h
 cp -rpv ../llama.cpp/ggml.h              include/ggml/ggml.h
 cp -rpv ../llama.cpp/ggml-alloc.h        include/ggml/ggml-alloc.h
 cp -rpv ../llama.cpp/ggml-backend.h      include/ggml/ggml-backend.h

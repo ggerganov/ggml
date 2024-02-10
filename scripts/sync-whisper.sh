@@ -7,6 +7,8 @@ cp -rpv ../whisper.cpp/ggml-backend-impl.h            src/ggml-backend-impl.h
 cp -rpv ../whisper.cpp/ggml-backend.c                 src/ggml-backend.c
 cp -rpv ../whisper.cpp/ggml-cuda.cu                   src/ggml-cuda.cu
 cp -rpv ../whisper.cpp/ggml-cuda.h                    src/ggml-cuda.h
+cp -rpv ../whisper.cpp/ggml-kompute.cpp               src/ggml-kompute.cpp
+cp -rpv ../whisper.cpp/ggml-kompute.h                 src/ggml-kompute.h
 cp -rpv ../whisper.cpp/ggml-metal.h                   src/ggml-metal.h
 cp -rpv ../whisper.cpp/ggml-metal.m                   src/ggml-metal.m
 cp -rpv ../whisper.cpp/ggml-metal.metal               src/ggml-metal.metal
@@ -16,6 +18,10 @@ cp -rpv ../whisper.cpp/ggml-opencl.cpp                src/ggml-opencl.cpp
 cp -rpv ../whisper.cpp/ggml-opencl.h                  src/ggml-opencl.h
 cp -rpv ../whisper.cpp/ggml-quants.c                  src/ggml-quants.c
 cp -rpv ../whisper.cpp/ggml-quants.h                  src/ggml-quants.h
+cp -rpv ../whisper.cpp/ggml-sycl.cpp                  src/ggml-sycl.cpp
+cp -rpv ../whisper.cpp/ggml-sycl.h                    src/ggml-sycl.h
+cp -rpv ../whisper.cpp/ggml-vulkan.cpp                src/ggml-vulkan.cpp
+cp -rpv ../whisper.cpp/ggml-vulkan.h                  src/ggml-vulkan.h
 
 cp -rpv ../whisper.cpp/ggml.h                         include/ggml/ggml.h
 cp -rpv ../whisper.cpp/ggml-alloc.h                   include/ggml/ggml-alloc.h
