@@ -481,7 +481,7 @@ static size_t whisper_allocr_size(struct whisper_allocr & allocr) {
 }
 
 // measure the memory usage of a graph and prepare the allocr's internal data buffer
-static void whisper_allocr_graph_init(struct whisper_allocr & allocr, ggml_backend_t backend, std::function<struct ggml_cgraph *()> && get_graph) {
+static bool whisper_allocr_graph_init(struct whisper_allocr & allocr, ggml_backend_t backend, std::function<struct ggml_cgraph *()> && get_graph) {
     auto & alloc = allocr.alloc;
     auto & meta  = allocr.meta;
 
@@ -493,8 +493,10 @@ static void whisper_allocr_graph_init(struct whisper_allocr & allocr, ggml_backe
     // we need to allocate them instead of only reserving to get the correct compute buffer size
     if (!ggml_gallocr_alloc_graph(alloc, get_graph())) {
         // failed to allocate the compute buffer
-        // FIXME: handle this error
+        WHISPER_LOG_ERROR("%s: failed to allocate the compute buffer\n", __func__);
+        return false;
     }
+    return true;
 }
 
 // medium
@@ -881,7 +883,7 @@ static bool kv_cache_init(
     cache.ctx = ggml_init(params);
 
     if (!cache.ctx) {
-        WHISPER_LOG_ERROR("%s: failed to allocate memory for kv cache\n", __func__);
+        WHISPER_LOG_ERROR("%s: failed to allocate memory for the kv cache context\n", __func__);
         return false;
     }
 
@@ -889,6 +891,10 @@ static bool kv_cache_init(
     cache.v = ggml_new_tensor_1d(cache.ctx, wtype, n_elements);
 
     cache.buffer = ggml_backend_alloc_ctx_tensors(cache.ctx, backend);
+    if (!cache.buffer) {
+        WHISPER_LOG_ERROR("%s: failed to allocate memory for the kv cache\n", __func__);
+        return false;
+    }
 
     return true;
 }
@@ -1477,10 +1483,17 @@ static bool whisper_model_load(struct whisper_model_loader * loader, whisper_con
     }
 
     wctx.backend = whisper_backend_init(wctx.params);
-
+    if (!wctx.backend) {
+        WHISPER_LOG_ERROR("%s: failed to initialize the backend\n", __func__);
+        return false;
+    }
 
     // allocate tensors in the backend buffers
     model.buffer = ggml_backend_alloc_ctx_tensors(model.ctx, wctx.backend);
+    if (!model.buffer) {
+        WHISPER_LOG_ERROR("%s: failed to allocate memory for the model\n", __func__);
+        return false;
+    }
 
     size_t size_main = ggml_backend_buffer_get_size(model.buffer);
     WHISPER_LOG_INFO("%s: %8s total size = %8.2f MB\n", __func__, ggml_backend_name(wctx.backend), size_main / 1e6);
@@ -2966,6 +2979,11 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
     whisper_state * state = new whisper_state;
 
     state->backend = whisper_backend_init(ctx->params);
+    if (!state->backend) {
+        WHISPER_LOG_ERROR("%s: whisper_backend_init() failed\n", __func__);
+        delete state;
+        return nullptr;
+    }
 
     // at this point, we don't know yet how many decoders will be used, so we overallocate 3x ctx
     // in theory, there can be a case where this is not enough, but in practice it should always be enough
@@ -3027,37 +3045,55 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
 
     // conv allocator
     {
-        whisper_allocr_graph_init(state->alloc_conv, ctx->backend,
+        bool ok = whisper_allocr_graph_init(state->alloc_conv, ctx->backend,
                 [&]() {
                     return whisper_build_graph_conv(*ctx, *state, 0);
                 });
+
+        if (!ok) {
+            WHISPER_LOG_ERROR("%s: failed to init conv allocator\n", __func__);
+            delete state;
+            return nullptr;
+        }
 
         WHISPER_LOG_INFO("%s: compute buffer (conv)   = %7.2f MB\n", __func__, whisper_allocr_size(state->alloc_conv) / 1e6);
     }
 
     // encoder allocator
     if (!whisper_encode_external(*state)) {
-        whisper_allocr_graph_init(state->alloc_encode, ctx->backend,
+        bool ok = whisper_allocr_graph_init(state->alloc_encode, ctx->backend,
                 [&]() {
                     return whisper_build_graph_encoder(*ctx, *state);
                 });
+
+        if (!ok) {
+            WHISPER_LOG_ERROR("%s: failed to init encoder allocator\n", __func__);
+            delete state;
+            return nullptr;
+        }
 
         WHISPER_LOG_INFO("%s: compute buffer (encode) = %7.2f MB\n", __func__, whisper_allocr_size(state->alloc_encode) / 1e6);
     }
 
     // cross allocator
     {
-        whisper_allocr_graph_init(state->alloc_cross, ctx->backend,
+        bool ok = whisper_allocr_graph_init(state->alloc_cross, ctx->backend,
                 [&]() {
                     return whisper_build_graph_cross(*ctx, *state);
                 });
+
+        if (!ok) {
+            WHISPER_LOG_ERROR("%s: failed to init cross allocator\n", __func__);
+            delete state;
+            return nullptr;
+        }
 
         WHISPER_LOG_INFO("%s: compute buffer (cross)  = %7.2f MB\n", __func__, whisper_allocr_size(state->alloc_cross) / 1e6);
     }
 
     // decoder allocator
     {
-        whisper_allocr_graph_init(state->alloc_decode, ctx->backend,
+        bool ok = whisper_allocr_graph_init(state->alloc_decode, ctx->backend,
                 [&]() {
                     const auto & hparams = ctx->model.hparams;
 
@@ -3069,6 +3105,12 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
 
                     return whisper_build_graph_decoder(*ctx, *state, state->batch, true);
                 });
+
+        if (!ok) {
+            WHISPER_LOG_ERROR("%s: failed to init decoder allocator\n", __func__);
+            delete state;
+            return nullptr;
+        }
 
         WHISPER_LOG_INFO("%s: compute buffer (decode) = %7.2f MB\n", __func__, whisper_allocr_size(state->alloc_decode) / 1e6);
     }

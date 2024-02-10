@@ -775,6 +775,9 @@ static struct ggml_backend_i cpu_backend_i = {
 
 ggml_backend_t ggml_backend_cpu_init(void) {
     struct ggml_backend_cpu_context * ctx = malloc(sizeof(struct ggml_backend_cpu_context));
+    if (ctx == NULL) {
+        return NULL;
+    }
 
     ctx->n_threads           = GGML_DEFAULT_N_THREADS;
     ctx->work_data           = NULL;
@@ -783,6 +786,10 @@ ggml_backend_t ggml_backend_cpu_init(void) {
     ctx->abort_callback_data = NULL;
 
     ggml_backend_t cpu_backend = malloc(sizeof(struct ggml_backend));
+    if (cpu_backend == NULL) {
+        free(ctx);
+        return NULL;
+    }
 
     *cpu_backend = (struct ggml_backend) {
         /* .interface = */ cpu_backend_i,
