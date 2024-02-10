@@ -638,9 +638,9 @@ struct whisper_kv_cache {
     struct ggml_tensor * k;
     struct ggml_tensor * v;
 
-    struct ggml_context * ctx;
+    struct ggml_context * ctx = nullptr;
 
-    ggml_backend_buffer_t buffer;
+    ggml_backend_buffer_t buffer = nullptr;
 };
 
 struct whisper_model {
@@ -678,10 +678,10 @@ struct whisper_model {
     std::vector<whisper_layer_decoder> layers_decoder;
 
     // ggml context that contains all the meta information about the model tensors
-    struct ggml_context * ctx;
+    struct ggml_context * ctx = nullptr;
 
     // the model backend data is read-only and can be shared between processors
-    ggml_backend_buffer_t buffer;
+    ggml_backend_buffer_t buffer = nullptr;
 
     // tensors
     int n_loaded;
@@ -2981,7 +2981,7 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
     state->backend = whisper_backend_init(ctx->params);
     if (!state->backend) {
         WHISPER_LOG_ERROR("%s: whisper_backend_init() failed\n", __func__);
-        delete state;
+        whisper_free_state(state);
         return nullptr;
     }
 
@@ -2991,7 +2991,7 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
 
     if (!kv_cache_init(ctx->model.hparams, state->kv_self, ctx->backend, ctx->itype, factor*ctx->model.hparams.n_text_ctx)) {
         WHISPER_LOG_ERROR("%s: kv_cache_init() failed for self-attention cache\n", __func__);
-        delete state;
+        whisper_free_state(state);
         return nullptr;
     }
 
@@ -3002,7 +3002,7 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
 
     if (!kv_cache_init(ctx->model.hparams, state->kv_cross, ctx->backend, ctx->itype, ctx->model.hparams.n_audio_ctx)) {
         WHISPER_LOG_ERROR("%s: kv_cache_init() failed for cross-attention cache\n", __func__);
-        delete state;
+        whisper_free_state(state);
         return nullptr;
     }
 
@@ -3021,7 +3021,7 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
     if (!state->ctx_coreml) {
         WHISPER_LOG_ERROR("%s: failed to load Core ML model from '%s'\n", __func__, path_coreml.c_str());
 #ifndef WHISPER_COREML_ALLOW_FALLBACK
-        delete state;
+        whisper_free_state(state);
         return nullptr;
 #endif
     } else {
@@ -3052,7 +3052,7 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
 
         if (!ok) {
             WHISPER_LOG_ERROR("%s: failed to init conv allocator\n", __func__);
-            delete state;
+            whisper_free_state(state);
             return nullptr;
         }
 
@@ -3068,7 +3068,7 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
 
         if (!ok) {
             WHISPER_LOG_ERROR("%s: failed to init encoder allocator\n", __func__);
-            delete state;
+            whisper_free_state(state);
             return nullptr;
         }
 
@@ -3084,7 +3084,7 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
 
         if (!ok) {
             WHISPER_LOG_ERROR("%s: failed to init cross allocator\n", __func__);
-            delete state;
+            whisper_free_state(state);
             return nullptr;
         }
 
@@ -3108,7 +3108,7 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
 
         if (!ok) {
             WHISPER_LOG_ERROR("%s: failed to init decoder allocator\n", __func__);
-            delete state;
+            whisper_free_state(state);
             return nullptr;
         }
 
@@ -3371,9 +3371,7 @@ void whisper_free_state(struct whisper_state * state) {
 
 void whisper_free(struct whisper_context * ctx) {
     if (ctx) {
-        if (ctx->model.ctx) {
-            ggml_free(ctx->model.ctx);
-        }
+        ggml_free(ctx->model.ctx);
 
         ggml_backend_buffer_free(ctx->model.buffer);
 
