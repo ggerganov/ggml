@@ -162,7 +162,7 @@ struct ggml_cgraph * build_graph(const test_model& model, struct ggml_allocr * a
     int d1 = 1;
 
     // split conv2d in fundamental methods for test unit
-    struct ggml_tensor* im2col_0 = ggml_im2col(ctx0, model.a, model.b, s0, s1, p0, p1, d0, d1, true);
+    struct ggml_tensor* im2col_0 = ggml_im2col(ctx0, model.a, model.b, s0, s1, p0, p1, d0, d1, true, GGML_TYPE_F16);
     ggml_set_name(im2col_0, "im2col_res");
     ggml_build_forward_expand(gf, im2col_0);
 
