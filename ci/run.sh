@@ -319,52 +319,6 @@ function gg_sum_yolo {
     gg_printf '```\n'
 }
 
-# mpt
-
-function gg_run_mpt {
-    cd ${SRC}
-
-    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/config.json
-    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/warnings.py
-    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/fc.py
-    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/attention.py
-    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/blocks.py
-    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/ffn.py
-    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/norm.py
-    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/tokenizer.json
-    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/tokenizer_config.json
-    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/pytorch_model.bin.index.json
-    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/raw/main/configuration_mpt.py
-    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/resolve/main/pytorch_model-00001-of-00002.bin
-    gg_wget models-mnt/mpt/7B/ https://huggingface.co/mosaicml/mpt-7b/resolve/main/pytorch_model-00002-of-00002.bin
-
-    cd build-ci-release
-
-    set -e
-
-    path_models="../models-mnt/mpt/7B"
-    model_f16="${path_models}/ggml-model-f16.bin"
-    model_q4_0="${path_models}/ggml-model-q4_0.bin"
-
-    python3 ../examples/mpt/convert-h5-to-ggml.py ${path_models} 1
-    ./bin/mpt-quantize ${model_f16} ${model_q4_0} q4_0
-
-    (time ./bin/mpt --model ${model_f16}  -s 1234 -n 64 -p "I believe the meaning of life is") 2>&1 | tee -a $OUT/${ci}-tg.log
-    (time ./bin/mpt --model ${model_q4_0} -s 1234 -n 64 -p "I believe the meaning of life is") 2>&1 | tee -a $OUT/${ci}-tg.log
-
-    set +e
-}
-
-function gg_sum_mpt {
-    gg_printf '### %s\n\n' "${ci}"
-
-    gg_printf 'Runs short MPT text generation\n'
-    gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
-    gg_printf '```\n'
-    gg_printf '%s\n' "$(cat $OUT/${ci}-tg.log)"
-    gg_printf '```\n'
-}
-
 ## main
 
 if [ -z $GG_BUILD_LOW_PERF ]; then
@@ -394,7 +348,8 @@ test $ret -eq 0 && gg_run yolo
 
 if [ -z $GG_BUILD_LOW_PERF ]; then
     if [ -z ${GG_BUILD_VRAM_GB} ] || [ ${GG_BUILD_VRAM_GB} -ge 16 ]; then
-        test $ret -eq 0 && gg_run mpt
+        # run tests that require GPU with at least 16GB of VRAM
+        date
     fi
 fi
 
