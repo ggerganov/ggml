@@ -158,7 +158,7 @@ static void remove_allocated_tensor(struct ggml_dyn_tallocr * alloc, size_t offs
             return;
         }
     }
-    printf("tried to free tensor %s not found\n", tensor->name);
+    fprintf(stderr, "tried to free tensor %s not found\n", tensor->name);
     GGML_ASSERT(!"tensor not found");
 }
 #endif
@@ -708,12 +708,10 @@ bool ggml_gallocr_reserve_n(ggml_gallocr_t galloc, struct ggml_cgraph * graph, c
         size_t cur_size = galloc->buffers[i] ? ggml_backend_buffer_get_size(galloc->buffers[i]) : 0;
         size_t new_size = ggml_dyn_tallocr_max_size(galloc->buf_tallocs[i]);
 
-        if (cur_size != 0) {
-            //fprintf(stderr, "%s: current %s buffer size: %zu, new size: %zu\n", __func__, ggml_backend_buft_name(galloc->bufts[i]), cur_size, new_size);
-        }
-
         if (new_size > cur_size) {
+#ifndef NDEBUG
             fprintf(stderr, "%s: reallocating %s buffer from size %.02f MiB to %.02f MiB\n", __func__, ggml_backend_buft_name(galloc->bufts[i]), cur_size / 1024.0 / 1024.0, new_size / 1024.0 / 1024.0);
+#endif
             ggml_backend_buffer_free(galloc->buffers[i]);
             galloc->buffers[i] = ggml_backend_buft_alloc_buffer(galloc->bufts[i], new_size);
             if (galloc->buffers[i] == NULL) {
@@ -748,7 +746,6 @@ static void ggml_gallocr_init_tensor(ggml_gallocr_t galloc, struct ggml_tensor *
             assert(ggml_backend_buffer_get_alloc_size(galloc->buffers[node_alloc->buffer_id], node) <= tensor_alloc->size_max);
             void * base = ggml_backend_buffer_get_base(galloc->buffers[node_alloc->buffer_id]);
             void * addr = (char *)base + tensor_alloc->offset;
-            //printf("allocating %s at %zu\n", node->name, tensor_alloc->offset);
             ggml_backend_tensor_alloc(galloc->buffers[node_alloc->buffer_id], node, addr);
         } else {
             if (node->buffer == NULL) {
@@ -776,7 +773,9 @@ static bool ggml_gallocr_node_valid(ggml_gallocr_t galloc, struct ggml_tensor * 
 
 static bool ggml_gallocr_needs_realloc(ggml_gallocr_t galloc, struct ggml_cgraph * graph) {
     if (galloc->n_nodes != graph->n_nodes) {
+#ifndef NDEBUG
         fprintf(stderr, "%s: graph has different number of nodes\n", __func__);
+#endif
         return true;
     }
 
@@ -785,7 +784,9 @@ static bool ggml_gallocr_needs_realloc(ggml_gallocr_t galloc, struct ggml_cgraph
         struct node_alloc * node_alloc = &galloc->node_allocs[i];
 
         if (!ggml_gallocr_node_valid(galloc, node, node_alloc, &node_alloc->dst)) {
-            //fprintf(stderr, "%s: node %s is not valid\n", __func__, node->name);
+#ifndef NDEBUG
+            fprintf(stderr, "%s: node %s is not valid\n", __func__, node->name);
+#endif
             return true;
         }
 
@@ -795,7 +796,9 @@ static bool ggml_gallocr_needs_realloc(ggml_gallocr_t galloc, struct ggml_cgraph
                 break;
             }
             if (!ggml_gallocr_node_valid(galloc, src, node_alloc, &node_alloc->src[j])) {
-                //fprintf(stderr, "%s: src %d (%s) of node %s is not valid\n", __func__, j, src->name, node->name);
+#ifndef NDEBUG
+                fprintf(stderr, "%s: src %d (%s) of node %s is not valid\n", __func__, j, src->name, node->name);
+#endif
                 return true;
             }
         }
@@ -807,11 +810,16 @@ static bool ggml_gallocr_needs_realloc(ggml_gallocr_t galloc, struct ggml_cgraph
 bool ggml_gallocr_alloc_graph(ggml_gallocr_t galloc, struct ggml_cgraph * graph) {
     if (ggml_gallocr_needs_realloc(galloc, graph)) {
         if (galloc->n_buffers == 1) {
-            //fprintf(stderr, "%s: reallocating buffers automatically\n", __func__);
-            ggml_gallocr_reserve(galloc, graph);
+#ifndef NDEBUG
+            fprintf(stderr, "%s: reallocating buffers automatically\n", __func__);
+#endif
+            if (!ggml_gallocr_reserve(galloc, graph)) {
+                return false;
+            }
         } else {
-            // TODO: debug only print
+#ifndef NDEBUG
             fprintf(stderr, "%s: cannot reallocate multi buffer graph automatically, call reserve\n", __func__);
+#endif
             return false;
         }
     }
@@ -911,7 +919,6 @@ ggml_backend_buffer_t ggml_backend_alloc_ctx_tensors_from_buft(struct ggml_conte
         }
 
         if (this_size > max_size) {
-            // tensor is too large to fit in a single buffer
             fprintf(stderr, "%s: tensor %s is too large to fit in a %s buffer (tensor size: %zu, max buffer size: %zu)\n",
                     __func__, t->name,
                     ggml_backend_buft_name(buft),
@@ -943,7 +950,6 @@ ggml_backend_buffer_t ggml_backend_alloc_ctx_tensors_from_buft(struct ggml_conte
     }
 
     if (n_buffers == 0) {
-        // all the tensors in the context are already allocated
 #ifndef NDEBUG
         fprintf(stderr, "%s: all tensors in the context are already allocated\n", __func__);
 #endif
