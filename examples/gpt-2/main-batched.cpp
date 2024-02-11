@@ -116,7 +116,7 @@ struct gpt2_model {
 
     gpt2_kv_cache kv_cache;
 
-    struct ggml_context * ctx;
+    struct ggml_context * ctx_w;
 
     ggml_backend_t backend = NULL;
 
@@ -225,7 +225,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         return false;
     }
 
-    auto & ctx = model.ctx;
+    auto & ctx = model.ctx_w;
 
     size_t buffer_size = 0;
 
@@ -277,8 +277,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             /*.no_alloc   =*/ true,
         };
 
-        model.ctx = ggml_init(params);
-        if (!model.ctx) {
+        model.ctx_w = ggml_init(params);
+        if (!model.ctx_w) {
             fprintf(stderr, "%s: ggml_init() failed\n", __func__);
             return false;
         }
@@ -419,21 +419,21 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
         // allocate the tensors into the backend buffer
         {
-            ggml_allocr * alloc = ggml_allocr_new_from_buffer(model.kv_cache.buffer);
+            ggml_tallocr * alloc = ggml_tallocr_new(model.kv_cache.buffer);
 
             // this updates the pointers in the tensors to point to the correct location in the buffer
             // this is necessary since the ggml_context is .no_alloc == true
             // note that the buffer can actually be a device buffer, depending on the backend
-            ggml_allocr_alloc(alloc, model.kv_cache.k);
-            ggml_allocr_alloc(alloc, model.kv_cache.v);
+            ggml_tallocr_alloc(alloc, model.kv_cache.k);
+            ggml_tallocr_alloc(alloc, model.kv_cache.v);
 
-            ggml_allocr_free(alloc);
+            ggml_tallocr_free(alloc);
         }
     }
 
     // load weights
     {
-        ggml_allocr * alloc = ggml_allocr_new_from_buffer(model.buffer_w);
+        ggml_tallocr * alloc = ggml_tallocr_new(model.buffer_w);
 
         size_t total_size = 0;
 
@@ -495,7 +495,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
                 return false;
             }
 
-            ggml_allocr_alloc(alloc, tensor);
+            ggml_tallocr_alloc(alloc, tensor);
 
             if (ggml_backend_is_cpu  (model.backend)
 #ifdef GGML_USE_METAL
@@ -513,7 +513,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
             // GPT-2 models share the WTE tensor as the LM head
             if (name == "model/wte" && has_lm_head == false) {
-                //ggml_allocr_alloc(alloc, model.lm_head);
+                //ggml_tallocr_alloc(alloc, model.lm_head);
                 //ggml_backend_tensor_copy(tensor, model.lm_head);
                 model.lm_head = tensor;
             }
@@ -525,7 +525,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             total_size += ggml_nbytes(tensor);
         }
 
-        ggml_allocr_free(alloc);
+        ggml_tallocr_free(alloc);
         printf("%s: model size  = %8.2f MB\n", __func__, total_size/1024.0/1024.0);
     }
 
@@ -537,8 +537,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 // build the computation graph
 struct ggml_cgraph * gpt2_graph(
         const  gpt2_model  & model,
-        struct ggml_allocr * allocr,
-        const  gpt2_batch  & batch) {
+        const  gpt2_batch  & batch,
+                     bool    measure) {
     const auto & hparams = model.hparams;
 
     const int n_embd  = hparams.n_embd;
@@ -549,8 +549,8 @@ struct ggml_cgraph * gpt2_graph(
     const auto & kv_cache = model.kv_cache;
 
     const int32_t n_tokens = batch.n_tokens;
-    const int32_t n_kv     = ggml_allocr_is_measure(allocr) ? n_ctx            : kv_cache.n;
-    const int32_t kv_head  = ggml_allocr_is_measure(allocr) ? n_ctx - n_tokens : kv_cache.head;
+    const int32_t n_kv     = measure ? n_ctx            : kv_cache.n;
+    const int32_t kv_head  = measure ? n_ctx - n_tokens : kv_cache.head;
 
     // since we are using ggml-alloc, this buffer only needs enough space to hold the ggml_tensor and ggml_cgraph structs, but not the tensor data
     static size_t buf_size = ggml_tensor_overhead()*GPT2_MAX_NODES + ggml_graph_overhead_custom(GPT2_MAX_NODES, false);
@@ -559,7 +559,7 @@ struct ggml_cgraph * gpt2_graph(
     struct ggml_init_params params = {
         /*.mem_size   =*/ buf_size,
         /*.mem_buffer =*/ buf.data(),
-        /*.no_alloc   =*/ true, // the tensors will be allocated later by ggml_allocr_alloc_graph()
+        /*.no_alloc   =*/ true, // the tensors will be allocated later by ggml_gallocr_alloc_graph()
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
@@ -569,19 +569,12 @@ struct ggml_cgraph * gpt2_graph(
     struct ggml_tensor * inpL;
     if (batch.token) {
         struct ggml_tensor * inp_tokens = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
-        ggml_allocr_alloc(allocr, inp_tokens);
-        if (!ggml_allocr_is_measure(allocr)) {
-            ggml_backend_tensor_set(inp_tokens, batch.token, 0, n_tokens*ggml_element_size(inp_tokens));
-        }
+        ggml_set_name(inp_tokens, "inp_tokens");
+        ggml_set_input(inp_tokens);
 
         struct ggml_tensor * position = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
-        ggml_allocr_alloc(allocr, position);
-        if (!ggml_allocr_is_measure(allocr)) {
-            for (int i = 0; i < n_tokens; ++i) {
-                int32_t v = batch.pos[i];
-                ggml_backend_tensor_set(position, &v, i*sizeof(int32_t), sizeof(v));
-            }
-        }
+        ggml_set_name(position, "position");
+        ggml_set_input(position);
 
         // wte + wpe
         inpL =
@@ -592,37 +585,15 @@ struct ggml_cgraph * gpt2_graph(
         GGML_ASSERT(batch.embd);
 
         inpL = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_embd, n_tokens);
-
-        ggml_allocr_alloc(allocr, inpL);
-        if (!ggml_allocr_is_measure(allocr)) {
-            ggml_backend_tensor_set(inpL, batch.embd, 0, n_tokens * n_embd * ggml_element_size(inpL));
-        }
+        ggml_set_name(inpL, "embd");
+        ggml_set_input(inpL);
     }
 
     // KQ_mask (mask for 1 head, it will be broadcasted to all heads)
     struct ggml_tensor * KQ_mask = ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_kv, n_tokens, 1);
     ggml_set_name(KQ_mask, "KQ_mask");
-    ggml_allocr_alloc(allocr, KQ_mask);
-    if (!ggml_allocr_is_measure(allocr)) {
-        std::vector<float> data_buf(n_kv*n_tokens);
-        const float neg_inf_v = -INFINITY;
+    ggml_set_input(KQ_mask);
 
-        for (int h = 0; h < 1; ++h) {
-            int h_offset = h*(n_kv*n_tokens);
-            for (int j = 0; j < n_tokens; ++j) {
-                const gpt2_pos    pos    = batch.pos[j];
-                const gpt2_seq_id seq_id = batch.seq_id[j];
-
-                for (int i = 0; i < n_kv; ++i) {
-                    if (!kv_cache.cells[i].has_seq_id(seq_id) || kv_cache.cells[i].pos > pos) {
-                        data_buf[h_offset + j*n_kv + i] = neg_inf_v;
-                    }
-                }
-            }
-        }
-
-        ggml_backend_tensor_set(KQ_mask, data_buf.data(), 0, data_buf.size() * sizeof(float));
-    }
 
     for (int il = 0; il < n_layer; ++il) {
         struct ggml_tensor * cur;
@@ -901,8 +872,8 @@ void gpt2_batch_free(struct gpt2_batch batch) {
 //   0 - success
 // < 0 - error
 int gpt2_decode(
-        struct gpt2_model  & model,
-        struct ggml_allocr * allocr,
+        struct gpt2_model &  model,
+        ggml_gallocr_t       allocr,
         struct gpt2_batch    batch,
         int                  n_threads,
         std::vector<float> & logits) {
@@ -926,13 +897,51 @@ int gpt2_decode(
 
     cache.n = cache.head + n_tokens;
 
-    // reset the allocator to free all the memory allocated during the previous inference
-    ggml_allocr_reset(allocr);
-
-    struct ggml_cgraph * gf = gpt2_graph(model, allocr, batch);
+    struct ggml_cgraph * gf = gpt2_graph(model, batch, false);
 
     // allocate tensors
-    ggml_allocr_alloc_graph(allocr, gf);
+    ggml_gallocr_alloc_graph(allocr, gf);
+
+    // set the graph inputs
+    if (batch.token) {
+        struct ggml_tensor * inp_tokens = ggml_graph_get_tensor(gf, "inp_tokens");
+        ggml_backend_tensor_set(inp_tokens, batch.token, 0, n_tokens*ggml_element_size(inp_tokens));
+
+        struct ggml_tensor * position = ggml_graph_get_tensor(gf, "position");
+        for (int i = 0; i < n_tokens; ++i) {
+            int32_t v = batch.pos[i];
+            ggml_backend_tensor_set(position, &v, i*sizeof(int32_t), sizeof(v));
+        }
+    } else {
+        struct ggml_tensor * embd = ggml_graph_get_tensor(gf, "embd");
+        ggml_backend_tensor_set(embd, batch.embd, 0, n_tokens * hparams.n_embd * ggml_element_size(embd));
+    }
+
+    {
+        struct ggml_tensor * KQ_mask = ggml_graph_get_tensor(gf, "KQ_mask");
+        const auto & kv_cache = model.kv_cache;
+        const int32_t n_tokens = batch.n_tokens;
+        const int32_t n_kv     = kv_cache.n;
+
+        std::vector<float> data_buf(n_kv*n_tokens);
+        const float neg_inf_v = -INFINITY;
+
+        for (int h = 0; h < 1; ++h) {
+            int h_offset = h*(n_kv*n_tokens);
+            for (int j = 0; j < n_tokens; ++j) {
+                const gpt2_pos    pos    = batch.pos[j];
+                const gpt2_seq_id seq_id = batch.seq_id[j];
+
+                for (int i = 0; i < n_kv; ++i) {
+                    if (!kv_cache.cells[i].has_seq_id(seq_id) || kv_cache.cells[i].pos > pos) {
+                        data_buf[h_offset + j*n_kv + i] = neg_inf_v;
+                    }
+                }
+            }
+        }
+
+        ggml_backend_tensor_set(KQ_mask, data_buf.data(), 0, data_buf.size() * sizeof(float));
+    }
 
     // run the computation
     if (ggml_backend_is_cpu(model.backend)) {
@@ -1024,9 +1033,6 @@ int main(int argc, char ** argv) {
     // tokenize the prompt
     std::vector<gpt_vocab::id> embd_inp = ::gpt_tokenize(vocab, params.prompt);
 
-    // keep this buffer alive while evaluating the model
-    ggml_backend_buffer_t buf_compute;
-
     const int n_parallel = params.n_parallel;
     const int n_batch_max = std::max(embd_inp.size(), (size_t)n_parallel);
 
@@ -1035,24 +1041,18 @@ int main(int argc, char ** argv) {
     gpt2_batch batch = gpt2_batch_init(n_batch_max, 0);
 
     // prepare required memory and allocate the compute buffer
-    struct ggml_allocr * allocr = NULL;
+    ggml_gallocr_t allocr = NULL;
     {
         // create an allocator to measure the memory usage
-        allocr = ggml_allocr_new_measure_from_backend(model.backend);
-
-        batch.n_tokens = n_batch_max;
+        allocr = ggml_gallocr_new(ggml_backend_get_default_buffer_type(model.backend));
 
         // create the worst case graph for memory usage estimation
-        struct ggml_cgraph * gf = gpt2_graph(model, allocr, batch);
+        batch.n_tokens = n_batch_max;
+        struct ggml_cgraph * gf = gpt2_graph(model, batch, true);
 
-        // compute the required memory
-        size_t mem_size = ggml_allocr_alloc_graph(allocr, gf);
-
-        // recreate the allocator with the required memory
-        ggml_allocr_free(allocr);
-        buf_compute = ggml_backend_alloc_buffer(model.backend, mem_size);
-        allocr = ggml_allocr_new_from_buffer(buf_compute);
-
+        // pre-allocate the compute buffer for the worst case (optional)
+        ggml_gallocr_reserve(allocr, gf);
+        size_t mem_size = ggml_gallocr_get_buffer_size(allocr, 0);
         fprintf(stderr, "%s: compute buffer size: %.2f MB\n", __func__, mem_size/1024.0/1024.0);
     }
 
@@ -1207,11 +1207,11 @@ int main(int argc, char ** argv) {
     }
 
     gpt2_batch_free(batch);
-    ggml_free(model.ctx);
+    ggml_free(model.ctx_w);
 
+    ggml_gallocr_free(allocr);
     ggml_backend_buffer_free(model.buffer_w);
     ggml_backend_buffer_free(model.kv_cache.buffer);
-    ggml_backend_buffer_free(buf_compute);
     ggml_backend_free(model.backend);
 
     return 0;

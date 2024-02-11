@@ -87,7 +87,7 @@ struct gpt2_model {
     struct ggml_tensor * memory_v;
 
     //
-    struct ggml_context * ctx;
+    struct ggml_context * ctx_w;
 
     std::vector<ggml_backend_t> backends;
     std::vector<ggml_backend_buffer_t> buffers_w;
@@ -217,7 +217,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         return false;
     }
 
-    auto & ctx = model.ctx;
+    auto & ctx = model.ctx_w;
 
     // create the ggml context
     {
@@ -228,8 +228,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             /*.no_alloc   =*/ true,
         };
 
-        model.ctx = ggml_init(params);
-        if (!model.ctx) {
+        model.ctx_w = ggml_init(params);
+        if (!model.ctx_w) {
             fprintf(stderr, "%s: ggml_init() failed\n", __func__);
             return false;
         }
@@ -342,7 +342,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
     }
 
     // allocate buffers
-    std::map<ggml_backend_t, std::unique_ptr<ggml_allocr, decltype(&ggml_allocr_free)>> backend_buffers;
+    std::map<ggml_backend_t, std::unique_ptr<ggml_tallocr, decltype(&ggml_tallocr_free)>> backend_buffers;
     for (auto backend : model.backends) {
         // compute the size of the buffer
         size_t size = 0;
@@ -355,10 +355,11 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             printf("%s: %8s buffer size = %8.2f MB\n", __func__, ggml_backend_name(backend), size/1024.0/1024.0);
             // allocate the buffer
             ggml_backend_buffer_t buffer = ggml_backend_alloc_buffer(backend, size);
+            ggml_backend_buffer_set_usage(buffer, GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
             model.buffers_w.push_back(buffer);
 
             // create an allocator for the buffer to allocate the tensors
-            auto alloc = std::unique_ptr<ggml_allocr, decltype(&ggml_allocr_free)>(ggml_allocr_new_from_buffer(buffer), ggml_allocr_free);
+            auto alloc = std::unique_ptr<ggml_tallocr, decltype(&ggml_tallocr_free)>(ggml_tallocr_new(buffer), ggml_tallocr_free);
             backend_buffers.insert(std::make_pair(backend, std::move(alloc)));
         } else {
             model.buffers_w.push_back(NULL);
@@ -393,15 +394,15 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
         // allocate the tensors into the backend buffer
         {
-            ggml_allocr * alloc = ggml_allocr_new_from_buffer(model.buffer_kv);
+            ggml_tallocr * alloc = ggml_tallocr_new(model.buffer_kv);
 
             // this updates the pointers in the tensors to point to the correct location in the buffer
             // this is necessary since the ggml_context is .no_alloc == true
             // note that the buffer can actually be a device buffer, depending on the backend
-            ggml_allocr_alloc(alloc, model.memory_k);
-            ggml_allocr_alloc(alloc, model.memory_v);
+            ggml_tallocr_alloc(alloc, model.memory_k);
+            ggml_tallocr_alloc(alloc, model.memory_v);
 
-            ggml_allocr_free(alloc);
+            ggml_tallocr_free(alloc);
         }
     }
 
@@ -469,8 +470,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
             // allocate the tensor
             ggml_backend_t backend = tensor_backends[name];
-            ggml_allocr * alloc = backend_buffers.find(backend)->second.get();
-            ggml_allocr_alloc(alloc, tensor);
+            ggml_tallocr * alloc = backend_buffers.find(backend)->second.get();
+            ggml_tallocr_alloc(alloc, tensor);
             //printf("%s: [%5.5s] %s\n", __func__, ggml_backend_name(backend), name.c_str());
 
             if (ggml_backend_is_cpu(backend)
@@ -489,7 +490,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
             // GPT-2 models share the WTE tensor as the LM head
             if (name == "model/wte" && has_lm_head == false) {
-                ggml_allocr_alloc(backend_buffers.find(tensor_backends["model/lm_head"])->second.get(), model.lm_head);
+                ggml_tallocr_alloc(backend_buffers.find(tensor_backends["model/lm_head"])->second.get(), model.lm_head);
                 //printf("%s: [%5.5s] %s (copied)\n", __func__, ggml_backend_name(tensor_backends["model/lm_head"]), "model/lm_head");
                 ggml_backend_tensor_copy(tensor, model.lm_head);
                 total_size += ggml_nbytes(model.lm_head);
@@ -523,10 +524,10 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         printf("%s: backend_in = %s (%zu bytes)\n", __func__, ggml_backend_name(backend_input), input_size);
 
         // allocate the tensors into the backend buffer
-        ggml_allocr * alloc = ggml_allocr_new_from_buffer(model.buffer_input);
-        ggml_allocr_alloc(alloc, model.embd);
-        ggml_allocr_alloc(alloc, model.position);
-        ggml_allocr_free(alloc);
+        ggml_tallocr * alloc = ggml_tallocr_new(model.buffer_input);
+        ggml_tallocr_alloc(alloc, model.embd);
+        ggml_tallocr_alloc(alloc, model.position);
+        ggml_tallocr_free(alloc);
     }
 
     return true;
@@ -553,7 +554,7 @@ struct ggml_cgraph * gpt2_graph(
     struct ggml_init_params params = {
         /*.mem_size   =*/ buf_size,
         /*.mem_buffer =*/ buf.data(),
-        /*.no_alloc   =*/ true, // the tensors will be allocated later by ggml_allocr_alloc_graph()
+        /*.no_alloc   =*/ true, // the tensors will be allocated later by ggml_gallocr_alloc_graph()
     };
 
     struct ggml_context * ctx0 = ggml_init(params);
@@ -562,23 +563,15 @@ struct ggml_cgraph * gpt2_graph(
 
     struct ggml_tensor * embd = ggml_view_1d(ctx0, model.embd, N, 0);
 
-    // TODO: avoid writing to tensors if we are only measuring the memory usage
-    // not critical, just a minor optimization
-
-    //if (!ggml_allocr_is_measure(allocr)) {
-        //ggml_backend_tensor_set(embd, embd_inp.data(), 0, N*ggml_element_size(embd));
-        ggml_backend_tensor_set(model.embd, embd_inp.data(), 0, N*ggml_element_size(embd)); // FIXME: cannot use the view here because it's not initialized yet (buffer not set), but we should
-    //}
-    //memcpy(embd->data, embd_inp.data(), N*ggml_element_size(embd));
+    // set inputs
+    // TODO: move to gpt2_eval
+    ggml_backend_tensor_set(model.embd, embd_inp.data(), 0, N*ggml_element_size(embd));
 
     struct ggml_tensor * position = ggml_view_1d(ctx0, model.position, N, 0);
-    //if (!ggml_allocr_is_measure(allocr)) {
-        for (int i = 0; i < N; ++i) {
-            int32_t v = n_past + i;
-            ggml_backend_tensor_set(model.position, &v, i*sizeof(int32_t), sizeof(v)); // FIXME: same
-            //((int32_t *) position->data)[i] = n_past + i;
-        }
-    //}
+    for (int i = 0; i < N; ++i) {
+        int32_t v = n_past + i;
+        ggml_backend_tensor_set(model.position, &v, i*sizeof(int32_t), sizeof(v));
+    }
 
     const float KQ_scale = 1.0f/sqrtf(float(model.hparams.n_embd)/model.hparams.n_head);
 
@@ -859,8 +852,7 @@ struct ggml_cgraph * gpt2_graph(
 // evaluate the transformer
 //
 //   - model:     the model
-//   - allocr:    ggml_allocr to use to allocate the compute buffer
-//   - n_threads: number of threads to use
+//   - sched:     the backend scheduler
 //   - n_past:    the context size so far
 //   - embd_inp:  the embeddings of the tokens in the context
 //   - embd_w:    the predicted logits for the next token
@@ -954,14 +946,13 @@ int main(int argc, char ** argv) {
         int n_past = model.hparams.n_ctx - n_tokens;
         struct ggml_cgraph * gf = gpt2_graph(model, n_past, std::vector<gpt_vocab::id>(n_tokens, 0));
 
-        ggml_backend_sched_init_measure(sched, gf);
+        ggml_backend_sched_reserve(sched, gf);
 
 
         // compute the required memory
         size_t mem_size = 0;
         for (size_t i = 0; i < model.backends.size(); i++) {
-            ggml_backend_buffer_t buf = ggml_backend_sched_get_buffer(sched, model.backends[i]);
-            size_t size = ggml_backend_buffer_get_size(buf);
+            size_t size = ggml_backend_sched_get_buffer_size(sched, model.backends[i]);
             if (size > 0) {
                 mem_size += size;
                 printf("%s: %8s compute buffer size = %8.2f MB\n", __func__, ggml_backend_name(model.backends[i]), size/1024.0/1024.0);
@@ -1065,11 +1056,11 @@ int main(int argc, char ** argv) {
         printf("%s:    total time = %8.2f ms\n", __func__, (t_main_end_us - t_main_start_us)/1000.0f);
     }
 
-    ggml_free(model.ctx);
+    ggml_free(model.ctx_w);
 
     ggml_backend_sched_free(sched);
     ggml_backend_buffer_free(model.buffer_kv);
-    for (auto & buf : model.buffers_w) {
+    for (auto buf : model.buffers_w) {
         ggml_backend_buffer_free(buf);
     }
     for (auto backend : model.backends) {
