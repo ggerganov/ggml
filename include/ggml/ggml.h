@@ -510,7 +510,7 @@ extern "C" {
         GGML_LOG_LEVEL_DEBUG = 5
     };
 
-    enum ggml_tensor_flags {
+    enum ggml_tensor_flag {
         GGML_TENSOR_FLAG_INPUT  = 1,
         GGML_TENSOR_FLAG_OUTPUT = 2,
         GGML_TENSOR_FLAG_PARAM  = 4,

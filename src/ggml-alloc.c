@@ -491,10 +491,7 @@ static void ggml_gallocr_allocate_node(ggml_gallocr_t galloc, struct ggml_tensor
                         struct hash_node * view_src_hn = ggml_gallocr_hash_get(galloc, view_src);
                         if (view_src_hn->n_views == 1 && view_src_hn->n_children == 0 && view_src->data == parent->data) {
                             AT_PRINTF("reusing view parent %s (%s) for %s\n", parent->name, view_src->name, node->name);
-                            //node->view_src = view_src;
-                            //view_src_hn->n_views += 1;
-                            //init_view(galloc, node, false);
-                            GGML_ASSERT(view_src_hn->offset == p_hn->offset);
+                            assert(view_src_hn->offset == p_hn->offset);
                             hn->buffer_id = p_hn->buffer_id;
                             hn->offset = p_hn->offset;
                             p_hn->allocated = false; // avoid freeing the parent
@@ -503,9 +500,6 @@ static void ggml_gallocr_allocate_node(ggml_gallocr_t galloc, struct ggml_tensor
                         }
                     } else {
                         AT_PRINTF("reusing parent %s for %s\n", parent->name, node->name);
-                        //node->view_src = parent;
-                        //p_hn->n_views += 1;
-                        //init_view(galloc, node, false);
                         hn->buffer_id = p_hn->buffer_id;
                         hn->offset = p_hn->offset;
                         p_hn->allocated = false; // avoid freeing the parent
@@ -671,7 +665,7 @@ bool ggml_gallocr_reserve_n(ggml_gallocr_t galloc, struct ggml_cgraph * graph, c
     // allocate in hash table
     ggml_gallocr_alloc_graph_impl(galloc, graph, node_buffer_ids);
 
-    // set the node_allocs from hash table
+    // set the node_allocs from the hash table
     if (galloc->n_nodes < graph->n_nodes) {
         free(galloc->node_allocs);
         galloc->node_allocs = calloc(sizeof(struct node_alloc), graph->n_nodes);
@@ -765,7 +759,7 @@ static void ggml_gallocr_init_tensor(ggml_gallocr_t galloc, struct ggml_tensor *
     }
 }
 
-static bool ggml_gallocr_node_valid(ggml_gallocr_t galloc, struct ggml_tensor * node, struct node_alloc * nalloc, struct tensor_alloc * talloc) {
+static bool ggml_gallocr_node_needs_realloc(ggml_gallocr_t galloc, struct ggml_tensor * node, struct node_alloc * nalloc, struct tensor_alloc * talloc) {
     ggml_backend_buffer_type_t buft = galloc->bufts[nalloc->buffer_id];
     size_t node_size = (node->data || node->view_src) ? 0 : ggml_backend_buft_get_alloc_size(buft, node);
     return talloc->size_max >= node_size;
@@ -783,7 +777,7 @@ static bool ggml_gallocr_needs_realloc(ggml_gallocr_t galloc, struct ggml_cgraph
         struct ggml_tensor * node = graph->nodes[i];
         struct node_alloc * node_alloc = &galloc->node_allocs[i];
 
-        if (!ggml_gallocr_node_valid(galloc, node, node_alloc, &node_alloc->dst)) {
+        if (!ggml_gallocr_node_needs_realloc(galloc, node, node_alloc, &node_alloc->dst)) {
 #ifndef NDEBUG
             fprintf(stderr, "%s: node %s is not valid\n", __func__, node->name);
 #endif
@@ -795,7 +789,7 @@ static bool ggml_gallocr_needs_realloc(ggml_gallocr_t galloc, struct ggml_cgraph
             if (src == NULL) {
                 break;
             }
-            if (!ggml_gallocr_node_valid(galloc, src, node_alloc, &node_alloc->src[j])) {
+            if (!ggml_gallocr_node_needs_realloc(galloc, src, node_alloc, &node_alloc->src[j])) {
 #ifndef NDEBUG
                 fprintf(stderr, "%s: src %d (%s) of node %s is not valid\n", __func__, j, src->name, node->name);
 #endif
