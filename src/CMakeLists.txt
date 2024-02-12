@@ -320,6 +320,28 @@ if (GGML_METAL)
         )
 endif()
 
+if (GGML_VULKAN)
+    find_package(Vulkan)
+    if (Vulkan_FOUND)
+        message(STATUS "Vulkan found")
+
+        set(GGML_VULKAN_SOURCES ggml-vulkan.cpp ggml-vulkan.h)
+
+        add_library(ggml-vulkan OBJECT ggml-vulkan.cpp ggml-vulkan.h)
+        if (BUILD_SHARED_LIBS)
+            set_target_properties(ggml-vulkan PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        endif()
+        target_link_libraries(ggml-vulkan PRIVATE Vulkan::Vulkan)
+        target_include_directories(ggml-vulkan PRIVATE . ../include ../include/ggml)
+
+        add_compile_definitions(GGML_USE_VULKAN)
+
+        set(GGML_EXTRA_LIBS ${GGMl_EXTRA_LIBS} ggml-vulkan)
+    else()
+        message(WARNING "Vulkan not found")
+    endif()
+endif()
+
 if (GGML_PERF)
     set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_PERF)
 endif()
