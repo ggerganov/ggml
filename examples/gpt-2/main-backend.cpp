@@ -538,9 +538,7 @@ struct ggml_cgraph * gpt2_graph(
             // [64, N, 12]
             struct ggml_tensor * Q =
                 ggml_permute(ctx,
-                        ggml_cpy(ctx,
-                            Qcur,
-                            ggml_new_tensor_3d(ctx, GGML_TYPE_F32, n_embd/n_head, n_head, N)),
+                        ggml_cont_3d(ctx, Qcur, n_embd/n_head, n_head, N),
                         0, 2, 1, 3);
 
             // K = Kmem.view(n_embd/n_head, n_head, n_past + N).permute(0, 2, 1, 3)
@@ -586,13 +584,13 @@ struct ggml_cgraph * gpt2_graph(
             // V_trans = Vmem.view(n_embd/n_head, n_head, n_past + N).permute(1, 2, 0, 3).contiguous()
             // [n_past + N, 64, 12]
             struct ggml_tensor * V_trans =
-                ggml_cpy(ctx,
+                ggml_cont_3d(ctx,
                         ggml_permute(ctx,
                             ggml_reshape_3d(ctx,
                                 ggml_view_1d(ctx, model.memory_v, (n_past + N)*n_embd, il*n_ctx*ggml_element_size(model.memory_v)*n_embd),
                                 n_embd/n_head, n_head, n_past + N),
                             1, 2, 0, 3),
-                        ggml_new_tensor_3d(ctx, model.memory_v->type, n_past + N, n_embd/n_head, n_head));
+                        n_past + N, n_embd/n_head, n_head);
 
             // KQV = transpose(V) * KQ_soft_max
             // [64, N, 12]
@@ -604,9 +602,7 @@ struct ggml_cgraph * gpt2_graph(
 
             // cur = KQV_merged.contiguous().view(n_embd, N)
             // [768, N]
-            cur = ggml_cpy(ctx,
-                    KQV_merged,
-                    ggml_new_tensor_2d(ctx, GGML_TYPE_F32, n_embd, N));
+            cur = ggml_cont_2d(ctx, KQV_merged, n_embd, N);
         }
 
         // projection
