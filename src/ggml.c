@@ -2607,7 +2607,7 @@ static struct ggml_tensor * ggml_new_tensor_impl(
         /*.nb           =*/ { 0, 0, 0, 0 },
         /*.op           =*/ GGML_OP_NONE,
         /*.op_params    =*/ { 0 },
-        /*.is_param     =*/ 0,
+        /*.flags     =*/ 0,
         /*.grad         =*/ NULL,
         /*.src          =*/ { NULL },
         /*.perf_runs    =*/ 0,
@@ -18131,7 +18131,7 @@ void ggml_graph_print(const struct ggml_cgraph * cgraph) {
         GGML_PRINT(" - %3d: [ %5" PRId64 ", %5" PRId64 ", %5" PRId64 "] %16s %s (%3d) cpu = %7.3f / %7.3f ms, wall = %7.3f / %7.3f ms\n",
                 i,
                 node->ne[0], node->ne[1], node->ne[2],
-                ggml_op_name(node->op), node->flags & GGML_TENSOR_FLAG_PARAM ? "x" : node->grad ? "g" : " ", node->perf_runs,
+                ggml_op_name(node->op), (node->flags & GGML_TENSOR_FLAG_PARAM) ? "x" : node->grad ? "g" : " ", node->perf_runs,
                 (double) node->perf_cycles  / (double) ggml_cycles_per_ms(),
                 (double) node->perf_cycles  / (double) ggml_cycles_per_ms() / (double) node->perf_runs,
                 (double) node->perf_time_us / 1000.0,
@@ -19245,7 +19245,6 @@ void ggml_set_output(struct ggml_tensor * tensor) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-
 
 void ggml_quantize_init(enum ggml_type type) {
     ggml_critical_section_start();
