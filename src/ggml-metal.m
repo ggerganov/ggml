@@ -272,6 +272,14 @@ static struct ggml_metal_context * ggml_metal_init(int n_cb) {
                 return NULL;
             }
         } else {
+#if GGML_METAL_EMBED_LIBRARY
+            GGML_METAL_LOG_INFO("%s: using embedded metal library\n", __func__);
+
+            extern const char ggml_metallib_start[];
+            extern const char ggml_metallib_end[];
+
+            NSString * src  = [[NSString alloc] initWithBytes:ggml_metallib_start length:(ggml_metallib_end-ggml_metallib_start) encoding:NSUTF8StringEncoding];
+#else
             GGML_METAL_LOG_INFO("%s: default.metallib not found, loading from source\n", __func__);
 
             NSString * sourcePath;
@@ -294,6 +302,7 @@ static struct ggml_metal_context * ggml_metal_init(int n_cb) {
                 GGML_METAL_LOG_ERROR("%s: error: %s\n", __func__, [[error description] UTF8String]);
                 return NULL;
             }
+#endif
 
             @autoreleasepool {
                 // dictionary of preprocessor macros
@@ -687,6 +696,7 @@ static bool ggml_metal_graph_compute(
         struct ggml_metal_context * ctx,
                struct ggml_cgraph * gf) {
 
+    @autoreleasepool {
     MTLComputePassDescriptor * edesc = MTLComputePassDescriptor.computePassDescriptor;
     edesc.dispatchType = MTLDispatchTypeSerial;
 
@@ -2272,6 +2282,7 @@ static bool ggml_metal_graph_compute(
         [[MTLCaptureManager sharedCaptureManager] stopCapture];
     }
 
+    }
     return true;
 }
 
