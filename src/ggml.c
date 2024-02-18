@@ -14888,7 +14888,7 @@ static void ggml_compute_forward_map_custom2(
               struct ggml_tensor * dst) {
 
     const struct ggml_tensor * a = dst->src[0];
-    const struct ggml_tensor * b = dst->src[0];
+    const struct ggml_tensor * b = dst->src[1];
 
     if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
         return;
@@ -14906,8 +14906,8 @@ static void ggml_compute_forward_map_custom3(
               struct ggml_tensor * dst) {
 
     const struct ggml_tensor * a = dst->src[0];
-    const struct ggml_tensor * b = dst->src[0];
-    const struct ggml_tensor * c = dst->src[0];
+    const struct ggml_tensor * b = dst->src[1];
+    const struct ggml_tensor * c = dst->src[2];
 
     if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
         return;
