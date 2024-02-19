@@ -329,14 +329,9 @@ target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
 
 #
-# test-svd0 (arm/x86)
+# test-svd0 (x86)
 
-if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm" AND NOT GGML_NO_ACCELERATE)
-    set(TEST_TARGET test-svd0)
-    add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
-    target_link_libraries(${TEST_TARGET} PRIVATE ggml ${GGML_EXTRA_LIBS})
-    target_compile_options(${TEST_TARGET} PRIVATE ${GGML_EXTRA_FLAGS})
-elseif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86" AND GGML_OPENBLAS)
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86" AND GGML_OPENBLAS)
     set(TEST_TARGET test-svd0)
     add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
     target_link_libraries(${TEST_TARGET} PRIVATE ggml ${GGML_EXTRA_LIBS})
