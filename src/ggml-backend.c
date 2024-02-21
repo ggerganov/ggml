@@ -807,7 +807,7 @@ ggml_backend_t ggml_backend_cpu_init(void) {
 }
 
 GGML_CALL bool ggml_backend_is_cpu(ggml_backend_t backend) {
-    if (!backend) {
+    if (!backend || !backend->iface.get_name) {
         return false;
     }
 
