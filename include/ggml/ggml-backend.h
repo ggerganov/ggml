@@ -48,7 +48,8 @@ extern "C" {
     //
     // Backend
     //
-    
+
+    GGML_API ggml_guid_t  ggml_backend_guid(ggml_backend_t backend);
     GGML_API const char * ggml_backend_name(ggml_backend_t backend);
     GGML_API void         ggml_backend_free(ggml_backend_t backend);
 
