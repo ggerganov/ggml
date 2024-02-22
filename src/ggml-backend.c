@@ -160,13 +160,6 @@ bool ggml_backend_buffer_copy_tensor(const struct ggml_tensor * src, struct ggml
 
 // backend
 
-ggml_guid_t ggml_backend_guid(ggml_backend_t backend) {
-    if (backend == NULL) {
-        return NULL;
-    }
-    return backend->iface.get_guid();
-}
-
 const char * ggml_backend_name(ggml_backend_t backend) {
     if (backend == NULL) {
         return "NULL";
@@ -775,7 +768,6 @@ GGML_CALL static bool ggml_backend_cpu_supports_op(ggml_backend_t backend, const
 }
 
 static struct ggml_backend_i cpu_backend_i = {
-    /* .get_guid                = */ ggml_backend_cpu_guid,
     /* .get_name                = */ ggml_backend_cpu_name,
     /* .free                    = */ ggml_backend_cpu_free,
     /* .get_default_buffer_type = */ ggml_backend_cpu_get_default_buffer_type,
@@ -821,7 +813,7 @@ ggml_guid_t ggml_backend_cpu_guid() {
 }
 
 GGML_CALL bool ggml_backend_is_cpu(ggml_backend_t backend) {
-    return backend != NULL && backend->iface.get_guid != NULL && ggml_guid_matches(CPU_GUID, backend->iface.get_guid());
+    return backend != NULL && ggml_guid_matches(CPU_GUID, backend->guid);
 }
 
 void ggml_backend_cpu_set_n_threads(ggml_backend_t backend_cpu, int n_threads) {
