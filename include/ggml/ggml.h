@@ -677,8 +677,8 @@ extern "C" {
     //
 
     // GUID types
-    typedef uint8_t ggml_guid [16];
-    typedef ggml_guid* ggml_guid_t;
+    typedef uint8_t ggml_guid[16];
+    typedef ggml_guid * ggml_guid_t;
 
     GGML_API bool ggml_guid_matches(ggml_guid_t guid_a, ggml_guid_t guid_b);
 
