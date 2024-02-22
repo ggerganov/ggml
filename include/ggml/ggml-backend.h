@@ -49,7 +49,7 @@ extern "C" {
     // Backend
     //
 
-
+    GGML_API ggml_guid_t  ggml_backend_guid(ggml_backend_t backend);
     GGML_API const char * ggml_backend_name(ggml_backend_t backend);
     GGML_API void         ggml_backend_free(ggml_backend_t backend);
 
@@ -82,6 +82,8 @@ extern "C" {
     //
 
     GGML_API ggml_backend_t ggml_backend_cpu_init(void);
+
+    GGML_API GGML_CALL ggml_guid_t ggml_backend_cpu_guid();
 
     GGML_API GGML_CALL bool ggml_backend_is_cpu                (ggml_backend_t backend);
     GGML_API           void ggml_backend_cpu_set_n_threads     (ggml_backend_t backend_cpu, int n_threads);
