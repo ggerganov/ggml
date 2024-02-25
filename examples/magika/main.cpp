@@ -2,20 +2,11 @@
 #include "ggml/ggml-alloc.h"
 #include "ggml/ggml-backend.h"
 #include <algorithm>
-#include <cassert>
 #include <cmath>
 #include <numeric>
 #include <stdexcept>
 #include <string>
 #include <vector>
-
-#ifdef GGML_USE_CUBLAS
-#include "ggml-cuda.h"
-#endif
-
-#ifdef GGML_USE_METAL
-#include "ggml-metal.h"
-#endif
 
 static const char * magika_labels[] = {
     "ai",                 "apk",                "appleplist",         "asm",                "asp",
@@ -85,7 +76,6 @@ struct magika_model {
     ggml_backend_buffer_t buf_w = nullptr;
     struct ggml_context * ctx_w = nullptr;
 };
-
 
 struct ggml_tensor * checked_get_tensor(struct ggml_context * ctx, const char * name) {
     struct ggml_tensor * tensor = ggml_get_tensor(ctx, name);
@@ -212,7 +202,6 @@ struct ggml_cgraph * magika_graph(
 
     // dense
     cur = ggml_mul_mat(ctx, model.dense_w, input);
-    assert(cur->ne[0] == model.dense_b->ne[0]);
     cur = ggml_add(ctx, cur, model.dense_b); // [128, 1536, n_files]
     cur = ggml_gelu(ctx, cur);
 
