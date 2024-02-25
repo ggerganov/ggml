@@ -559,6 +559,7 @@ static_assert(sizeof(block_iq4_nl) == sizeof(ggml_fp16_t) + QK4_NL/2, "wrong iq4
 #define CUDA_UPSCALE_BLOCK_SIZE 256
 #define CUDA_CONCAT_BLOCK_SIZE 256
 #define CUDA_PAD_BLOCK_SIZE 256
+#define CUDA_ARANGE_BLOCK_SIZE 256
 #define CUDA_ACC_BLOCK_SIZE 256
 #define CUDA_IM2COL_BLOCK_SIZE 256
 #define CUDA_POOL2D_BLOCK_SIZE 256
@@ -988,6 +989,15 @@ static __global__ void pad_f32(const float * x, float * dst, const int ne0, cons
     } else {
         dst[offset_dst] = 0.0f;
     }
+}
+
+static __global__ void arange_f32(float * dst, const int ne0, const float start, const float step) {
+    // blockIDx.x: idx of ne0 / BLOCK_SIZE
+    int nidx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (nidx >= ne0) {
+        return;
+    }
+    dst[nidx] = start + step * nidx;
 }
 
 template <int block_size>
@@ -6746,6 +6756,11 @@ static void pad_f32_cuda(const float * x, float * dst,
     pad_f32<<<gridDim, CUDA_PAD_BLOCK_SIZE, 0, stream>>>(x, dst, ne0, ne00, ne01, ne02, ne03);
 }
 
+static void arange_f32_cuda(float * dst, const int ne0, const float start, const float step, cudaStream_t stream) {
+    int num_blocks = (ne0 + CUDA_ARANGE_BLOCK_SIZE - 1) / CUDA_ARANGE_BLOCK_SIZE;
+    arange_f32<<<num_blocks, CUDA_ARANGE_BLOCK_SIZE, 0, stream>>>(dst, ne0, start,  step);
+}
+
 static void rms_norm_f32_cuda(const float * x, float * dst, const int ncols, const int nrows, const float eps, cudaStream_t stream) {
     GGML_ASSERT(ncols % WARP_SIZE == 0);
     if (ncols < 1024) {
@@ -8579,6 +8594,26 @@ static void ggml_cuda_op_pad(
     (void) src1_dd;
 }
 
+static void ggml_cuda_op_arange(
+    const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
+    const float * src0_dd, const float * src1_dd, float * dst_dd, cudaStream_t main_stream) {
+    GGML_ASSERT(dst->type == GGML_TYPE_F32);
+
+    const float start = ((float*)dst->op_params)[0];
+    const float stop = ((float*)dst->op_params)[1];
+    const float step = ((float*)dst->op_params)[2];
+
+    int64_t steps = (int64_t)ceil((stop - start) / step);
+    GGML_ASSERT(ggml_nelements(dst) == steps);
+
+    arange_f32_cuda(dst_dd, dst->ne[0], start, step, main_stream);
+
+    (void) src0;
+    (void) src1;
+    (void) src0_dd;
+    (void) src1_dd;
+}
+
 static void ggml_cuda_op_rms_norm(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
     const float * src0_dd, const float * src1_dd, float * dst_dd, cudaStream_t main_stream) {
@@ -9839,6 +9874,43 @@ static void ggml_cuda_pad(const ggml_tensor * src0, const ggml_tensor * src1, gg
     ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_pad);
 }
 
+static void ggml_cuda_arange(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+    GGML_ASSERT(              dst->backend != GGML_BACKEND_GPU_SPLIT);
+
+    ggml_tensor_extra_gpu * dst_extra  =            (ggml_tensor_extra_gpu *)  dst->extra;
+
+    const bool  dst_on_device =              dst->backend == GGML_BACKEND_GPU;
+
+    // dd = data device
+    float * src0_ddf = nullptr;
+    float * src1_ddf = nullptr;
+    float *  dst_ddf = nullptr;
+
+    cuda_pool_alloc<float>  dst_f;
+
+    ggml_cuda_set_device(g_main_device);
+    cudaStream_t main_stream = g_cudaStreams[g_main_device][0];
+
+    if (dst_on_device) {
+        dst_ddf = (float *) dst_extra->data_device[g_main_device];
+    } else {
+        dst_ddf = dst_f.alloc(ggml_nelements(dst));
+    }
+
+    // do the computation
+    ggml_cuda_op_arange(src0, src1, dst, src0_ddf, src1_ddf, dst_ddf, main_stream);
+    CUDA_CHECK(cudaGetLastError());
+
+    // copy dst to host if necessary
+    if (!dst_on_device) {
+        CUDA_CHECK(cudaMemcpyAsync(dst->data, dst_ddf, ggml_nbytes(dst), cudaMemcpyDeviceToHost, main_stream));
+    }
+
+    if (dst->backend == GGML_BACKEND_CPU) {
+        CUDA_CHECK(cudaDeviceSynchronize());
+    }
+}
+
 static void ggml_cuda_rms_norm(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     ggml_cuda_op_flatten(src0, src1, dst, ggml_cuda_op_rms_norm);
 }
@@ -10739,6 +10811,9 @@ GGML_CALL bool ggml_cuda_compute_forward(struct ggml_compute_params * params, st
         case GGML_OP_PAD:
             func = ggml_cuda_pad;
             break;
+        case GGML_OP_ARANGE:
+            func = ggml_cuda_arange;
+            break;
         case GGML_OP_LEAKY_RELU:
             func = ggml_cuda_leaky_relu;
             break;
@@ -11633,6 +11708,7 @@ GGML_CALL static bool ggml_backend_cuda_supports_op(ggml_backend_t backend, cons
         case GGML_OP_GROUP_NORM:
         case GGML_OP_UPSCALE:
         case GGML_OP_PAD:
+        case GGML_OP_ARANGE:
         case GGML_OP_LEAKY_RELU:
             return true;
         default:
