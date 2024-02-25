@@ -233,27 +233,8 @@ struct ggml_cgraph * magika_graph(
 
     // global_max_pooling1d
     cur = ggml_cont(ctx, ggml_transpose(ctx, cur)); // [384, 256, n_files]
-
-    // cur = ggml_global_pool_1d(ctx, cur); // [256, n_files]
-    struct ggml_tensor * tmp = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 256, n_files);
-    cur = ggml_map_custom2_inplace(ctx, tmp, cur, [](struct ggml_tensor * dst, const struct ggml_tensor * t1, const struct ggml_tensor * t2, int ith, int nth, void * user_data) {
-        const char * src_data = (const char *)t2->data;
-        char * dst_data = (char *)dst->data;
-        for (int64_t i3 = 0;  i3 < t2->ne[3]; i3++) {
-            for (int64_t i2 = 0;  i2 < t2->ne[2]; i2++) {
-                for (int64_t i1 = 0;  i1 < t2->ne[1]; i1++) {
-                    float max = -INFINITY;
-                    for (int64_t i0 = 0;  i0 < t2->ne[0]; i0++) {
-                        float val = *(const float *)(src_data + i0*t2->nb[0] + i1*t2->nb[1] + i2*t2->nb[2] + i3*t2->nb[3]);
-                        if (val > max) {
-                            max = val;
-                        }
-                    }
-                    *(float *)(dst_data + i1*dst->nb[0] + i2*dst->nb[1] + i3*dst->nb[2]) = max;
-                }
-            }
-        }
-    }, 1, NULL);
+    cur = ggml_pool_1d(ctx, cur, GGML_OP_POOL_MAX, 384, 384, 0); // [1, 256, n_files]
+    cur = ggml_reshape_2d(ctx, cur, 256, n_files); // [256, n_files]
 
     // layer normalization 1
     cur = ggml_norm(ctx, cur, hparams.f_norm_eps);
