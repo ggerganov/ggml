@@ -111,8 +111,11 @@ bool magika_model_load(const std::string & fname, magika_model & model) {
     }
 
     model.buf_w = ggml_backend_alloc_ctx_tensors(ctx, model.backend);
-
-    int n_tensors = gguf_get_n_tensors(ctx_gguf);
+    if (!model.buf_w) {
+        fprintf(stderr, "%s: ggml_backend_alloc_ctx_tensors() failed\n", __func__);
+        gguf_free(ctx_gguf);
+        return false;
+    }
 
     try {
         model.dense_w = checked_get_tensor(ctx, "dense/kernel:0");
@@ -144,6 +147,8 @@ bool magika_model_load(const std::string & fname, magika_model & model) {
         gguf_free(ctx_gguf);
         return false;
     }
+
+    const int n_tensors = gguf_get_n_tensors(ctx_gguf);
 
     for (int i = 0; i < n_tensors; i++) {
         const char * name = gguf_get_tensor_name(ctx_gguf, i);
@@ -276,24 +281,40 @@ bool magika_eval(
             fprintf(stderr, "%s: fopen() failed\n", __func__);
             return false;
         }
-
-        std::vector<uint8_t> buf(1536);
         fseek(f, 0, SEEK_END);
         long fsize = ftell(f);
 
-        // TODO: fill with padding token if the file is too small
+        // the buffer is padded with the padding_token if the file is smaller than the block size
+        std::vector<int> buf(1536, hparams.padding_token);
+        std::vector<uint8_t> read_buf(std::max(hparams.beg_size, std::max(hparams.mid_size, hparams.end_size)));
 
         // read beg
         fseek(f, 0, SEEK_SET);
-        fread(buf.data(), 1, hparams.beg_size, f);
+        int n_read = fread(read_buf.data(), 1, hparams.beg_size, f);
+        for (int j = 0; j < n_read; j++) {
+            // pad at the end
+            buf[j] = read_buf[j];
+        }
 
         // read mid
-        fseek(f, (fsize - hparams.mid_size) / 2, SEEK_SET);
-        fread(buf.data() + hparams.beg_size, 1, hparams.mid_size, f);
+        long mid_offs = std::max(0L, (fsize - hparams.mid_size) / 2);
+        fseek(f, mid_offs, SEEK_SET);
+        n_read = fread(read_buf.data(), 1, hparams.mid_size, f);
+        for (int j = 0; j < n_read; j++) {
+            // pad at both ends
+            long mid_idx = hparams.beg_size + (hparams.mid_size / 2) - n_read / 2 + j;
+            buf[mid_idx] = read_buf[j];
+        }
 
         // read end
-        fseek(f, fsize - hparams.end_size, SEEK_SET);
-        fread(buf.data() + hparams.beg_size + hparams.mid_size, 1, hparams.end_size, f);
+        long end_offs = std::max(0L, fsize - hparams.end_size);
+        fseek(f, end_offs, SEEK_SET);
+        n_read = fread(read_buf.data(), 1, hparams.end_size, f);
+        for (int j = 0; j < n_read; j++) {
+            // pad at the beginning
+            int end_idx = hparams.beg_size + hparams.mid_size + hparams.end_size - n_read + j;
+            buf[end_idx] = read_buf[j];
+        }
 
         fclose(f);
 
@@ -308,28 +329,10 @@ bool magika_eval(
         ggml_backend_tensor_set(input, one_hot.data(), 257*inp_bytes*i*sizeof(float), 257*inp_bytes*sizeof(float));
     }
 
-#if 1
     if (!ggml_backend_graph_compute(model.backend, gf)) {
         fprintf(stderr, "%s: ggml_backend_graph_compute() failed\n", __func__);
         return false;
     }
-#else
-    for (int i = 0; i < gf->n_nodes; i++) {
-        struct ggml_cgraph gv = ggml_graph_view(gf, i, i + 1);
-        if (!ggml_backend_graph_compute(model.backend, &gv)) {
-            fprintf(stderr, "%s: ggml_backend_graph_compute() failed\n", __func__);
-            return false;
-        }
-        struct ggml_tensor * node = gf->nodes[i];
-        std::vector<float> data(ggml_nbytes(node)/sizeof(float));
-        ggml_backend_tensor_get(node, data.data(), 0, ggml_nbytes(node));
-        printf("%s[%s]: ", node->name, ggml_op_desc(node));
-        for (int j = 0; j < std::min(200, (int)data.size()); j++) {
-            printf("%e ", data[j]);
-        }
-        printf("\n");
-    }
-#endif
 
     struct ggml_tensor * target_label_probs = ggml_graph_get_tensor(gf, "target_label_probs");
 
@@ -355,7 +358,7 @@ bool magika_eval(
     return true;
 }
 
-int main(int argc, char ** argv) {
+int main(int argc, const char ** argv) {
     if (argc < 3) {
         fprintf(stderr, "usage: %s <model> <file1> [<file2> ...]\n", argv[0]);
         return 1;
