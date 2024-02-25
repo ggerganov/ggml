@@ -10182,11 +10182,11 @@ static void ggml_compute_forward_group_norm_f32(
                     const float * x = (float *)((char *) src0->data + i01 * nb01 + i02 * nb02 + i03 * nb03);
 
                     for (int64_t i00 = 0; i00 < ne00; i00++) {
-                        sum += (ggml_float)x[i00];
+                        sum += (ggml_float)x[i00] / (ne00 * ne01 * step);
                     }
                 }
             }
-            float mean = sum / (ne00 * ne01 * step);
+            float mean = sum;
             ggml_float sum2 = 0.0;
 
             for (int64_t i02 = start; i02 < end; i02++) {
@@ -10198,11 +10198,11 @@ static void ggml_compute_forward_group_norm_f32(
                     for (int64_t i00 = 0; i00 < ne00; i00++) {
                         float v = x[i00] - mean;
                         y[i00] = v;
-                        sum2 += (ggml_float)(v * v);
+                        sum2 += (ggml_float)(v * v) / (ne00 * ne01 * step);
                     }
                 }
             }
-            float variance = sum2 / (ne00 * ne01 * step);
+            float variance = sum2;
             const float scale = 1.0f / sqrtf(variance + eps);
 
             for (int64_t i02 = start; i02 < end; i02++) {

@@ -985,6 +985,8 @@ static __global__ void pad_f32(const float * x, float * dst, const int ne0, cons
 
 template <int block_size>
 static __global__ void group_norm_f32(const float * x, float * dst, const int group_size, const int ne_elements, const float eps) {
+    // blockIdx.x: num_groups idx
+    // threadIdx.x: block_size idx
     int start = blockIdx.x * group_size;
     int end = start + group_size;
 
@@ -8512,7 +8514,7 @@ static void ggml_cuda_op_group_norm(
 
     int num_groups = dst->op_params[0];
     int group_size = src0->ne[0] * src0->ne[1] * ((src0->ne[2] + num_groups - 1) / num_groups);
-    group_norm_f32_cuda(src0_dd, dst_dd, num_groups, group_size, src0->ne[0] * src0->ne[1] * src0->ne[2], main_stream);
+    group_norm_f32_cuda(src0_dd, dst_dd, num_groups * src0->ne[3], group_size, ggml_nelements(src0), main_stream);
 
     (void) src1;
     (void) dst;
