@@ -45,14 +45,13 @@ int main(int argc, const char** argv) {
         struct ggml_tensor * t = ggml_arange(ctx, 0, 3, 1);
         GGML_ASSERT(t->ne[0] == 3);
 
-        ggml_backend_buffer_t buf_compute = ggml_backend_alloc_buffer(backend, buffer_size);
-        struct ggml_allocr * allocr = ggml_allocr_new_from_buffer(buf_compute);
+        ggml_gallocr_t galloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(backend));
 
         struct ggml_cgraph * graph = ggml_new_graph(ctx);
         ggml_build_forward_expand(graph, t);
 
         // allocate tensors
-        ggml_allocr_alloc_graph(allocr, graph);
+        ggml_gallocr_alloc_graph(galloc, graph);
 
         int n_threads = 4;
 
@@ -76,7 +75,7 @@ int main(int argc, const char** argv) {
 
         free(output);
         ggml_free(ctx);
-        ggml_backend_buffer_free(buf_compute);
+        ggml_gallocr_free(galloc);
         ggml_backend_free(backend);
     }
 

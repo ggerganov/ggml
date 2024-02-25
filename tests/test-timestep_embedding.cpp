@@ -70,7 +70,7 @@ int main(int argc, const char** argv) {
         
         float* vec1 = ggml_get_data_f32(embedding);
         for (int i = 0; i < ggml_nelements(embedding); i++) {
-            printf("%.2f ", *(vec1 + i));
+            printf("%.4f ", *(vec1 + i));
         }
         printf("\n");
     }
@@ -106,14 +106,9 @@ int main(int argc, const char** argv) {
         struct ggml_context* ctx = ggml_init(params);
 
 
-        params_buffer = ggml_backend_alloc_buffer(backend, buffer_size);
-
         struct ggml_tensor* timesteps = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, ts.size());
 
-        ggml_allocr * alloc = ggml_allocr_new_from_buffer(params_buffer);
-
-        // alloc memory
-        ggml_allocr_alloc(alloc, timesteps);
+        params_buffer = ggml_backend_alloc_ctx_tensors(ctx, backend);
 
         // load data to buffer
         if(ggml_backend_is_cpu(backend)) {
@@ -122,20 +117,15 @@ int main(int argc, const char** argv) {
             ggml_backend_tensor_set(timesteps, ts.data(), 0, ggml_nbytes(timesteps));
         }
 
-        ggml_allocr_free(alloc);
 
-
-        // create context
         struct ggml_tensor * t = ggml_timestep_embedding(ctx, timesteps, dim, max_period);
 
-        ggml_backend_buffer_t compute_buffer = ggml_backend_alloc_buffer(backend, buffer_size);
-        struct ggml_allocr * allocr = ggml_allocr_new_from_buffer(compute_buffer);
+        ggml_gallocr_t galloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(backend));
 
         struct ggml_cgraph * graph = ggml_new_graph(ctx);
         ggml_build_forward_expand(graph, t);
 
-        // allocate tensors
-        ggml_allocr_alloc_graph(allocr, graph);
+        ggml_gallocr_alloc_graph(galloc, graph);
 
         int n_threads = 4;
 
@@ -149,15 +139,15 @@ int main(int argc, const char** argv) {
         ggml_backend_tensor_get(t, output, 0, ggml_nbytes(t));
 
         for (int i = 0; i < ggml_nelements(t); i++) {
-            printf("%.2f ", output[i]);
+            printf("%.4f ", output[i]);
         }
         printf("\n");
 
         free(output);
         ggml_free(ctx);
-        ggml_backend_buffer_free(compute_buffer);
         ggml_backend_buffer_free(params_buffer);
         ggml_backend_free(backend);
+        ggml_gallocr_free(galloc);
     }
 
     return 0;
