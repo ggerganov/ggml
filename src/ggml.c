@@ -148,7 +148,7 @@ void ggml_print_backtrace(void) {
 
 /*#define GGML_PERF*/
 #define GGML_DEBUG 0
-#define GGML_GELU_FP16
+//#define GGML_GELU_FP16
 #define GGML_GELU_QUICK_FP16
 #define GGML_SILU_FP16
 // #define GGML_CROSS_ENTROPY_EXP_FP16
