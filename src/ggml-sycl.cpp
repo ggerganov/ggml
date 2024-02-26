@@ -14867,14 +14867,16 @@ static void ggml_backend_sycl_graph_plan_free(ggml_backend_t backend, ggml_backe
     UNUSED(plan);
 }
 
-static void ggml_backend_sycl_graph_plan_compute(ggml_backend_t backend, ggml_backend_graph_plan_t plan) {
+GGML_CALL static ggml_compute_exit_code ggml_backend_sycl_graph_plan_compute(ggml_backend_t backend, ggml_backend_graph_plan_t plan) {
     GGML_ASSERT(!"not implemented");
+
+    return GGML_COMPUTE_SUCCESS;
 
     UNUSED(backend);
     UNUSED(plan);
 }
 
-static bool ggml_backend_sycl_graph_compute(ggml_backend_t backend, ggml_cgraph * cgraph) {
+GGML_CALL static ggml_compute_exit_code ggml_backend_sycl_graph_compute(ggml_backend_t backend, ggml_cgraph * cgraph) {
     ggml_backend_sycl_context * sycl_ctx = (ggml_backend_sycl_context *)backend->context;
 
     ggml_sycl_set_main_device(sycl_ctx->device);
@@ -14931,7 +14933,7 @@ static bool ggml_backend_sycl_graph_compute(ggml_backend_t backend, ggml_cgraph 
     }
 
     UNUSED(backend);
-    return true;
+    return GGML_COMPUTE_SUCCESS;
 }
 
 static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, const ggml_tensor * op) {
