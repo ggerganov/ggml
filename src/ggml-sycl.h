@@ -1,7 +1,8 @@
-/*MIT license
-  Copyright (C) 2024 Intel Corporation
-  SPDX-License-Identifier: MIT
-*/
+//
+//  MIT license
+//  Copyright (C) 2024 Intel Corporation
+//  SPDX-License-Identifier: MIT
+//
 
 #pragma once
 
@@ -21,7 +22,8 @@ GGML_API ggml_backend_t ggml_backend_sycl_init(int device);
 GGML_API ggml_backend_buffer_type_t ggml_backend_sycl_buffer_type(int device);
 GGML_API ggml_backend_buffer_type_t ggml_backend_sycl_host_buffer_type(void);
 GGML_API void   ggml_backend_sycl_print_sycl_devices(void);
-
+GGML_API GGML_CALL void   ggml_sycl_get_gpu_list(int *id_list, int max_len);
+GGML_API GGML_CALL void   ggml_sycl_get_device_description(int device, char *description, size_t description_size);
 #ifdef  __cplusplus
 }
 #endif

@@ -74,12 +74,13 @@ int main(void)
     ggml_time_init();
 
     // initialize data of matrices to perform matrix multiplication
-    const int rows_A = 3, cols_A = 2;
+    const int rows_A = 4, cols_A = 2;
 
     float matrix_A[rows_A * cols_A] = {
         2, 8,
         5, 1,
-        4, 2
+        4, 2,
+        8, 6
     };
 
     const int rows_B = 3, cols_B = 2;
@@ -103,17 +104,20 @@ int main(void)
     float* out_data = (float*)result->data;
 
     // expected result:
-    // [ 60.00 90.00 42.00
-    //  55.00 54.00 29.00
-    //  50.00 54.00 28.00]
-    printf("mult mat (transposed result):\n[");
+    // [ 60.00 110.00 54.00 29.00
+    //  55.00 90.00 126.00 28.00
+    //  50.00 54.00 42.00 64.00 ]
+
+    printf("mult mat (%d x %d) (transposed result):\n[", result->ne[0], result->ne[1]);
     for(int j = 0; j < result->ne[1] /* rows */; j++) {
+        if(j > 0) {
+            printf("\n");
+        }
         for(int i = 0; i < result->ne[0] /* cols */; i++) {
             printf(" %.2f", out_data[i * result->ne[1] + j]);
         }
-        printf("\n");
     }
-    printf("]");
+    printf(" ]");
 
     // free memory
     ggml_free(model.ctx);

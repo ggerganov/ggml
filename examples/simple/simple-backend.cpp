@@ -83,7 +83,7 @@ void load_model(simple_model & model, float* a, float* b, int rows_A,int cols_A,
 }
 
 // build the compute graph to perform a matrix multiplication
-struct ggml_cgraph * build_graph(const simple_model& model, struct ggml_allocr * allocr) {
+struct ggml_cgraph * build_graph(const simple_model& model) {
     static size_t buf_size = ggml_tensor_overhead()*GGML_DEFAULT_GRAPH_SIZE + ggml_graph_overhead();
     static std::vector<uint8_t> buf(buf_size);
 
@@ -110,14 +110,13 @@ struct ggml_cgraph * build_graph(const simple_model& model, struct ggml_allocr *
 }
 
 // compute with backend
-struct ggml_tensor* compute(const simple_model & model, struct ggml_allocr * allocr) {
+struct ggml_tensor* compute(const simple_model & model, ggml_gallocr_t allocr) {
     // reset the allocator to free all the memory allocated during the previous inference
-    ggml_allocr_reset(allocr);
 
-    struct ggml_cgraph * gf = build_graph(model, allocr);
+    struct ggml_cgraph * gf = build_graph(model);
 
     // allocate tensors
-    ggml_allocr_alloc_graph(allocr, gf);
+    ggml_gallocr_alloc_graph(allocr, gf);
 
     int n_threads = 1; // number of threads to perform some operations with multi-threading
 
@@ -142,12 +141,13 @@ int main(void)
     ggml_time_init();
 
     // initialize data of matrices to perform matrix multiplication
-    const int rows_A = 3, cols_A = 2;
+    const int rows_A = 4, cols_A = 2;
 
     float matrix_A[rows_A * cols_A] = {
         2, 8,
         5, 1,
-        4, 2
+        4, 2,
+        8, 6
     };
 
     const int rows_B = 3, cols_B = 2;
@@ -165,18 +165,16 @@ int main(void)
     load_model(model, matrix_A, matrix_B, rows_A, cols_A, rows_B, cols_B);
 
     // calculate the temporaly memory required to compute
-    struct ggml_allocr * allocr = NULL;
+    ggml_gallocr_t allocr = NULL;
 
     {
-        allocr = ggml_allocr_new_measure_from_backend(model.backend);
+        allocr = ggml_gallocr_new(ggml_backend_get_default_buffer_type(model.backend));
 
         //create the worst case graph for memory usage estimation
-        struct ggml_cgraph * gf = build_graph(model, allocr);
-        size_t mem_size = ggml_allocr_alloc_graph(allocr, gf);
-        ggml_allocr_free(allocr);
+        struct ggml_cgraph * gf = build_graph(model);
+        ggml_gallocr_reserve(allocr, gf);
+        size_t mem_size = ggml_gallocr_get_buffer_size(allocr, 0);
 
-        // compute the required memory
-        allocr = ggml_allocr_new_from_backend(model.backend, mem_size);
         fprintf(stderr, "%s: compute buffer size: %.4f KB\n", __func__, mem_size/1024.0);
     }
 
@@ -190,20 +188,23 @@ int main(void)
     ggml_backend_tensor_get(result, out_data, 0, ggml_nbytes(result));
 
     // expected result:
-    // [ 60.00 90.00 42.00
-    //  55.00 54.00 29.00
-    //  50.00 54.00 28.00]
-    printf("mult mat (transposed result):\n[");
+    // [ 60.00 110.00 54.00 29.00
+    //  55.00 90.00 126.00 28.00
+    //  50.00 54.00 42.00 64.00 ]
+
+    printf("mult mat (%d x %d) (transposed result):\n[", result->ne[0], result->ne[1]);
     for(int j = 0; j < result->ne[1] /* rows */; j++) {
+        if(j > 0) {
+            printf("\n");
+        }
         for(int i = 0; i < result->ne[0] /* cols */; i++) {
             printf(" %.2f", out_data[i * result->ne[1] + j]);
         }
-        printf("\n");
     }
-    printf("]");
+    printf(" ]");
 
     // release backend memory used for computation
-    ggml_allocr_free(allocr);
+    ggml_gallocr_free(allocr);
 
     // free memory
     ggml_free(model.ctx);

@@ -146,7 +146,7 @@ if (APPLE AND NOT GGML_NO_ACCELERATE)
         message(STATUS "Accelerate framework found")
 
         set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${ACCELERATE_FRAMEWORK})
-        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_ACCELERATE)
+        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_ACCELERATE -DACCELERATE_NEW_LAPACK -DACCELERATE_LAPACK_ILP64)
     else()
         message(WARNING "Accelerate framework not found")
     endif()

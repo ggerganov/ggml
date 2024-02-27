@@ -14,34 +14,6 @@
 #pragma warning(disable: 4244 4267) // possible loss of data
 #endif
 
-// Terminal color map. 10 colors grouped in ranges [0.0, 0.1, ..., 0.9]
-// Lowest is red, middle is yellow, highest is green.
-const std::vector<std::string> k_colors = {
-    "\033[38;5;196m", "\033[38;5;202m", "\033[38;5;208m", "\033[38;5;214m", "\033[38;5;220m",
-    "\033[38;5;226m", "\033[38;5;190m", "\033[38;5;154m", "\033[38;5;118m", "\033[38;5;82m",
-};
-
-//  500 -> 00:05.000
-// 6000 -> 01:00.000
-std::string to_timestamp(int64_t t, bool comma = false) {
-    int64_t msec = t * 10;
-    int64_t hr = msec / (1000 * 60 * 60);
-    msec = msec - hr * (1000 * 60 * 60);
-    int64_t min = msec / (1000 * 60);
-    msec = msec - min * (1000 * 60);
-    int64_t sec = msec / 1000;
-    msec = msec - sec * 1000;
-
-    char buf[32];
-    snprintf(buf, sizeof(buf), "%02d:%02d:%02d%s%03d", (int) hr, (int) min, (int) sec, comma ? "," : ".", (int) msec);
-
-    return std::string(buf);
-}
-
-int timestamp_to_sample(int64_t t, int n_samples) {
-    return std::max(0, std::min((int) n_samples - 1, (int) ((t*WHISPER_SAMPLE_RATE)/100)));
-}
-
 // helper function to replace substrings
 void replace_all(std::string & s, const std::string & search, const std::string & replace) {
     for (size_t pos = 0; ; pos += replace.length()) {
@@ -64,6 +36,7 @@ struct whisper_params {
     int32_t max_len      =  0;
     int32_t best_of      = whisper_full_default_params(WHISPER_SAMPLING_GREEDY).greedy.best_of;
     int32_t beam_size    = whisper_full_default_params(WHISPER_SAMPLING_BEAM_SEARCH).beam_search.beam_size;
+    int32_t audio_ctx   = 0;
 
     float word_thold    =  0.01f;
     float entropy_thold =  2.40f;
@@ -136,6 +109,7 @@ bool whisper_params_parse(int argc, char ** argv, whisper_params & params) {
         else if (arg == "-ml"   || arg == "--max-len")         { params.max_len         = std::stoi(argv[++i]); }
         else if (arg == "-bo"   || arg == "--best-of")         { params.best_of         = std::stoi(argv[++i]); }
         else if (arg == "-bs"   || arg == "--beam-size")       { params.beam_size       = std::stoi(argv[++i]); }
+        else if (arg == "-ac"   || arg == "--audio-context")   { params.audio_ctx       = std::stoi(argv[++i]); }
         else if (arg == "-wt"   || arg == "--word-thold")      { params.word_thold      = std::stof(argv[++i]); }
         else if (arg == "-et"   || arg == "--entropy-thold")   { params.entropy_thold   = std::stof(argv[++i]); }
         else if (arg == "-lpt"  || arg == "--logprob-thold")   { params.logprob_thold   = std::stof(argv[++i]); }
@@ -195,6 +169,7 @@ void whisper_print_usage(int /*argc*/, char ** argv, const whisper_params & para
     fprintf(stderr, "  -sow,      --split-on-word     [%-7s] split on word rather than on token\n",             params.split_on_word ? "true" : "false");
     fprintf(stderr, "  -bo N,     --best-of N         [%-7d] number of best candidates to keep\n",              params.best_of);
     fprintf(stderr, "  -bs N,     --beam-size N       [%-7d] beam size for beam search\n",                      params.beam_size);
+    fprintf(stderr, "  -ac N,     --audio-ctx N       [%-7d] audio context size (0 - all)\n",                   params.audio_ctx);
     fprintf(stderr, "  -wt N,     --word-thold N      [%-7.2f] word timestamp probability threshold\n",         params.word_thold);
     fprintf(stderr, "  -et N,     --entropy-thold N   [%-7.2f] entropy threshold for decoder fail\n",           params.entropy_thold);
     fprintf(stderr, "  -lpt N,    --logprob-thold N   [%-7.2f] log probability threshold for decoder fail\n",   params.logprob_thold);
@@ -241,8 +216,8 @@ std::string estimate_diarization_speaker(std::vector<std::vector<float>> pcmf32s
     std::string speaker = "";
     const int64_t n_samples = pcmf32s[0].size();
 
-    const int64_t is0 = timestamp_to_sample(t0, n_samples);
-    const int64_t is1 = timestamp_to_sample(t1, n_samples);
+    const int64_t is0 = timestamp_to_sample(t0, n_samples, WHISPER_SAMPLE_RATE);
+    const int64_t is1 = timestamp_to_sample(t1, n_samples, WHISPER_SAMPLE_RATE);
 
     double energy0 = 0.0f;
     double energy1 = 0.0f;
@@ -866,6 +841,19 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
+    // remove non-existent files
+    for (auto it = params.fname_inp.begin(); it != params.fname_inp.end();) {
+        const auto fname_inp = it->c_str();
+
+        if (*it != "-" && !is_file_exist(fname_inp)) {
+            fprintf(stderr, "error: input file not found '%s'\n", fname_inp);
+            it = params.fname_inp.erase(it);
+            continue;
+        }
+
+        it++;
+    }
+
     if (params.fname_inp.empty()) {
         fprintf(stderr, "error: no input files specified\n");
         whisper_print_usage(argc, argv, params);
@@ -890,7 +878,7 @@ int main(int argc, char ** argv) {
 
     // whisper init
 
-    struct whisper_context_params cparams;
+    struct whisper_context_params cparams = whisper_context_default_params();
     cparams.use_gpu = params.use_gpu;
 
     struct whisper_context * ctx = whisper_init_from_file_with_params(params.model.c_str(), cparams);
@@ -967,6 +955,7 @@ int main(int argc, char ** argv) {
             wparams.thold_pt         = params.word_thold;
             wparams.max_len          = params.output_wts && params.max_len == 0 ? 60 : params.max_len;
             wparams.split_on_word    = params.split_on_word;
+            wparams.audio_ctx        = params.audio_ctx;
 
             wparams.speed_up         = params.speed_up;
             wparams.debug_mode       = params.debug_mode;

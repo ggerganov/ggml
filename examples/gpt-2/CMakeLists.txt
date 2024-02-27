@@ -13,8 +13,8 @@ set(TEST_TARGET gpt-2-backend)
 add_executable(${TEST_TARGET} main-backend.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml common common-ggml)
 
-set(TEST_TARGET gpt-2-backend2)
-add_executable(${TEST_TARGET} main.cpp)
+set(TEST_TARGET gpt-2-sched)
+add_executable(${TEST_TARGET} main-sched.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml common common-ggml)
 
 #
