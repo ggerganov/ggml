@@ -2382,9 +2382,9 @@ static ggml_compute_result_t ggml_metal_graph_compute(
         }
     }
 
-        if (should_capture) {
-            [[MTLCaptureManager sharedCaptureManager] stopCapture];
-        }
+    if (should_capture) {
+        [[MTLCaptureManager sharedCaptureManager] stopCapture];
+    }
 
     }
     return GGML_COMPUTE_SUCCESS;
