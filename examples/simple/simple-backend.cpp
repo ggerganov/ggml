@@ -181,10 +181,10 @@ int main(void) {
     struct ggml_tensor * result = compute(model, allocr);
 
     // create a array to print result
-    float* out_data = new float[ggml_nelements(result)];
+    std::vector<float> out_data(ggml_nelements(result));
 
     // bring the data from the backend memory
-    ggml_backend_tensor_get(result, out_data, 0, ggml_nbytes(result));
+    ggml_backend_tensor_get(result, out_data.data(), 0, ggml_nbytes(result));
 
     // expected result:
     // [ 60.00 110.00 54.00 29.00

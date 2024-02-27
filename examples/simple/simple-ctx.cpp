@@ -100,7 +100,8 @@ int main(void) {
     struct ggml_tensor * result = compute(model);
 
     // get the result data pointer as a float array to print
-    float* out_data = (float*)result->data;
+    std::vector<float> out_data(ggml_nelements(result));
+    memcpy(out_data.data(), result->data, ggml_nbytes(result));
 
     // expected result:
     // [ 60.00 110.00 54.00 29.00
