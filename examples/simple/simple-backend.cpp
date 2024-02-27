@@ -136,8 +136,7 @@ struct ggml_tensor* compute(const simple_model & model, ggml_gallocr_t allocr) {
     return gf->nodes[gf->n_nodes - 1];
 }
 
-int main(void)
-{
+int main(void) {
     ggml_time_init();
 
     // initialize data of matrices to perform matrix multiplication
