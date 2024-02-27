@@ -1930,6 +1930,8 @@ static_assert(GGML_UNARY_OP_COUNT == 12, "GGML_UNARY_OP_COUNT != 12");
 static_assert(sizeof(struct ggml_object)%GGML_MEM_ALIGN == 0, "ggml_object size must be a multiple of GGML_MEM_ALIGN");
 static_assert(sizeof(struct ggml_tensor)%GGML_MEM_ALIGN == 0, "ggml_tensor size must be a multiple of GGML_MEM_ALIGN");
 
+static_assert(sizeof(enum ggml_compute_exit_code) == sizeof(ggml_compute_result_t), "ggml_compute_exit_code must fit ggml_compute_result_t");
+
 // WARN:
 // Mis-configuration can lead to problem that's hard to reason about:
 // * At best  it crash or talks nosense.
@@ -17772,7 +17774,7 @@ struct ggml_cplan ggml_graph_plan(const struct ggml_cgraph * cgraph, int n_threa
     return cplan;
 }
 
-enum ggml_compute_exit_code ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {
+ggml_compute_result_t ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {
     {
         GGML_ASSERT(cplan);
         GGML_ASSERT(cplan->n_threads > 0);
@@ -17834,7 +17836,7 @@ enum ggml_compute_exit_code ggml_graph_compute(struct ggml_cgraph * cgraph, stru
 
     // this is a work thread too
     ggml_graph_compute_thread(&workers[0]);
-    enum ggml_compute_exit_code compute_status = workers[0].ec;
+    ggml_compute_result_t compute_status = workers[0].ec;
 
     // don't leave affinity set on the main thread
     clear_numa_thread_affinity();
@@ -17872,7 +17874,7 @@ enum ggml_compute_exit_code ggml_graph_compute(struct ggml_cgraph * cgraph, stru
     return compute_status;
 }
 
-enum ggml_compute_exit_code ggml_graph_compute_with_ctx(struct ggml_context * ctx, struct ggml_cgraph * cgraph, int n_threads) {
+ggml_compute_result_t ggml_graph_compute_with_ctx(struct ggml_context * ctx, struct ggml_cgraph * cgraph, int n_threads) {
     struct ggml_cplan cplan = ggml_graph_plan(cgraph, n_threads);
 
     struct ggml_object * obj = ggml_new_object(ctx, GGML_OBJECT_TYPE_WORK_BUFFER, cplan.work_size);

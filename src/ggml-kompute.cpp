@@ -1927,7 +1927,7 @@ static ggml_backend_buffer_type_t ggml_backend_kompute_get_default_buffer_type(g
     return ggml_backend_kompute_buffer_type(ctx->device);
 }
 
-static ggml_compute_exit_code ggml_backend_kompute_graph_compute(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
+static ggml_compute_result_t ggml_backend_kompute_graph_compute(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
     auto * ctx = static_cast<ggml_kompute_context *>(backend->context);
     ggml_vk_graph_compute(ctx, cgraph);
     return GGML_COMPUTE_SUCCESS;

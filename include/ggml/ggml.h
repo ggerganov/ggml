@@ -322,6 +322,9 @@ extern "C" {
         GGML_COMPUTE_ALLOC_FAILED = 1 << 2,
     };
 
+    // logical disjunction (OR-operation) of ggml_compute_exit_code values
+    typedef unsigned int ggml_compute_result_t;
+
     typedef uint16_t ggml_fp16_t;
 
     // convert FP16 <-> FP32
@@ -1926,12 +1929,11 @@ extern "C" {
 
     // ggml_graph_plan() has to be called before ggml_graph_compute()
     // when plan.work_size > 0, caller must allocate memory for plan.work_data
-    GGML_API struct ggml_cplan           ggml_graph_plan   (const struct ggml_cgraph * cgraph, int n_threads /*= GGML_DEFAULT_N_THREADS*/);
-    GGML_API enum ggml_compute_exit_code ggml_graph_compute(      struct ggml_cgraph * cgraph, struct ggml_cplan * cplan);
-
+    GGML_API struct ggml_cplan     ggml_graph_plan            (const struct ggml_cgraph * cgraph, int n_threads /*= GGML_DEFAULT_N_THREADS*/);
+    GGML_API ggml_compute_result_t ggml_graph_compute         (      struct ggml_cgraph * cgraph, struct ggml_cplan * cplan);
     // same as ggml_graph_compute() but the work data is allocated as a part of the context
     // note: the drawback of this API is that you must have ensured that the context has enough memory for the work data
-    GGML_API enum ggml_compute_exit_code ggml_graph_compute_with_ctx(struct ggml_context * ctx, struct ggml_cgraph * cgraph, int n_threads);
+    GGML_API ggml_compute_result_t ggml_graph_compute_with_ctx(struct ggml_context * ctx, struct ggml_cgraph * cgraph, int n_threads);
 
     GGML_API struct ggml_tensor * ggml_graph_get_tensor(struct ggml_cgraph * cgraph, const char * name);
 

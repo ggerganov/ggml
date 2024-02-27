@@ -262,11 +262,11 @@ void ggml_backend_graph_plan_free(ggml_backend_t backend, ggml_backend_graph_pla
     backend->iface.graph_plan_free(backend, plan);
 }
 
-enum ggml_compute_exit_code ggml_backend_graph_plan_compute(ggml_backend_t backend, ggml_backend_graph_plan_t plan) {
+ggml_compute_result_t ggml_backend_graph_plan_compute(ggml_backend_t backend, ggml_backend_graph_plan_t plan) {
     return backend->iface.graph_plan_compute(backend, plan);
 }
 
-enum ggml_compute_exit_code ggml_backend_graph_compute(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
+ggml_compute_result_t ggml_backend_graph_compute(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
     return backend->iface.graph_compute(backend, cgraph);
 }
 
@@ -732,7 +732,7 @@ GGML_CALL static void ggml_backend_cpu_graph_plan_free(ggml_backend_t backend, g
     GGML_UNUSED(backend);
 }
 
-GGML_CALL static enum ggml_compute_exit_code ggml_backend_cpu_graph_plan_compute(ggml_backend_t backend, ggml_backend_graph_plan_t plan) {
+GGML_CALL static ggml_compute_result_t ggml_backend_cpu_graph_plan_compute(ggml_backend_t backend, ggml_backend_graph_plan_t plan) {
     struct ggml_backend_plan_cpu * cpu_plan = (struct ggml_backend_plan_cpu *)plan;
 
     return ggml_graph_compute(&cpu_plan->cgraph, &cpu_plan->cplan);
@@ -740,7 +740,7 @@ GGML_CALL static enum ggml_compute_exit_code ggml_backend_cpu_graph_plan_compute
     GGML_UNUSED(backend);
 }
 
-GGML_CALL static enum ggml_compute_exit_code ggml_backend_cpu_graph_compute(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
+GGML_CALL static ggml_compute_result_t ggml_backend_cpu_graph_compute(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
     struct ggml_backend_cpu_context * cpu_ctx = (struct ggml_backend_cpu_context *)backend->context;
 
     struct ggml_cplan cplan = ggml_graph_plan(cgraph, cpu_ctx->n_threads);
@@ -1436,7 +1436,7 @@ static bool ggml_backend_sched_alloc_splits(ggml_backend_sched_t sched) {
     return true;
 }
 
-static enum ggml_compute_exit_code ggml_backend_sched_compute_splits(ggml_backend_sched_t sched) {
+static ggml_compute_result_t ggml_backend_sched_compute_splits(ggml_backend_sched_t sched) {
     uint64_t copy_us[GGML_MAX_BACKENDS] = {0};
     uint64_t compute_us[GGML_MAX_BACKENDS] = {0};
 
@@ -1471,7 +1471,7 @@ static enum ggml_compute_exit_code ggml_backend_sched_compute_splits(ggml_backen
 
         uint64_t compute_start_us = ggml_time_us();
         if (!sched->callback_eval) {
-            enum ggml_compute_exit_code ec = ggml_backend_graph_compute(split_backend, &split->graph);
+            ggml_compute_result_t ec = ggml_backend_graph_compute(split_backend, &split->graph);
             if (ec != GGML_COMPUTE_SUCCESS) {
                 return ec;
             }
@@ -1494,7 +1494,7 @@ static enum ggml_compute_exit_code ggml_backend_sched_compute_splits(ggml_backen
 
                 struct ggml_cgraph gv = ggml_graph_view(&split->graph, j0, j1 + 1);
 
-                enum ggml_compute_exit_code ec = ggml_backend_graph_compute(split_backend, &gv);
+                ggml_compute_result_t ec = ggml_backend_graph_compute(split_backend, &gv);
                 if (ec != GGML_COMPUTE_SUCCESS) {
                     return ec;
                 }
@@ -1582,7 +1582,7 @@ bool ggml_backend_sched_reserve(ggml_backend_sched_t sched, struct ggml_cgraph *
     return true;
 }
 
-enum ggml_compute_exit_code ggml_backend_sched_graph_compute(ggml_backend_sched_t sched, struct ggml_cgraph * graph) {
+ggml_compute_result_t ggml_backend_sched_graph_compute(ggml_backend_sched_t sched, struct ggml_cgraph * graph) {
     GGML_ASSERT((int)sched->hash_set.size >= graph->n_nodes + GGML_MAX_SPLITS*GGML_MAX_SPLIT_INPUTS);
 
     if (!sched->is_reset) {

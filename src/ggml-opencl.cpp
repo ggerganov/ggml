@@ -2231,7 +2231,7 @@ static ggml_backend_buffer_type_t ggml_backend_opencl_get_default_buffer_type(gg
     GGML_UNUSED(backend);
 }
 
-static ggml_compute_exit_code ggml_backend_opencl_graph_compute(ggml_backend_t backend, ggml_cgraph * graph) {
+static ggml_compute_result_t ggml_backend_opencl_graph_compute(ggml_backend_t backend, ggml_cgraph * graph) {
     for (int i = 0; i < graph->n_nodes; ++i) {
         ggml_tensor * node = graph->nodes[i];
         switch (node->op) {
