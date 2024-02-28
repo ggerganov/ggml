@@ -323,7 +323,7 @@ extern "C" {
     };
 
     // get ggml_status name string
-    GGML_API GGML_CALL const char * ggml_status_name(enum ggml_status status);
+    GGML_API GGML_CALL const char * ggml_status_to_string(enum ggml_status status);
 
     typedef uint16_t ggml_fp16_t;
 
