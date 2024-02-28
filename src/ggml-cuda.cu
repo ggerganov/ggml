@@ -11638,7 +11638,7 @@ GGML_CALL static void ggml_backend_cuda_synchronize(ggml_backend_t backend) {
     UNUSED(backend);
 }
 
-GGML_CALL static ggml_compute_result_t ggml_backend_cuda_graph_compute(ggml_backend_t backend, ggml_cgraph * cgraph) {
+GGML_CALL static enum ggml_status ggml_backend_cuda_graph_compute(ggml_backend_t backend, ggml_cgraph * cgraph) {
     ggml_backend_cuda_context * cuda_ctx = (ggml_backend_cuda_context *)backend->context;
 
     ggml_cuda_set_main_device(cuda_ctx->device);
@@ -11674,7 +11674,7 @@ GGML_CALL static ggml_compute_result_t ggml_backend_cuda_graph_compute(ggml_back
         GGML_ASSERT(ok);
     }
 
-    return GGML_COMPUTE_SUCCESS;
+    return GGML_STATUS_SUCCESS;
 }
 
 GGML_CALL static bool ggml_backend_cuda_supports_op(ggml_backend_t backend, const ggml_tensor * op) {

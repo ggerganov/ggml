@@ -320,6 +320,16 @@ static ggml_fp16_t ggml_table_exp_f16[1 << 16];
 // precomputed f32 table for f16 (256 KB) (ggml-impl.h)
 float ggml_table_f32_f16[1 << 16];
 
+GGML_CALL const char * ggml_status_name(enum ggml_status status) {
+    switch (status) {
+        case GGML_STATUS_ALLOC_FAILED: return "GGML status: error (failed to allocate memory)";
+        case GGML_STATUS_FAILED: return "GGML status: error (operation failed)";
+        case GGML_STATUS_SUCCESS: return "GGML status: success";
+        case GGML_STATUS_ABORTED: return "GGML status: warning (operation aborted)";
+        default: GGML_ASSERT(false);
+    }
+}
+
 // note: do not use these inside ggml.c
 // these are meant to be used via the ggml.h API
 float ggml_fp16_to_fp32(ggml_fp16_t x) {
@@ -1929,8 +1939,6 @@ static_assert(GGML_UNARY_OP_COUNT == 12, "GGML_UNARY_OP_COUNT != 12");
 
 static_assert(sizeof(struct ggml_object)%GGML_MEM_ALIGN == 0, "ggml_object size must be a multiple of GGML_MEM_ALIGN");
 static_assert(sizeof(struct ggml_tensor)%GGML_MEM_ALIGN == 0, "ggml_tensor size must be a multiple of GGML_MEM_ALIGN");
-
-static_assert(sizeof(enum ggml_compute_exit_code) == sizeof(ggml_compute_result_t), "ggml_compute_exit_code must fit ggml_compute_result_t");
 
 // WARN:
 // Mis-configuration can lead to problem that's hard to reason about:
@@ -17169,7 +17177,7 @@ struct ggml_compute_state {
     ggml_thread_t thrd;
     int ith;
     struct ggml_compute_state_shared * shared;
-    enum ggml_compute_exit_code ec;
+    enum ggml_status ec;
 };
 
 static void ggml_graph_compute_perf_stats_node(struct ggml_tensor * node, const struct ggml_compute_state_shared * st) {
@@ -17455,7 +17463,7 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
     while (true) {
         if (cplan->abort_callback && cplan->abort_callback(cplan->abort_callback_data)) {
             state->shared->node_n += 1;
-            state->ec = GGML_COMPUTE_ABORTED;
+            state->ec = GGML_STATUS_ABORTED;
             return 0;
         }
 
@@ -17774,7 +17782,7 @@ struct ggml_cplan ggml_graph_plan(const struct ggml_cgraph * cgraph, int n_threa
     return cplan;
 }
 
-ggml_compute_result_t ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {
+enum ggml_status ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {
     {
         GGML_ASSERT(cplan);
         GGML_ASSERT(cplan->n_threads > 0);
@@ -17818,7 +17826,7 @@ ggml_compute_result_t ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggm
                 .thrd   = 0,
                 .ith = j,
                 .shared = &state_shared,
-                .ec = GGML_COMPUTE_SUCCESS,
+                .ec = GGML_STATUS_SUCCESS,
             };
 
             const int rc = ggml_thread_create(&workers[j].thrd, NULL, ggml_graph_compute_thread, &workers[j]);
@@ -17829,14 +17837,14 @@ ggml_compute_result_t ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggm
 
     workers[0].ith = 0;
     workers[0].shared = &state_shared;
-    workers[0].ec = GGML_COMPUTE_SUCCESS;
+    workers[0].ec = GGML_STATUS_SUCCESS;
 
     const int64_t perf_start_cycles  = ggml_perf_cycles();
     const int64_t perf_start_time_us = ggml_perf_time_us();
 
     // this is a work thread too
     ggml_graph_compute_thread(&workers[0]);
-    ggml_compute_result_t compute_status = workers[0].ec;
+    enum ggml_status compute_status = workers[0].ec;
 
     // don't leave affinity set on the main thread
     clear_numa_thread_affinity();
@@ -17846,7 +17854,8 @@ ggml_compute_result_t ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggm
         for (int j = 1; j < n_threads; j++) {
             const int rc = ggml_thread_join(workers[j].thrd, NULL);
             GGML_ASSERT(rc == 0);
-            compute_status |= workers[j].ec;
+            if (workers[j].ec != GGML_STATUS_SUCCESS)
+                compute_status = workers[j].ec;
         }
     }
 
@@ -17874,7 +17883,7 @@ ggml_compute_result_t ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggm
     return compute_status;
 }
 
-ggml_compute_result_t ggml_graph_compute_with_ctx(struct ggml_context * ctx, struct ggml_cgraph * cgraph, int n_threads) {
+enum ggml_status ggml_graph_compute_with_ctx(struct ggml_context * ctx, struct ggml_cgraph * cgraph, int n_threads) {
     struct ggml_cplan cplan = ggml_graph_plan(cgraph, n_threads);
 
     struct ggml_object * obj = ggml_new_object(ctx, GGML_OBJECT_TYPE_WORK_BUFFER, cplan.work_size);
