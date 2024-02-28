@@ -58,7 +58,7 @@ struct ggml_cgraph * build_graph(const simple_model& model) {
 }
 
 // compute with backend
-struct ggml_tensor* compute(const simple_model & model) {
+struct ggml_tensor * compute(const simple_model & model) {
     struct ggml_cgraph * gf = build_graph(model);
 
     int n_threads = 1; // number of threads to perform some operations with multi-threading
