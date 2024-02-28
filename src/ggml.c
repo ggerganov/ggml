@@ -320,7 +320,7 @@ static ggml_fp16_t ggml_table_exp_f16[1 << 16];
 // precomputed f32 table for f16 (256 KB) (ggml-impl.h)
 float ggml_table_f32_f16[1 << 16];
 
-GGML_CALL const char * ggml_status_to_string(enum ggml_status status) {
+const char * ggml_status_to_string(enum ggml_status status) {
     switch (status) {
         case GGML_STATUS_ALLOC_FAILED: return "GGML status: error (failed to allocate memory)";
         case GGML_STATUS_FAILED: return "GGML status: error (operation failed)";
