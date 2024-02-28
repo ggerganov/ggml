@@ -35,7 +35,7 @@ struct simple_model {
 };
 
 // initialize the tensors of the model in this case two matrices 2x2
-void load_model(simple_model & model, float* a, float* b, int rows_A,int cols_A, int rows_B, int cols_B) {
+void load_model(simple_model & model, float * a, float * b, int rows_A, int cols_A, int rows_B, int cols_B) {
     // initialize the backend
 #ifdef GGML_USE_CUBLAS
     fprintf(stderr, "%s: using CUDA backend\n", __func__);
@@ -55,7 +55,7 @@ void load_model(simple_model & model, float* a, float* b, int rows_A,int cols_A,
 #endif
 
     // if there aren't GPU Backends fallback to CPU backend
-    if(!model.backend) {
+    if (!model.backend) {
         model.backend = ggml_backend_cpu_init();
     }
 
@@ -99,7 +99,7 @@ struct ggml_cgraph * build_graph(const simple_model& model) {
     struct ggml_cgraph  * gf = ggml_new_graph(ctx0);
 
     // result = a*b^T
-    struct ggml_tensor* result = ggml_mul_mat(ctx0, model.a, model.b);
+    struct ggml_tensor * result = ggml_mul_mat(ctx0, model.a, model.b);
 
     // build operations nodes
     ggml_build_forward_expand(gf, result);
@@ -110,7 +110,7 @@ struct ggml_cgraph * build_graph(const simple_model& model) {
 }
 
 // compute with backend
-struct ggml_tensor* compute(const simple_model & model, ggml_gallocr_t allocr) {
+struct ggml_tensor * compute(const simple_model & model, ggml_gallocr_t allocr) {
     // reset the allocator to free all the memory allocated during the previous inference
 
     struct ggml_cgraph * gf = build_graph(model);
@@ -169,7 +169,7 @@ int main(void) {
     {
         allocr = ggml_gallocr_new(ggml_backend_get_default_buffer_type(model.backend));
 
-        //create the worst case graph for memory usage estimation
+        // create the worst case graph for memory usage estimation
         struct ggml_cgraph * gf = build_graph(model);
         ggml_gallocr_reserve(allocr, gf);
         size_t mem_size = ggml_gallocr_get_buffer_size(allocr, 0);
@@ -191,16 +191,17 @@ int main(void) {
     //  55.00 90.00 126.00 28.00
     //  50.00 54.00 42.00 64.00 ]
 
-    printf("mult mat (%d x %d) (transposed result):\n[", result->ne[0], result->ne[1]);
-    for(int j = 0; j < result->ne[1] /* rows */; j++) {
-        if(j > 0) {
+    printf("mul mat (%d x %d) (transposed result):\n[", result->ne[0], result->ne[1]);
+    for (int j = 0; j < result->ne[1] /* rows */; j++) {
+        if (j > 0) {
             printf("\n");
         }
-        for(int i = 0; i < result->ne[0] /* cols */; i++) {
+
+        for (int i = 0; i < result->ne[0] /* cols */; i++) {
             printf(" %.2f", out_data[i * result->ne[1] + j]);
         }
     }
-    printf(" ]");
+    printf(" ]\n");
 
     // release backend memory used for computation
     ggml_gallocr_free(allocr);

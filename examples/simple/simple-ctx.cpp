@@ -19,7 +19,7 @@ struct simple_model {
 };
 
 // initialize the tensors of the model in this case two matrices 2x2
-void load_model(simple_model & model, float* a, float* b, int rows_A,int cols_A, int rows_B, int cols_B) {
+void load_model(simple_model & model, float * a, float * b, int rows_A, int cols_A, int rows_B, int cols_B) {
     size_t ctx_size = 0;
     {
         ctx_size += rows_A * cols_A * ggml_type_size(GGML_TYPE_F32); // tensor a
@@ -51,7 +51,7 @@ struct ggml_cgraph * build_graph(const simple_model& model) {
     struct ggml_cgraph  * gf = ggml_new_graph(model.ctx);
 
     // result = a*b^T
-    struct ggml_tensor* result = ggml_mul_mat(model.ctx, model.a, model.b);
+    struct ggml_tensor * result = ggml_mul_mat(model.ctx, model.a, model.b);
 
     ggml_build_forward_expand(gf, result);
     return gf;
@@ -108,16 +108,17 @@ int main(void) {
     //  55.00 90.00 126.00 28.00
     //  50.00 54.00 42.00 64.00 ]
 
-    printf("mult mat (%d x %d) (transposed result):\n[", result->ne[0], result->ne[1]);
-    for(int j = 0; j < result->ne[1] /* rows */; j++) {
-        if(j > 0) {
+    printf("mul mat (%d x %d) (transposed result):\n[", result->ne[0], result->ne[1]);
+    for (int j = 0; j < result->ne[1] /* rows */; j++) {
+        if (j > 0) {
             printf("\n");
         }
-        for(int i = 0; i < result->ne[0] /* cols */; i++) {
+
+        for (int i = 0; i < result->ne[0] /* cols */; i++) {
             printf(" %.2f", out_data[i * result->ne[1] + j]);
         }
     }
-    printf(" ]");
+    printf(" ]\n");
 
     // free memory
     ggml_free(model.ctx);
