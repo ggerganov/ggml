@@ -10554,11 +10554,9 @@ static void ggml_cuda_pad(const ggml_tensor * src0, const ggml_tensor * src1, gg
 }
 
 static void ggml_cuda_arange(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
-    GGML_ASSERT(              dst->backend != GGML_BACKEND_GPU_SPLIT);
-
     ggml_tensor_extra_gpu * dst_extra  =            (ggml_tensor_extra_gpu *)  dst->extra;
 
-    const bool  dst_on_device =              dst->backend == GGML_BACKEND_GPU;
+    const bool  dst_on_device =              dst->backend == GGML_BACKEND_TYPE_GPU;
 
     // dd = data device
     float * src0_ddf = nullptr;
@@ -10585,7 +10583,7 @@ static void ggml_cuda_arange(const ggml_tensor * src0, const ggml_tensor * src1,
         CUDA_CHECK(cudaMemcpyAsync(dst->data, dst_ddf, ggml_nbytes(dst), cudaMemcpyDeviceToHost, main_stream));
     }
 
-    if (dst->backend == GGML_BACKEND_CPU) {
+    if (dst->backend == GGML_BACKEND_TYPE_CPU) {
         CUDA_CHECK(cudaDeviceSynchronize());
     }
 }

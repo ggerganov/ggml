@@ -13608,7 +13608,7 @@ static void ggml_compute_forward_arange_f32(
     const struct ggml_tensor * src0,
     struct ggml_tensor * dst) {
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_TYPE_INIT || params->type == GGML_TASK_TYPE_FINALIZE) {
         return;
     }
 
@@ -13653,7 +13653,7 @@ static void ggml_compute_forward_timestep_embedding_f32(
     const struct ggml_tensor * src0,
     struct ggml_tensor * dst) {
 
-    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+    if (params->type == GGML_TASK_TYPE_INIT || params->type == GGML_TASK_TYPE_FINALIZE) {
         return;
     }
 
