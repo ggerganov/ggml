@@ -6,6 +6,11 @@
 #include "ggml-cuda.h"
 #endif
 
+#ifdef GGML_USE_METAL
+#include "ggml-metal.h"
+#endif
+
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +29,10 @@ int main(int argc, const char** argv) {
                 fprintf(stderr, "%s: ggml_backend_cuda_init() failed\n", __func__);
             }
         }
+        #endif
+
+        #ifdef GGML_USE_METAL
+            backend = ggml_backend_metal_init();
         #endif
 
         int num_tensors = 2;

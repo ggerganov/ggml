@@ -2263,7 +2263,7 @@ static bool ggml_metal_graph_compute(
                         [encoder setComputePipelineState:pipeline];
                         [encoder setBuffer:id_src0 offset:offs_src0 atIndex:0];
                         [encoder setBuffer:id_dst  offset:offs_dst  atIndex:1];
-                        [encoder setBytes:&nb0 length:sizeof(nb0) atIndex:2];
+                        [encoder setBytes:&nb1 length:sizeof(nb1) atIndex:2];
                         [encoder setBytes:&dim length:sizeof(dim) atIndex:3];
                         [encoder setBytes:&max_period length:sizeof(max_period) atIndex:4];
 

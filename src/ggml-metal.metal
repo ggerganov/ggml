@@ -1978,7 +1978,7 @@ kernel void kernel_arange_f32(
 kernel void kernel_timestep_embedding_f32(
     device  const char * src0,
     device        char * dst,
-    constant  uint64_t & nb0,
+    constant  uint64_t & nb1,
     constant  int      & dim,
     constant  int      & max_period,
     uint3 tgpig[[threadgroup_position_in_grid]],
@@ -1986,15 +1986,15 @@ kernel void kernel_timestep_embedding_f32(
     uint3   ntg[[threads_per_threadgroup]]) {
 
     int i = tgpig.x;
-    device float * embed_data = (float *)((char *)dst +  i*nb1);
+    device float * embed_data = (device float *)(dst +  i*nb1);
 
-    int half = dim / 2;
-    for (int j = tpitg.x; j < half; j += ntg.x) {
-        float timestep = ((float *)src0->data)[i];
-        float freq = (float)exp(-log(max_period) * j / half);
+    int half_ = dim / 2;
+    for (int j = tpitg.x; j < half_; j += ntg.x) {
+        float timestep = ((device float *)src0)[i];
+        float freq = (float)exp(-log((float)max_period) * j / half_);
         float arg = timestep * freq;
         embed_data[j] = cos(arg);
-        embed_data[j + half] = sin(arg);
+        embed_data[j + half_] = sin(arg);
     }
 
     if (dim % 2 != 0 && tpitg.x == 0) {
