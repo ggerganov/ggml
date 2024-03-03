@@ -2316,10 +2316,10 @@ static bool ggml_metal_graph_compute(
                         id<MTLComputePipelineState> pipeline = ctx->kernels[GGML_METAL_KERNEL_TYPE_ARANGE_F32].pipeline;
 
                         [encoder setComputePipelineState:pipeline];
-                        [encoder setBuffer:id_dst  offset:offs_dst  atIndex:0];
-                        [encoder setBytes:&ne0 length:sizeof(ne0) atIndex:1];
+                        [encoder setBuffer:id_dst  offset:offs_dst    atIndex:0];
+                        [encoder setBytes:&ne0   length:sizeof(ne0)   atIndex:1];
                         [encoder setBytes:&start length:sizeof(start) atIndex:2];
-                        [encoder setBytes:&step length:sizeof(step) atIndex:3];
+                        [encoder setBytes:&step  length:sizeof(step)  atIndex:3];
 
                         const int nth = MIN(1024, ne0);
 
