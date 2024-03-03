@@ -1685,9 +1685,9 @@ extern "C" {
 
     GGML_API struct ggml_tensor * ggml_arange(
             struct ggml_context * ctx,
-            float                  start,
-            float                  stop,
-            float                  step);
+            float                 start,
+            float                 stop,
+            float                 step);
 
     // top k elements per row
     GGML_API struct ggml_tensor * ggml_top_k(
