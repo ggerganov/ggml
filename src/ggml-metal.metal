@@ -1968,7 +1968,7 @@ kernel void kernel_arange_f32(
     uint3 tpitg[[thread_position_in_threadgroup]],
     uint3   ntg[[threads_per_threadgroup]]) {
 
-    device       float * dst_ptr  = (device       float *) dst;
+    device float * dst_ptr = (device float *) dst;
 
     for (int i0 = tpitg.x; i0 < ne0; i0 += ntg.x) {
         dst_ptr[i0] = start + step * i0;
