@@ -2899,9 +2899,19 @@ static int32_t ggml_get_op_params_i32(const struct ggml_tensor * tensor, uint32_
     return ((const int32_t *)(tensor->op_params))[i];
 }
 
+static float ggml_get_op_params_f32(const struct ggml_tensor * tensor, uint32_t i) {
+    assert(i < GGML_MAX_OP_PARAMS / sizeof(float));
+    return ((const float *)(tensor->op_params))[i];
+}
+
 static void ggml_set_op_params_i32(struct ggml_tensor * tensor, uint32_t i, int32_t value) {
     assert(i < GGML_MAX_OP_PARAMS / sizeof(int32_t));
     ((int32_t *)(tensor->op_params))[i] = value;
+}
+
+static void ggml_set_op_params_f32(struct ggml_tensor * tensor, uint32_t i, float value) {
+    assert(i < GGML_MAX_OP_PARAMS / sizeof(float));
+    ((float *)(tensor->op_params))[i] = value;
 }
 
 struct ggml_tensor * ggml_set_zero(struct ggml_tensor * tensor) {
@@ -5915,13 +5925,12 @@ struct ggml_tensor * ggml_arange(
     struct ggml_tensor * result = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, steps);
 
     result->op = GGML_OP_ARANGE;
-    ((float *)(result->op_params))[0] = start;
-    ((float *)(result->op_params))[1] = stop;
-    ((float *)(result->op_params))[2] = step;
+    ggml_set_op_params_f32(result, 0, start);
+    ggml_set_op_params_f32(result, 1, stop);
+    ggml_set_op_params_f32(result, 2, step);
 
     return result;
 }
-
 
 struct ggml_tensor * ggml_timestep_embedding(
             struct ggml_context * ctx,
@@ -5935,16 +5944,17 @@ struct ggml_tensor * ggml_timestep_embedding(
         is_node = true;
     }
 
-    int acutual_dim = dim;
+    int actual_dim = dim;
     if (dim % 2 != 0) {
-        acutual_dim = dim + 1;
+        actual_dim = dim + 1;
     }
 
-    struct ggml_tensor * result = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, acutual_dim, timesteps->ne[0]);
+    struct ggml_tensor * result = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, actual_dim, timesteps->ne[0]);
 
     result->op = GGML_OP_TIMESTEP_EMBEDDING;
-    result->op_params[0] = dim;
-    result->op_params[1] = max_period;
+    ggml_set_op_params_i32(result, 0, dim);
+    ggml_set_op_params_i32(result, 1, max_period);
+
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = timesteps;
 
@@ -13619,9 +13629,9 @@ static void ggml_compute_forward_arange_f32(
 
     GGML_TENSOR_UNARY_OP_LOCALS
 
-    const float start = ((float*)dst->op_params)[0];
-    const float stop = ((float*)dst->op_params)[1];
-    const float step = ((float*)dst->op_params)[2];
+    const float start = ggml_get_op_params_f32(dst, 0);
+    const float stop = ggml_get_op_params_f32(dst, 1);
+    const float step = ggml_get_op_params_f32(dst, 2);
 
     int64_t steps = (int64_t)ceil((stop - start) / step);
     GGML_ASSERT(ggml_nelements(dst) == steps);
@@ -13664,22 +13674,19 @@ static void ggml_compute_forward_timestep_embedding_f32(
 
     GGML_TENSOR_UNARY_OP_LOCALS
 
-    const int dim = dst->op_params[0];
-    const int max_period = dst->op_params[1];
-    int acutual_dim = dim;
-    if (dim % 2 != 0) {
-        acutual_dim = dim + 1;
-    }
+    const int dim = ggml_get_op_params_i32(dst, 0);
+    const int max_period = ggml_get_op_params_i32(dst, 1);
+
     int half = dim / 2;
 
     for (int64_t i = 0; i < ne00; i++) {
         float * embed_data = (float *)((char *)  dst->data +  i*nb1);
         for (int64_t j = ith; j < half; j += nth) {
             float timestep = ((float *)src0->data)[i];
-            float freq = (float)exp(-log(max_period) * j / half);
+            float freq = (float)expf(-logf(max_period) * j / half);
             float arg = timestep * freq;
-            embed_data[j] = cos(arg);
-            embed_data[j + half] = sin(arg);
+            embed_data[j] = cosf(arg);
+            embed_data[j + half] = sinf(arg);
         }
         if (dim % 2 != 0 && ith == 0) {
             embed_data[dim] = 0.f;

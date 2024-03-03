@@ -1077,10 +1077,10 @@ static __global__ void timestep_embedding_f32(const float * timesteps, float * d
     }
 
     float timestep = timesteps[i];
-    float freq = (float)exp(-logf(max_period) * j / half);
+    float freq = (float)expf(-logf(max_period) * j / half);
     float arg = timestep * freq;
-    embed_data[j] = cos(arg);
-    embed_data[j + half] = sin(arg);
+    embed_data[j] = cosf(arg);
+    embed_data[j + half] = sinf(arg);
 }
 
 template <int block_size>

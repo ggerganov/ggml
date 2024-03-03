@@ -41,17 +41,24 @@ void set_timestep_embedding(struct ggml_tensor* timesteps, struct ggml_tensor* e
     }
 }
 
+static bool equalsf(float v1, float v2) {
+    if (fabs(v1 - v2) <= 0.00001) {
+        return true;
+    }
+    return false;
+}
+
 struct ggml_tensor* new_timestep_embedding(struct ggml_context* ctx,
                                            struct ggml_tensor* timesteps,
                                            int dim,
                                            int max_period = 10000) {
     // timesteps: [N,]
     // embedding: [dim, N]
-    int acutual_dim = dim;
+    int actual_dim = dim;
     if (dim % 2 != 0) {
-        acutual_dim = dim + 1;
+        actual_dim = dim + 1;
     }
-    struct ggml_tensor* embedding = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, acutual_dim, timesteps->ne[0]);
+    struct ggml_tensor* embedding = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, actual_dim, timesteps->ne[0]);
     set_timestep_embedding(timesteps, embedding, dim, max_period);
     return embedding;
 }
@@ -60,6 +67,7 @@ int main(int argc, const char** argv) {
     std::vector<float> ts = {12, 24};
     int dim = 15;
     int max_period = 10000;
+    std::vector<float> expected_result;
     {
         struct ggml_init_params params;
         params.mem_size = 16 * 1024 * 1024;
@@ -71,10 +79,13 @@ int main(int argc, const char** argv) {
         struct ggml_tensor* timesteps = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, ts.size());
         memcpy(timesteps->data, ts.data(), ggml_nbytes(timesteps));
         struct ggml_tensor* embedding = new_timestep_embedding(ctx, timesteps, dim, max_period);
+        expected_result.resize(ggml_nelements(embedding));
         
         float* vec1 = ggml_get_data_f32(embedding);
         for (int i = 0; i < ggml_nelements(embedding); i++) {
-            printf("%.4f ", *(vec1 + i));
+            float value = vec1[i];
+            expected_result[i] = value;
+            printf("%.4f ", value);
         }
         printf("\n");
     }
@@ -146,8 +157,11 @@ int main(int argc, const char** argv) {
         float* output = new float[ggml_nelements(t)];
         ggml_backend_tensor_get(t, output, 0, ggml_nbytes(t));
 
+        GGML_ASSERT(ggml_nelements(t) == expected_result.size());
+
         for (int i = 0; i < ggml_nelements(t); i++) {
             printf("%.4f ", output[i]);
+            GGML_ASSERT(equalsf(output[i], expected_result[i]));
         }
         printf("\n");
 
