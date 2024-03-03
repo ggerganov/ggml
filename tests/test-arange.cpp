@@ -10,16 +10,17 @@
 #include "ggml-metal.h"
 #endif
 
-
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-int main(int argc, const char** argv) {
+int main(int /*argc*/, const char** /*argv*/) {
     {
         bool use_gpu = true;
+        GGML_UNUSED(use_gpu);
+
         ggml_backend_t backend = NULL;
-        ggml_backend_buffer_t buffer;
+        //ggml_backend_buffer_t buffer;
 
         #ifdef GGML_USE_CUBLAS
         if (use_gpu) {
@@ -32,26 +33,32 @@ int main(int argc, const char** argv) {
         #endif
 
         #ifdef GGML_USE_METAL
+        if (!backend) {
+            fprintf(stderr, "%s: using Metal backend\n", __func__);
             backend = ggml_backend_metal_init();
+            if (!backend) {
+                fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
+            }
+        }
         #endif
 
-        int num_tensors = 2;
-        int buffer_size = 1024;
+        const int num_tensors = 2;
+
         struct ggml_init_params params = {
-                /*.mem_size   =*/ggml_tensor_overhead() * num_tensors + 2 * 1024 * 1024,
+                /*.mem_size   =*/ ggml_tensor_overhead() * num_tensors + 2 * 1024 * 1024,
                 /*.mem_size   =*/ NULL,
                 /*.mem_size   =*/ true,
         };
 
-        if(!backend) {
+        if (!backend) {
             // fallback to CPU backend
             backend = ggml_backend_cpu_init();
         }
 
-
         // create context
         struct ggml_context* ctx = ggml_init(params);
         struct ggml_tensor * t = ggml_arange(ctx, 0, 3, 1);
+
         GGML_ASSERT(t->ne[0] == 3);
 
         ggml_gallocr_t galloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(backend));
@@ -70,7 +77,7 @@ int main(int argc, const char** argv) {
 
         ggml_backend_graph_compute(backend, graph);
 
-        float* output = new float[ggml_nelements(t)];
+        float * output = new float[ggml_nelements(t)];
         ggml_backend_tensor_get(t, output, 0, ggml_nbytes(t));
 
         for (int i = 0; i < t->ne[0]; i++) {

@@ -5920,7 +5920,7 @@ struct ggml_tensor * ggml_arange(
 
     GGML_ASSERT(stop > start);
 
-    int64_t steps = (int64_t)ceil((stop - start) / step);
+    const int64_t steps = (int64_t) ceilf((stop - start) / step);
 
     struct ggml_tensor * result = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, steps);
 
@@ -10294,7 +10294,7 @@ static void ggml_compute_forward_group_norm_f32(
     int n_channels = src0->ne[2];
     int n_groups = dst->op_params[0];
     int n_channels_per_group = (n_channels + n_groups - 1) / n_groups;
-    for (int i = ith; i < n_groups; i+=nth) {
+    for (int i = ith; i < n_groups; i += nth) {
         int start = i * n_channels_per_group;
         int end = start + n_channels_per_group;
         if (end > n_channels) {
@@ -10308,28 +10308,32 @@ static void ggml_compute_forward_group_norm_f32(
                 for (int64_t i01 = 0; i01 < ne01; i01++) {
                     const float * x = (float *)((char *) src0->data + i01 * nb01 + i02 * nb02 + i03 * nb03);
 
+                    ggml_float sumr = 0.0;
                     for (int64_t i00 = 0; i00 < ne00; i00++) {
-                        sum += (ggml_float)x[i00] / (ne00 * ne01 * step);
+                        sumr += (ggml_float)x[i00];
                     }
+                    sum += sumr;
                 }
             }
-            float mean = sum;
-            ggml_float sum2 = 0.0;
+            const float mean = sum / (ne00 * ne01 * step);
 
+            ggml_float sum2 = 0.0;
             for (int64_t i02 = start; i02 < end; i02++) {
                 for (int64_t i01 = 0; i01 < ne01; i01++) {
                     const float * x = (float *)((char *) src0->data + i01 * nb01 + i02 * nb02 + i03 * nb03);
 
                     float * y = (float *)((char *) dst->data + i01 * nb1 + i02 * nb2 + i03 * nb3);
 
+                    ggml_float sumr = 0.0;
                     for (int64_t i00 = 0; i00 < ne00; i00++) {
                         float v = x[i00] - mean;
                         y[i00] = v;
-                        sum2 += (ggml_float)(v * v) / (ne00 * ne01 * step);
+                        sumr += (ggml_float)(v * v);
                     }
+                    sum2 += sumr;
                 }
             }
-            float variance = sum2;
+            const float variance = sum2 / (ne00 * ne01 * step);
             const float scale = 1.0f / sqrtf(variance + eps);
 
             for (int64_t i02 = start; i02 < end; i02++) {
@@ -13630,10 +13634,11 @@ static void ggml_compute_forward_arange_f32(
     GGML_TENSOR_UNARY_OP_LOCALS
 
     const float start = ggml_get_op_params_f32(dst, 0);
-    const float stop = ggml_get_op_params_f32(dst, 1);
-    const float step = ggml_get_op_params_f32(dst, 2);
+    const float stop  = ggml_get_op_params_f32(dst, 1);
+    const float step  = ggml_get_op_params_f32(dst, 2);
 
-    int64_t steps = (int64_t)ceil((stop - start) / step);
+    const int64_t steps = (int64_t) ceilf((stop - start) / step);
+
     GGML_ASSERT(ggml_nelements(dst) == steps);
 
     for (int64_t i = ith; i < steps; i+= nth) {

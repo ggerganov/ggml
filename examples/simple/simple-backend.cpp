@@ -19,6 +19,13 @@
 #include <string>
 #include <vector>
 
+static void ggml_log_callback_default(ggml_log_level level, const char * text, void * user_data) {
+    (void) level;
+    (void) user_data;
+    fputs(text, stderr);
+    fflush(stderr);
+}
+
 // This is a simple model with two tensors a and b
 struct simple_model {
     struct ggml_tensor * a;
@@ -47,7 +54,7 @@ void load_model(simple_model & model, float * a, float * b, int rows_A, int cols
 
 #ifdef GGML_USE_METAL
     fprintf(stderr, "%s: using Metal backend\n", __func__);
-    ggml_metal_log_set_callback(ggml_log_callback_default, nullptr);
+    ggml_backend_metal_log_set_callback(ggml_log_callback_default, nullptr);
     model.backend = ggml_backend_metal_init();
     if (!model.backend) {
         fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
@@ -191,7 +198,7 @@ int main(void) {
     //  55.00 90.00 126.00 28.00
     //  50.00 54.00 42.00 64.00 ]
 
-    printf("mul mat (%d x %d) (transposed result):\n[", result->ne[0], result->ne[1]);
+    printf("mul mat (%d x %d) (transposed result):\n[", (int) result->ne[0], (int) result->ne[1]);
     for (int j = 0; j < result->ne[1] /* rows */; j++) {
         if (j > 0) {
             printf("\n");

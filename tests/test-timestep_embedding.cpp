@@ -75,12 +75,12 @@ int main(int argc, const char** argv) {
         params.no_alloc = false;
         // memory allocation happens here
         struct ggml_context* ctx = ggml_init(params);
-        
+
         struct ggml_tensor* timesteps = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, ts.size());
         memcpy(timesteps->data, ts.data(), ggml_nbytes(timesteps));
         struct ggml_tensor* embedding = new_timestep_embedding(ctx, timesteps, dim, max_period);
         expected_result.resize(ggml_nelements(embedding));
-        
+
         float* vec1 = ggml_get_data_f32(embedding);
         for (int i = 0; i < ggml_nelements(embedding); i++) {
             float value = vec1[i];
@@ -91,7 +91,8 @@ int main(int argc, const char** argv) {
     }
     printf("-----------------------------------\n");
     {
-        bool use_gpu = true;
+        bool use_gpu = true; GGML_UNUSED(use_gpu);
+
         ggml_backend_t backend = NULL;
         ggml_backend_buffer_t params_buffer = NULL;
 
@@ -106,36 +107,41 @@ int main(int argc, const char** argv) {
         #endif
 
         #ifdef GGML_USE_METAL
+        if (use_gpu) {
+            fprintf(stderr, "%s: using Metal backend\n", __func__);
             backend = ggml_backend_metal_init();
+            if (!backend) {
+                fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
+            }
+        }
         #endif
 
-        int num_tensors = 2;
-        int buffer_size = 1024;
+        const int num_tensors = 2;
+
         struct ggml_init_params params = {
-                /*.mem_size   =*/ggml_tensor_overhead() * num_tensors + 2 * 1024 * 1024,
+                /*.mem_size   =*/ ggml_tensor_overhead() * num_tensors + 2 * 1024 * 1024,
                 /*.mem_size   =*/ NULL,
                 /*.mem_size   =*/ true,
         };
 
-        if(!backend) {
+        if (!backend) {
             // fallback to CPU backend
             backend = ggml_backend_cpu_init();
         }
 
-        struct ggml_context* ctx = ggml_init(params);
+        struct ggml_context * ctx = ggml_init(params);
 
 
-        struct ggml_tensor* timesteps = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, ts.size());
+        struct ggml_tensor * timesteps = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, ts.size());
 
         params_buffer = ggml_backend_alloc_ctx_tensors(ctx, backend);
 
         // load data to buffer
-        if(ggml_backend_is_cpu(backend)) {
+        if (ggml_backend_is_cpu(backend)) {
             memcpy(timesteps->data, ts.data(), ggml_nbytes(timesteps));
         } else {
             ggml_backend_tensor_set(timesteps, ts.data(), 0, ggml_nbytes(timesteps));
         }
-
 
         struct ggml_tensor * t = ggml_timestep_embedding(ctx, timesteps, dim, max_period);
 
@@ -154,7 +160,7 @@ int main(int argc, const char** argv) {
 
         ggml_backend_graph_compute(backend, graph);
 
-        float* output = new float[ggml_nelements(t)];
+        float * output = new float[ggml_nelements(t)];
         ggml_backend_tensor_get(t, output, 0, ggml_nbytes(t));
 
         GGML_ASSERT(ggml_nelements(t) == expected_result.size());

@@ -1097,7 +1097,8 @@ static bool ggml_metal_graph_compute(
                     {
                         GGML_ASSERT(ggml_is_contiguous(src0));
 
-                        const float scale = *(const float *) dst->op_params;
+                        float scale;
+                        memcpy(&scale, dst->op_params, sizeof(scale));
 
                         int64_t n = ggml_nelements(dst);
 
@@ -1256,11 +1257,15 @@ static bool ggml_metal_graph_compute(
                             pipeline = ctx->kernels[GGML_METAL_KERNEL_TYPE_SOFT_MAX].pipeline;
                         }
 
-                        const float scale    = ((float *) dst->op_params)[0];
-                        const float max_bias = ((float *) dst->op_params)[1];
+                        float scale;
+                        float max_bias;
+
+                        memcpy(&scale,    ((int32_t *) dst->op_params) + 0, sizeof(scale));
+                        memcpy(&max_bias, ((int32_t *) dst->op_params) + 1, sizeof(max_bias));
 
                         const int64_t nrows_x = ggml_nrows(src0);
                         const int64_t nrows_y = src0->ne[1];
+
                         const uint32_t n_head_kv   = nrows_x/nrows_y;
                         const uint32_t n_head_log2 = 1u << (uint32_t) floorf(log2f((float) n_head_kv));
 
@@ -2092,6 +2097,7 @@ static bool ggml_metal_graph_compute(
 
                         //const int n_past = ((int32_t *) dst->op_params)[0];
                         const int n_head = ((int32_t *) dst->op_params)[1];
+
                         float max_bias;
                         memcpy(&max_bias, (int32_t *) dst->op_params + 2, sizeof(float));
 
@@ -2310,8 +2316,11 @@ static bool ggml_metal_graph_compute(
                     {
                         GGML_ASSERT(dst->type == GGML_TYPE_F32);
 
-                        const float start = ((float*)dst->op_params)[0];
-                        const float step = ((float*)dst->op_params)[2];
+                        float start;
+                        float step;
+
+                        memcpy(&start, ((int32_t *) dst->op_params) + 0, sizeof(float));
+                        memcpy(&step,  ((int32_t *) dst->op_params) + 2, sizeof(float));
 
                         id<MTLComputePipelineState> pipeline = ctx->kernels[GGML_METAL_KERNEL_TYPE_ARANGE_F32].pipeline;
 
@@ -2329,9 +2338,10 @@ static bool ggml_metal_graph_compute(
                     {
                         GGML_ASSERT(src0->type == GGML_TYPE_F32);
 
-                        const int dim = dst->op_params[0];
+                        const int dim        = dst->op_params[0];
                         const int max_period = dst->op_params[1];
-                        int half = dim / 2;
+
+                        const int half = dim / 2;
 
                         id<MTLComputePipelineState> pipeline = ctx->kernels[GGML_METAL_KERNEL_TYPE_TIMESTEP_EMBEDDING_F32].pipeline;
 

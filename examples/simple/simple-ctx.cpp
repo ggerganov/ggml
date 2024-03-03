@@ -108,7 +108,7 @@ int main(void) {
     //  55.00 90.00 126.00 28.00
     //  50.00 54.00 42.00 64.00 ]
 
-    printf("mul mat (%d x %d) (transposed result):\n[", result->ne[0], result->ne[1]);
+    printf("mul mat (%d x %d) (transposed result):\n[", (int) result->ne[0], (int) result->ne[1]);
     for (int j = 0; j < result->ne[1] /* rows */; j++) {
         if (j > 0) {
             printf("\n");

@@ -1451,7 +1451,7 @@ struct test_timestep_embedding : public test_case {
         : type(type), ne_a(ne_a), dim(dim), max_period(max_period)  {}
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
-        ggml_tensor* a = ggml_new_tensor(ctx, type, 4, ne_a.data());
+        ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne_a.data());
         ggml_tensor * out = ggml_timestep_embedding(ctx, a, dim, max_period);
         return out;
     }

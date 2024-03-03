@@ -1993,7 +1993,7 @@ kernel void kernel_timestep_embedding_f32(
         float timestep = ((device float *)src0)[i];
         float freq = (float)exp(-log((float)max_period) * j / half_);
         float arg = timestep * freq;
-        embed_data[j] = cos(arg);
+        embed_data[j        ] = cos(arg);
         embed_data[j + half_] = sin(arg);
     }
 
