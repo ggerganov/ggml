@@ -13619,7 +13619,6 @@ static void ggml_compute_forward_pad(
 
 static void ggml_compute_forward_arange_f32(
     const struct ggml_compute_params * params,
-    const struct ggml_tensor * src0,
     struct ggml_tensor * dst) {
 
     if (params->type == GGML_TASK_TYPE_INIT || params->type == GGML_TASK_TYPE_FINALIZE) {
@@ -13630,8 +13629,6 @@ static void ggml_compute_forward_arange_f32(
 
     const int ith = params->ith;
     const int nth = params->nth;
-
-    GGML_TENSOR_UNARY_OP_LOCALS
 
     const float start = ggml_get_op_params_f32(dst, 0);
     const float stop  = ggml_get_op_params_f32(dst, 1);
@@ -13649,12 +13646,11 @@ static void ggml_compute_forward_arange_f32(
 
 static void ggml_compute_forward_arange(
     const struct ggml_compute_params * params,
-    const struct ggml_tensor * src0,
     struct ggml_tensor * dst) {
     switch (dst->type) {
         case GGML_TYPE_F32:
             {
-                ggml_compute_forward_arange_f32(params, src0, dst);
+                ggml_compute_forward_arange_f32(params, dst);
             } break;
         default:
             {
@@ -13665,12 +13661,13 @@ static void ggml_compute_forward_arange(
 
 static void ggml_compute_forward_timestep_embedding_f32(
     const struct ggml_compute_params * params,
-    const struct ggml_tensor * src0,
     struct ggml_tensor * dst) {
 
     if (params->type == GGML_TASK_TYPE_INIT || params->type == GGML_TASK_TYPE_FINALIZE) {
         return;
     }
+
+    const struct ggml_tensor * src0 = dst->src[0];
 
     GGML_ASSERT(src0->nb[0] == sizeof(float));
 
@@ -13701,12 +13698,14 @@ static void ggml_compute_forward_timestep_embedding_f32(
 
 static void ggml_compute_forward_timestep_embedding(
     const struct ggml_compute_params * params,
-    const struct ggml_tensor * src0,
     struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src0 = dst->src[0];
+
     switch (src0->type) {
         case GGML_TYPE_F32:
             {
-                ggml_compute_forward_timestep_embedding_f32(params, src0, dst);
+                ggml_compute_forward_timestep_embedding_f32(params, dst);
             } break;
         default:
             {
@@ -15785,11 +15784,11 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             } break;
         case GGML_OP_ARANGE:
             {
-                ggml_compute_forward_arange(params, tensor->src[0], tensor);
+                ggml_compute_forward_arange(params, tensor);
             } break;
         case GGML_OP_TIMESTEP_EMBEDDING:
             {
-                ggml_compute_forward_timestep_embedding(params, tensor->src[0], tensor);
+                ggml_compute_forward_timestep_embedding(params, tensor);
             } break;
         case GGML_OP_ARGSORT:
             {
