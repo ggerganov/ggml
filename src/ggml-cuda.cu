@@ -10554,9 +10554,9 @@ static void ggml_cuda_pad(const ggml_tensor * src0, const ggml_tensor * src1, gg
 }
 
 static void ggml_cuda_arange(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
-    ggml_tensor_extra_gpu * dst_extra  =            (ggml_tensor_extra_gpu *)  dst->extra;
+    ggml_tensor_extra_gpu * dst_extra = (ggml_tensor_extra_gpu *)  dst->extra;
 
-    const bool  dst_on_device =              dst->backend == GGML_BACKEND_TYPE_GPU;
+    const bool dst_on_device = dst->backend == GGML_BACKEND_TYPE_GPU;
 
     // dd = data device
     float * src0_ddf = nullptr;
