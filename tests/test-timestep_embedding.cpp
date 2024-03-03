@@ -163,7 +163,7 @@ int main(int argc, const char** argv) {
         float * output = new float[ggml_nelements(t)];
         ggml_backend_tensor_get(t, output, 0, ggml_nbytes(t));
 
-        GGML_ASSERT(ggml_nelements(t) == expected_result.size());
+        GGML_ASSERT((size_t)ggml_nelements(t) == expected_result.size());
 
         for (int i = 0; i < ggml_nelements(t); i++) {
             printf("%.4f ", output[i]);
@@ -171,7 +171,7 @@ int main(int argc, const char** argv) {
         }
         printf("\n");
 
-        free(output);
+        delete[] output;
         ggml_free(ctx);
         ggml_backend_buffer_free(params_buffer);
         ggml_backend_free(backend);

@@ -1433,7 +1433,6 @@ struct test_arange : public test_case {
     }
 };
 
-
 // GGML_OP_TIMESTEP_EMBEDDING
 struct test_timestep_embedding : public test_case {
     const ggml_type type;

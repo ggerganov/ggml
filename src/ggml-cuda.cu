@@ -992,13 +992,13 @@ static __global__ void concat_f32(const float * x,const float * y, float * dst, 
             nidx +
             blockIdx.y * ne0 +
             blockIdx.z * ne0 * gridDim.y;
-            dst[offset_dst] = x[offset_src];
+        dst[offset_dst] = x[offset_src];
     } else {
         int offset_src =
             nidx +
             blockIdx.y * ne0 +
             (blockIdx.z - ne02) * ne0 *  gridDim.y;
-            dst[offset_dst] = y[offset_src];
+        dst[offset_dst] = y[offset_src];
     }
 }
 
@@ -1045,7 +1045,7 @@ static __global__ void pad_f32(const float * x, float * dst, const int ne0, cons
             nidx +
             blockIdx.y * ne00 +
             blockIdx.z * ne00 * ne01;
-            dst[offset_dst] = x[offset_src];
+        dst[offset_dst] = x[offset_src];
     } else {
         dst[offset_dst] = 0.0f;
     }
@@ -9240,11 +9240,15 @@ static void ggml_cuda_op_pad(
 static void ggml_cuda_op_arange(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
     const float * src0_dd, const float * src1_dd, float * dst_dd, cudaStream_t main_stream) {
+
     GGML_ASSERT(dst->type == GGML_TYPE_F32);
 
-    const float start = ((float*)dst->op_params)[0];
-    const float stop = ((float*)dst->op_params)[1];
-    const float step = ((float*)dst->op_params)[2];
+    float start;
+    float stop;
+    float step;
+    memcpy(&start, (float *)dst->op_params + 0, sizeof(float));
+    memcpy(&stop,  (float *)dst->op_params + 1, sizeof(float));
+    memcpy(&step,  (float *)dst->op_params + 2, sizeof(float));
 
     int64_t steps = (int64_t)ceil((stop - start) / step);
     GGML_ASSERT(ggml_nelements(dst) == steps);
@@ -9256,7 +9260,6 @@ static void ggml_cuda_op_arange(
     (void) src0_dd;
     (void) src1_dd;
 }
-
 
 static void ggml_cuda_op_timestep_embedding(
     const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,

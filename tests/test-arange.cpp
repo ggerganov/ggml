@@ -89,7 +89,7 @@ int main(int /*argc*/, const char** /*argv*/) {
         GGML_ASSERT(output[1] == 1);
         GGML_ASSERT(output[2] == 2);
 
-        free(output);
+        delete[] output;
         ggml_free(ctx);
         ggml_gallocr_free(galloc);
         ggml_backend_free(backend);
