@@ -320,6 +320,43 @@ if (GGML_METAL)
         )
 endif()
 
+if (GGML_RPC)
+    find_package(protobuf CONFIG REQUIRED)
+    message(STATUS "Using protobuf ${Protobuf_VERSION}")
+    set(_PROTOBUF_LIBPROTOBUF protobuf::libprotobuf)
+    set(_PROTOBUF_PROTOC $<TARGET_FILE:protobuf::protoc>)
+
+    find_package(gRPC CONFIG REQUIRED)
+    message(STATUS "Using gRPC ${gRPC_VERSION}")
+    set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
+
+    # Proto file
+    get_filename_component(ggml_proto "ggml-rpc.proto" ABSOLUTE)
+    get_filename_component(ggml_proto_path "${ggml_proto}" PATH)
+
+    # Generated sources
+    set(ggml_proto_srcs "${CMAKE_CURRENT_BINARY_DIR}/ggml-rpc.pb.cc")
+    set(ggml_proto_hdrs "${CMAKE_CURRENT_BINARY_DIR}/ggml-rpc.pb.h")
+    set(ggml_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/ggml-rpc.grpc.pb.cc")
+    set(ggml_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/ggml-rpc.grpc.pb.h")
+
+    add_custom_command(
+        OUTPUT "${ggml_proto_srcs}" "${ggml_proto_hdrs}" "${ggml_grpc_srcs}" "${ggml_grpc_hdrs}"
+        COMMAND ${_PROTOBUF_PROTOC}
+        ARGS --grpc_out "${CMAKE_CURRENT_BINARY_DIR}"
+            --cpp_out "${CMAKE_CURRENT_BINARY_DIR}"
+            -I "${ggml_proto_path}"
+            --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}"
+            "${ggml_proto}"
+        DEPENDS "${ggml_proto}")
+
+    # Include generated *.pb.h files
+    set(GGML_EXTRA_INCS  ${GGML_EXTRA_INCS}  ${CMAKE_CURRENT_BINARY_DIR})
+
+    set(GGML_RPC_SOURCES ggml-rpc.cpp ggml-rpc.h ${ggml_grpc_srcs} ${ggml_grpc_hdrs} ${ggml_proto_srcs} ${ggml_proto_hdrs})
+    set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} gRPC::grpc++ gRPC::grpc gRPC::grpc++_reflection ${_PROTOBUF_LIBPROTOBUF})
+endif()
+
 if (GGML_PERF)
     set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_PERF)
 endif()
@@ -337,6 +374,7 @@ add_library(${TARGET}
     ${GGML_CUDA_SOURCES}
     ${GGML_OPENCL_SOURCES}
     ${GGML_METAL_SOURCES}
+    ${GGML_RPC_SOURCES}
     )
 
 target_include_directories(${TARGET} PUBLIC

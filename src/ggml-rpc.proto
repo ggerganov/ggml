@@ -1,0 +1,130 @@
+syntax = "proto3";
+
+package ggml;
+
+service Backend {
+
+  rpc GetAlignment (GetAlignmentRequest) returns (GetAlignmentReply) {}
+  rpc GetAllocSize (GetAllocSizeRequest) returns (GetAllocSizeReply) {}
+  rpc AllocateBuffer (AllocateBufferRequest) returns (AllocateBufferReply) {}
+  rpc BufferGetBase (BufferGetBaseRequest) returns (BufferGetBaseReply) {}
+  rpc FreeBuffer (FreeBufferRequest) returns (FreeBufferReply) {}
+  rpc BufferClear (BufferClearRequest) returns (BufferClearReply) {}
+
+  rpc InitTensor (InitTensorRequest) returns (InitTensorReply) {}
+  rpc SetTensor (SetTensorRequest) returns (SetTensorReply) {}
+  rpc GetTensor (GetTensorRequest) returns (GetTensorReply) {}
+  rpc CopyTensor (CopyTensorRequest) returns (CopyTensorReply) {}
+  rpc GraphCompute (GraphComputeRequest) returns (GraphComputeReply) {}
+}
+
+message Tensor {
+  // use the local tensor address as ID
+  uint64 id = 1;
+
+  int32 type = 2;
+  int32 backend = 3;
+  uint64 bufptr = 4;
+  repeated int64 ne = 5;
+  int32 op = 6;
+  repeated int32 op_params = 7;
+  int32 flags = 8;
+  repeated uint64 src = 9;
+  uint64 view_src = 10;
+  uint32 view_offs = 11;
+  uint64 data = 12;
+  string name = 13;
+  uint64 extra = 14;
+}
+
+message GetAlignmentRequest {
+}
+
+message GetAlignmentReply {
+  uint32 alignment = 1;
+}
+
+message GetAllocSizeRequest {
+  Tensor tensor = 1;
+}
+
+message GetAllocSizeReply {
+  uint32 size = 1;
+}
+
+message AllocateBufferRequest {
+  uint32 size = 1;
+}
+
+message AllocateBufferReply {
+  uint64 bufptr = 1;
+  uint32 size = 2;
+}
+
+message BufferGetBaseRequest {
+  uint64 bufptr = 1;
+}
+
+message BufferGetBaseReply {
+  uint64 baseptr = 1;
+}
+
+message FreeBufferRequest {
+  uint64 bufptr = 1;
+}
+
+message FreeBufferReply {
+}
+
+message BufferClearRequest {
+  uint64 bufptr = 1;
+  uint32 value = 2;
+}
+
+message BufferClearReply {
+}
+
+message InitTensorRequest {
+  Tensor tensor = 1;
+}
+
+message InitTensorReply {
+  Tensor tensor = 1;
+}
+
+message SetTensorRequest {
+  Tensor tensor = 1;
+  uint32 offset = 2;
+  bytes data = 3;
+}
+
+message SetTensorReply {
+}
+
+message GetTensorRequest {
+  Tensor tensor = 1;
+  uint32 offset = 2;
+  uint32 size = 3;
+}
+
+message GetTensorReply {
+  bytes data = 1;
+}
+
+message CopyTensorRequest {
+  Tensor src = 2;
+  Tensor dst = 3;
+}
+
+message CopyTensorReply {
+  bool result = 1;
+}
+
+message GraphComputeRequest {
+  repeated Tensor tensors = 1;
+  repeated uint64 nodes = 2;
+}
+
+message GraphComputeReply {
+  int32 status = 1;
+}
