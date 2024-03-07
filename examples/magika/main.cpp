@@ -318,7 +318,7 @@ bool magika_eval(
         ggml_backend_tensor_set(input, one_hot.data(), 257*inp_bytes*i*sizeof(float), 257*inp_bytes*sizeof(float));
     }
 
-    if (!ggml_backend_graph_compute(model.backend, gf)) {
+    if (ggml_backend_graph_compute(model.backend, gf) != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "%s: ggml_backend_graph_compute() failed\n", __func__);
         return false;
     }
