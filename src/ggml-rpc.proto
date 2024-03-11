@@ -26,15 +26,16 @@ message Tensor {
   int32 backend = 3;
   uint64 bufptr = 4;
   repeated int64 ne = 5;
-  int32 op = 6;
-  repeated int32 op_params = 7;
-  int32 flags = 8;
-  repeated uint64 src = 9;
-  uint64 view_src = 10;
-  uint32 view_offs = 11;
-  uint64 data = 12;
-  string name = 13;
-  uint64 extra = 14;
+  repeated uint32 nb = 6;
+  int32 op = 7;
+  repeated int32 op_params = 8;
+  int32 flags = 9;
+  repeated uint64 src = 10;
+  uint64 view_src = 11;
+  uint32 view_offs = 12;
+  uint64 data = 13;
+  string name = 14;
+  uint64 extra = 15;
 }
 
 message GetAlignmentRequest {

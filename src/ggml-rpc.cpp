@@ -86,6 +86,7 @@ static void serialize_tensor(const ggml_tensor * tensor, ggml::Tensor * protobuf
     }
     for (uint32_t i = 0; i < GGML_MAX_DIMS; i++) {
         protobuf_tensor->add_ne(tensor->ne[i]);
+        protobuf_tensor->add_nb(tensor->nb[i]);
     }
     protobuf_tensor->set_op(tensor->op);
     for (uint32_t i = 0; i < GGML_MAX_OP_PARAMS / sizeof(int32_t); i++) {
@@ -105,6 +106,9 @@ static void serialize_tensor(const ggml_tensor * tensor, ggml::Tensor * protobuf
 static ggml_tensor * deserialize_tensor(struct ggml_context * ctx, const ggml::Tensor & protobuf_tensor) {
     ggml_tensor * result = ggml_new_tensor_4d(ctx, (ggml_type) protobuf_tensor.type(),
         protobuf_tensor.ne(0), protobuf_tensor.ne(1), protobuf_tensor.ne(2), protobuf_tensor.ne(3));
+    for (uint32_t i = 0; i < GGML_MAX_DIMS; i++) {
+        result->nb[i] = protobuf_tensor.nb(i);
+    }
     result->backend = (ggml_backend_type) protobuf_tensor.backend();
     result->buffer = reinterpret_cast<ggml_backend_buffer_t>(protobuf_tensor.bufptr());
     result->op = (ggml_op) protobuf_tensor.op();
@@ -113,7 +117,7 @@ static ggml_tensor * deserialize_tensor(struct ggml_context * ctx, const ggml::T
     }
     result->flags = protobuf_tensor.flags();
     result->data = reinterpret_cast<void *>(protobuf_tensor.data());
-    strncpy(result->name, protobuf_tensor.name().c_str(), GGML_MAX_NAME);
+    snprintf(result->name, GGML_MAX_NAME, "%s", protobuf_tensor.name().c_str());
     result->extra = reinterpret_cast<void *>(protobuf_tensor.extra());
     return result;
 }
