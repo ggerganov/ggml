@@ -54,6 +54,7 @@ GGML_CALL static void ggml_backend_rpc_buffer_free_buffer(ggml_backend_buffer_t 
     grpc::ClientContext context;
     grpc::Status status = ctx->stub->FreeBuffer(&context, request, &reply);
     GGML_ASSERT(status.ok());
+    delete ctx;
 }
 
 GGML_CALL static void * ggml_backend_rpc_buffer_get_base(ggml_backend_buffer_t buffer) {
@@ -225,15 +226,11 @@ GGML_CALL static ggml_backend_buffer_t ggml_backend_rpc_buffer_type_alloc_buffer
     grpc::ClientContext context;
     grpc::Status status = buft_ctx->stub->AllocateBuffer(&context, request, &reply);
     GGML_ASSERT(status.ok());
-    ggml_backend_buffer_t buffer = (ggml_backend_buffer_t) malloc(sizeof(struct ggml_backend_buffer));
 
-    (*buffer) = (struct ggml_backend_buffer) {
-        /* .interface = */ ggml_backend_rpc_buffer_interface,
-        /* .buft      = */ buft,
-        /* .context   = */ new ggml_backend_rpc_buffer_context{buft_ctx->stub, reply.bufptr(), "RPC Buffer"},
-        /* .size      = */ reply.size(),
-        /* .usage     = */ GGML_BACKEND_BUFFER_USAGE_ANY
-    };
+    ggml_backend_buffer_t buffer = ggml_backend_buffer_init(buft,
+        ggml_backend_rpc_buffer_interface,
+        new ggml_backend_rpc_buffer_context{buft_ctx->stub, reply.bufptr(), "RPC Buffer"},
+        reply.size());
 
     return buffer;
 }
