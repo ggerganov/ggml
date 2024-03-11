@@ -7,6 +7,10 @@
 #include "ggml-cuda.h"
 #endif
 
+#ifdef GGML_USE_METAL
+#include "ggml-metal.h"
+#endif
+
 #include <grpcpp/grpcpp.h>
 #include <memory>
 #include <string>
@@ -80,15 +84,15 @@ static void serialize_tensor(const ggml_tensor * tensor, ggml::Tensor * protobuf
     } else {
         protobuf_tensor->set_bufptr(0);
     }
-    for (int i = 0; i < GGML_MAX_DIMS; i++) {
+    for (uint32_t i = 0; i < GGML_MAX_DIMS; i++) {
         protobuf_tensor->add_ne(tensor->ne[i]);
     }
     protobuf_tensor->set_op(tensor->op);
-    for (int i = 0; i < GGML_MAX_OP_PARAMS / sizeof(int32_t); i++) {
+    for (uint32_t i = 0; i < GGML_MAX_OP_PARAMS / sizeof(int32_t); i++) {
         protobuf_tensor->add_op_params(tensor->op_params[i]);
     }
     protobuf_tensor->set_flags(tensor->flags);
-    for (int i = 0; i < GGML_MAX_SRC; i++) {
+    for (uint32_t i = 0; i < GGML_MAX_SRC; i++) {
         protobuf_tensor->add_src(reinterpret_cast<uint64_t>(tensor->src[i]));
     }
     protobuf_tensor->set_view_src(reinterpret_cast<uint64_t>(tensor->view_src));
@@ -104,7 +108,7 @@ static ggml_tensor * deserialize_tensor(struct ggml_context * ctx, const ggml::T
     result->backend = (ggml_backend_type) protobuf_tensor.backend();
     result->buffer = reinterpret_cast<ggml_backend_buffer_t>(protobuf_tensor.bufptr());
     result->op = (ggml_op) protobuf_tensor.op();
-    for (int i = 0; i < GGML_MAX_OP_PARAMS / sizeof(int32_t); i++) {
+    for (uint32_t i = 0; i < GGML_MAX_OP_PARAMS / sizeof(int32_t); i++) {
         result->op_params[i] = protobuf_tensor.op_params(i);
     }
     result->flags = protobuf_tensor.flags();
@@ -405,7 +409,6 @@ BackendImpl::BackendImpl() {
 
 #ifdef GGML_USE_METAL
     fprintf(stderr, "%s: using Metal backend\n", __func__);
-    ggml_metal_log_set_callback(ggml_log_callback_default, nullptr);
     backend = ggml_backend_metal_init();
     if (!backend) {
         fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
