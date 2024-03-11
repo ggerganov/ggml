@@ -573,12 +573,12 @@ static struct ggml_tensor * create_node(uint64_t id,
             GGML_PRINT_DEBUG("create node: %lx\n", id);
             const ggml::Tensor & protobuf_tensor = request->tensors(i);
             struct ggml_tensor * result = deserialize_tensor(ctx, protobuf_tensor);
+            tensor_map[id] = result;
             for (int i = 0; i < GGML_MAX_SRC; i++) {
                 result->src[i] = create_node(protobuf_tensor.src(i), ctx, request, tensor_map);
             }
             result->view_src = create_node(protobuf_tensor.view_src(), ctx, request, tensor_map);
             result->view_offs = protobuf_tensor.view_offs();
-            tensor_map[id] = result;
             return result;
         }
     }
