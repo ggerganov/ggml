@@ -10,6 +10,10 @@
 #include "ggml-metal.h"
 #endif
 
+#ifdef GGML_USE_RPC
+#include "ggml-rpc.h"
+#endif
+
 #include "common.h"
 #include "common-ggml.h"
 
@@ -215,6 +219,14 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         if (!model.backend) {
             fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
         }
+    }
+#endif
+
+#ifdef GGML_USE_RPC
+    fprintf(stderr, "%s: using RPC backend\n", __func__);
+    model.backend = ggml_backend_rpc_init("localhost:50051");
+    if (!model.backend) {
+        fprintf(stderr, "%s: ggml_backend_rpc_init() failed\n", __func__);
     }
 #endif
 

@@ -22,6 +22,9 @@ int main(int argc, char * argv[])
     // Listen on the given address without any authentication mechanism.
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
     builder.RegisterService(&service);
+    builder.SetMaxSendMessageSize(1024 * 1024 * 1024);
+    builder.SetMaxMessageSize(1024 * 1024 * 1024);
+    builder.SetMaxReceiveMessageSize(1024 * 1024 * 1024);
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
     std::cout << "RPC backend listening on " << server_address << std::endl;
 
