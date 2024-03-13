@@ -234,6 +234,7 @@ By convention, most counts/lengths/etc are `uint64` unless otherwise specified. 
   - `gpt2`
   - `bloom`
   - `falcon`
+  - `mamba`
   - `rwkv`
 - **`general.quantization_version: uint32`**: The version of the quantization format. Not required if the model is not quantized (i.e. no tensors are quantized). If any tensors are quantized, this _must_ be present. This is separate to the quantization scheme of the tensors itself; the quantization version may change without changing the scheme's name (e.g. the quantization scheme is Q5_K, and the quantization version is 4).
 - **`general.alignment: uint32`**: the global alignment to use, as described above. This can vary to allow for different alignment schemes, but it must be a multiple of 8. Some writers may not write the alignment. If the alignment is **not** specified, assume it is `32`.
@@ -318,6 +319,13 @@ Note that older models may not have these keys, and may instead use the followin
 - `[llm].rope.scale_linear: float32`: A linear scale factor for RoPE to adjust the context length.
 
 It is recommended that models use the newer keys if possible, as they are more flexible and allow for more complex scaling schemes. Executors will need to support both indefinitely.
+
+#### SSM
+
+- `[llm].ssm.conv_kernel: uint32`: The size of the rolling/shift state.
+- `[llm].ssm.inner_size: uint32`: The embedding size of the states.
+- `[llm].ssm.state_size: uint32`: The size of the recurrent state.
+- `[llm].ssm.time_step_rank: uint32`: The rank of time steps.
 
 #### Models
 
@@ -437,6 +445,17 @@ The following sections describe the metadata for each model architecture. Each k
 
         model[src] = torch.cat((q,k,v)).reshape_as(model[src])
     ```
+
+##### Mamba
+
+- `mamba.context_length`
+- `mamba.embedding_length`
+- `mamba.block_count`
+- `mamba.ssm.conv_kernel`
+- `mamba.ssm.inner_size`
+- `mamba.ssm.state_size`
+- `mamba.ssm.time_step_rank`
+- `mamba.attention.layer_norm_rms_epsilon`
 
 ##### RWKV
 
@@ -563,6 +582,14 @@ where N signifies the block number a layer belongs to, and where `BB` could be:
 - `ffn_gate_exp`: Feed-forward network "gate" layer per expert in MoE models
 - `ffn_down_exp`: Feed-forward network "down" layer per expert in MoE models
 - `ffn_up_exp`: Feed-forward network "up" layer per expert in MoE models
+
+- `ssm_in`: State space model input projections layer
+- `ssm_conv1d`: State space model rolling/shift layer
+- `ssm_x`: State space model selective parametrization layer
+- `ssm_a`: State space model state compression layer
+- `ssm_d`: State space model skip connection layer
+- `ssm_dt`: State space model time step layer
+- `ssm_out`: State space model output projection layer
 
 ## Version History
 
