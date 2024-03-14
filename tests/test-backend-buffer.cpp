@@ -40,8 +40,8 @@ static void test_buffer(ggml_backend_t backend, ggml_backend_buffer_type_t buft)
 
     GGML_ASSERT(ggml_backend_buffer_get_alloc_size(buffer, tensor) >= n * sizeof(float));
 
-    ggml_tallocr_t allocr = ggml_tallocr_new(buffer);
-    ggml_tallocr_alloc(allocr, tensor);
+    struct ggml_tallocr allocr = ggml_tallocr_new(buffer);
+    ggml_tallocr_alloc(&allocr, tensor);
 
     GGML_ASSERT(tensor->data != NULL);
 
@@ -59,7 +59,6 @@ static void test_buffer(ggml_backend_t backend, ggml_backend_buffer_type_t buft)
 
     GGML_ASSERT(memcmp(data, data2, sizeof(data)) == 0);
 
-    ggml_tallocr_free(allocr);
     ggml_backend_buffer_free(buffer);
     ggml_free(ctx);
 }

@@ -342,7 +342,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
     }
 
     // allocate buffers
-    std::map<ggml_backend_t, std::unique_ptr<ggml_tallocr, decltype(&ggml_tallocr_free)>> backend_buffers;
+    std::map<ggml_backend_t, ggml_tallocr> backend_buffers;
     for (auto backend : model.backends) {
         // compute the size of the buffer
         size_t size = 0;
@@ -359,7 +359,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             model.buffers_w.push_back(buffer);
 
             // create an allocator for the buffer to allocate the tensors
-            auto alloc = std::unique_ptr<ggml_tallocr, decltype(&ggml_tallocr_free)>(ggml_tallocr_new(buffer), ggml_tallocr_free);
+            auto alloc = ggml_tallocr_new(buffer);
             backend_buffers.insert(std::make_pair(backend, std::move(alloc)));
         } else {
             model.buffers_w.push_back(NULL);
@@ -394,15 +394,13 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
         // allocate the tensors into the backend buffer
         {
-            ggml_tallocr * alloc = ggml_tallocr_new(model.buffer_kv);
+            ggml_tallocr alloc = ggml_tallocr_new(model.buffer_kv);
 
             // this updates the pointers in the tensors to point to the correct location in the buffer
             // this is necessary since the ggml_context is .no_alloc == true
             // note that the buffer can actually be a device buffer, depending on the backend
-            ggml_tallocr_alloc(alloc, model.memory_k);
-            ggml_tallocr_alloc(alloc, model.memory_v);
-
-            ggml_tallocr_free(alloc);
+            ggml_tallocr_alloc(&alloc, model.memory_k);
+            ggml_tallocr_alloc(&alloc, model.memory_v);
         }
     }
 
@@ -470,7 +468,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
             // allocate the tensor
             ggml_backend_t backend = tensor_backends[name];
-            ggml_tallocr * alloc = backend_buffers.find(backend)->second.get();
+            ggml_tallocr * alloc = &backend_buffers.find(backend)->second;
             ggml_tallocr_alloc(alloc, tensor);
             //printf("%s: [%5.5s] %s\n", __func__, ggml_backend_name(backend), name.c_str());
 
@@ -490,7 +488,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
             // GPT-2 models share the WTE tensor as the LM head
             if (name == "model/wte" && has_lm_head == false) {
-                ggml_tallocr_alloc(backend_buffers.find(tensor_backends["model/lm_head"])->second.get(), model.lm_head);
+                ggml_tallocr * alloc_head = &backend_buffers.find(tensor_backends["model/lm_head"])->second;
+                ggml_tallocr_alloc(alloc_head, model.lm_head);
                 //printf("%s: [%5.5s] %s (copied)\n", __func__, ggml_backend_name(tensor_backends["model/lm_head"]), "model/lm_head");
                 ggml_backend_tensor_copy(tensor, model.lm_head);
                 total_size += ggml_nbytes(model.lm_head);
@@ -524,10 +523,9 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         printf("%s: backend_in = %s (%zu bytes)\n", __func__, ggml_backend_name(backend_input), input_size);
 
         // allocate the tensors into the backend buffer
-        ggml_tallocr * alloc = ggml_tallocr_new(model.buffer_input);
-        ggml_tallocr_alloc(alloc, model.embd);
-        ggml_tallocr_alloc(alloc, model.position);
-        ggml_tallocr_free(alloc);
+        ggml_tallocr alloc = ggml_tallocr_new(model.buffer_input);
+        ggml_tallocr_alloc(&alloc, model.embd);
+        ggml_tallocr_alloc(&alloc, model.position);
     }
 
     return true;
@@ -867,6 +865,7 @@ bool gpt2_eval(
     struct ggml_cgraph * gf = gpt2_graph(model, n_past, embd_inp);
 
     // run the computation
+    ggml_backend_sched_reset(sched);
     ggml_backend_sched_graph_compute(sched, gf);
 
     //if (n_past%100 == 0) {
@@ -934,7 +933,7 @@ int main(int argc, char ** argv) {
     ggml_backend_sched_t sched;
     {
         // initialize the scheduler
-        sched = ggml_backend_sched_new(model.backends.data(), NULL, model.backends.size(), GPT2_MAX_NODES);
+        sched = ggml_backend_sched_new(model.backends.data(), NULL, model.backends.size(), GPT2_MAX_NODES, false);
 
         // create the worst case graph for memory usage estimation
         int n_tokens = std::min(model.hparams.n_ctx, params.n_batch);

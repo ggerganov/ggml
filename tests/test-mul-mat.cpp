@@ -85,10 +85,10 @@ void load_model(test_model & model, float* a, float* b, int M, int N, int K, boo
     printf("Matrix B: [%i, %i]\n", K, N);
 
     // create a allocator
-    ggml_tallocr_t alloc = ggml_tallocr_new(model.buffer);
+    struct ggml_tallocr alloc = ggml_tallocr_new(model.buffer);
 
     // alloc memory
-    ggml_tallocr_alloc(alloc, model.a);
+    ggml_tallocr_alloc(&alloc, model.a);
 
     // load data to buffer
     if(ggml_backend_is_cpu(model.backend)
@@ -102,7 +102,7 @@ void load_model(test_model & model, float* a, float* b, int M, int N, int K, boo
     }
 
     // alloc memory
-    ggml_tallocr_alloc(alloc, model.b);
+    ggml_tallocr_alloc(&alloc, model.b);
 
     if(ggml_backend_is_cpu(model.backend)
 #ifdef GGML_USE_METAL
@@ -113,8 +113,6 @@ void load_model(test_model & model, float* a, float* b, int M, int N, int K, boo
     } else {
         ggml_backend_tensor_set(model.b, b, 0, ggml_nbytes(model.b));  // cuda requires copy the data directly to device
     }
-
-    ggml_tallocr_free(alloc);
 }
 
 struct ggml_cgraph * build_graph(const test_model& model) {

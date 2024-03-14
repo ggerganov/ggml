@@ -419,21 +419,19 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
         // allocate the tensors into the backend buffer
         {
-            ggml_tallocr * alloc = ggml_tallocr_new(model.kv_cache.buffer);
+            ggml_tallocr alloc = ggml_tallocr_new(model.kv_cache.buffer);
 
             // this updates the pointers in the tensors to point to the correct location in the buffer
             // this is necessary since the ggml_context is .no_alloc == true
             // note that the buffer can actually be a device buffer, depending on the backend
-            ggml_tallocr_alloc(alloc, model.kv_cache.k);
-            ggml_tallocr_alloc(alloc, model.kv_cache.v);
-
-            ggml_tallocr_free(alloc);
+            ggml_tallocr_alloc(&alloc, model.kv_cache.k);
+            ggml_tallocr_alloc(&alloc, model.kv_cache.v);
         }
     }
 
     // load weights
     {
-        ggml_tallocr * alloc = ggml_tallocr_new(model.buffer_w);
+        ggml_tallocr alloc = ggml_tallocr_new(model.buffer_w);
 
         size_t total_size = 0;
 
@@ -495,7 +493,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
                 return false;
             }
 
-            ggml_tallocr_alloc(alloc, tensor);
+            ggml_tallocr_alloc(&alloc, tensor);
 
             if (ggml_backend_is_cpu  (model.backend)
 #ifdef GGML_USE_METAL
@@ -525,7 +523,6 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             total_size += ggml_nbytes(tensor);
         }
 
-        ggml_tallocr_free(alloc);
         printf("%s: model size  = %8.2f MB\n", __func__, total_size/1024.0/1024.0);
     }
 
