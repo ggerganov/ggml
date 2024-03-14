@@ -17,7 +17,7 @@
 
 #define UNUSED GGML_UNUSED
 
-#define GGML_DEBUG 1
+#define GGML_DEBUG 0
 #if (GGML_DEBUG >= 1)
 #define GGML_PRINT_DEBUG(...) printf(__VA_ARGS__)
 #else
@@ -255,6 +255,9 @@ GGML_CALL static size_t ggml_backend_rpc_buffer_type_get_alignment(ggml_backend_
 }
 
 GGML_CALL static size_t ggml_backend_rpc_buffer_type_get_alloc_size(ggml_backend_buffer_type_t buft, const ggml_tensor * tensor) {
+    // TODO: temporary workaround
+    return ggml_nbytes(tensor);
+
     GGML_PRINT_DEBUG("get alloc size\n");
     ggml::GetAllocSizeRequest request;
     ggml::Tensor * protobuf_tensor = request.mutable_tensor();
@@ -316,7 +319,7 @@ GGML_CALL static ggml_backend_buffer_type_t ggml_backend_rpc_get_default_buffer_
 GGML_CALL static void ggml_backend_rpc_synchronize(ggml_backend_t backend) {
     GGML_PRINT_DEBUG("synchronize\n");
     UNUSED(backend);
-    GGML_ASSERT(false && "not implemented");
+    //GGML_ASSERT(false && "not implemented");
 }
 
 static void add_node(ggml::GraphComputeRequest & request, ggml_tensor * node, std::unordered_set<ggml_tensor*> & visited) {
@@ -375,6 +378,11 @@ static ggml_backend_i ggml_backend_rpc_interface = {
     /* .graph_plan_compute      = */ NULL,
     /* .graph_compute           = */ ggml_backend_rpc_graph_compute,
     /* .supports_op             = */ ggml_backend_rpc_supports_op,
+    /* .event_new               = */ NULL,
+    /* .event_free              = */ NULL,
+    /* .event_record            = */ NULL,
+    /* .event_wait              = */ NULL,
+    /* .event_synchronize       = */ NULL,
 };
 
 GGML_CALL ggml_backend_t ggml_backend_rpc_init(const char * endpoint) {
