@@ -111,10 +111,10 @@ void load_model(test_model & model, bool use_gpu = false) {
     model.b = ggml_new_tensor_3d(model.ctx, GGML_TYPE_F32, IL, IC, N);
 
     // create a allocator
-    ggml_tallocr_t alloc = ggml_tallocr_new(model.buffer);
+    ggml_tallocr alloc = ggml_tallocr_new(model.buffer);
 
     // alloc memory
-    ggml_tallocr_alloc(alloc, model.a);
+    ggml_tallocr_alloc(&alloc, model.a);
 
     // load data to buffer
     if(ggml_backend_is_cpu(model.backend)) {
@@ -124,7 +124,7 @@ void load_model(test_model & model, bool use_gpu = false) {
     }
 
     // alloc memory
-    ggml_tallocr_alloc(alloc, model.b);
+    ggml_tallocr_alloc(&alloc, model.b);
 
     if(ggml_backend_is_cpu(model.backend)
 #ifdef GGML_USE_METAL
@@ -135,8 +135,6 @@ void load_model(test_model & model, bool use_gpu = false) {
     } else {
         ggml_backend_tensor_set(model.b, bdata, 0, ggml_nbytes(model.b));
     }
-
-    ggml_tallocr_free(alloc);
 }
 
 struct ggml_cgraph * build_graph(const test_model& model) {
