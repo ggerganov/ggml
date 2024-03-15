@@ -20,6 +20,9 @@ The key difference between GGJT and GGUF is the use of a key-value structure for
 
 ### File Structure
 
+![image](https://github.com/ggerganov/ggml/assets/1991296/c3623641-3a1d-408e-bfaf-1b7c4e16aa63)
+*diagram by [@mishig25](https://github.com/mishig25) (GGUF v3)*
+
 GGUF files are structured as follows. They use a global alignment specified in the `general.alignment` metadata field, referred to as `ALIGNMENT` below. Where required, the file is padded with `0x00` bytes to the next multiple of `general.alignment`.
 
 Fields, including arrays, are written sequentially without alignment unless otherwise specified.
