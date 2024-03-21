@@ -104,9 +104,9 @@ int main(void) {
     memcpy(out_data.data(), result->data, ggml_nbytes(result));
 
     // expected result:
-    // [ 60.00 110.00 54.00 29.00
-    //  55.00 90.00 126.00 28.00
-    //  50.00 54.00 42.00 64.00 ]
+    // [ 60.00 55.00 50.00 110.00
+    //   90.00 54.00 54.00 126.00
+    //   42.00 29.00 28.00 64.00 ]
 
     printf("mul mat (%d x %d) (transposed result):\n[", (int) result->ne[0], (int) result->ne[1]);
     for (int j = 0; j < result->ne[1] /* rows */; j++) {
@@ -115,7 +115,7 @@ int main(void) {
         }
 
         for (int i = 0; i < result->ne[0] /* cols */; i++) {
-            printf(" %.2f", out_data[i * result->ne[1] + j]);
+            printf(" %.2f", out_data[j * result->ne[0] + i]);
         }
     }
     printf(" ]\n");
