@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it using these metadata.
+title: GGML - Tensor library for machine learning
+authors:
+  - family-names: Gerganov
+    given-names: Georgi
+license: MIT
+repository-code: "https://github.com/ggerganov/ggml"
