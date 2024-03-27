@@ -6,6 +6,7 @@ cp -rpv ../whisper.cpp/ggml-alloc.c                   src/ggml-alloc.c
 cp -rpv ../whisper.cpp/ggml-backend-impl.h            src/ggml-backend-impl.h
 cp -rpv ../whisper.cpp/ggml-backend.c                 src/ggml-backend.c
 cp -rpv ../whisper.cpp/ggml-common.h                  src/ggml-common.h
+cp -rpv ../whisper.cpp/ggml-cuda/*                    src/ggml-cuda/
 cp -rpv ../whisper.cpp/ggml-cuda.cu                   src/ggml-cuda.cu
 cp -rpv ../whisper.cpp/ggml-cuda.h                    src/ggml-cuda.h
 cp -rpv ../whisper.cpp/ggml-kompute.cpp               src/ggml-kompute.cpp
