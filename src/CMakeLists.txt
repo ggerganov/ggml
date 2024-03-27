@@ -206,6 +206,11 @@ if (GGML_CLBLAST)
 endif()
 
 if (GGML_CUBLAS)
+    message(WARNING "GGML_CUBLAS is deprecated and will be removed in the future.\nUse GGML_CUDA instead")
+    set(GGML_CUDA ON)
+endif()
+
+if (GGML_CUDA)
     cmake_minimum_required(VERSION 3.17)
 
     find_package(CUDAToolkit)
@@ -214,9 +219,11 @@ if (GGML_CUBLAS)
 
         enable_language(CUDA)
 
-        set(GGML_CUDA_SOURCES ggml-cuda.cu ggml-cuda.h)
+        file(GLOB   GGML_CUDA_SOURCES "ggml-cuda/*.cu")
+        list(APPEND GGML_CUDA_SOURCES  ggml-cuda.h)
+        list(APPEND GGML_CUDA_SOURCES  ggml-cuda.cu)
 
-        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CUBLAS)
+        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CUDA)
 
         if (GGML_CUDA_FORCE_DMMV)
             add_compile_definitions(GGML_CUDA_FORCE_DMMV)
@@ -266,9 +273,10 @@ if (GGML_HIPBLAS)
     if (${hipblas_FOUND} AND ${hip_FOUND})
         message(STATUS "HIP and hipBLAS found")
 
-        add_compile_definitions(GGML_USE_HIPBLAS GGML_USE_CUBLAS)
+        add_compile_definitions(GGML_USE_HIPBLAS GGML_USE_CUDA)
 
         add_library(ggml-rocm OBJECT ggml-cuda.cu ggml-cuda.h)
+
         if (BUILD_SHARED_LIBS)
             set_target_properties(ggml-rocm PROPERTIES POSITION_INDEPENDENT_CODE ON)
         endif()
