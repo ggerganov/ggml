@@ -5,6 +5,7 @@ cp -rpv ../llama.cpp/ggml-alloc.c        src/ggml-alloc.c
 cp -rpv ../llama.cpp/ggml-backend-impl.h src/ggml-backend-impl.h
 cp -rpv ../llama.cpp/ggml-backend.c      src/ggml-backend.c
 cp -rpv ../llama.cpp/ggml-common.h       src/ggml-common.h
+cp -rpv ../llama.cpp/ggml-cuda/*         src/ggml-cuda/
 cp -rpv ../llama.cpp/ggml-cuda.cu        src/ggml-cuda.cu
 cp -rpv ../llama.cpp/ggml-cuda.h         src/ggml-cuda.h
 cp -rpv ../llama.cpp/ggml-impl.h         src/ggml-impl.h
