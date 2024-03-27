@@ -85,7 +85,7 @@ enum gguf_metadata_value_type: uint32_t {
     GGUF_METADATA_VALUE_TYPE_INT64 = 11,
     // The value is a 64-bit IEEE754 floating point number.
     GGUF_METADATA_VALUE_TYPE_FLOAT64 = 12,
-}
+};
 
 // A string in GGUF.
 struct gguf_string_t {
@@ -93,7 +93,7 @@ struct gguf_string_t {
     uint64_t len;
     // The string as a UTF-8 non-null-terminated string.
     char string[len];
-}
+};
 
 union gguf_metadata_value_t {
     uint8_t uint8;
