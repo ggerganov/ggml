@@ -52,7 +52,7 @@ As of this writing the best is to use [ggerganov/llama.cpp](https://github.com/g
 
 ```bash
 git clone https://github.com/ggerganov/llama.cpp
-# On a CUDA-enabled system add -DLLAMA_CUBLAS=1
+# On a CUDA-enabled system add -DLLAMA_CUDA=1
 # On a Mac add -DLLAMA_METAL=1
 cmake llama.cpp \
   -B llama_build \

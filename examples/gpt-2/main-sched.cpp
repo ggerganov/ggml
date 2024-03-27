@@ -2,7 +2,7 @@
 #include "ggml/ggml-alloc.h"
 #include "ggml/ggml-backend.h"
 
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_CUDA
 #include "ggml-cuda.h"
 #endif
 
@@ -105,7 +105,7 @@ void init_backends(gpt2_model & model, const gpt_params & params) {
     ggml_backend_t gpu_backend = NULL;
 
     // initialize the backends
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_CUDA
     if (params.n_gpu_layers > 0) {
         fprintf(stderr, "%s: using CUDA backend\n", __func__);
         gpu_backend = ggml_backend_cuda_init(0);
