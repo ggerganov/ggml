@@ -1,6 +1,7 @@
 build/
 build-debug/
 build-release/
+build-rpc/
 build-sanitize-addr/
 build-sanitize-thread/
 build-cov/
