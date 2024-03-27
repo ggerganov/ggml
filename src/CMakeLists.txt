@@ -215,7 +215,7 @@ if (GGML_CUDA)
 
     find_package(CUDAToolkit)
     if (CUDAToolkit_FOUND)
-        message(STATUS "cuBLAS found")
+        message(STATUS "CUDA found")
 
         enable_language(CUDA)
 
@@ -252,10 +252,11 @@ if (GGML_CUDA)
             set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -lineinfo")
         endif()
     else()
-        message(WARNING "cuBLAS not found")
+        message(WARNING "CUDA not found")
     endif()
 endif()
 
+# TODO: do not build separate ggml-rocm target (see CUDA build above, or llama.cpp for reference)
 if (GGML_HIPBLAS)
     list(APPEND CMAKE_PREFIX_PATH /opt/rocm)
 
