@@ -2942,7 +2942,8 @@ static struct ggml_tensor * ggml_new_tensor_impl(
 
     void * data = view_src != NULL ? view_src->data : NULL;
     if (data != NULL) {
-        data = (char *) data + view_offs;
+        size_t type_size = ggml_type_size(type);
+        data = (char *) data + (view_offs * type_size);
     }
 
     size_t obj_alloc_size = 0;
