@@ -59,6 +59,7 @@ while read c; do
         ggml*.m \
         ggml*.metal \
         ggml*.cu \
+        ggml-cuda/* \
         tests/test-opt.cpp \
         tests/test-grad0.cpp \
         tests/test-quantize-fns.cpp \
