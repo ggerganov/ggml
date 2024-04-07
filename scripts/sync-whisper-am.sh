@@ -59,6 +59,7 @@ while read c; do
     ggml*.m \
     ggml*.metal \
     ggml*.cu \
+    ggml-cuda/* \
     whisper.h \
     whisper.cpp \
     examples/common.h \
