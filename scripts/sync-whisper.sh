@@ -33,6 +33,8 @@ cp -rpv ../whisper.cpp/examples/common.h              examples/common.h
 cp -rpv ../whisper.cpp/examples/common.cpp            examples/common.cpp
 cp -rpv ../whisper.cpp/examples/common-ggml.h         examples/common-ggml.h
 cp -rpv ../whisper.cpp/examples/common-ggml.cpp       examples/common-ggml.cpp
+cp -rpv ../whisper.cpp/examples/grammar-parser.h      examples/whisper/grammar-parser.h
+cp -rpv ../whisper.cpp/examples/grammar-parser.cpp    examples/whisper/grammar-parser.cpp
 
 cp -rpv ../whisper.cpp/whisper.h                      examples/whisper/whisper.h
 cp -rpv ../whisper.cpp/whisper.cpp                    examples/whisper/whisper.cpp

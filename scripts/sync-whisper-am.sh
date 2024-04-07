@@ -66,6 +66,8 @@ while read c; do
     examples/common.cpp \
     examples/common-ggml.h \
     examples/common-ggml.cpp \
+    examples/grammar-parser.h \
+    examples/grammar-parser.cpp \
     examples/main/main.cpp \
     examples/quantize/quantize.cpp \
     >> $SRC_GGML/whisper-src.patch
@@ -127,6 +129,8 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
     # examples/common.cpp            -> examples/common.cpp
     # examples/common-ggml.h         -> examples/common-ggml.h
     # examples/common-ggml.cpp       -> examples/common-ggml.cpp
+    # examples/grammar-parser.h      -> examples/whisper/grammar-parser.h
+    # examples/grammar-parser.cpp    -> examples/whisper/grammar-parser.cpp
     # examples/main/main.cpp         -> examples/whisper/main.cpp
     # examples/quantize/quantize.cpp -> examples/whisper/quantize.cpp
 
@@ -163,6 +167,8 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
         -e 's/\/examples\/common\.cpp/\/examples\/common.cpp/g' \
         -e 's/\/examples\/common-ggml\.h/\/examples\/common-ggml.h/g' \
         -e 's/\/examples\/common-ggml\.cpp/\/examples\/common-ggml.cpp/g' \
+        -e 's/\/examples\/grammar-parser\.h/\/examples\/whisper\/grammar-parser.h/g' \
+        -e 's/\/examples\/grammar-parser\.cpp/\/examples\/whisper\/grammar-parser.cpp/g' \
         -e 's/\/examples\/main\/main\.cpp/\/examples\/whisper\/main.cpp/g' \
         -e 's/\/examples\/quantize\/quantize\.cpp/\/examples\/whisper\/quantize.cpp/g' \
         > whisper-src.patch.tmp
