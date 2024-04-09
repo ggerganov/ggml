@@ -40,3 +40,6 @@ cp -rpv ../whisper.cpp/whisper.h                      examples/whisper/whisper.h
 cp -rpv ../whisper.cpp/whisper.cpp                    examples/whisper/whisper.cpp
 cp -rpv ../whisper.cpp/examples/main/main.cpp         examples/whisper/main.cpp
 cp -rpv ../whisper.cpp/examples/quantize/quantize.cpp examples/whisper/quantize.cpp
+
+cp -rpv ../whisper.cpp/LICENSE                        ./LICENSE
+cp -rpv ../whisper.cpp/scripts/gen-authors.sh         ./scripts/gen-authors.sh
