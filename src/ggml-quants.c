@@ -5273,7 +5273,6 @@ void ggml_vec_dot_q8_0_q8_0(int n, float * restrict s, size_t bs, const void * r
         vector signed short qv2 = vec_mule(q8x1, q8y1);
         vector signed short qv3 = vec_mulo(q8x1, q8y1);
 
-        // unpack then add to avoid overflow
         vector signed int vsumi0 = vec_add(vec_unpackh(qv0), vec_unpackh(qv1));
         vector signed int vsumi1 = vec_add(vec_unpackl(qv0), vec_unpackl(qv1));
         vector signed int vsumi2 = vec_add(vec_unpackh(qv2), vec_unpackh(qv3));
@@ -5725,7 +5724,6 @@ void ggml_vec_dot_q2_K_q8_K(int n, float * restrict s, size_t bs, const void * r
             vector signed char q8y13 = vec_xl(112, q8);
             q8 += 128;
 
-            // 2bit * 8bit ==> short then add, no overflow.
             vector signed short qv0 = vec_add(vec_mule(q2x00, q8y00), vec_mulo(q2x00, q8y00));
             vector signed short qv1 = vec_add(vec_mule(q2x01, q8y01), vec_mulo(q2x01, q8y01));
             vector signed short qv2 = vec_add(vec_mule(q2x02, q8y02), vec_mulo(q2x02, q8y02));
@@ -5746,16 +5744,14 @@ void ggml_vec_dot_q2_K_q8_K(int n, float * restrict s, size_t bs, const void * r
             vector signed short vs7 = vec_splat(vscales_h, 7);
             vscales = vec_sld(vscales, vscales, 8);
 
-            // multiply by 4 more bits. short mul+madd should be ok as 2+8+4 twice. It is at most 15 bits.
-            // Inner loop, 24 insn, Outer loop, 12 insn. This seems to be better?
             qv0 = vec_mul(qv0, vs0);
-            qv1 = vec_mul(qv1, vs1);
-            qv2 = vec_mul(qv2, vs2);
-            qv3 = vec_mul(qv3, vs3);
+            qv1 = vec_mul(qv1, vs2);
+            qv2 = vec_mul(qv2, vs4);
+            qv3 = vec_mul(qv3, vs6);
 
-            qv0 = vec_madd(qv4, vs4, qv0);
-            qv1 = vec_madd(qv5, vs5, qv1);
-            qv2 = vec_madd(qv6, vs6, qv2);
+            qv0 = vec_madd(qv4, vs1, qv0);
+            qv1 = vec_madd(qv5, vs3, qv1);
+            qv2 = vec_madd(qv6, vs5, qv2);
             qv3 = vec_madd(qv7, vs7, qv3);
 
             vsumi0 = vec_add(vec_unpackh(qv0), vsumi0);
@@ -6751,12 +6747,12 @@ void ggml_vec_dot_q3_K_q8_K(int n, float * restrict s, size_t bs, const void * r
             vector signed short qv13 = vec_add(vec_mule(q3x13, q8y13), vec_mulo(q3x13, q8y13));
 
             vector signed int vsum0 = vec_add(vec_mule(qv00, vs0), vec_mulo(qv00, vs0));
-            vector signed int vsum1 = vec_add(vec_mule(qv01, vs1), vec_mulo(qv01, vs1));
-            vector signed int vsum2 = vec_add(vec_mule(qv02, vs2), vec_mulo(qv02, vs2));
-            vector signed int vsum3 = vec_add(vec_mule(qv03, vs3), vec_mulo(qv03, vs3));
-            vector signed int vsum4 = vec_add(vec_mule(qv10, vs4), vec_mulo(qv10, vs4));
-            vector signed int vsum5 = vec_add(vec_mule(qv11, vs5), vec_mulo(qv11, vs5));
-            vector signed int vsum6 = vec_add(vec_mule(qv12, vs6), vec_mulo(qv12, vs6));
+            vector signed int vsum1 = vec_add(vec_mule(qv01, vs2), vec_mulo(qv01, vs2));
+            vector signed int vsum2 = vec_add(vec_mule(qv02, vs4), vec_mulo(qv02, vs4));
+            vector signed int vsum3 = vec_add(vec_mule(qv03, vs6), vec_mulo(qv03, vs6));
+            vector signed int vsum4 = vec_add(vec_mule(qv10, vs1), vec_mulo(qv10, vs1));
+            vector signed int vsum5 = vec_add(vec_mule(qv11, vs3), vec_mulo(qv11, vs3));
+            vector signed int vsum6 = vec_add(vec_mule(qv12, vs5), vec_mulo(qv12, vs5));
             vector signed int vsum7 = vec_add(vec_mule(qv13, vs7), vec_mulo(qv13, vs7));
 
             vsumi0 = vec_add(vsum0, vsumi0);
@@ -7696,10 +7692,10 @@ void ggml_vec_dot_q4_K_q8_K(int n, float * restrict s, size_t bs, const void * r
             vector signed short vs3 = vec_splat(vscales, 3);
             vscales = vec_sld(vscales, vscales, 8);
 
-            qv00 = vec_add(qv00, qv01);
-            qv10 = vec_add(qv10, qv11);
-            qv20 = vec_add(qv20, qv21);
-            qv30 = vec_add(qv30, qv31);
+            qv00 = vec_add(qv00, qv10);
+            qv10 = vec_add(qv01, qv11);
+            qv20 = vec_add(qv20, qv30);
+            qv30 = vec_add(qv21, qv31);
 
             vsumi0 = vec_add(vec_mule(qv00, vs0), vsumi0);
             vsumi1 = vec_add(vec_mulo(qv00, vs0), vsumi1);
@@ -8577,15 +8573,15 @@ void ggml_vec_dot_q5_K_q8_K(int n, float * restrict s, size_t bs, const void * r
 
             vector signed short vs0 = vec_splat(vscales, 0);
             vector signed short vs1 = vec_splat(vscales, 1);
-            vscales = vec_sld(vscales, vscales, 4);
+            vscales = vec_sld(vscales, vscales, 12);
 
-            qv00 = vec_add(qv00, qv01);
-            qv10 = vec_add(qv10, qv11);
+            qv00 = vec_add(qv00, qv10);
+            qv01 = vec_add(qv01, qv11);
 
             vsumi0 = vec_add(vec_mule(qv00, vs0), vsumi0);
             vsumi1 = vec_add(vec_mulo(qv00, vs0), vsumi1);
-            vsumi2 = vec_add(vec_mule(qv10, vs1), vsumi2);
-            vsumi3 = vec_add(vec_mulo(qv10, vs1), vsumi3);
+            vsumi2 = vec_add(vec_mule(qv01, vs1), vsumi2);
+            vsumi3 = vec_add(vec_mulo(qv01, vs1), vsumi3);
         }
 
         vsumf0 = vec_madd(vec_ctf(vsumi0, 0), vd, vsumf0);
@@ -9492,7 +9488,6 @@ void ggml_vec_dot_q6_K_q8_K(int n, float * restrict s, size_t bs, const void * r
             vector signed char q8y31 = vec_xl(112, q8);
             q8 += 128;
 
-            // 6bit * 8bit then add, at most 15 bits. No overflow for short
             vector signed short qv00 = vec_add(vec_mule(q6x00, q8y00), vec_mulo(q6x00, q8y00));
             vector signed short qv10 = vec_add(vec_mule(q6x10, q8y10), vec_mulo(q6x10, q8y10));
             vector signed short qv20 = vec_add(vec_mule(q6x20, q8y20), vec_mulo(q6x20, q8y20));
@@ -9516,19 +9511,19 @@ void ggml_vec_dot_q6_K_q8_K(int n, float * restrict s, size_t bs, const void * r
 
             vsumi0 = vec_add(vec_mule(qv00, vs0), vsumi0);
             vsumi1 = vec_add(vec_mulo(qv00, vs0), vsumi1);
-            vsumi2 = vec_add(vec_mule(qv01, vs1), vsumi2);
-            vsumi3 = vec_add(vec_mulo(qv01, vs1), vsumi3);
-            vsumi4 = vec_add(vec_mule(qv10, vs2), vsumi4);
-            vsumi5 = vec_add(vec_mulo(qv10, vs2), vsumi5);
-            vsumi6 = vec_add(vec_mule(qv11, vs3), vsumi6);
-            vsumi7 = vec_add(vec_mulo(qv11, vs3), vsumi7);
+            vsumi2 = vec_add(vec_mule(qv01, vs4), vsumi2);
+            vsumi3 = vec_add(vec_mulo(qv01, vs4), vsumi3);
+            vsumi4 = vec_add(vec_mule(qv10, vs1), vsumi4);
+            vsumi5 = vec_add(vec_mulo(qv10, vs1), vsumi5);
+            vsumi6 = vec_add(vec_mule(qv11, vs5), vsumi6);
+            vsumi7 = vec_add(vec_mulo(qv11, vs5), vsumi7);
 
-            vsumi0 = vec_add(vec_mule(qv20, vs4), vsumi0);
-            vsumi1 = vec_add(vec_mulo(qv20, vs4), vsumi1);
-            vsumi2 = vec_add(vec_mule(qv21, vs5), vsumi2);
-            vsumi3 = vec_add(vec_mulo(qv21, vs5), vsumi3);
-            vsumi4 = vec_add(vec_mule(qv30, vs6), vsumi4);
-            vsumi5 = vec_add(vec_mulo(qv30, vs6), vsumi5);
+            vsumi0 = vec_add(vec_mule(qv20, vs2), vsumi0);
+            vsumi1 = vec_add(vec_mulo(qv20, vs2), vsumi1);
+            vsumi2 = vec_add(vec_mule(qv21, vs6), vsumi2);
+            vsumi3 = vec_add(vec_mulo(qv21, vs6), vsumi3);
+            vsumi4 = vec_add(vec_mule(qv30, vs3), vsumi4);
+            vsumi5 = vec_add(vec_mulo(qv30, vs3), vsumi5);
             vsumi6 = vec_add(vec_mule(qv31, vs7), vsumi6);
             vsumi7 = vec_add(vec_mulo(qv31, vs7), vsumi7);
         }
@@ -9907,7 +9902,6 @@ void ggml_vec_dot_q6_K_q8_K(int n, float * restrict s, size_t bs, const void * r
         vector signed char q8y01 = vec_xl(32, y[i].qs);
         vector signed char q8y11 = vec_xl(48, y[i].qs);
 
-        // 6bit * 8bit then add, at most 15 bits. No overflow for short
         vector signed short qv00 = vec_add(vec_mule(q6x00, q8y00), vec_mulo(q6x00, q8y00));
         vector signed short qv10 = vec_add(vec_mule(q6x10, q8y10), vec_mulo(q6x10, q8y10));
         vector signed short qv01 = vec_add(vec_mule(q6x01, q8y01), vec_mulo(q6x01, q8y01));
@@ -9920,8 +9914,8 @@ void ggml_vec_dot_q6_K_q8_K(int n, float * restrict s, size_t bs, const void * r
         vector signed short vs3 = vec_splat(vs, 3);
 
         vector signed int vsumi0 = vec_add(vec_mule(qv00, vs0), vec_mulo(qv00, vs0));
-        vector signed int vsumi1 = vec_add(vec_mule(qv01, vs1), vec_mulo(qv01, vs1));
-        vector signed int vsumi2 = vec_add(vec_mule(qv10, vs2), vec_mulo(qv10, vs2));
+        vector signed int vsumi1 = vec_add(vec_mule(qv10, vs1), vec_mulo(qv10, vs1));
+        vector signed int vsumi2 = vec_add(vec_mule(qv01, vs2), vec_mulo(qv01, vs2));
         vector signed int vsumi3 = vec_add(vec_mule(qv11, vs3), vec_mulo(qv11, vs3));
 
         vsumf0 = vec_madd(vec_ctf(vsumi0, 0), vd, vsumf0);
@@ -11099,7 +11093,6 @@ void ggml_vec_dot_iq3_xxs_q8_K(int n, float * restrict s, size_t bs, const void 
             vector signed char q8y3 = vec_xl(48, q8);
             q8 += 64;
 
-            // 3bit * 8bit then add, at most 12 bits. No overflow for short
             vector signed short qv0 = vec_add(vec_mule(q3x0, q8y0), vec_mulo(q3x0, q8y0));
             vector signed short qv1 = vec_add(vec_mule(q3x1, q8y1), vec_mulo(q3x1, q8y1));
             vector signed short qv2 = vec_add(vec_mule(q3x2, q8y2), vec_mulo(q3x2, q8y2));
