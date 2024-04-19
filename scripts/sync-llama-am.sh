@@ -59,11 +59,14 @@ while read c; do
         ggml*.m \
         ggml*.metal \
         ggml*.cu \
+        ggml-cuda/* \
         tests/test-opt.cpp \
         tests/test-grad0.cpp \
         tests/test-quantize-fns.cpp \
         tests/test-quantize-perf.cpp \
         tests/test-backend-ops.cpp \
+        LICENSE \
+        scripts/gen-authors.sh \
         >> $SRC_GGML/llama-src.patch
 done < $SRC_GGML/llama-commits
 
@@ -121,6 +124,9 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     # tests/test-quantize-fns.cpp  -> tests/test-quantize-fns.cpp
     # tests/test-quantize-perf.cpp -> tests/test-quantize-perf.cpp
     # tests/test-backend-ops.cpp   -> tests/test-backend-ops.cpp
+    #
+    # LICENSE                -> LICENSE
+    # scripts/gen-authors.sh -> scripts/gen-authors.sh
 
     cat llama-src.patch | sed \
         -e 's/\/ggml\.c/\/src\/ggml.c/g' \
@@ -154,6 +160,8 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
         -e 's/\/tests\/test-quantize-fns\.cpp/\/tests\/test-quantize-fns.cpp/g' \
         -e 's/\/tests\/test-quantize-perf\.cpp/\/tests\/test-quantize-perf.cpp/g' \
         -e 's/\/tests\/test-backend-ops\.cpp/\/tests\/test-backend-ops.cpp/g' \
+        -e 's/\/LICENSE/\/LICENSE/g' \
+        -e 's/\/scripts\/gen-authors\.sh/\/scripts\/gen-authors.sh/g' \
         > llama-src.patch.tmp
     mv llama-src.patch.tmp llama-src.patch
 

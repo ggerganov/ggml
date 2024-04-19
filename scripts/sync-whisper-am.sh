@@ -59,14 +59,19 @@ while read c; do
     ggml*.m \
     ggml*.metal \
     ggml*.cu \
+    ggml-cuda/* \
     whisper.h \
     whisper.cpp \
     examples/common.h \
     examples/common.cpp \
     examples/common-ggml.h \
     examples/common-ggml.cpp \
+    examples/grammar-parser.h \
+    examples/grammar-parser.cpp \
     examples/main/main.cpp \
     examples/quantize/quantize.cpp \
+    LICENSE \
+    scripts/gen-authors.sh \
     >> $SRC_GGML/whisper-src.patch
 done < $SRC_GGML/whisper-commits
 
@@ -126,8 +131,13 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
     # examples/common.cpp            -> examples/common.cpp
     # examples/common-ggml.h         -> examples/common-ggml.h
     # examples/common-ggml.cpp       -> examples/common-ggml.cpp
+    # examples/grammar-parser.h      -> examples/whisper/grammar-parser.h
+    # examples/grammar-parser.cpp    -> examples/whisper/grammar-parser.cpp
     # examples/main/main.cpp         -> examples/whisper/main.cpp
     # examples/quantize/quantize.cpp -> examples/whisper/quantize.cpp
+    #
+    # LICENSE                -> LICENSE
+    # scripts/gen-authors.sh -> scripts/gen-authors.sh
 
     cat whisper-src.patch | sed \
         -e 's/\/ggml\.c/\/src\/ggml.c/g' \
@@ -162,8 +172,12 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
         -e 's/\/examples\/common\.cpp/\/examples\/common.cpp/g' \
         -e 's/\/examples\/common-ggml\.h/\/examples\/common-ggml.h/g' \
         -e 's/\/examples\/common-ggml\.cpp/\/examples\/common-ggml.cpp/g' \
+        -e 's/\/examples\/grammar-parser\.h/\/examples\/whisper\/grammar-parser.h/g' \
+        -e 's/\/examples\/grammar-parser\.cpp/\/examples\/whisper\/grammar-parser.cpp/g' \
         -e 's/\/examples\/main\/main\.cpp/\/examples\/whisper\/main.cpp/g' \
         -e 's/\/examples\/quantize\/quantize\.cpp/\/examples\/whisper\/quantize.cpp/g' \
+        -e 's/\/LICENSE/\/LICENSE/g' \
+        -e 's/\/scripts\/gen-authors\.sh/\/scripts\/gen-authors.sh/g' \
         > whisper-src.patch.tmp
     mv whisper-src.patch.tmp whisper-src.patch
 
