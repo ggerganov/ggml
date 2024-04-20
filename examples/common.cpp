@@ -315,21 +315,43 @@ std::vector<gpt_vocab::id> gpt_tokenize(const gpt_vocab & vocab, const std::stri
 
     // find the longest token that forms each word in words:
     std::vector<gpt_vocab::id> tokens;
+    // unknown token
+    std::vector<char> unknown;
+    unknown.clear();
     for (const auto & word : words) {
         for (int i = 0; i < (int) word.size(); ){
             for (int j = word.size() - 1; j >= i; j--){
                 auto cand = word.substr(i, j-i+1);
                 auto it = vocab.token_to_id.find(cand);
                 if (it != vocab.token_to_id.end()){ // word.substr(i, j-i+1) in vocab
+                    if (!unknown.empty()){
+                        unknown.push_back(0); // terminator
+                        std::string unkstr(unknown.begin(), unknown.end());
+                        fprintf(stderr, "%s: unknown token '%s'\n", __func__, unkstr.data());
+                        unknown.clear();
+                    }
                     tokens.push_back(it->second);
+                    //fprintf(stderr, "%s: known token   '%s'(%5d)\n", __func__, cand.data(), it->second);
                     i = j + 1;
                     break;
                 }
                 else if (j == i){ // word.substr(i, 1) has no matching
-                    fprintf(stderr, "%s: unknown token '%s'\n", __func__, word.substr(i, 1).data());
+                    //fprintf(stderr, "%s: unknown token '%s'\n", __func__, word.substr(i, 1).data());
+                    auto unk = word.substr(i, 1).data();
+                    //fprintf(stderr, "%s: unknown token '%s'(%02x)\n", __func__, unk, *unk);
+                    unknown.push_back(*unk);
                     i++;
                 }
+                else {
+                    //fprintf(stderr, "%s: UNKNOWN token '%s'(%02x)\n", __func__, cand.data(), *(cand.data()));
+                }
             }
+        }
+        if (!unknown.empty()){
+            unknown.push_back(0); // terminator
+            std::string unkstr(unknown.begin(), unknown.end());
+            fprintf(stderr, "%s: unknown token '%s'\n", __func__, unkstr.data());
+            unknown.clear();
         }
     }
 
