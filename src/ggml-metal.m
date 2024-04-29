@@ -166,6 +166,8 @@ enum ggml_metal_kernel_type {
     GGML_METAL_KERNEL_TYPE_ALIBI_F32,
     GGML_METAL_KERNEL_TYPE_IM2COL_F16,
     GGML_METAL_KERNEL_TYPE_IM2COL_F32,
+    GGML_METAL_KERNEL_TYPE_COL2IM_F16,
+    GGML_METAL_KERNEL_TYPE_COL2IM_F32,
     GGML_METAL_KERNEL_TYPE_UPSCALE_F32,
     GGML_METAL_KERNEL_TYPE_PAD_F32,
     GGML_METAL_KERNEL_TYPE_ARANGE_F32,
@@ -597,6 +599,8 @@ static struct ggml_metal_context * ggml_metal_init(int n_cb) {
         GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_ALIBI_F32,                 alibi_f32,              true);
         GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_IM2COL_F16,                im2col_f16,             true);
         GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_IM2COL_F32,                im2col_f32,             true);
+        GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_COL2IM_F16,                col2im_f16,  true);
+        GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_COL2IM_F32,                col2im_f32,  true);
         GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_UPSCALE_F32,               upscale_f32,            true);
         GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_PAD_F32,                   pad_f32,                true);
         GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_TIMESTEP_EMBEDDING_F32,    timestep_embedding_f32, true);
@@ -724,6 +728,7 @@ static bool ggml_metal_supports_op(const struct ggml_metal_context * ctx, const 
         case GGML_OP_ALIBI:
         case GGML_OP_ROPE:
         case GGML_OP_IM2COL:
+        case GGML_OP_COL2IM:
             return true;
         case GGML_OP_POOL_1D:
         case GGML_OP_POOL_2D:

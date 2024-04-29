@@ -1996,6 +1996,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CLAMP",
     "CONV_TRANSPOSE_1D",
     "IM2COL",
+    "COL2IM",
     "CONV_TRANSPOSE_2D",
     "POOL_1D",
     "POOL_2D",
@@ -2086,6 +2087,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "clamp(x)",
     "conv_transpose_1d(x)",
     "im2col(x)",
+    "col2im(x)",
     "conv_transpose_2d(x)",
     "pool_1d(x)",
     "pool_2d(x)",
@@ -5872,6 +5874,55 @@ struct ggml_tensor * ggml_im2col(
     ggml_set_op_params(result, params, sizeof(params));
 
     result->op = GGML_OP_IM2COL;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->src[0] = a;
+    result->src[1] = b;
+
+    return result;
+}
+
+// col2im: [N, IH, IW, IC*KH*KW] => [N, IC, OH, OW]
+// a: [IC，OC, KH, KW]
+// b: [N, IH, IW, IC*KH*KW]
+// result: [N, IC, OH, OW]
+struct ggml_tensor * ggml_col2im(
+    struct ggml_context * ctx,
+    struct ggml_tensor  * a,
+    struct ggml_tensor  * b,
+    int                  s0,
+    int                  s1,
+    int                  p0,
+    int                  p1,
+    int                  d0,
+    int                  d1,
+    bool                 is_2D,
+    enum ggml_type       dst_type) {
+
+    bool is_node = false;
+
+    GGML_ASSERT(d0 == 1);
+    GGML_ASSERT(d1 == 1);
+
+    if (a->grad || b->grad) {
+        GGML_ASSERT(false); // TODO: implement backward
+        is_node = true;
+    }
+
+    const int64_t OH = is_2D ? ggml_calc_conv_transpose_output_size(b->ne[2], a->ne[1], s1, p1) : 0;
+    const int64_t OW =         ggml_calc_conv_transpose_output_size(b->ne[1], a->ne[0], s0, p0);
+
+    const int64_t ne[4] = {
+        OW,
+        OH,
+        is_2D ? a->ne[3] : a ->ne[2],
+        is_2D ? b->ne[3] : 1,
+    };
+
+    struct ggml_tensor * result = ggml_new_tensor(ctx, dst_type, 4, ne);
+    int32_t params[] = { s0, s1, p0, p1, d0, d1, (is_2D ? 1 : 0) };
+    ggml_set_op_params(result, params, sizeof(params));
+
+    result->op = GGML_OP_COL2IM;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = b;
@@ -13548,6 +13599,189 @@ static void ggml_compute_forward_im2col(
     }
 }
 
+// ggml_compute_forward_col2im
+
+// src0: kernel [IC, OC, KH, KW]
+// src1: image [N, IH, IW, IC*KH*KW]
+// dst:  result [N, IC, OH, OW]
+static void ggml_compute_forward_col2im_f32(
+        const struct ggml_compute_params * params,
+              struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src0 = dst->src[0];
+    const struct ggml_tensor * src1 = dst->src[1];
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F16);
+    GGML_ASSERT(src1->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+
+    int64_t t0 = ggml_perf_time_us();
+    UNUSED(t0);
+
+    GGML_TENSOR_BINARY_OP_LOCALS;
+
+    const int32_t s0 = ((const int32_t *)(dst->op_params))[0];
+    const int32_t s1 = ((const int32_t *)(dst->op_params))[1];
+    const int32_t p0 = ((const int32_t *)(dst->op_params))[2];
+    const int32_t p1 = ((const int32_t *)(dst->op_params))[3];
+    const int32_t d0 = ((const int32_t *)(dst->op_params))[4];
+    const int32_t d1 = ((const int32_t *)(dst->op_params))[5];
+    const bool is_2D = ((const int32_t *)(dst->op_params))[6] == 1;
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int64_t N  = is_2D ? ne13 : ne12;
+    const int64_t IC = is_2D ? ne03 : ne02;
+    const int64_t IH = is_2D ? ne12 : 1;
+    const int64_t IW = ne11;
+
+    const int64_t KH = is_2D ? ne01 : 1;
+    const int64_t KW = ne00;
+
+    const int64_t OH = is_2D ? ne1 : 1;
+    const int64_t OW = ne0;
+
+    GGML_ASSERT(nb00 == sizeof(float));
+    GGML_ASSERT(nb10 == sizeof(float));
+
+    if (params->type == GGML_TASK_TYPE_INIT) {
+        return;
+    }
+
+    if (params->type == GGML_TASK_TYPE_FINALIZE) {
+        return;
+    }
+
+    // col2im: [N, IH, IW, IC*KH*KW] => [N, IC, OH, OW]
+    {
+        float * const wdata = (float *) dst->data;
+
+        memset(wdata, 0, sizeof(float) * N * IC * OH * OW);
+
+        for (int64_t in = 0; in < N; in++) {
+            for (int64_t iih = 0; iih < IH; iih++) {  // 1
+                for (int64_t iiw = 0; iiw < IW; iiw++) {
+                    for (int64_t iic = ith; iic < IC; iic += nth) {
+
+                        const float * src_data = (float *)((char *) src1->data + (in*IH*IW + iih*IW + iiw) * (IC*KH*KW));  // [IC*KH*KW]
+                        float * dst_data = wdata + (in*IC*OH + iic*OH) * OW;  // [OH, OW]
+
+                        for (int64_t ikh = 0; ikh < KH; ikh++) {  // 1
+                            for (int64_t ikw = 0; ikw < KW; ikw++) {
+                                const int64_t iow = iiw*s0 + ikw*d0 - p0;
+                                const int64_t ioh = iih*s1 + ikh*d1 - p1;
+
+                                if (ioh >= 0 && ioh < OH && iow >= 0 && iow < OW) {
+                                    dst_data[ioh*OW + iow] += src_data[iic*(KH*KW) + ikh*KW + ikw];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+static void ggml_compute_forward_col2im_f16(
+        const struct ggml_compute_params * params,
+              struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src0 = dst->src[0];
+    const struct ggml_tensor * src1 = dst->src[1];
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F16);
+    GGML_ASSERT(src1->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F16);
+
+    int64_t t0 = ggml_perf_time_us();
+    UNUSED(t0);
+
+    GGML_TENSOR_BINARY_OP_LOCALS;
+
+    const int32_t s0 = ((const int32_t *)(dst->op_params))[0];
+    const int32_t s1 = ((const int32_t *)(dst->op_params))[1];
+    const int32_t p0 = ((const int32_t *)(dst->op_params))[2];
+    const int32_t p1 = ((const int32_t *)(dst->op_params))[3];
+    const int32_t d0 = ((const int32_t *)(dst->op_params))[4];
+    const int32_t d1 = ((const int32_t *)(dst->op_params))[5];
+    const bool is_2D = ((const int32_t *)(dst->op_params))[6] == 1;
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int64_t N  = is_2D ? ne13 : ne12;
+    const int64_t IC = is_2D ? ne03 : ne02;
+    const int64_t IH = is_2D ? ne12 : 1;
+    const int64_t IW = ne11;
+
+    const int64_t KH = is_2D ? ne01 : 1;
+    const int64_t KW = ne00;
+
+    const int64_t OH = is_2D ? ne1 : 1;
+    const int64_t OW = ne0;
+
+    GGML_ASSERT(nb00 == sizeof(ggml_fp16_t));
+    GGML_ASSERT(nb10 == sizeof(float));
+
+    if (params->type == GGML_TASK_TYPE_INIT) {
+        return;
+    }
+
+    if (params->type == GGML_TASK_TYPE_FINALIZE) {
+        return;
+    }
+
+    // col2im: [N, IH, IW, IC*KH*KW] => [N, IC, OH, OW]
+    {
+        ggml_fp16_t * const wdata = (ggml_fp16_t *) dst->data;
+
+        memset(wdata, 0, sizeof(ggml_fp16_t) * N * IC * OH * OW);
+
+        for (int64_t in = 0; in < N; in++) {
+            for (int64_t iih = 0; iih < IH; iih++) {  // 1
+                for (int64_t iiw = 0; iiw < IW; iiw++) {
+                    for (int64_t iic = ith; iic < IC; iic += nth) {
+
+                        const float * src_data = (float *)((char *) src1->data + (in*IH*IW + iih*IW + iiw) * (IC*KH*KW));
+                        ggml_fp16_t * dst_data = wdata + (in*IC*OH + iic*OH) * OW;
+
+                        for (int64_t ikh = 0; ikh < KH; ikh++) {  // 1
+                            for (int64_t ikw = 0; ikw < KW; ikw++) {
+                                const int64_t iow = iiw*s0 + ikw*d0 - p0;
+                                const int64_t ioh = iih*s1 + ikh*d1 - p1;
+
+                                if (ioh >= 0 && ioh < OH && iow >= 0 && iow < OW) {
+                                    dst_data[ioh*OW + iow] += GGML_FP32_TO_FP16(src_data[iic*(KH*KW) + ikh*KW + ikw]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+static void ggml_compute_forward_col2im(
+        const struct ggml_compute_params * params,
+              struct ggml_tensor * dst) {
+    switch (dst->type) {
+        case GGML_TYPE_F16:
+            {
+                ggml_compute_forward_col2im_f16(params, dst);
+            } break;
+        case GGML_TYPE_F32:
+            {
+                ggml_compute_forward_col2im_f32(params, dst);
+            } break;
+        default:
+            {
+                GGML_ASSERT(false);
+            } break;
+    }
+}
 
 // ggml_compute_forward_conv_transpose_2d
 
@@ -16296,6 +16530,10 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_im2col(params, tensor);
             } break;
+        case GGML_OP_COL2IM:
+            {
+                ggml_compute_forward_col2im(params, tensor);
+            } break;
         case GGML_OP_CONV_TRANSPOSE_2D:
             {
                 ggml_compute_forward_conv_transpose_2d(params, tensor);
@@ -17314,6 +17552,10 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             {
                 GGML_ASSERT(false); // TODO: not implemented
             } break;
+        case GGML_OP_COL2IM:
+            {
+                GGML_ASSERT(false); // TODO: not implemented
+            } break;
         case GGML_OP_CONV_TRANSPOSE_2D:
             {
                 GGML_ASSERT(false); // TODO: not implemented
@@ -18090,6 +18332,10 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads, int n_cur_
                 n_tasks = n_threads;
             } break;
         case GGML_OP_IM2COL:
+            {
+                n_tasks = n_threads;
+            } break;
+        case GGML_OP_COL2IM:
             {
                 n_tasks = n_threads;
             } break;
