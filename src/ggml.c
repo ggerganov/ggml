@@ -13642,7 +13642,7 @@ static void ggml_compute_forward_col2im_f32(
     const int64_t OH = is_2D ? ne1 : 1;
     const int64_t OW = ne0;
 
-    GGML_ASSERT(nb00 == sizeof(float));
+    GGML_ASSERT(nb00 == sizeof(ggml_fp16_t));
     GGML_ASSERT(nb10 == sizeof(float));
 
     if (params->type == GGML_TASK_TYPE_INIT) {
