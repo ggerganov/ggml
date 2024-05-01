@@ -1837,6 +1837,61 @@ kernel void kernel_im2col(
 template [[host_name("kernel_im2col_f32")]] kernel im2col_t kernel_im2col<float>;
 template [[host_name("kernel_im2col_f16")]] kernel im2col_t kernel_im2col<half>;
 
+typedef void (col2im_t)(
+        device const float * x,
+        device        char * dst,
+        constant   int32_t & IW,
+        constant   int32_t & IH,
+        constant   int32_t & CHW,
+        constant   int32_t & s0,
+        constant   int32_t & s1,
+        constant   int32_t & p0,
+        constant   int32_t & p1,
+        constant   int32_t & d0,
+        constant   int32_t & d1,
+        uint3 tgpig[[threadgroup_position_in_grid]],
+        uint3  tgpg[[threadgroups_per_grid]],
+        uint3 tpitg[[thread_position_in_threadgroup]],
+        uint3   ntg[[threads_per_threadgroup]]);
+
+template <typename T>
+kernel void kernel_col2im(
+        device const float * x,
+        device        char * dst,
+        constant   int32_t & OW,
+        constant   int32_t & OH,
+        constant   int32_t & CHW,
+        constant   int32_t & s0,
+        constant   int32_t & s1,
+        constant   int32_t & p0,
+        constant   int32_t & p1,
+        constant   int32_t & d0,
+        constant   int32_t & d1,
+        uint3 tgpig[[threadgroup_position_in_grid]],
+        uint3  tgpg[[threadgroups_per_grid]],
+        uint3 tpitg[[thread_position_in_threadgroup]],
+        uint3   ntg[[threads_per_threadgroup]]) {
+    const int32_t iow = tgpig[2] * s0 + tpitg[2] * d0 - p0;
+    const int32_t ioh = tgpig[1] * s1 + tpitg[1] * d1 - p1;
+
+    const int32_t offset_dst =
+        (tgpig[0] * tgpg[0] * tgpg[1] + tgpg[1] * tgpig[0]) * tgpg[2] +
+        ioh * tgpg[2] + iow;
+    
+    const int32_t offset_src =
+        (tgpig[0] * ) * CHW;
+
+
+    device T * pdst = (device T *) (dst);
+
+    if (ioh >= 0 && ioh < OH && iow >= 0 && iow < OW) {
+        pdst[offset_dst] += x[offset_src];
+    }
+}
+
+template [[host_name("kernel_col2im_f32")]] kernel col2im_t kernel_col2im<float>;
+template [[host_name("kernel_col2im_f16")]] kernel col2im_t kernel_col2im<half>;
+
 kernel void kernel_upscale_f32(
     device  const char * src0,
     device        char * dst,

@@ -2300,6 +2300,57 @@ static enum ggml_status ggml_metal_graph_compute(
 
                         [encoder dispatchThreadgroups:MTLSizeMake(IC, OH, OW) threadsPerThreadgroup:MTLSizeMake(N, KH, KW)];
                     } break;
+                case GGML_OP_COL2IM:
+                    {
+                        GGML_ASSERT(src0->type == GGML_TYPE_F16);
+                        GGML_ASSERT(src1->type == GGML_TYPE_F32);
+                        GGML_ASSERT( dst->type == GGML_TYPE_F16 || dst->type == GGML_TYPE_F32);
+
+                        const int32_t s0 = ((const int32_t *)(dst->op_params))[0];
+                        const int32_t s1 = ((const int32_t *)(dst->op_params))[1];
+                        const int32_t p0 = ((const int32_t *)(dst->op_params))[2];
+                        const int32_t p1 = ((const int32_t *)(dst->op_params))[3];
+                        const int32_t d0 = ((const int32_t *)(dst->op_params))[4];
+                        const int32_t d1 = ((const int32_t *)(dst->op_params))[5];
+                        const bool is_2D = ((const int32_t *)(dst->op_params))[6] == 1;
+
+                        const int32_t N  = src1->ne[is_2D ? 3 : 2];
+                        const int32_t IC = src0->ne[is_2D ? 3 : 2];
+                        const int32_t IH = is_2D ? src1->ne[2] : 1;
+                        const int32_t IW =         src1->ne[1];
+
+                        const int32_t KH = is_2D ? src0->ne[1] : 1;
+                        const int32_t KW =         src0->ne[0];
+
+                        const int32_t OH = is_2D ? dst->ne[1] : 1;
+                        const int32_t OW =         dst->ne[0];
+
+                        const int32_t CHW = IC * KH * KW;
+
+                        id<MTLComputePipelineState> pipeline = nil;
+
+                        switch (dst->type) {
+                            case GGML_TYPE_F32: pipeline = ctx->kernels[GGML_METAL_KERNEL_TYPE_IM2COL_F32].pipeline; break;
+                            case GGML_TYPE_F16: pipeline = ctx->kernels[GGML_METAL_KERNEL_TYPE_IM2COL_F16].pipeline; break;
+                            default: GGML_ASSERT(false);
+                        };
+
+                        [encoder setComputePipelineState:pipeline];
+                        [encoder setBuffer:id_src1 offset:offs_src1        atIndex:0];
+                        [encoder setBuffer:id_dst  offset:offs_dst         atIndex:1];
+                        // TODO:
+                        [encoder setBytes:&OW      length:sizeof( int32_t) atIndex:4];
+                        [encoder setBytes:&OH      length:sizeof( int32_t) atIndex:5];
+                        [encoder setBytes:&CHW     length:sizeof( int32_t) atIndex:6];
+                        [encoder setBytes:&s0      length:sizeof( int32_t) atIndex:7];
+                        [encoder setBytes:&s1      length:sizeof( int32_t) atIndex:8];
+                        [encoder setBytes:&p0      length:sizeof( int32_t) atIndex:9];
+                        [encoder setBytes:&p1      length:sizeof( int32_t) atIndex:10];
+                        [encoder setBytes:&d0      length:sizeof( int32_t) atIndex:11];
+                        [encoder setBytes:&d1      length:sizeof( int32_t) atIndex:12];
+
+                        [encoder dispatchThreadgroups:MTLSizeMake(IC, OH, OW) threadsPerThreadgroup:MTLSizeMake(N, KH, KW)];
+                    } break;
                 case GGML_OP_UPSCALE:
                     {
                         GGML_ASSERT(src0->type == GGML_TYPE_F32);

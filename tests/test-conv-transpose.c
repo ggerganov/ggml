@@ -42,27 +42,85 @@ void printf_tensor(struct ggml_tensor * t) {
     }
 }
 
-void check_tensor(struct ggml_tensor * t, float * expected_t_d, int ne0, int ne1, int ne2) {
+void check_tensor(struct ggml_tensor * t, float * expected_t_d, int ne0, int ne1, int ne2, int ne3) {
     GGML_ASSERT(t->type == GGML_TYPE_F32);
     GGML_ASSERT(t->ne[0] == ne0);
     GGML_ASSERT(t->ne[1] == ne1);
     GGML_ASSERT(t->ne[2] == ne2);
-    for (int i2 = 0; i2 < ne2; ++i2) {
-        for (int i1 = 0; i1 < ne1; ++i1) {
-            for (int i0 = 0; i0 < ne0; ++i0) {
-                float expected = *(expected_t_d + i2 * ne1 * ne0 + i1 * ne0 + i0);
-                float actual = ggml_get_data_f32(t)[i2 * ne1 * ne0 + i1 * ne0 + i0];
-                if (expected != actual) {
-                    printf("expected %.1f, got %.1f\n", expected, actual);
+    GGML_ASSERT(t->ne[3] == ne3);
+    for (int i3 = 0; i3 < ne3; ++i3) {
+        for (int i2 = 0; i2 < ne2; ++i2) {
+            for (int i1 = 0; i1 < ne1; ++i1) {
+                for (int i0 = 0; i0 < ne0; ++i0) {
+                    float expected = *(expected_t_d + i3 * ne2 * ne1 * ne0 + i2 * ne1 * ne0 + i1 * ne0 + i0);
+                    float actual = ggml_get_data_f32(t)[i3 * ne2 * ne1 * ne0 + i2 * ne1 * ne0 + i1 * ne0 + i0];
+                    if (expected != actual) {
+                        printf("expected %.1f, got %.1f\n", expected, actual);
+                    }
+                    GGML_ASSERT(expected == actual);
                 }
-                GGML_ASSERT(expected == actual);
             }
         }
     }
 }
 
-void test_conv_transpose_1d(void) {
+void test_col2im(void) {
+    int32_t N = 1;
 
+    int32_t IH = 3;
+    int32_t IW = 2;
+    int32_t IC = 2;
+
+    int32_t KH = 2;
+    int32_t KW = 3;
+    int32_t OC = 3;
+
+    int32_t OH = 4;
+    int32_t OW = 3;
+
+    float buf_a[KW * KH * OC * IC];
+    for (int i = 0; i < KW*KH*OC*IC; ++i) {
+        buf_a[i] = (float)i;
+    }
+
+    ggml_fp16_t buf_b[IC*KH*KW*IW*IH*N];
+    for (int i = 0; i < IC*KH*KW*IW*IH*N; ++i) {
+        buf_b[i] = ggml_fp32_to_fp16((float)i);
+    }
+
+    // col2im 2d with stride 1, 2 & 3
+    {
+        struct ggml_context * ctx = make_ctx();
+
+        struct ggml_tensor * a = ggml_new_tensor_4d(ctx, GGML_TYPE_F16, KW, KH, OC, IC);
+        memcpy(a->data, buf_a, ggml_nbytes(a));
+
+        struct ggml_tensor * b = ggml_new_tensor_4d(ctx, GGML_TYPE_F16, IC*KH*KW, IW, IH, N);
+        memcpy(b->data, buf_b, ggml_nbytes(b));
+
+        struct ggml_tensor * out_1 = ggml_col2im(ctx, a, b, 1 /* s0 */, 1 /* s1 */, 0 /* p0 */, 0 /* p1 */, 1 /* d0 */, 1 /* d1 */, true /* is_2D */, GGML_TYPE_F16);
+        struct ggml_tensor * out_2 = ggml_col2im(ctx, a, b, 2 /* s0 */, 3 /* s1 */, 0 /* p0 */, 0 /* p1 */, 1 /* d0 */, 1 /* d1 */, true /* is_2D */, GGML_TYPE_F16);
+        struct ggml_tensor * out_3 = ggml_col2im(ctx, a, b, 2 /* s0 */, 3 /* s1 */, 0 /* p0 */, 0 /* p1 */, 1 /* d0 */, 1 /* d1 */, true /* is_2D */, GGML_TYPE_F16);
+
+        struct ggml_cgraph * gf_1 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_2 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_3 = ggml_new_graph(ctx);
+
+        ggml_build_forward_expand(gf_1, out_1);
+        ggml_build_forward_expand(gf_2, out_2);
+        ggml_build_forward_expand(gf_3, out_3);
+
+        ggml_graph_compute_with_ctx(ctx, gf_1, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_2, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_3, 1);
+
+        check_tensor(out_1, (float*)expected_out_1, OW, OH, IC, N);
+        check_tensor(out_2, (float*)expected_out_2, OW, OH, IC, N);
+        check_tensor(out_3, (float*)expected_out_3, OW, OH, IC, N);
+    }
+}
+
+void test_conv_transpose_1d(void) {
     float buf_f32[1024];
     for (int i = 0; i < 1024; ++i) {
         buf_f32[i] = (float)i;
@@ -115,9 +173,9 @@ void test_conv_transpose_1d(void) {
         ggml_graph_compute_with_ctx(ctx, gf_2, 1);
         ggml_graph_compute_with_ctx(ctx, gf_3, 1);
 
-        check_tensor(out_1, (float*)expected_out_1, 4, 3, 1);
-        check_tensor(out_2, (float*)expected_out_2, 6, 3, 1);
-        check_tensor(out_3, (float*)expected_out_3, 8, 3, 1);
+        check_tensor(out_1, (float*)expected_out_1, 4, 3, 1, 1);
+        check_tensor(out_2, (float*)expected_out_2, 6, 3, 1, 1);
+        check_tensor(out_3, (float*)expected_out_3, 8, 3, 1, 1);
     }
 }
 
@@ -233,9 +291,9 @@ void test_conv_transpose_2d(void) {
         // printf("\n\nout_3\n");
         // printf_tensor(out_3);
 
-        check_tensor(out_1, (float*)expected_out_1, 4, 3, 3);
-        check_tensor(out_2, (float*)expected_out_2, 6, 4, 3);
-        check_tensor(out_3, (float*)expected_out_3, 8, 5, 3);
+        check_tensor(out_1, (float*)expected_out_1, 4, 3, 3, 1);
+        check_tensor(out_2, (float*)expected_out_2, 6, 4, 3, 1);
+        check_tensor(out_3, (float*)expected_out_3, 8, 5, 3, 1);
 
     }
 }
