@@ -33,3 +33,6 @@ cp -rpv ../llama.cpp/tests/test-grad0.cpp         tests/test-grad0.cpp
 cp -rpv ../llama.cpp/tests/test-quantize-fns.cpp  tests/test-quantize-fns.cpp
 cp -rpv ../llama.cpp/tests/test-quantize-perf.cpp tests/test-quantize-perf.cpp
 cp -rpv ../llama.cpp/tests/test-backend-ops.cpp   tests/test-backend-ops.cpp
+
+cp -rpv ../llama.cpp/LICENSE                ./LICENSE
+cp -rpv ../llama.cpp/scripts/gen-authors.sh ./scripts/gen-authors.sh

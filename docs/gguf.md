@@ -591,7 +591,7 @@ where N signifies the block number a layer belongs to, and where `BB` could be:
 - `ffn_up`: Feed-forward network "up" layer
 - `ffn_gate`: Feed-forward network "gate" layer
 - `ffn_down`: Feed-forward network "down" layer
-- `ffn_gate_inp`: Expert-routing layer for the Fee-forward network in MoE models
+- `ffn_gate_inp`: Expert-routing layer for the Feed-forward network in MoE models
 - `ffn_gate_exp`: Feed-forward network "gate" layer per expert in MoE models
 - `ffn_down_exp`: Feed-forward network "down" layer per expert in MoE models
 - `ffn_up_exp`: Feed-forward network "up" layer per expert in MoE models
