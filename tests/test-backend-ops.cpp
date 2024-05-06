@@ -1339,6 +1339,30 @@ struct test_upscale : public test_case {
     }
 };
 
+// GGML_OP_UPSCALE
+struct test_upscale_to_shape : public test_case {
+    const ggml_type type;
+    const std::array<int64_t, 4> ne;
+    const std::array<int64_t, 4> target_ne;
+
+
+    std::string vars() override {
+        return VARS_TO_STR3(type, ne, target_ne);
+    }
+
+    test_upscale_to_shape(ggml_type type = GGML_TYPE_F32,
+            std::array<int64_t, 4> ne = {2, 5, 7, 11},
+            std::array<int64_t, 4> target_ne = {5, 7, 11, 13})
+        : type(type), ne(ne), target_ne(target_ne) {}
+
+    ggml_tensor * build_graph(ggml_context * ctx) override {
+        ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne.data());
+        ggml_tensor * out = ggml_upscale_to_shape(ctx, a, target_ne[0], target_ne[1],target_ne[2], target_ne[3]);
+        return out;
+    }
+};
+
+
 // GGML_OP_GROUP_NORM
 struct test_group_norm : public test_case {
     const ggml_type type;
@@ -2085,6 +2109,7 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
 
     test_cases.emplace_back(new test_sum_rows());
     test_cases.emplace_back(new test_upscale());
+    test_cases.emplace_back(new test_upscale_to_shape());
     test_cases.emplace_back(new test_group_norm());
     test_cases.emplace_back(new test_acc());
     test_cases.emplace_back(new test_pad());

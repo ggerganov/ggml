@@ -468,6 +468,7 @@ extern "C" {
         GGML_OP_POOL_1D,
         GGML_OP_POOL_2D,
         GGML_OP_UPSCALE, // nearest interpolate
+        GGML_OP_UPSCALE_TO_SHAPE, // nearest interpolate to specified tensor shape
         GGML_OP_PAD,
         GGML_OP_ARANGE,
         GGML_OP_TIMESTEP_EMBEDDING,
@@ -1682,6 +1683,18 @@ extern "C" {
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             int                   scale_factor);
+
+
+    // nearest interpolate to specified dimensions
+    // used in tortoise.cpp
+    GGML_API struct ggml_tensor * ggml_upscale_to_shape(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            int                   ne0,
+            int                   ne1,
+            int                   ne2,
+            int                   ne3);
+
 
     // pad each dimension with zeros: [x, ..., x] -> [x, ..., x, 0, ..., 0]
     GGML_API struct ggml_tensor * ggml_pad(
