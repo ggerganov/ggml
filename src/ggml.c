@@ -2034,7 +2034,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS_BACK",
 };
 
-static_assert(GGML_OP_COUNT == 76, "GGML_OP_COUNT != 76");
+static_assert(GGML_OP_COUNT == 77, "GGML_OP_COUNT != 77");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -2125,7 +2125,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "cross_entropy_loss_back(x,y)",
 };
 
-static_assert(GGML_OP_COUNT == 76, "GGML_OP_COUNT != 76");
+static_assert(GGML_OP_COUNT == 77, "GGML_OP_COUNT != 77");
 
 static_assert(GGML_OP_POOL_COUNT == 2, "GGML_OP_POOL_COUNT != 2");
 
@@ -5762,7 +5762,7 @@ struct ggml_tensor* ggml_conv_1d_ph(
 
 // ggml_conv_transpose_1d
 
-static int64_t ggml_calc_conv_transpose_1d_output_size(int64_t ins, int64_t ks, int s, int p, int d) {
+static int64_t ggml_calc_conv_transpose_output_size(int64_t ins, int64_t ks, int s, int p, int d) {
     return (ins - 1) * s - 2 * p + d * (ks - 1) + 1;
 }
 
@@ -5788,7 +5788,7 @@ GGML_API struct ggml_tensor * ggml_conv_transpose_1d(
     }
 
     const int64_t ne[4] = {
-        ggml_calc_conv_transpose_1d_output_size(b->ne[0], a->ne[0], s0, 0 /*p0*/, 1 /*d0*/),
+        ggml_calc_conv_transpose_output_size(b->ne[0], a->ne[0], s0, 0 /*p0*/, 1 /*d0*/),
         a->ne[1], b->ne[2], 1,
     };
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
@@ -5908,8 +5908,8 @@ struct ggml_tensor * ggml_col2im(
         is_node = true;
     }
 
-    const int64_t OH = is_2D ? ggml_calc_conv_transpose_output_size(b->ne[2], a->ne[1], s1, p1) : 0;
-    const int64_t OW =         ggml_calc_conv_transpose_output_size(b->ne[1], a->ne[0], s0, p0);
+    const int64_t OH = is_2D ? ggml_calc_conv_transpose_output_size(b->ne[2], a->ne[1], s1, p1, 1 /*d0*/) : 0;
+    const int64_t OW =         ggml_calc_conv_transpose_output_size(b->ne[1], a->ne[0], s0, p0, 1 /*d1*/);
 
     const int64_t ne[4] = {
         OW,
@@ -5976,10 +5976,6 @@ struct ggml_tensor * ggml_conv_2d_s1_ph(
 
 // ggml_conv_transpose_2d_p0
 
-static int64_t ggml_calc_conv_transpose_output_size(int64_t ins, int64_t ks, int s, int p) {
-    return (ins - 1) * s - 2 * p + ks;
-}
-
 struct ggml_tensor * ggml_conv_transpose_2d_p0(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
@@ -5995,8 +5991,8 @@ struct ggml_tensor * ggml_conv_transpose_2d_p0(
     }
 
     const int64_t ne[4] = {
-        ggml_calc_conv_transpose_output_size(b->ne[0], a->ne[0], stride, 0 /*p0*/),
-        ggml_calc_conv_transpose_output_size(b->ne[1], a->ne[1], stride, 0 /*p1*/),
+        ggml_calc_conv_transpose_output_size(b->ne[0], a->ne[0], stride, 0 /*p0*/, 1 /*d1*/),
+        ggml_calc_conv_transpose_output_size(b->ne[1], a->ne[1], stride, 0 /*p1*/, 1 /*d1*/),
         a->ne[2], b->ne[3],
     };
 
