@@ -10,7 +10,21 @@ static __global__ void upscale_to_shape_f32(const float * x, float * dst, const 
     {
         return;
     }
-    dst[index] = 9;
+
+    int i10 = index % ne10;
+    int i11 = (index / ne10)  % ne11;
+    int i12 = (index / (ne10* ne11))  % ne12;
+    int i13 = (index / (ne10* ne11 * ne12))  % ne13;
+
+    int i00 = i10 / ne0_scale_factor;
+    int i01 = i11 / ne1_scale_factor;
+    int i02 = i12 / ne2_scale_factor;
+    int i03 = i13 / ne3_scale_factor;
+
+    int src_index = i00 + (i01 * ne00) + (i02 * ne00 * ne01) + (i02 * ne00 * ne01 * ne02);
+
+
+    dst[index] = x[src_index];
     // blockIdx.z: idx of ne02*ne03
     // blockIdx.y: idx of ne01*scale_factor， aka ne1
     // blockIDx.x: idx of ne00*scale_factor / BLOCK_SIZE
