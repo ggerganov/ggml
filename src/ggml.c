@@ -13997,10 +13997,10 @@ static void ggml_compute_forward_upscale_to_shape_f32(
     GGML_TENSOR_UNARY_OP_LOCALS
 
 
-    const int ne0_scale_factor = ne0/dst->op_params[0];
-    const int ne1_scale_factor = ne1/dst->op_params[1];
-    const int ne2_scale_factor = ne2/dst->op_params[2];
-    const int ne3_scale_factor = ne3/dst->op_params[3];
+    const float ne0_scale_factor = (float)ne0/dst->op_params[0];
+    const float ne1_scale_factor = (float)ne1/dst->op_params[1];
+    const float ne2_scale_factor = (float)ne2/dst->op_params[2];
+    const float ne3_scale_factor = (float)ne3/dst->op_params[3];
 
 
     // TODO: optimize
