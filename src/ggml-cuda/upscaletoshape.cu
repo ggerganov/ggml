@@ -24,7 +24,7 @@ static __global__ void upscale_to_shape_f32(const float * x, float * dst, const 
     int src_index = i00 + (i01 * ne00) + (i02 * ne00 * ne01) + (i02 * ne00 * ne01 * ne02);
 
 
-    dst[index] = x[src_index];
+    dst[index] =src_index;
     // blockIdx.z: idx of ne02*ne03
     // blockIdx.y: idx of ne01*scale_factor， aka ne1
     // blockIDx.x: idx of ne00*scale_factor / BLOCK_SIZE
