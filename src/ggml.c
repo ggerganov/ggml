@@ -6055,7 +6055,6 @@ struct ggml_tensor * ggml_pool_2d(
     return result;
 }
 
-
 // ggml_upscale
 
 static struct ggml_tensor * ggml_upscale_impl(
@@ -6071,7 +6070,6 @@ static struct ggml_tensor * ggml_upscale_impl(
         GGML_ASSERT(false); // TODO: implement backward
         is_node = true;
     }
-
 
     GGML_ASSERT(a->ne[0] <= ne0);
     GGML_ASSERT(a->ne[1] <= ne1);
@@ -6092,6 +6090,25 @@ static struct ggml_tensor * ggml_upscale_impl(
 
     return result;
 }
+
+struct ggml_tensor * ggml_upscale(
+    struct ggml_context * ctx,
+    struct ggml_tensor * a,
+    int scale_factor) {
+    return ggml_upscale_impl(ctx, a, a->ne[0] * scale_factor, a->ne[1] * scale_factor, a->ne[2], a->ne[3]);
+}
+
+struct ggml_tensor * ggml_upscale_ext(
+    struct ggml_context * ctx,
+    struct ggml_tensor * a,
+    int ne0,
+    int ne1,
+    int ne2,
+    int ne3) {
+    return ggml_upscale_impl(ctx, a, ne0, ne1, ne2, ne3);
+}
+
+// ggml_pad
 
 struct ggml_tensor * ggml_pad(
     struct ggml_context * ctx,
@@ -6117,22 +6134,7 @@ struct ggml_tensor * ggml_pad(
     return result;
 }
 
-struct ggml_tensor * ggml_upscale(
-    struct ggml_context * ctx,
-    struct ggml_tensor * a,
-    int scale_factor) {
-    return ggml_upscale_impl(ctx, a, a->ne[0] * scale_factor, a->ne[1] * scale_factor, 1, 1);
-}
-
-struct ggml_tensor * ggml_upscale_ext(
-    struct ggml_context * ctx,
-    struct ggml_tensor * a,
-    int ne0,
-    int ne1,
-    int ne2,
-    int ne3) {
-    return ggml_upscale_impl(ctx, a, ne0, ne1, ne2, ne3);
-}
+// ggml_arange
 
 struct ggml_tensor * ggml_arange(
     struct ggml_context * ctx,
@@ -6153,6 +6155,8 @@ struct ggml_tensor * ggml_arange(
 
     return result;
 }
+
+// ggml_timestep_embedding
 
 struct ggml_tensor * ggml_timestep_embedding(
             struct ggml_context * ctx,
@@ -13887,6 +13891,7 @@ static void ggml_compute_forward_pool_2d(
     }
 }
 
+// ggml_compute_forward_upscale
 
 static void ggml_compute_forward_upscale_f32(
     const struct ggml_compute_params * params,
@@ -13905,23 +13910,21 @@ static void ggml_compute_forward_upscale_f32(
 
     GGML_TENSOR_UNARY_OP_LOCALS
 
-
-    const float ne0_scale_factor = (float)ne0/src0->ne[0];
-    const float ne1_scale_factor = (float)ne1/src0->ne[1];
-    const float ne2_scale_factor = (float)ne2/src0->ne[2];
-    const float ne3_scale_factor = (float)ne3/src0->ne[3];
-
+    const float sf0 = (float)ne0/src0->ne[0];
+    const float sf1 = (float)ne1/src0->ne[1];
+    const float sf2 = (float)ne2/src0->ne[2];
+    const float sf3 = (float)ne3/src0->ne[3];
 
     // TODO: optimize
 
     for (int64_t i3 = 0; i3 < ne3; i3++) {
-        const int64_t i03 = i3 / ne3_scale_factor;
+        const int64_t i03 = i3 / sf3;
         for (int64_t i2 = ith; i2 < ne2; i2 += nth) {
-            const int64_t i02 = i2 / ne2_scale_factor;
+            const int64_t i02 = i2 / sf2;
             for (int64_t i1 = 0; i1 < ne1; i1++) {
-                const int64_t i01 = i1 / ne1_scale_factor;
+                const int64_t i01 = i1 / sf1;
                 for (int64_t i0 = 0; i0 < ne0; i0++) {
-                    const int64_t i00 = i0 / ne0_scale_factor;
+                    const int64_t i00 = i0 / sf0;
 
                     const float * x = (float *)((char *) src0->data + i00*nb00 + i01*nb01 + i02*nb02 + i03*nb03);
                           float * y = (float *)((char *)  dst->data +  i0*nb0  +  i1*nb1  +  i2*nb2  +  i3*nb3);
@@ -13932,9 +13935,6 @@ static void ggml_compute_forward_upscale_f32(
         }
     }
 }
-
-// ggml_compute_forward_upscale
-
 
 static void ggml_compute_forward_upscale(
     const struct ggml_compute_params * params,

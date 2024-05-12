@@ -1339,31 +1339,27 @@ struct test_upscale : public test_case {
     }
 };
 
-
-
 // GGML_OP_UPSCALE (ext)
 struct test_upscale_ext : public test_case {
     const ggml_type type;
     const std::array<int64_t, 4> ne;
-    const std::array<int64_t, 4> target_ne;
-
+    const std::array<int64_t, 4> ne_tgt;
 
     std::string vars() override {
-        return VARS_TO_STR3(type, ne, target_ne);
+        return VARS_TO_STR3(type, ne, ne_tgt);
     }
 
     test_upscale_ext(ggml_type type = GGML_TYPE_F32,
-            std::array<int64_t, 4> ne = {2, 5, 7, 11},
-            std::array<int64_t, 4> target_ne = {5, 7, 11, 13})
-        : type(type), ne(ne), target_ne(target_ne) {}
+            std::array<int64_t, 4> ne     = {2, 5,  7, 11},
+            std::array<int64_t, 4> ne_tgt = {5, 7, 11, 13})
+        : type(type), ne(ne), ne_tgt(ne_tgt) {}
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
         ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne.data());
-        ggml_tensor * out = ggml_upscale_ext(ctx, a, target_ne[0], target_ne[1],target_ne[2], target_ne[3]);
+        ggml_tensor * out = ggml_upscale_ext(ctx, a, ne_tgt[0], ne_tgt[1],ne_tgt[2], ne_tgt[3]);
         return out;
     }
 };
-
 
 // GGML_OP_GROUP_NORM
 struct test_group_norm : public test_case {
