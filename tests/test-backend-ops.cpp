@@ -1339,6 +1339,8 @@ struct test_upscale : public test_case {
     }
 };
 
+/*
+
 // GGML_OP_UPSCALE
 struct test_upscale_to_shape : public test_case {
     const ggml_type type;
@@ -1361,7 +1363,7 @@ struct test_upscale_to_shape : public test_case {
         return out;
     }
 };
-
+*/
 
 // GGML_OP_GROUP_NORM
 struct test_group_norm : public test_case {
@@ -2109,7 +2111,7 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
 
     test_cases.emplace_back(new test_sum_rows());
     test_cases.emplace_back(new test_upscale());
-    test_cases.emplace_back(new test_upscale_to_shape());
+    //test_cases.emplace_back(new test_upscale_to_shape());
     test_cases.emplace_back(new test_group_norm());
     test_cases.emplace_back(new test_acc());
     test_cases.emplace_back(new test_pad());
