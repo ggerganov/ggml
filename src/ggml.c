@@ -13628,7 +13628,7 @@ static void ggml_compute_forward_col2im_f32(
     const int nth = params->nth;
 
     const int64_t N  = is_2D ? ne13 : ne12;
-    const int64_t IC = is_2D ? ne03 : ne02;
+    const int64_t C  = is_2D ? ne03 : ne02;
     const int64_t IH = is_2D ? ne12 : 1;
     const int64_t IW = ne11;
 
@@ -13649,19 +13649,19 @@ static void ggml_compute_forward_col2im_f32(
         return;
     }
 
-    // col2im: [N, IH, IW, IC*KH*KW] => [N, IC, OH, OW]
+    // col2im: [N, IH, IW, C*KH*KW] => [N, C, OH, OW]
     {
         float * const wdata = (float *) dst->data;
 
-        memset(wdata, 0, sizeof(float) * N * IC * OH * OW);
+        memset(wdata, 0, sizeof(float) * N * C * OH * OW);
 
         for (int64_t in = 0; in < N; in++) {
             for (int64_t iih = 0; iih < IH; iih++) {  // 1
                 for (int64_t iiw = 0; iiw < IW; iiw++) {
-                    for (int64_t iic = ith; iic < IC; iic += nth) {
+                    for (int64_t iic = ith; iic < C; iic += nth) {
 
-                        const float * src_data = (float *)((char *) src1->data + (in*IH*IW + iih*IW + iiw) * (IC*KH*KW));  // [IC*KH*KW]
-                        float * dst_data = wdata + (in*IC*OH + iic*OH) * OW;  // [OH, OW]
+                        const float * src_data = (float *)((char *) src1->data + (in*IH*IW + iih*IW + iiw) * (C*KH*KW));  // [C*KH*KW]
+                        float * dst_data = wdata + (in*C*OH + iic*OH) * OW;  // [OH, OW]
 
                         for (int64_t ikh = 0; ikh < KH; ikh++) {  // 1
                             for (int64_t ikw = 0; ikw < KW; ikw++) {
