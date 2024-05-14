@@ -20,6 +20,8 @@ cp -rpv ../whisper.cpp/ggml-opencl.cpp                src/ggml-opencl.cpp
 cp -rpv ../whisper.cpp/ggml-opencl.h                  src/ggml-opencl.h
 cp -rpv ../whisper.cpp/ggml-quants.c                  src/ggml-quants.c
 cp -rpv ../whisper.cpp/ggml-quants.h                  src/ggml-quants.h
+cp -rpv ../whisper.cpp/ggml-rpc.cpp                   src/ggml-rpc.cpp
+cp -rpv ../whisper.cpp/ggml-rpc.h                     src/ggml-rpc.h
 cp -rpv ../whisper.cpp/ggml-sycl.cpp                  src/ggml-sycl.cpp
 cp -rpv ../whisper.cpp/ggml-sycl.h                    src/ggml-sycl.h
 cp -rpv ../whisper.cpp/ggml-vulkan.cpp                src/ggml-vulkan.cpp
