@@ -33,9 +33,10 @@ The components are:
     - `M`: Million parameters.
     - `K`: Thousand parameters.
 5. **Quantization**: This part specifies how the model parameters are quantized or compressed.
-   - Uncompressed formats:
-     - `F16`: 16-bit floats per weight
-     - `F32`: 32-bit floats per weight
+   - Floating Representation:
+     - `BF16`: [16-bit bfloat16](https://en.wikipedia.org/wiki/Bfloat16_floating-point_format) [Google Brain](https://en.wikipedia.org/wiki/Google_Brain) truncated form of 32-bit IEEE 754 (1 sign bit, 8 exponent bits, 7 fractional bits)
+     - `F32`: [32-bit IEEE 754](https://en.wikipedia.org/wiki/Single-precision_floating-point_format#IEEE_754_standard:_binary32) floats per weight (1 sign bit, 8 exponent bits, 23 fractional bits)
+     - `F16`: [16-bit IEEE 754](https://en.wikipedia.org/wiki/Half-precision_floating-point_format) floats per weight (1 sign bit, 5 exponent bits, 10 fractional bits)
    - Quantization (Compression) formats:
      - `Q<X>`: X bits per weight, where `X` could be `4` (for 4 bits) or `8` (for 8 bits) etc...
      - Variants provide further details on how the quantized weights are interpreted:
