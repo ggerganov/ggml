@@ -1322,47 +1322,24 @@ struct test_upscale : public test_case {
     const ggml_type type;
     const std::array<int64_t, 4> ne;
     const int32_t scale_factor;
+    const bool transpose;
 
     std::string vars() override {
-        return VARS_TO_STR3(type, ne, scale_factor);
+        return VARS_TO_STR4(type, ne, scale_factor, transpose);
     }
 
     test_upscale(ggml_type type = GGML_TYPE_F32,
             std::array<int64_t, 4> ne = {512, 512, 3, 1},
-            int32_t scale_factor = 2)
-        : type(type), ne(ne), scale_factor(scale_factor) {}
+            int32_t scale_factor = 2, bool transpose = false)
+        : type(type), ne(ne), scale_factor(scale_factor), transpose(transpose) {}
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
         ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne.data());
+        if (transpose) a = ggml_transpose(ctx, a);
         ggml_tensor * out = ggml_upscale(ctx, a, scale_factor);
         return out;
     }
 };
-
-
-// GGML_OP_UPSCALE noncontinugous
-struct test_upscale_noncontiguous : public test_case {
-    const ggml_type type;
-    const std::array<int64_t, 4> ne;
-    const int32_t scale_factor;
-
-    std::string vars() override {
-        return VARS_TO_STR3(type, ne, scale_factor);
-    }
-
-    test_upscale_noncontiguous(ggml_type type = GGML_TYPE_F32,
-            std::array<int64_t, 4> ne = {512, 512, 3, 1},
-            int32_t scale_factor = 2)
-        : type(type), ne(ne), scale_factor(scale_factor) {}
-
-    ggml_tensor * build_graph(ggml_context * ctx) override {
-        ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne.data());
-        a = ggml_transpose(ctx, a);
-        ggml_tensor * out = ggml_upscale(ctx, a, scale_factor);
-        return out;
-    }
-};
-
 
 // GGML_OP_UPSCALE (ext)
 struct test_upscale_ext : public test_case {
@@ -2132,7 +2109,7 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
 
     test_cases.emplace_back(new test_sum_rows());
     test_cases.emplace_back(new test_upscale());
-    test_cases.emplace_back(new test_upscale_noncontiguous());
+    test_cases.emplace_back(new test_upscale(GGML_TYPE_F32, { 512, 512, 3, 1 }, 2, true));
     test_cases.emplace_back(new test_upscale_ext());
     test_cases.emplace_back(new test_group_norm());
     test_cases.emplace_back(new test_acc());

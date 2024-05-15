@@ -1879,11 +1879,13 @@ kernel void kernel_upscale_f32(
     const int64_t i02 = i2/sf2;
     const int64_t i01 = i1/sf1;
 
-    device const float * src0_ptr = (device const float *) (src0 + i03*nb03 + i02*nb02 + i01*nb01);
-    device       float * dst_ptr  = (device       float *) (dst  +  i3*nb3  +  i2*nb2  +  i1*nb1);
-
     for (int i0 = tpitg.x; i0 < ne0; i0 += ntg.x) {
-        dst_ptr[i0] = src0_ptr[(int)(i0/sf0)];
+        const int64_t i00 = i0/sf0;
+
+        device const float * src0_ptr = (device const float *) (src0 + i03*nb03 + i02*nb02 + i01*nb01 + i00*nb00);
+        device       float * dst_ptr  = (device       float *) (dst  +  i3*nb3  +  i2*nb2  +  i1*nb1  +  i0*nb0);
+
+        dst_ptr[0] = src0_ptr[0];
     }
 }
 

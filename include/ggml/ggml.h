@@ -1682,8 +1682,7 @@ extern "C" {
     GGML_API struct ggml_tensor * ggml_upscale(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
-            int scale_factor);
-
+            int                   scale_factor);
 
     // nearest interpolate
     // nearest interpolate to specified dimensions
@@ -1695,8 +1694,6 @@ extern "C" {
             int                   ne1,
             int                   ne2,
             int                   ne3);
-
-
 
     // pad each dimension with zeros: [x, ..., x] -> [x, ..., x, 0, ..., 0]
     GGML_API struct ggml_tensor * ggml_pad(
