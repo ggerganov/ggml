@@ -62,19 +62,19 @@ To correctly parse a well formed naming convention based gguf filename, it is re
 
 For example:
 
-  * `mixtral-v0.1-8x7B-Q2_K.gguf`:
+  * `mixtral-v0.1-8x7B-kQ2.gguf`:
     - Model Name: Mixtral
     - Version Number: v0.1
     - Expert Count: 8
     - Parameter Count: 7B
-    - Quantization: Q2_K
+    - Tensor Type: kQ2
 
   * `Hermes-2-Pro-Llama-3-8B-F16.gguf`:
     - Model Name: Hermes 2 Pro Llama 3
     - Version Number: v0.0 (`<Version>-` missing)
     - Expert Count: 0 (`<ExpertsCount>x` missing)
     - Parameter Count: 8B
-    - Quantization: F16
+    - Tensor Type: F16
 
 #### Tensor Type to File Type Mapping
 
