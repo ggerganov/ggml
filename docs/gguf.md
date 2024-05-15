@@ -81,31 +81,35 @@ For example:
 This list helps to understand the mapping between the file name tensor type designation and the internal ggml/gguf filetype and what it means.
 In addition we also include a link to the corresponding initial commit to each tensor format entry to explain the historical context of it's inclusion.
 
-| TensorType | enum ggml_ftype                 | Tensor Type Description (Plus link to initial commit in llama.cpp for historical context)                  |
-|------------|---------------------------------|------------------------------------------------------------------------------------------------------------|
-| F32        | GGML_FTYPE_ALL_F32              | 32-bit IEEE 754                           [llama.cpp CM](https://github.com/ggerganov/llama.cpp/commit/6bc4400e67e6bc4faad3ad3d5e9d8a6576a9752d) |
-| F16        | GGML_FTYPE_MOSTLY_F16           | 16-bit IEEE 754                           [llama.cpp CM](https://github.com/ggerganov/llama.cpp/commit/6bc4400e67e6bc4faad3ad3d5e9d8a6576a9752d) |
-| Q4_0       | GGML_FTYPE_MOSTLY_Q4_0          | 4 bit quant (scaling only)                [llama.cpp CM](https://github.com/ggerganov/llama.cpp/commit/6bc4400e67e6bc4faad3ad3d5e9d8a6576a9752d) |
-| Q4_1       | GGML_FTYPE_MOSTLY_Q4_1          | 4 bit quant (scaling plus offset)         [llama.cpp CM](https://github.com/ggerganov/llama.cpp/commit/6bc4400e67e6bc4faad3ad3d5e9d8a6576a9752d) |
-| Q4_1_F16   | GGML_FTYPE_MOSTLY_Q4_1_SOME_F16 | 4 bit quant (scaling plus offset) except for tok_embeddings and output weights which are F16 [llama.cpp CM](https://github.com/ggerganov/llama.cpp/commit/6bc4400e67e6bc4faad3ad3d5e9d8a6576a9752d) |
-| Q8_0       | GGML_FTYPE_MOSTLY_Q8_0          | 8 bit quant (scaling only)                [llama.cpp CM](https://github.com/ggerganov/llama.cpp/commit/6bc4400e67e6bc4faad3ad3d5e9d8a6576a9752d) |
-| Q5_0       | GGML_FTYPE_MOSTLY_Q5_0          | 5 bit quant (scaling only)                [llama.cpp CM](https://github.com/ggerganov/llama.cpp/commit/6bc4400e67e6bc4faad3ad3d5e9d8a6576a9752d) |
-| Q5_1       | GGML_FTYPE_MOSTLY_Q5_1          | 5 bit quant (scaling plus offset)         [llama.cpp CM](https://github.com/ggerganov/llama.cpp/commit/6bc4400e67e6bc4faad3ad3d5e9d8a6576a9752d) |
-| kQ2        | GGML_FTYPE_MOSTLY_Q2_K          | 2 bits k-quant (SOTA)                     [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/1684) |
-| kQ3        | GGML_FTYPE_MOSTLY_Q3_K          | 3 bits k-quant (SOTA)                     [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/1684) |
-| kQ4        | GGML_FTYPE_MOSTLY_Q4_K          | 4 bits k-quant (SOTA)                     [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/1684) |
-| kQ5        | GGML_FTYPE_MOSTLY_Q5_K          | 5 bits k-quant (SOTA)                     [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/1684) |
-| kQ6        | GGML_FTYPE_MOSTLY_Q6_K          | 6 bits k-quant (SOTA)                     [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/1684) |
-| iQ2_XXS    | GGML_FTYPE_MOSTLY_IQ2_XXS       | 2.0625 bits per weight quants (SOTA)      [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/4773) |
-| iQ2_XS     | GGML_FTYPE_MOSTLY_IQ2_XS        | 2.31 bits per weight quants (SOTA)        [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/4856) |
-| iQ3_XXS    | GGML_FTYPE_MOSTLY_IQ3_XXS       | 3.0625 bit per weight quants (SOTA)       [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/5196) |
-| iQ1_S      | GGML_FTYPE_MOSTLY_IQ1_S         | 1.5 bit per weight quants                 [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/5453) |
-| iQ4_NL     | GGML_FTYPE_MOSTLY_IQ4_NL        | 4 bit non-linear quants with blocks of 32 [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/5590) |
-| iQ3_S      | GGML_FTYPE_MOSTLY_IQ3_S         | 3.4375 bits per weight quants             [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/5676) |
-| iQ2_S      | GGML_FTYPE_MOSTLY_IQ2_S         | 2 to 3 bit per weight quants              [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/5721) |
-| iQ4_XS     | GGML_FTYPE_MOSTLY_IQ4_XS        | 4.25 bits per weight quants               [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/5747) |
-| iQ1_M      | GGML_FTYPE_MOSTLY_IQ1_M         | 1.75 bits per weight quants               [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/6302) |
-| BF16       | GGML_FTYPE_MOSTLY_BF16          | bfloat16 (truncated 32-bit IEEE 754)      [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/6412) |
+| TensorType | enum ggml_ftype                 | Bits Per Weight | Data Type        | Block Configuration                                   | Weight Formula                                  | Initial Commits Or Pull Request Sources |
+|------------|---------------------------------|-----------------|------------------|-------------------------------------------------------|-------------------------------------------------|-----------------------------------------|
+| F32        | GGML_FTYPE_ALL_F32              | 32-bits         | 32-bit IEEE 754  | -                                                     | w                                               | [llama.cpp CM](https://github.com/ggerganov/llama.cpp/commit/6bc4400e67e6bc4faad3ad3d5e9d8a6576a9752d) |
+| F16        | GGML_FTYPE_MOSTLY_F16           | 16-bits         | 16-bit IEEE 754  | -                                                     | w                                               | [llama.cpp CM](https://github.com/ggerganov/llama.cpp/commit/6bc4400e67e6bc4faad3ad3d5e9d8a6576a9752d) |
+| Q4_0       | GGML_FTYPE_MOSTLY_Q4_0          | 4-bits          | round to nearest | Each block has 32 weights                             | w = q * block_scale                             | [llama.cpp CM](https://github.com/ggerganov/llama.cpp/commit/6bc4400e67e6bc4faad3ad3d5e9d8a6576a9752d) |
+| Q4_1       | GGML_FTYPE_MOSTLY_Q4_1          | 4-bits          | round to nearest | Each block has 32 weights                             | w = q * block_scale + block_minimum             | [llama.cpp CM](https://github.com/ggerganov/llama.cpp/commit/6bc4400e67e6bc4faad3ad3d5e9d8a6576a9752d) |
+| Q4_1_F16   | GGML_FTYPE_MOSTLY_Q4_1_SOME_F16 | 4-bits          | round to nearest | Each block has 32 weights                             | w = q * block_scale + block_minimum             | [llama.cpp CM](https://github.com/ggerganov/llama.cpp/commit/6bc4400e67e6bc4faad3ad3d5e9d8a6576a9752d) |
+| Q8_0       | GGML_FTYPE_MOSTLY_Q8_0          | 8-bits          | round to nearest | Each block has 32 weights                             | w = q * block_scale                             | [llama.cpp CM](https://github.com/ggerganov/llama.cpp/commit/6bc4400e67e6bc4faad3ad3d5e9d8a6576a9752d) |
+| Q5_0       | GGML_FTYPE_MOSTLY_Q5_0          | 5-bits          | round to nearest | Each block has 32 weights                             | w = q * block_scale                             | [llama.cpp CM](https://github.com/ggerganov/llama.cpp/commit/6bc4400e67e6bc4faad3ad3d5e9d8a6576a9752d) |
+| Q5_1       | GGML_FTYPE_MOSTLY_Q5_1          | 5-bits          | round to nearest | Each block has 32 weights                             | w = q * block_scale + block_minimum             | [llama.cpp CM](https://github.com/ggerganov/llama.cpp/commit/6bc4400e67e6bc4faad3ad3d5e9d8a6576a9752d) |
+| kQ2        | GGML_FTYPE_MOSTLY_Q2_K          | 2.5625-bits     | k-quantization   | Superblocks with 16 blocks, each block has 16 weights | w = q * block_scale (4-bit) + block_min (4-bit) | [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/1684) |
+| kQ3        | GGML_FTYPE_MOSTLY_Q3_K          | 3.4375-bits     | k-quantization   | Superblocks with 16 blocks, each block has 16 weights | w = q * block_scale (6-bit)                     | [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/1684) |
+| kQ4        | GGML_FTYPE_MOSTLY_Q4_K          | 4.5-bits        | k-quantization   | Superblocks with  8 blocks, each block has 32 weights | w = q * block_scale (6-bit) + block_min (6-bit) | [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/1684) |
+| kQ5        | GGML_FTYPE_MOSTLY_Q5_K          | 5.5-bits        | k-quantization   | Superblocks with  8 blocks, each block has 32 weights | w = q * block_scale (6-bit) + block_min (6-bit) | [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/1684) |
+| kQ6        | GGML_FTYPE_MOSTLY_Q6_K          | 6.5625-bits     | k-quantization   | Superblocks with 16 blocks, each block has 16 weights | w = q * block_scale (8-bit)                     | [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/1684) |
+| iQ2_XXS    | GGML_FTYPE_MOSTLY_IQ2_XXS       | 2.0625-bits     | i-quantization   | Superblocks with  8 blocks, each block has 32 weights | w = func(superblock_scale, importance_matrix)   | [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/4773) |
+| iQ2_XS     | GGML_FTYPE_MOSTLY_IQ2_XS        | 2.31-bits       | i-quantization   | Superblocks with 16 blocks, each block has 16 weights | w = func(superblock_scale, importance_matrix)   | [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/4856) |
+| iQ3_XXS    | GGML_FTYPE_MOSTLY_IQ3_XXS       | 3.0625-bits     | i-quantization   | Superblocks with  8 blocks, each block has 32 weights | w = func(superblock_scale, importance_matrix)   | [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/5196) |
+| iQ1_S      | GGML_FTYPE_MOSTLY_IQ1_S         | 1.5-bits        | i-quantization   | Superblocks with  8 blocks, each block has 32 weights | w = func(superblock_scale, importance_matrix)   | [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/5453) |
+| iQ4_NL     | GGML_FTYPE_MOSTLY_IQ4_NL        | 4.5-bits        | i-quantization   | Superblocks with 16 blocks, each block has 16 weights | w = [non linear mapping of quants to weights]   | [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/5590) |
+| iQ3_S      | GGML_FTYPE_MOSTLY_IQ3_S         | 3.4375-bits     | i-quantization   | ?                                                     | w = func(superblock_scale, importance_matrix)   | [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/5676) |
+| iQ2_S      | GGML_FTYPE_MOSTLY_IQ2_S         | 2.5-bits        | i-quantization   | ?                                                     | w = func(superblock_scale, importance_matrix)   | [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/5721) |
+| iQ4_XS     | GGML_FTYPE_MOSTLY_IQ4_XS        | 4.25-bits       | i-quantization   | Superblocks with 8 blocks, each block has 32 weights  | w = func(superblock_scale, importance_matrix)   | [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/5747) |
+| iQ1_M      | GGML_FTYPE_MOSTLY_IQ1_M         | 1.75-bits       | i-quantization   | Superblocks with 16 blocks, each block has 16 weights | w = func(superblock_scale, importance_matrix)   | [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/6302) |
+| BF16       | GGML_FTYPE_MOSTLY_BF16          | 16-bits         | bfloat16         | -                                                     | w                                               | [llama.cpp PR](https://github.com/ggerganov/llama.cpp/pull/6412) |
+
+* All superblocks have fp16 scaling factor and contains up to 256 weights. Number of weights in a block must be divisible by 256.
+* GGML_FTYPE_MOSTLY_IQ3_S and GGML_FTYPE_MOSTLY_IQ2_S : Unsure on superblock configuration
+* GGML_FTYPE_MOSTLY_Q4_1_SOME_F16 : Except for tok_embeddings and output weights which are F16, everything else is 4 bits per weight.
 
 
 ### File Structure
