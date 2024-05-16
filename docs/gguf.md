@@ -20,7 +20,7 @@ The key difference between GGJT and GGUF is the use of a key-value structure for
 
 ### GGUF Naming Convention
 
-GGUF follow a naming convention of `<Model>-<Version>-<ExpertsCount>x<Parameters>-<Quantization>.gguf`
+GGUF follow a naming convention of `<Model>-<Version>-<ExpertsCount>x<Parameters>-<EncodingScheme>.gguf`
 
 The components are:
 1. **Model**: A descriptive name for the model type or architecture.
