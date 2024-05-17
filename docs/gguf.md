@@ -20,7 +20,7 @@ The key difference between GGJT and GGUF is the use of a key-value structure for
 
 ### GGUF Naming Convention
 
-GGUF follow a naming convention of `<Model>-<Version>-<ExpertsCount>x<Parameters>-<EncodingScheme>.gguf`
+GGUF follow a naming convention of `<Model>-<Version>-<ExpertsCount>x<Parameters>-<EncodingScheme>-<Shard>.gguf`
 
 The components are:
 1. **Model**: A descriptive name for the model type or architecture.
@@ -34,6 +34,10 @@ The components are:
     - `M`: Million parameters.
     - `K`: Thousand parameters.
 5. **EncodingScheme**: Indicates the weights encoding scheme that was applied to the model. Content, type mixture and arrangement however are determined by user code and can vary depending on project needs.
+6. **Shard**: (Optional) Indicates and denotes that the model has been split into multiple shards, formatted as `<ShardNum>-of-<ShardTotal>`.
+    - *ShardNum* : Shard position in this model. Must be 5 digits padded by zeros.
+      - Shard number always starts from `00001` onwards (e.g. First shard always starts at `00001-of-XXXXX` rather than `00000-of-XXXXX`).
+    - *ShardTotal* : Total number of shards in this model. Must be 5 digits padded by zeros.
 
 #### Parsing Above Naming Convention
 
@@ -47,13 +51,24 @@ For example:
     - Expert Count: 8
     - Parameter Count: 7B
     - Weight Encoding Scheme: KQ2
+    - Shard: N/A
 
   * `Hermes-2-Pro-Llama-3-8B-F16.gguf`:
     - Model Name: Hermes 2 Pro Llama 3
-    - Version Number: v0.0 (`<Version>-` missing)
-    - Expert Count: 0 (`<ExpertsCount>x` missing)
+    - Version Number: v0.0
+    - Expert Count: 0
     - Parameter Count: 8B
     - Weight Encoding Scheme: F16
+    - Shard: N/A
+
+  * `grok-v1.0-100B-Q4_0-00003-of-00009.gguf"`
+    - Model Name: Grok
+    - Version Number: v1.0
+    - Expert Count: 0
+    - Parameter Count: 100B
+    - Weight Encoding Scheme: Q4_0
+    - Shard: 3 out of 9 total shards
+
 
 ### File Structure
 
