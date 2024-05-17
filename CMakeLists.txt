@@ -50,6 +50,7 @@ option(GGML_METAL                   "ggml: use Metal"                         OF
 option(GGML_METAL_NDEBUG            "ggml: disable Metal debugging"           OFF)
 option(GGML_METAL_SHADER_DEBUG      "ggml: compile Metal with -fno-fast-math" OFF)
 option(GGML_METAL_EMBED_LIBRARY     "ggml: embed Metal library"               OFF)
+option(GGML_MKL                     "ggml: use intel mkl"                     off) 
 
 option(GGML_CUDA_FORCE_DMMV                 "ggml: use dmmv instead of mmvq CUDA kernels"     OFF)
 option(GGML_CUDA_FORCE_MMQ                  "ggml: use mmq kernels instead of cuBLAS"         OFF)
@@ -172,6 +173,35 @@ endif()
 
 set(CMAKE_C_STANDARD   11)
 set(CMAKE_CXX_STANDARD 11)
+
+# detect mkl
+if (GGML_MKL)
+
+    find_package(BLAS)
+
+    message(STATUS "BLAS MKL found, Libraries: ${BLAS_LIBRARIES}")
+
+    if ("${BLAS_INCLUDE_DIRS}" STREQUAL "")
+        # BLAS_INCLUDE_DIRS is missing in FindBLAS.cmake.
+        # see https://gitlab.kitware.com/cmake/cmake/-/issues/20268
+        find_package(PkgConfig REQUIRED)
+        # all Intel* libraries share the same include path
+        pkg_check_modules(DepBLAS REQUIRED mkl-sdl)
+        if (DepBLAS_FOUND)
+            set(BLAS_INCLUDE_DIRS ${DepBLAS_INCLUDE_DIRS})
+        endif()
+    endif()
+
+    message(STATUS "BLAS found, Includes: ${BLAS_INCLUDE_DIRS}")
+
+    add_compile_options(${BLAS_LINKER_FLAGS})
+
+    add_compile_definitions(GGML_BLAS_USE_MKL)
+
+    set(LLAMA_EXTRA_LIBS     ${LLAMA_EXTRA_LIBS}     ${BLAS_LIBRARIES})
+    set(LLAMA_EXTRA_INCLUDES ${LLAMA_EXTRA_INCLUDES} ${BLAS_INCLUDE_DIRS})
+
+endif()
 
 find_package(Threads REQUIRED)
 
