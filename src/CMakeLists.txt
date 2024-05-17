@@ -402,6 +402,16 @@ if (GGML_METAL)
         )
 endif()
 
+if (GGML_RPC)
+    add_compile_definitions(GGML_USE_RPC)
+
+    if (WIN32)
+        set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} ws2_32)
+    endif()
+
+    set(GGML_RPC_SOURCES ggml-rpc.cpp)
+endif()
+
 if (GGML_PERF)
     set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_PERF)
 endif()
@@ -419,6 +429,7 @@ add_library(${TARGET}
     ${GGML_CUDA_SOURCES}
     ${GGML_OPENCL_SOURCES}
     ${GGML_METAL_SOURCES}
+    ${GGML_RPC_SOURCES}
     )
 
 target_include_directories(${TARGET} PUBLIC
