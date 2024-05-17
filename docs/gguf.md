@@ -24,9 +24,12 @@ GGUF follow a naming convention of `<Model>-<Version>-<ExpertsCount>x<Parameters
 
 The components are:
 1. **Model**: A descriptive name for the model type or architecture.
+    - This can be derived from gguf metadata `general.name` substituting spaces for dashes.
 2. **Version**: (Optional) Denotes the model version number, formatted as `v<Major>.<Minor>`
     - If model is missing a version number then assume `v0.0` (Prerelease)
+    - This can be derived from gguf metadata `general.version`
 3. **ExpertsCount**: Indicates the number of experts found in a Mixture of Experts based model.
+    - This can be derived from gguf metadata `llama.expert_count`
 4. **Parameters**: Indicates the number of parameters and their scale, represented as `<count><scale-prefix>`:
     - `Q`: Quadrillion parameters.
     - `T`: Trillion parameters.
@@ -45,7 +48,7 @@ To correctly parse a well formed naming convention based gguf filename, it is re
 
 For example:
 
-  * `mixtral-v0.1-8x7B-KQ2.gguf`:
+  * `Mixtral-v0.1-8x7B-KQ2.gguf`:
     - Model Name: Mixtral
     - Version Number: v0.1
     - Expert Count: 8
@@ -61,7 +64,7 @@ For example:
     - Weight Encoding Scheme: F16
     - Shard: N/A
 
-  * `grok-v1.0-100B-Q4_0-00003-of-00009.gguf"`
+  * `Grok-v1.0-100B-Q4_0-00003-of-00009.gguf"`
     - Model Name: Grok
     - Version Number: v1.0
     - Expert Count: 0
