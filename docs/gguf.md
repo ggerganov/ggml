@@ -18,6 +18,43 @@ GGUF is a format based on the existing GGJT, but makes a few changes to the form
 
 The key difference between GGJT and GGUF is the use of a key-value structure for the hyperparameters (now referred to as metadata), rather than a list of untyped values. This allows for new metadata to be added without breaking compatibility with existing models, and to annotate the model with additional information that may be useful for inference or for identifying the model.
 
+### GGUF Naming Convention
+
+GGUF follow a naming convention of `<Model>-<Version>-<ExpertsCount>x<Parameters>-<EncodingScheme>.gguf`
+
+The components are:
+1. **Model**: A descriptive name for the model type or architecture.
+2. **Version**: (Optional) Denotes the model version number, formatted as `v<Major>.<Minor>`
+    - If model is missing a version number then assume `v0.0` (Prerelease)
+3. **ExpertsCount**: Indicates the number of experts found in a Mixture of Experts based model.
+4. **Parameters**: Indicates the number of parameters and their scale, represented as `<count><scale-prefix>`:
+    - `Q`: Quadrillion parameters.
+    - `T`: Trillion parameters.
+    - `B`: Billion parameters.
+    - `M`: Million parameters.
+    - `K`: Thousand parameters.
+5. **EncodingScheme**: Indicates the weights encoding scheme that was applied to the model. Content, type mixture and arrangement however are determined by user code and can vary depending on project needs.
+
+#### Parsing Above Naming Convention
+
+To correctly parse a well formed naming convention based gguf filename, it is recommended to read from right to left using `-` as the delimiter. This strategy allow for the most flexibility in model name to include dashes if they so choose, while at the same time allowing for version string to be optional. This approach also gives some future proofing to extend the format if needed in the future.
+
+For example:
+
+  * `mixtral-v0.1-8x7B-KQ2.gguf`:
+    - Model Name: Mixtral
+    - Version Number: v0.1
+    - Expert Count: 8
+    - Parameter Count: 7B
+    - Weight Encoding Scheme: KQ2
+
+  * `Hermes-2-Pro-Llama-3-8B-F16.gguf`:
+    - Model Name: Hermes 2 Pro Llama 3
+    - Version Number: v0.0 (`<Version>-` missing)
+    - Expert Count: 0 (`<ExpertsCount>x` missing)
+    - Parameter Count: 8B
+    - Weight Encoding Scheme: F16
+
 ### File Structure
 
 ![image](https://github.com/ggerganov/ggml/assets/1991296/c3623641-3a1d-408e-bfaf-1b7c4e16aa63)
