@@ -20,7 +20,7 @@ The key difference between GGJT and GGUF is the use of a key-value structure for
 
 ### GGUF Naming Convention
 
-GGUF follow a naming convention of `<Model>-<Version>-<ExpertsCount>x<Parameters>-<EncodingScheme>-<Shard>.gguf`
+GGUF follow a naming convention of `<Model>(-<Version>)-(<ExpertsCount>x)<Parameters>-<EncodingScheme>(-<Shard>).gguf`
 
 The components are:
 1. **Model**: A descriptive name for the model type or architecture.
@@ -28,7 +28,7 @@ The components are:
 2. **Version**: (Optional) Denotes the model version number, formatted as `v<Major>.<Minor>`
     - If model is missing a version number then assume `v0.0` (Prerelease)
     - This can be derived from gguf metadata `general.version`
-3. **ExpertsCount**: Indicates the number of experts found in a Mixture of Experts based model.
+3. **ExpertsCount**: (Optional) Indicates the number of experts found in a Mixture of Experts based model.
     - This can be derived from gguf metadata `llama.expert_count`
 4. **Parameters**: Indicates the number of parameters and their scale, represented as `<count><scale-prefix>`:
     - `Q`: Quadrillion parameters.
@@ -71,6 +71,39 @@ For example:
     - Parameter Count: 100B
     - Weight Encoding Scheme: Q4_0
     - Shard: 3 out of 9 total shards
+
+You can also try using `/^(?<model_name>[A-Za-z0-9\s-]+)(?:-v(?<major>\d+)\.(?<minor>\d+))?-(?:(?<experts_count>\d+)x)?(?<parameters>\d+[A-Za-z]?)-(?<encoding_scheme>[\w_]+)(?:-(?<shard>\d{5})-of-(?<shardTotal>\d{5}))?\.gguf$/` regular expression to extract all the values above as well. Just don't forget to convert `-` to ` ` for the model name.
+
+<details><summary>Example Node.js Regex Function</summary>
+
+```js
+#!/usr/bin/env node
+const ggufRegex = /^(?<model_name>[A-Za-z0-9\s-]+)(?:-v(?<major>\d+)\.(?<minor>\d+))?-(?:(?<experts_count>\d+)x)?(?<parameters>\d+[A-Za-z]?)-(?<encoding_scheme>[\w_]+)(?:-(?<shard>\d{5})-of-(?<shardTotal>\d{5}))?\.gguf$/;
+
+function parseGGUFFilename(filename) {
+  const match = ggufRegex.exec(filename);
+  if (!match)
+    return null;
+  const {model_name, major = '0', minor = '0', experts_count = null, parameters, encoding_scheme, shard = null, shardTotal = null} = match.groups;
+  return {modelName: model_name.trim().replace(/-/g, ' '), version: `v${major}.${minor}`, expertsCount: experts_count, parameters, encodingScheme: encoding_scheme, shard, shardTotal};
+}
+
+const testCases = [
+  {filename: 'Mixtral-v0.1-8x7B-KQ2.gguf',              expected: { modelName: 'Mixtral',              version: 'v0.1',   expertsCount: '8',  parameters: '7B',   encodingScheme: 'KQ2',  shard: null,    shardTotal: null }},
+  {filename: 'Grok-v1.0-100B-Q4_0-00003-of-00009.gguf', expected: { modelName: 'Grok',                 version: 'v1.0',   expertsCount: null, parameters: '100B', encodingScheme: 'Q4_0', shard: '00003', shardTotal: '00009' }},
+  {filename: 'Hermes-2-Pro-Llama-3-8B-F16.gguf',        expected: { modelName: 'Hermes 2 Pro Llama 3', version: 'v0.0',   expertsCount: null, parameters: '8B',   encodingScheme: 'F16',  shard: null,    shardTotal: null }},
+  {filename: 'Hermes-2-Pro-Llama-3-v32.33-8Q-F16.gguf', expected: { modelName: 'Hermes 2 Pro Llama 3', version: 'v32.33', expertsCount: null, parameters: '8Q',   encodingScheme: 'F16',  shard: null,    shardTotal: null }},
+  {filename: 'not-a-known-arrangement.gguf', expected: null},
+];
+
+testCases.forEach(({ filename, expected }) => {
+  const result = parseGGUFFilename(filename);
+  const passed = JSON.stringify(result) === JSON.stringify(expected);
+  console.log(`${filename}: ${passed ? "PASS" : "FAIL"}`);}
+);
+```
+
+</details>
 
 
 ### File Structure
