@@ -85,12 +85,12 @@ function parseGGUFFilename(filename) {
   if (!match)
     return null;
   const {model_name, major = '0', minor = '0', experts_count = null, parameters, encoding_scheme, shard = null, shardTotal = null} = match.groups;
-  return {modelName: model_name.trim().replace(/-/g, ' '), version: `v${major}.${minor}`, expertsCount: experts_count, parameters, encodingScheme: encoding_scheme, shard, shardTotal};
+  return {modelName: model_name.trim().replace(/-/g, ' '), version: `v${major}.${minor}`, expertsCount: experts_count ? +experts_count : null, parameters, encodingScheme: encoding_scheme, shard: shard ? +shard : null, shardTotal: shardTotal ? +shardTotal : null};
 }
 
 const testCases = [
-  {filename: 'Mixtral-v0.1-8x7B-KQ2.gguf',              expected: { modelName: 'Mixtral',              version: 'v0.1',   expertsCount: '8',  parameters: '7B',   encodingScheme: 'KQ2',  shard: null,    shardTotal: null }},
-  {filename: 'Grok-v1.0-100B-Q4_0-00003-of-00009.gguf', expected: { modelName: 'Grok',                 version: 'v1.0',   expertsCount: null, parameters: '100B', encodingScheme: 'Q4_0', shard: '00003', shardTotal: '00009' }},
+  {filename: 'Mixtral-v0.1-8x7B-KQ2.gguf',              expected: { modelName: 'Mixtral',              version: 'v0.1',   expertsCount: 8,    parameters: '7B',   encodingScheme: 'KQ2',  shard: null,    shardTotal: null }},
+  {filename: 'Grok-v1.0-100B-Q4_0-00003-of-00009.gguf', expected: { modelName: 'Grok',                 version: 'v1.0',   expertsCount: null, parameters: '100B', encodingScheme: 'Q4_0', shard: 3,       shardTotal: 9    }},
   {filename: 'Hermes-2-Pro-Llama-3-8B-F16.gguf',        expected: { modelName: 'Hermes 2 Pro Llama 3', version: 'v0.0',   expertsCount: null, parameters: '8B',   encodingScheme: 'F16',  shard: null,    shardTotal: null }},
   {filename: 'Hermes-2-Pro-Llama-3-v32.33-8Q-F16.gguf', expected: { modelName: 'Hermes 2 Pro Llama 3', version: 'v32.33', expertsCount: null, parameters: '8Q',   encodingScheme: 'F16',  shard: null,    shardTotal: null }},
   {filename: 'not-a-known-arrangement.gguf', expected: null},
@@ -99,8 +99,8 @@ const testCases = [
 testCases.forEach(({ filename, expected }) => {
   const result = parseGGUFFilename(filename);
   const passed = JSON.stringify(result) === JSON.stringify(expected);
-  console.log(`${filename}: ${passed ? "PASS" : "FAIL"}`);}
-);
+  console.log(`${filename}: ${passed ? "PASS" : "FAIL"}`);
+});
 ```
 
 </details>
