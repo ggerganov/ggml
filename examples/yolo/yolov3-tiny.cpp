@@ -30,6 +30,7 @@ struct yolo_model {
     int height = 416;
     std::vector<conv2d_layer> conv2d_layers;
     struct ggml_context * ctx;
+    struct gguf_context * ggufctx;
 };
 
 struct yolo_layer {
@@ -71,6 +72,7 @@ static bool load_model(const std::string & fname, yolo_model & model) {
         fprintf(stderr, "%s: gguf_init_from_file() failed\n", __func__);
         return false;
     }
+    model.ggufctx = ctx;
     model.width  = 416;
     model.height = 416;
     model.conv2d_layers.resize(13);
@@ -100,9 +102,69 @@ static bool load_model(const std::string & fname, yolo_model & model) {
     return true;
 }
 
+// istream from memory
+#include <streambuf>
+#include <istream>
+
+struct membuf : std::streambuf {
+    membuf(const char * begin, const char * end) {
+        char * b(const_cast<char *>(begin));
+        char * e(const_cast<char *>(end));
+        this->begin = b;
+        this->end = e;
+        this->setg(b, b, e);
+    }
+
+    membuf(const char * base, size_t size) {
+        char * b(const_cast<char *>(begin));
+        this->begin = b;
+        this->end = b + size;
+        this->setg(b, b, end);
+    }
+    
+    virtual pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::in) override {
+        if(dir == std::ios_base::cur) {
+            gbump(off);
+        } else if(dir == std::ios_base::end) {
+            setg(begin, end + off, end);
+        } else if(dir == std::ios_base::beg) {
+            setg(begin, begin + off, end);
+        }
+
+        return gptr() - eback();
+    }
+    
+    virtual pos_type seekpos(std::streampos pos, std::ios_base::openmode mode) override {
+        return seekoff(pos - pos_type(off_type(0)), std::ios_base::beg, mode);
+    }
+    
+    char * begin;
+    char * end;
+};
+
+
 static bool load_labels(const char * filename, std::vector<std::string> & labels)
 {
     std::ifstream file_in(filename);
+    if (!file_in) {
+        return false;
+    }
+    std::string line;
+    while (std::getline(file_in, line)) {
+        labels.push_back(line);
+    }
+    GGML_ASSERT(labels.size() == 80);
+    return true;
+}
+
+static bool load_labels_kv(const struct gguf_context * ctx, const char * filename, std::vector<std::string> & labels)
+{
+    struct gguf_nobj nobj = gguf_find_name_nobj(ctx, filename);
+    if (nobj.n == 0) {
+        return false;
+    }
+    membuf buf(nobj.data, nobj.data + nobj.n);
+    std::istream file_in(&buf);
     if (!file_in) {
         return false;
     }
@@ -122,6 +184,27 @@ static bool load_alphabet(std::vector<yolo_image> & alphabet)
             char fname[256];
             sprintf(fname, "data/labels/%d_%d.png", i, j);
             if (!load_image(fname, alphabet[j*128 + i])) {
+                fprintf(stderr, "Cannot load '%s'\n", fname);
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+static bool load_alphabet_kv(const struct gguf_context * ctx, std::vector<yolo_image> & alphabet)
+{
+    alphabet.resize(8 * 128);
+    for (int j = 0; j < 8; j++) {
+        for (int i = 32; i < 127; i++) {
+            char fname[256];
+            sprintf(fname, "data/labels/%d_%d.png", i, j);
+            struct gguf_nobj nobj = gguf_find_name_nobj(ctx, fname);
+            if (nobj.n == 0) {
+                fprintf(stderr, "Cannot find '%s'\n", fname);
+                return false;
+            }
+            if (!load_image_from_memory(nobj.data, nobj.n, alphabet[j*128 + i])) {
                 fprintf(stderr, "Cannot load '%s'\n", fname);
                 return false;
             }
@@ -503,14 +586,20 @@ int main(int argc, char *argv[])
         return 1;
     }
     std::vector<std::string> labels;
-    if (!load_labels("data/coco.names", labels)) {
-        fprintf(stderr, "%s: failed to load labels from 'data/coco.names'\n", __func__);
-        return 1;
+    if (!load_labels_kv(model.ggufctx, "data/coco.names", labels)) {
+        fprintf(stderr, "%s: failed to load labels from 'data/coco.names' in model\n", __func__);
+        if (!load_labels("data/coco.names", labels)) {
+            fprintf(stderr, "%s: failed to load labels from 'data/coco.names'\n", __func__);
+            return 1;
+        }
     }
     std::vector<yolo_image> alphabet;
-    if (!load_alphabet(alphabet)) {
-        fprintf(stderr, "%s: failed to load alphabet\n", __func__);
-        return 1;
+    if (!load_alphabet_kv(model.ggufctx, alphabet)) {
+        fprintf(stderr, "%s: failed to load alphabet from model\n", __func__);
+        if (!load_alphabet(alphabet)) {
+            fprintf(stderr, "%s: failed to load alphabet\n", __func__);
+            return 1;
+        }
     }
     const int64_t t_start_ms = ggml_time_ms();
     detect(img, model, params.thresh, labels, alphabet);
