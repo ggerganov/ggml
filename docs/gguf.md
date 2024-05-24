@@ -48,12 +48,12 @@ To correctly parse a well formed naming convention based gguf filename, it is re
 
 For example:
 
-  * `Mixtral-v0.1-8x7B-KQ2.gguf`:
+  * `Mixtral-v0.1-8x7B-Q2_K.gguf`:
     - Model Name: Mixtral
     - Version Number: v0.1
     - Expert Count: 8
     - Parameter Count: 7B
-    - Weight Encoding Scheme: KQ2
+    - Weight Encoding Scheme: Q2_K
     - Shard: N/A
 
   * `Hermes-2-Pro-Llama-3-8B-F16.gguf`:
@@ -89,7 +89,7 @@ function parseGGUFFilename(filename) {
 }
 
 const testCases = [
-  {filename: 'Mixtral-v0.1-8x7B-KQ2.gguf',              expected: { modelName: 'Mixtral',              version: 'v0.1',   expertsCount: 8,    parameters: '7B',   encodingScheme: 'KQ2',  shard: null,    shardTotal: null }},
+  {filename: 'Mixtral-v0.1-8x7B-Q2_K.gguf',              expected: { modelName: 'Mixtral',              version: 'v0.1',   expertsCount: 8,    parameters: '7B',   encodingScheme: 'Q2_K',  shard: null,    shardTotal: null }},
   {filename: 'Grok-v1.0-100B-Q4_0-00003-of-00009.gguf', expected: { modelName: 'Grok',                 version: 'v1.0',   expertsCount: null, parameters: '100B', encodingScheme: 'Q4_0', shard: 3,       shardTotal: 9    }},
   {filename: 'Hermes-2-Pro-Llama-3-8B-F16.gguf',        expected: { modelName: 'Hermes 2 Pro Llama 3', version: 'v0.0',   expertsCount: null, parameters: '8B',   encodingScheme: 'F16',  shard: null,    shardTotal: null }},
   {filename: 'Hermes-2-Pro-Llama-3-v32.33-8Q-F16.gguf', expected: { modelName: 'Hermes 2 Pro Llama 3', version: 'v32.33', expertsCount: null, parameters: '8Q',   encodingScheme: 'F16',  shard: null,    shardTotal: null }},
