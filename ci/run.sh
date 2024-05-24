@@ -37,7 +37,10 @@ if [ ! -z ${GG_BUILD_CUDA} ]; then
 fi
 
 if [ ! -z ${GG_BUILD_METAL} ]; then
-    CMAKE_EXTRA="${CMAKE_EXTRA} -DGGML_METAL=ON"
+    # TODO: this should use -DGGML_METAL_SHADER_DEBUG=ON instead, but currently it fails because
+    #       the binaries cannot locate default.metallib eventhough it is in bin/. cannot figure out
+    #       why this is happening, so temporary workaround is to use -DGGML_METAL_EMBED_LIBRARY=ON
+    CMAKE_EXTRA="${CMAKE_EXTRA} -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON"
 fi
 
 ## helpers

@@ -61,7 +61,6 @@ static bool ggml_op_can_inplace(enum ggml_op op) {
     }
 }
 
-// TODO: GGML_PAD ?
 static size_t aligned_offset(const void * buffer, size_t offset, size_t alignment) {
     assert(alignment && !(alignment & (alignment - 1))); // power of 2
     size_t align = (alignment - (((uintptr_t)buffer + offset) % alignment)) % alignment;
@@ -69,25 +68,14 @@ static size_t aligned_offset(const void * buffer, size_t offset, size_t alignmen
 }
 
 // tallocr
-struct ggml_tallocr {
-    ggml_backend_buffer_t buffer;
-    void * base;
-    size_t alignment;
-    size_t offset;
-};
 
-ggml_tallocr_t ggml_tallocr_new(ggml_backend_buffer_t buffer) {
-    ggml_tallocr_t talloc = malloc(sizeof(struct ggml_tallocr));
-    if (talloc == NULL) {
-        return NULL;
-    }
-
+struct ggml_tallocr ggml_tallocr_new(ggml_backend_buffer_t buffer) {
     void * base = ggml_backend_buffer_get_base(buffer);
     size_t align = ggml_backend_buffer_get_alignment(buffer);
 
     assert(align && !(align & (align - 1))); // power of 2
 
-    *talloc = (struct ggml_tallocr) {
+    struct ggml_tallocr talloc = (struct ggml_tallocr) {
         /*.buffer    = */ buffer,
         /*.base      = */ base,
         /*.alignment = */ align,
@@ -96,11 +84,7 @@ ggml_tallocr_t ggml_tallocr_new(ggml_backend_buffer_t buffer) {
     return talloc;
 }
 
-void ggml_tallocr_free(ggml_tallocr_t talloc) {
-    free(talloc);
-}
-
-void ggml_tallocr_alloc(ggml_tallocr_t talloc, struct ggml_tensor * tensor) {
+void ggml_tallocr_alloc(struct ggml_tallocr * talloc, struct ggml_tensor * tensor) {
     size_t size = ggml_backend_buffer_get_alloc_size(talloc->buffer, tensor);
     size = GGML_PAD(size, talloc->alignment);
 
@@ -354,10 +338,14 @@ struct hash_node {
     bool allocated;
 };
 
-//
 struct tensor_alloc {
     size_t offset;
     size_t size_max; // 0 = pre-allocated, unused, or view
+};
+
+struct leaf_alloc {
+    int buffer_id;
+    struct tensor_alloc leaf;
 };
 
 struct node_alloc {
@@ -377,19 +365,22 @@ struct ggml_gallocr {
 
     struct node_alloc * node_allocs; // [n_nodes]
     int n_nodes;
+
+    struct leaf_alloc * leaf_allocs; // [n_leafs]
+    int n_leafs;
 };
 
 ggml_gallocr_t ggml_gallocr_new_n(ggml_backend_buffer_type_t * bufts, int n_bufs) {
-    ggml_gallocr_t galloc = (ggml_gallocr_t)calloc(sizeof(struct ggml_gallocr), 1);
+    ggml_gallocr_t galloc = (ggml_gallocr_t)calloc(1, sizeof(struct ggml_gallocr));
     GGML_ASSERT(galloc != NULL);
 
-    galloc->bufts = calloc(sizeof(ggml_backend_buffer_type_t) * n_bufs, 1);
+    galloc->bufts = calloc(n_bufs, sizeof(ggml_backend_buffer_type_t));
     GGML_ASSERT(galloc->bufts != NULL);
 
-    galloc->buffers = calloc(sizeof(ggml_backend_buffer_t) * n_bufs, 1);
+    galloc->buffers = calloc(n_bufs, sizeof(ggml_backend_buffer_t) * n_bufs);
     GGML_ASSERT(galloc->buffers != NULL);
 
-    galloc->buf_tallocs = calloc(sizeof(struct ggml_dyn_tallocr *) * n_bufs, 1);
+    galloc->buf_tallocs = calloc(n_bufs, sizeof(struct ggml_dyn_tallocr *));
     GGML_ASSERT(galloc->buf_tallocs != NULL);
 
     for (int i = 0; i < n_bufs; i++) {
@@ -427,6 +418,7 @@ void ggml_gallocr_free(ggml_gallocr_t galloc) {
     free(galloc->buffers);
     free(galloc->buf_tallocs);
     free(galloc->node_allocs);
+    free(galloc->leaf_allocs);
     free(galloc);
 }
 
@@ -464,7 +456,7 @@ static void ggml_gallocr_allocate_node(ggml_gallocr_t galloc, struct ggml_tensor
             for (int i = 0; i < GGML_MAX_SRC; i++) {
                 struct ggml_tensor * parent = node->src[i];
                 if (parent == NULL) {
-                    break;
+                    continue;
                 }
 
                 // if the node's data is external, then we cannot re-use it
@@ -539,43 +531,50 @@ static int get_node_buffer_id(const int * node_buffer_ids, int i) {
     return node_buffer_ids ? node_buffer_ids[i] : 0;
 }
 
-static void ggml_gallocr_alloc_graph_impl(ggml_gallocr_t galloc, struct ggml_cgraph * graph, const int * node_buffer_ids) {
+static void ggml_gallocr_alloc_graph_impl(ggml_gallocr_t galloc, struct ggml_cgraph * graph, const int * node_buffer_ids, const int * leaf_buffer_ids) {
     // clear hash tables
     memset(galloc->hash_set.keys, 0, galloc->hash_set.size * sizeof(struct ggml_tensor *));
     memset(galloc->hash_values,   0, galloc->hash_set.size * sizeof(struct hash_node));
 
-    // allocate all graph inputs first to avoid overwriting them
-    for (int i = 0; i < graph->n_nodes; i++) {
-        if (graph->nodes[i]->flags & GGML_TENSOR_FLAG_INPUT) {
-            ggml_gallocr_allocate_node(galloc, graph->nodes[i], get_node_buffer_id(node_buffer_ids, i));
-        }
-        for (int j = 0; j < GGML_MAX_SRC; j++) {
-            if (graph->nodes[i]->src[j] == NULL) {
-                break;
-            }
-            if (graph->nodes[i]->src[j]->flags & GGML_TENSOR_FLAG_INPUT) {
-                ggml_gallocr_allocate_node(galloc, graph->nodes[i]->src[j], get_node_buffer_id(node_buffer_ids, i));
-            }
-        }
+    // allocate leafs
+    // these may be tensors that the application is not using in the graph, but may still want to allocate for other purposes
+    for (int i = 0; i < graph->n_leafs; i++) {
+        struct ggml_tensor * leaf = graph->leafs[i];
+        ggml_gallocr_allocate_node(galloc, leaf, get_node_buffer_id(leaf_buffer_ids, i));
     }
 
     // count number of children and views
+    // allocate other graph inputs and leafs first to avoid overwriting them
     for (int i = 0; i < graph->n_nodes; i++) {
         struct ggml_tensor * node = graph->nodes[i];
 
-        if (ggml_is_view(node)) {
+        // TODO: better way to add external dependencies
+        // GGML_OP_NONE does not appear normally in the graph nodes, but is used by ggml-backend to add dependencies to
+        // control when some tensors are allocated and freed. in this case, the dependencies are in `src`, but the node
+        // itself is never used and should not be considered a dependency
+        if (ggml_is_view(node) && node->op != GGML_OP_NONE) {
             struct ggml_tensor * view_src = node->view_src;
             ggml_gallocr_hash_get(galloc, view_src)->n_views += 1;
         }
 
-        for (int j = 0; j < GGML_MAX_SRC; j++) {
-            struct ggml_tensor * parent = node->src[j];
-            if (parent == NULL) {
-                break;
-            }
-            ggml_gallocr_hash_get(galloc, parent)->n_children += 1;
+        if (node->flags & GGML_TENSOR_FLAG_INPUT) {
+            ggml_gallocr_allocate_node(galloc, graph->nodes[i], get_node_buffer_id(node_buffer_ids, i));
         }
-   }
+
+        for (int j = 0; j < GGML_MAX_SRC; j++) {
+            struct ggml_tensor * src = node->src[j];
+            if (src == NULL) {
+                continue;
+            }
+
+            ggml_gallocr_hash_get(galloc, src)->n_children += 1;
+
+            // allocate explicit inputs
+            if (src->flags & GGML_TENSOR_FLAG_INPUT) {
+                ggml_gallocr_allocate_node(galloc, src, get_node_buffer_id(node_buffer_ids, i));
+            }
+        }
+    }
 
     // allocate tensors
     for (int i = 0; i < graph->n_nodes; i++) {
@@ -586,7 +585,7 @@ static void ggml_gallocr_alloc_graph_impl(ggml_gallocr_t galloc, struct ggml_cgr
         for (int j = 0; j < GGML_MAX_SRC; j++) {
             struct ggml_tensor * parent = node->src[j];
             if (parent == NULL) {
-                break;
+                continue;
             }
             ggml_gallocr_allocate_node(galloc, parent, buffer_id);
         }
@@ -598,7 +597,7 @@ static void ggml_gallocr_alloc_graph_impl(ggml_gallocr_t galloc, struct ggml_cgr
         for (int j = 0; j < GGML_MAX_SRC; j++) {
             struct ggml_tensor * parent = node->src[j];
             if (parent == NULL) {
-                break;
+                continue;
             }
             AT_PRINTF("%s", parent->name);
             if (j < GGML_MAX_SRC - 1 && node->src[j + 1] != NULL) {
@@ -611,7 +610,7 @@ static void ggml_gallocr_alloc_graph_impl(ggml_gallocr_t galloc, struct ggml_cgr
         for (int j = 0; j < GGML_MAX_SRC; j++) {
             struct ggml_tensor * parent = node->src[j];
             if (parent == NULL) {
-                break;
+                continue;
             }
             struct hash_node * p_hn = ggml_gallocr_hash_get(galloc, parent);
             p_hn->n_children -= 1;
@@ -639,7 +638,7 @@ static void ggml_gallocr_alloc_graph_impl(ggml_gallocr_t galloc, struct ggml_cgr
     }
 }
 
-bool ggml_gallocr_reserve_n(ggml_gallocr_t galloc, struct ggml_cgraph * graph, const int * node_buffer_ids) {
+bool ggml_gallocr_reserve_n(ggml_gallocr_t galloc, struct ggml_cgraph * graph, const int * node_buffer_ids, const int * leaf_buffer_ids) {
     size_t hash_size = graph->visited_hash_table.size;
 
     // initialize hash table
@@ -647,8 +646,8 @@ bool ggml_gallocr_reserve_n(ggml_gallocr_t galloc, struct ggml_cgraph * graph, c
         free(galloc->hash_set.keys);
         free(galloc->hash_values);
         galloc->hash_set.size = hash_size;
-        galloc->hash_set.keys = calloc(sizeof(struct ggml_tensor *), hash_size);
-        galloc->hash_values   = calloc(sizeof(struct hash_node), hash_size);
+        galloc->hash_set.keys = calloc(hash_size, sizeof(struct ggml_tensor *));
+        galloc->hash_values   = calloc(hash_size, sizeof(struct hash_node));
         GGML_ASSERT(galloc->hash_set.keys != NULL);
         GGML_ASSERT(galloc->hash_values != NULL);
     } else {
@@ -663,12 +662,12 @@ bool ggml_gallocr_reserve_n(ggml_gallocr_t galloc, struct ggml_cgraph * graph, c
     }
 
     // allocate in hash table
-    ggml_gallocr_alloc_graph_impl(galloc, graph, node_buffer_ids);
+    ggml_gallocr_alloc_graph_impl(galloc, graph, node_buffer_ids, leaf_buffer_ids);
 
     // set the node_allocs from the hash table
     if (galloc->n_nodes < graph->n_nodes) {
         free(galloc->node_allocs);
-        galloc->node_allocs = calloc(sizeof(struct node_alloc), graph->n_nodes);
+        galloc->node_allocs = calloc(graph->n_nodes, sizeof(struct node_alloc));
         GGML_ASSERT(galloc->node_allocs != NULL);
     }
     galloc->n_nodes = graph->n_nodes;
@@ -696,13 +695,32 @@ bool ggml_gallocr_reserve_n(ggml_gallocr_t galloc, struct ggml_cgraph * graph, c
             }
         }
     }
+    if (galloc->n_leafs < graph->n_leafs) {
+        free(galloc->leaf_allocs);
+        galloc->leaf_allocs = calloc(graph->n_leafs, sizeof(galloc->leaf_allocs[0]));
+        GGML_ASSERT(galloc->leaf_allocs != NULL);
+    }
+    galloc->n_leafs = graph->n_leafs;
+    for (int i = 0; i < graph->n_leafs; i++) {
+        struct ggml_tensor * leaf = graph->leafs[i];
+        struct hash_node * hn = ggml_gallocr_hash_get(galloc, leaf);
+        galloc->leaf_allocs[i].buffer_id = hn->buffer_id;
+        if (leaf->view_src || leaf->data) {
+            galloc->leaf_allocs[i].leaf.offset = SIZE_MAX;
+            galloc->leaf_allocs[i].leaf.size_max = 0;
+        } else {
+            galloc->leaf_allocs[i].leaf.offset = hn->offset;
+            galloc->leaf_allocs[i].leaf.size_max = ggml_backend_buft_get_alloc_size(galloc->bufts[hn->buffer_id], leaf);
+        }
+    }
 
     // reallocate buffers if needed
     for (int i = 0; i < galloc->n_buffers; i++) {
         size_t cur_size = galloc->buffers[i] ? ggml_backend_buffer_get_size(galloc->buffers[i]) : 0;
         size_t new_size = ggml_dyn_tallocr_max_size(galloc->buf_tallocs[i]);
 
-        if (new_size > cur_size) {
+        // even if there are no tensors allocated in this buffer, we still need to allocate it to initialize views
+        if (new_size > cur_size || galloc->buffers[i] == NULL) {
 #ifndef NDEBUG
             fprintf(stderr, "%s: reallocating %s buffer from size %.02f MiB to %.02f MiB\n", __func__, ggml_backend_buft_name(galloc->bufts[i]), cur_size / 1024.0 / 1024.0, new_size / 1024.0 / 1024.0);
 #endif
@@ -719,42 +737,33 @@ bool ggml_gallocr_reserve_n(ggml_gallocr_t galloc, struct ggml_cgraph * graph, c
 }
 
 bool ggml_gallocr_reserve(ggml_gallocr_t galloc, struct ggml_cgraph *graph) {
-    return ggml_gallocr_reserve_n(galloc, graph, NULL);
+    return ggml_gallocr_reserve_n(galloc, graph, NULL, NULL);
 }
 
-static void ggml_gallocr_init_tensor(ggml_gallocr_t galloc, struct ggml_tensor * node, struct node_alloc * node_alloc, struct tensor_alloc * tensor_alloc) {
-    assert(node->data || node->view_src || ggml_backend_buffer_get_alloc_size(galloc->buffers[node_alloc->buffer_id], node) <= tensor_alloc->size_max);
+static void ggml_gallocr_init_tensor(ggml_gallocr_t galloc, struct ggml_tensor * tensor, int buffer_id, struct tensor_alloc * tensor_alloc) {
+    assert(tensor->data || tensor->view_src || ggml_backend_buffer_get_alloc_size(galloc->buffers[buffer_id], tensor) <= tensor_alloc->size_max);
 
-    if (node->view_src != NULL) {
-        if (node->buffer == NULL) {
+    if (tensor->view_src != NULL) {
+        if (tensor->buffer == NULL) {
             assert(tensor_alloc->offset == SIZE_MAX);
-            if (node->view_src->buffer == NULL) {
+            if (tensor->view_src->buffer == NULL) {
                 // this tensor was allocated without ggml-backend
                 return;
             }
-            ggml_backend_view_init(galloc->buffers[node_alloc->buffer_id], node);
+            ggml_backend_view_init(galloc->buffers[buffer_id], tensor);
         }
     } else {
-        if (node->data == NULL) {
+        if (tensor->data == NULL) {
             assert(tensor_alloc->offset != SIZE_MAX);
-            assert(ggml_backend_buffer_get_alloc_size(galloc->buffers[node_alloc->buffer_id], node) <= tensor_alloc->size_max);
-            void * base = ggml_backend_buffer_get_base(galloc->buffers[node_alloc->buffer_id]);
+            assert(ggml_backend_buffer_get_alloc_size(galloc->buffers[buffer_id], tensor) <= tensor_alloc->size_max);
+            void * base = ggml_backend_buffer_get_base(galloc->buffers[buffer_id]);
             void * addr = (char *)base + tensor_alloc->offset;
-            ggml_backend_tensor_alloc(galloc->buffers[node_alloc->buffer_id], node, addr);
+            ggml_backend_tensor_alloc(galloc->buffers[buffer_id], tensor, addr);
         } else {
-            if (node->buffer == NULL) {
+            if (tensor->buffer == NULL) {
                 // this tensor was allocated without ggml-backend
                 return;
             }
-
-#ifndef NDEBUG
-            size_t offset =
-                (char *)node->data -
-                (char *)ggml_backend_buffer_get_base(node->buffer);
-            size_t size = ggml_backend_buffer_get_alloc_size(node->buffer, node);
-            assert(tensor_alloc->offset == SIZE_MAX || offset == tensor_alloc->offset);
-            assert(tensor_alloc->offset == SIZE_MAX || size <= tensor_alloc->size_max);
-#endif
         }
     }
 }
@@ -773,6 +782,13 @@ static bool ggml_gallocr_needs_realloc(ggml_gallocr_t galloc, struct ggml_cgraph
         return true;
     }
 
+    if (galloc->n_leafs != graph->n_leafs) {
+#ifndef NDEBUG
+        fprintf(stderr, "%s: graph has different number of leafs\n", __func__);
+#endif
+        return true;
+    }
+
     for (int i = 0; i < graph->n_nodes; i++) {
         struct ggml_tensor * node = graph->nodes[i];
         struct node_alloc * node_alloc = &galloc->node_allocs[i];
@@ -787,7 +803,7 @@ static bool ggml_gallocr_needs_realloc(ggml_gallocr_t galloc, struct ggml_cgraph
         for (int j = 0; j < GGML_MAX_SRC; j++) {
             struct ggml_tensor * src = node->src[j];
             if (src == NULL) {
-                break;
+                continue;
             }
             if (!ggml_gallocr_node_needs_realloc(galloc, src, node_alloc, &node_alloc->src[j])) {
 #ifndef NDEBUG
@@ -820,24 +836,30 @@ bool ggml_gallocr_alloc_graph(ggml_gallocr_t galloc, struct ggml_cgraph * graph)
 
     // reset buffers
     for (int i = 0; i < galloc->n_buffers; i++) {
-        // zero size buffers are not allocated
         if (galloc->buffers[i] != NULL) {
             ggml_backend_buffer_reset(galloc->buffers[i]);
         }
     }
 
     // allocate the graph tensors from the previous assignments
+    // leafs
+    for (int i = 0; i < graph->n_leafs; i++) {
+        struct ggml_tensor * leaf = graph->leafs[i];
+        struct leaf_alloc * leaf_alloc = &galloc->leaf_allocs[i];
+        ggml_gallocr_init_tensor(galloc, leaf, leaf_alloc->buffer_id, &leaf_alloc->leaf);
+    }
+    // nodes
     for (int i = 0; i < graph->n_nodes; i++) {
         struct ggml_tensor * node = graph->nodes[i];
         struct node_alloc * node_alloc = &galloc->node_allocs[i];
         for (int j = 0; j < GGML_MAX_SRC; j++) {
             struct ggml_tensor * src = node->src[j];
             if (src == NULL) {
-                break;
+                continue;
             }
-            ggml_gallocr_init_tensor(galloc, src, node_alloc, &node_alloc->src[j]);
+            ggml_gallocr_init_tensor(galloc, src, node_alloc->buffer_id, &node_alloc->src[j]);
         }
-        ggml_gallocr_init_tensor(galloc, node, node_alloc, &node_alloc->dst);
+        ggml_gallocr_init_tensor(galloc, node, node_alloc->buffer_id, &node_alloc->dst);
     }
 
     return true;
@@ -870,12 +892,12 @@ static bool alloc_tensor_range(struct ggml_context * ctx,
         return false;
     }
 
-    struct ggml_tallocr * tallocr = ggml_tallocr_new(buffer);
+    struct ggml_tallocr tallocr = ggml_tallocr_new(buffer);
 
     for (struct ggml_tensor * t = first; t != last; t = ggml_get_next_tensor(ctx, t)) {
         if (t->data == NULL) {
             if (t->view_src == NULL) {
-                ggml_tallocr_alloc(tallocr, t);
+                ggml_tallocr_alloc(&tallocr, t);
             } else if (t->buffer == NULL) {
                 ggml_backend_view_init(buffer, t);
             }
@@ -886,8 +908,6 @@ static bool alloc_tensor_range(struct ggml_context * ctx,
             }
         }
     }
-
-    ggml_tallocr_free(tallocr);
 
     *buffers = realloc(*buffers, sizeof(ggml_backend_buffer_t) * (*n_buffers + 1));
     (*buffers)[(*n_buffers)++] = buffer;

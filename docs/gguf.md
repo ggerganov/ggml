@@ -18,7 +18,98 @@ GGUF is a format based on the existing GGJT, but makes a few changes to the form
 
 The key difference between GGJT and GGUF is the use of a key-value structure for the hyperparameters (now referred to as metadata), rather than a list of untyped values. This allows for new metadata to be added without breaking compatibility with existing models, and to annotate the model with additional information that may be useful for inference or for identifying the model.
 
+### GGUF Naming Convention
+
+GGUF follow a naming convention of `<Model>(-<Version>)-(<ExpertsCount>x)<Parameters>-<EncodingScheme>(-<Shard>).gguf`
+
+The components are:
+1. **Model**: A descriptive name for the model type or architecture.
+    - This can be derived from gguf metadata `general.name` substituting spaces for dashes.
+2. **Version**: (Optional) Denotes the model version number, formatted as `v<Major>.<Minor>`
+    - If model is missing a version number then assume `v0.0` (Prerelease)
+    - This can be derived from gguf metadata `general.version`
+3. **ExpertsCount**: (Optional) Indicates the number of experts found in a Mixture of Experts based model.
+    - This can be derived from gguf metadata `llama.expert_count`
+4. **Parameters**: Indicates the number of parameters and their scale, represented as `<count><scale-prefix>`:
+    - `Q`: Quadrillion parameters.
+    - `T`: Trillion parameters.
+    - `B`: Billion parameters.
+    - `M`: Million parameters.
+    - `K`: Thousand parameters.
+5. **EncodingScheme**: Indicates the weights encoding scheme that was applied to the model. Content, type mixture and arrangement however are determined by user code and can vary depending on project needs.
+6. **Shard**: (Optional) Indicates and denotes that the model has been split into multiple shards, formatted as `<ShardNum>-of-<ShardTotal>`.
+    - *ShardNum* : Shard position in this model. Must be 5 digits padded by zeros.
+      - Shard number always starts from `00001` onwards (e.g. First shard always starts at `00001-of-XXXXX` rather than `00000-of-XXXXX`).
+    - *ShardTotal* : Total number of shards in this model. Must be 5 digits padded by zeros.
+
+#### Parsing Above Naming Convention
+
+To correctly parse a well formed naming convention based gguf filename, it is recommended to read from right to left using `-` as the delimiter. This strategy allow for the most flexibility in model name to include dashes if they so choose, while at the same time allowing for version string to be optional. This approach also gives some future proofing to extend the format if needed in the future.
+
+For example:
+
+  * `Mixtral-v0.1-8x7B-KQ2.gguf`:
+    - Model Name: Mixtral
+    - Version Number: v0.1
+    - Expert Count: 8
+    - Parameter Count: 7B
+    - Weight Encoding Scheme: KQ2
+    - Shard: N/A
+
+  * `Hermes-2-Pro-Llama-3-8B-F16.gguf`:
+    - Model Name: Hermes 2 Pro Llama 3
+    - Version Number: v0.0
+    - Expert Count: 0
+    - Parameter Count: 8B
+    - Weight Encoding Scheme: F16
+    - Shard: N/A
+
+  * `Grok-v1.0-100B-Q4_0-00003-of-00009.gguf"`
+    - Model Name: Grok
+    - Version Number: v1.0
+    - Expert Count: 0
+    - Parameter Count: 100B
+    - Weight Encoding Scheme: Q4_0
+    - Shard: 3 out of 9 total shards
+
+You can also try using `/^(?<model_name>[A-Za-z0-9\s-]+)(?:-v(?<major>\d+)\.(?<minor>\d+))?-(?:(?<experts_count>\d+)x)?(?<parameters>\d+[A-Za-z]?)-(?<encoding_scheme>[\w_]+)(?:-(?<shard>\d{5})-of-(?<shardTotal>\d{5}))?\.gguf$/` regular expression to extract all the values above as well. Just don't forget to convert `-` to ` ` for the model name.
+
+<details><summary>Example Node.js Regex Function</summary>
+
+```js
+#!/usr/bin/env node
+const ggufRegex = /^(?<model_name>[A-Za-z0-9\s-]+)(?:-v(?<major>\d+)\.(?<minor>\d+))?-(?:(?<experts_count>\d+)x)?(?<parameters>\d+[A-Za-z]?)-(?<encoding_scheme>[\w_]+)(?:-(?<shard>\d{5})-of-(?<shardTotal>\d{5}))?\.gguf$/;
+
+function parseGGUFFilename(filename) {
+  const match = ggufRegex.exec(filename);
+  if (!match)
+    return null;
+  const {model_name, major = '0', minor = '0', experts_count = null, parameters, encoding_scheme, shard = null, shardTotal = null} = match.groups;
+  return {modelName: model_name.trim().replace(/-/g, ' '), version: `v${major}.${minor}`, expertsCount: experts_count ? +experts_count : null, parameters, encodingScheme: encoding_scheme, shard: shard ? +shard : null, shardTotal: shardTotal ? +shardTotal : null};
+}
+
+const testCases = [
+  {filename: 'Mixtral-v0.1-8x7B-KQ2.gguf',              expected: { modelName: 'Mixtral',              version: 'v0.1',   expertsCount: 8,    parameters: '7B',   encodingScheme: 'KQ2',  shard: null,    shardTotal: null }},
+  {filename: 'Grok-v1.0-100B-Q4_0-00003-of-00009.gguf', expected: { modelName: 'Grok',                 version: 'v1.0',   expertsCount: null, parameters: '100B', encodingScheme: 'Q4_0', shard: 3,       shardTotal: 9    }},
+  {filename: 'Hermes-2-Pro-Llama-3-8B-F16.gguf',        expected: { modelName: 'Hermes 2 Pro Llama 3', version: 'v0.0',   expertsCount: null, parameters: '8B',   encodingScheme: 'F16',  shard: null,    shardTotal: null }},
+  {filename: 'Hermes-2-Pro-Llama-3-v32.33-8Q-F16.gguf', expected: { modelName: 'Hermes 2 Pro Llama 3', version: 'v32.33', expertsCount: null, parameters: '8Q',   encodingScheme: 'F16',  shard: null,    shardTotal: null }},
+  {filename: 'not-a-known-arrangement.gguf', expected: null},
+];
+
+testCases.forEach(({ filename, expected }) => {
+  const result = parseGGUFFilename(filename);
+  const passed = JSON.stringify(result) === JSON.stringify(expected);
+  console.log(`${filename}: ${passed ? "PASS" : "FAIL"}`);
+});
+```
+
+</details>
+
+
 ### File Structure
+
+![image](https://github.com/ggerganov/ggml/assets/1991296/c3623641-3a1d-408e-bfaf-1b7c4e16aa63)
+*diagram by [@mishig25](https://github.com/mishig25) (GGUF v3)*
 
 GGUF files are structured as follows. They use a global alignment specified in the `general.alignment` metadata field, referred to as `ALIGNMENT` below. Where required, the file is padded with `0x00` bytes to the next multiple of `general.alignment`.
 
@@ -28,26 +119,36 @@ Models are little-endian by default. They can also come in big-endian for use wi
 
 ```c
 enum ggml_type: uint32_t {
-    GGML_TYPE_F32  = 0,
-    GGML_TYPE_F16  = 1,
-    GGML_TYPE_Q4_0 = 2,
-    GGML_TYPE_Q4_1 = 3,
+    GGML_TYPE_F32     = 0,
+    GGML_TYPE_F16     = 1,
+    GGML_TYPE_Q4_0    = 2,
+    GGML_TYPE_Q4_1    = 3,
     // GGML_TYPE_Q4_2 = 4, support has been removed
-    // GGML_TYPE_Q4_3 (5) support has been removed
-    GGML_TYPE_Q5_0 = 6,
-    GGML_TYPE_Q5_1 = 7,
-    GGML_TYPE_Q8_0 = 8,
-    GGML_TYPE_Q8_1 = 9,
-    // k-quantizations
-    GGML_TYPE_Q2_K = 10,
-    GGML_TYPE_Q3_K = 11,
-    GGML_TYPE_Q4_K = 12,
-    GGML_TYPE_Q5_K = 13,
-    GGML_TYPE_Q6_K = 14,
-    GGML_TYPE_Q8_K = 15,
-    GGML_TYPE_I8,
-    GGML_TYPE_I16,
-    GGML_TYPE_I32,
+    // GGML_TYPE_Q4_3 = 5, support has been removed
+    GGML_TYPE_Q5_0    = 6,
+    GGML_TYPE_Q5_1    = 7,
+    GGML_TYPE_Q8_0    = 8,
+    GGML_TYPE_Q8_1    = 9,
+    GGML_TYPE_Q2_K    = 10,
+    GGML_TYPE_Q3_K    = 11,
+    GGML_TYPE_Q4_K    = 12,
+    GGML_TYPE_Q5_K    = 13,
+    GGML_TYPE_Q6_K    = 14,
+    GGML_TYPE_Q8_K    = 15,
+    GGML_TYPE_IQ2_XXS = 16,
+    GGML_TYPE_IQ2_XS  = 17,
+    GGML_TYPE_IQ3_XXS = 18,
+    GGML_TYPE_IQ1_S   = 19,
+    GGML_TYPE_IQ4_NL  = 20,
+    GGML_TYPE_IQ3_S   = 21,
+    GGML_TYPE_IQ2_S   = 22,
+    GGML_TYPE_IQ4_XS  = 23,
+    GGML_TYPE_I8      = 24,
+    GGML_TYPE_I16     = 25,
+    GGML_TYPE_I32     = 26,
+    GGML_TYPE_I64     = 27,
+    GGML_TYPE_F64     = 28,
+    GGML_TYPE_IQ1_M   = 29,
     GGML_TYPE_COUNT,
 };
 
@@ -82,7 +183,7 @@ enum gguf_metadata_value_type: uint32_t {
     GGUF_METADATA_VALUE_TYPE_INT64 = 11,
     // The value is a 64-bit IEEE754 floating point number.
     GGUF_METADATA_VALUE_TYPE_FLOAT64 = 12,
-}
+};
 
 // A string in GGUF.
 struct gguf_string_t {
@@ -90,7 +191,7 @@ struct gguf_string_t {
     uint64_t len;
     // The string as a UTF-8 non-null-terminated string.
     char string[len];
-}
+};
 
 union gguf_metadata_value_t {
     uint8_t uint8;
@@ -234,6 +335,7 @@ By convention, most counts/lengths/etc are `uint64` unless otherwise specified. 
   - `gpt2`
   - `bloom`
   - `falcon`
+  - `mamba`
   - `rwkv`
 - **`general.quantization_version: uint32`**: The version of the quantization format. Not required if the model is not quantized (i.e. no tensors are quantized). If any tensors are quantized, this _must_ be present. This is separate to the quantization scheme of the tensors itself; the quantization version may change without changing the scheme's name (e.g. the quantization scheme is Q5_K, and the quantization version is 4).
 - **`general.alignment: uint32`**: the global alignment to use, as described above. This can vary to allow for different alignment schemes, but it must be a multiple of 8. Some writers may not write the alignment. If the alignment is **not** specified, assume it is `32`.
@@ -318,6 +420,13 @@ Note that older models may not have these keys, and may instead use the followin
 - `[llm].rope.scale_linear: float32`: A linear scale factor for RoPE to adjust the context length.
 
 It is recommended that models use the newer keys if possible, as they are more flexible and allow for more complex scaling schemes. Executors will need to support both indefinitely.
+
+#### SSM
+
+- `[llm].ssm.conv_kernel: uint32`: The size of the rolling/shift state.
+- `[llm].ssm.inner_size: uint32`: The embedding size of the states.
+- `[llm].ssm.state_size: uint32`: The size of the recurrent state.
+- `[llm].ssm.time_step_rank: uint32`: The rank of time steps.
 
 #### Models
 
@@ -437,6 +546,17 @@ The following sections describe the metadata for each model architecture. Each k
 
         model[src] = torch.cat((q,k,v)).reshape_as(model[src])
     ```
+
+##### Mamba
+
+- `mamba.context_length`
+- `mamba.embedding_length`
+- `mamba.block_count`
+- `mamba.ssm.conv_kernel`
+- `mamba.ssm.inner_size`
+- `mamba.ssm.state_size`
+- `mamba.ssm.time_step_rank`
+- `mamba.attention.layer_norm_rms_epsilon`
 
 ##### RWKV
 
@@ -559,10 +679,18 @@ where N signifies the block number a layer belongs to, and where `BB` could be:
 - `ffn_up`: Feed-forward network "up" layer
 - `ffn_gate`: Feed-forward network "gate" layer
 - `ffn_down`: Feed-forward network "down" layer
-- `ffn_gate_inp`: Expert-routing layer for the Fee-forward network in MoE models
+- `ffn_gate_inp`: Expert-routing layer for the Feed-forward network in MoE models
 - `ffn_gate_exp`: Feed-forward network "gate" layer per expert in MoE models
 - `ffn_down_exp`: Feed-forward network "down" layer per expert in MoE models
 - `ffn_up_exp`: Feed-forward network "up" layer per expert in MoE models
+
+- `ssm_in`: State space model input projections layer
+- `ssm_conv1d`: State space model rolling/shift layer
+- `ssm_x`: State space model selective parametrization layer
+- `ssm_a`: State space model state compression layer
+- `ssm_d`: State space model skip connection layer
+- `ssm_dt`: State space model time step layer
+- `ssm_out`: State space model output projection layer
 
 ## Version History
 

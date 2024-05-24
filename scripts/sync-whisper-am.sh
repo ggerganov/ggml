@@ -59,14 +59,19 @@ while read c; do
     ggml*.m \
     ggml*.metal \
     ggml*.cu \
+    ggml-cuda/* \
     whisper.h \
     whisper.cpp \
     examples/common.h \
     examples/common.cpp \
     examples/common-ggml.h \
     examples/common-ggml.cpp \
+    examples/grammar-parser.h \
+    examples/grammar-parser.cpp \
     examples/main/main.cpp \
     examples/quantize/quantize.cpp \
+    LICENSE \
+    scripts/gen-authors.sh \
     >> $SRC_GGML/whisper-src.patch
 done < $SRC_GGML/whisper-commits
 
@@ -96,6 +101,8 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
     # ggml-alloc.c        -> src/ggml-alloc.c
     # ggml-backend-impl.h -> src/ggml-backend-impl.h
     # ggml-backend.c      -> src/ggml-backend.c
+    # ggml-common.h       -> src/ggml-common.h
+    # ggml-cuda/*         -> src/ggml-cuda/
     # ggml-cuda.cu        -> src/ggml-cuda.cu
     # ggml-cuda.h         -> src/ggml-cuda.h
     # ggml-impl.h         -> src/ggml-impl.h
@@ -109,10 +116,12 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
     # ggml-opencl.h       -> src/ggml-opencl.h
     # ggml-quants.c       -> src/ggml-quants.c
     # ggml-quants.h       -> src/ggml-quants.h
+    # ggml-rpc.cpp        -> src/ggml-rpc.cpp
+    # ggml-rpc.h          -> src/ggml-rpc.h
     # ggml-sycl.cpp       -> src/ggml-sycl.cpp
     # ggml-sycl.h         -> src/ggml-sycl.h
-    # ggml-vulkan.cpp    -> src/ggml-vulkan.cpp
-    # ggml-vulkan.h      -> src/ggml-vulkan.h
+    # ggml-vulkan.cpp     -> src/ggml-vulkan.cpp
+    # ggml-vulkan.h       -> src/ggml-vulkan.h
     # ggml.h              -> include/ggml/ggml.h
     # ggml-alloc.h        -> include/ggml/ggml-alloc.h
     # ggml-backend.h      -> include/ggml/ggml-backend.h
@@ -124,14 +133,21 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
     # examples/common.cpp            -> examples/common.cpp
     # examples/common-ggml.h         -> examples/common-ggml.h
     # examples/common-ggml.cpp       -> examples/common-ggml.cpp
+    # examples/grammar-parser.h      -> examples/whisper/grammar-parser.h
+    # examples/grammar-parser.cpp    -> examples/whisper/grammar-parser.cpp
     # examples/main/main.cpp         -> examples/whisper/main.cpp
     # examples/quantize/quantize.cpp -> examples/whisper/quantize.cpp
+    #
+    # LICENSE                -> LICENSE
+    # scripts/gen-authors.sh -> scripts/gen-authors.sh
 
     cat whisper-src.patch | sed \
         -e 's/\/ggml\.c/\/src\/ggml.c/g' \
         -e 's/\/ggml-alloc\.c/\/src\/ggml-alloc.c/g' \
         -e 's/\/ggml-backend-impl\.h/\/src\/ggml-backend-impl.h/g' \
         -e 's/\/ggml-backend\.c/\/src\/ggml-backend.c/g' \
+        -e 's/\/ggml-common\.h/\/src\/ggml-common.h/g' \
+        -e 's/\/ggml-cuda\//\/src\/ggml-cuda\//g' \
         -e 's/\/ggml-cuda\.cu/\/src\/ggml-cuda.cu/g' \
         -e 's/\/ggml-cuda\.h/\/src\/ggml-cuda.h/g' \
         -e 's/\/ggml-impl\.h/\/src\/ggml-impl.h/g' \
@@ -145,6 +161,8 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
         -e 's/\/ggml-opencl\.h/\/src\/ggml-opencl.h/g' \
         -e 's/\/ggml-quants\.c/\/src\/ggml-quants.c/g' \
         -e 's/\/ggml-quants\.h/\/src\/ggml-quants.h/g' \
+        -e 's/\/ggml-rpc\.cpp/\/src\/ggml-rpc.cpp/g' \
+        -e 's/\/ggml-rpc\.h/\/src\/ggml-rpc.h/g' \
         -e 's/\/ggml-sycl\.cpp/\/src\/ggml-sycl.cpp/g' \
         -e 's/\/ggml-sycl\.h/\/src\/ggml-sycl.h/g' \
         -e 's/\/ggml-vulkan\.cpp/\/src\/ggml-vulkan.cpp/g' \
@@ -158,8 +176,12 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
         -e 's/\/examples\/common\.cpp/\/examples\/common.cpp/g' \
         -e 's/\/examples\/common-ggml\.h/\/examples\/common-ggml.h/g' \
         -e 's/\/examples\/common-ggml\.cpp/\/examples\/common-ggml.cpp/g' \
+        -e 's/\/examples\/grammar-parser\.h/\/examples\/whisper\/grammar-parser.h/g' \
+        -e 's/\/examples\/grammar-parser\.cpp/\/examples\/whisper\/grammar-parser.cpp/g' \
         -e 's/\/examples\/main\/main\.cpp/\/examples\/whisper\/main.cpp/g' \
         -e 's/\/examples\/quantize\/quantize\.cpp/\/examples\/whisper\/quantize.cpp/g' \
+        -e 's/\/LICENSE/\/LICENSE/g' \
+        -e 's/\/scripts\/gen-authors\.sh/\/scripts\/gen-authors.sh/g' \
         > whisper-src.patch.tmp
     mv whisper-src.patch.tmp whisper-src.patch
 

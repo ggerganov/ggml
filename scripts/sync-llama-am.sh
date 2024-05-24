@@ -59,11 +59,14 @@ while read c; do
         ggml*.m \
         ggml*.metal \
         ggml*.cu \
+        ggml-cuda/* \
         tests/test-opt.cpp \
         tests/test-grad0.cpp \
         tests/test-quantize-fns.cpp \
         tests/test-quantize-perf.cpp \
         tests/test-backend-ops.cpp \
+        LICENSE \
+        scripts/gen-authors.sh \
         >> $SRC_GGML/llama-src.patch
 done < $SRC_GGML/llama-commits
 
@@ -93,6 +96,8 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     # ggml-alloc.c        -> src/ggml-alloc.c
     # ggml-backend-impl.h -> src/ggml-backend-impl.h
     # ggml-backend.c      -> src/ggml-backend.c
+    # ggml-common.h       -> src/ggml-common.h
+    # ggml-cuda/*         -> src/ggml-cuda/*
     # ggml-cuda.cu        -> src/ggml-cuda.cu
     # ggml-cuda.h         -> src/ggml-cuda.h
     # ggml-impl.h         -> src/ggml-impl.h
@@ -106,6 +111,8 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     # ggml-opencl.h       -> src/ggml-opencl.h
     # ggml-quants.c       -> src/ggml-quants.c
     # ggml-quants.h       -> src/ggml-quants.h
+    # ggml-rpc.cpp        -> src/ggml-rpc.cpp
+    # ggml-rpc.h          -> src/ggml-rpc.h
     # ggml-sycl.cpp       -> src/ggml-sycl.cpp
     # ggml-sycl.h         -> src/ggml-sycl.h
     # ggml-vulkan.cpp     -> src/ggml-vulkan.cpp
@@ -119,12 +126,17 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     # tests/test-quantize-fns.cpp  -> tests/test-quantize-fns.cpp
     # tests/test-quantize-perf.cpp -> tests/test-quantize-perf.cpp
     # tests/test-backend-ops.cpp   -> tests/test-backend-ops.cpp
+    #
+    # LICENSE                -> LICENSE
+    # scripts/gen-authors.sh -> scripts/gen-authors.sh
 
     cat llama-src.patch | sed \
         -e 's/\/ggml\.c/\/src\/ggml.c/g' \
         -e 's/\/ggml-alloc\.c/\/src\/ggml-alloc.c/g' \
         -e 's/\/ggml-backend-impl\.h/\/src\/ggml-backend-impl.h/g' \
         -e 's/\/ggml-backend\.c/\/src\/ggml-backend.c/g' \
+        -e 's/\/ggml-common\.h/\/src\/ggml-common.h/g' \
+        -e 's/\/ggml-cuda\//\/src\/ggml-cuda\//g' \
         -e 's/\/ggml-cuda\.cu/\/src\/ggml-cuda.cu/g' \
         -e 's/\/ggml-cuda\.h/\/src\/ggml-cuda.h/g' \
         -e 's/\/ggml-impl\.h/\/src\/ggml-impl.h/g' \
@@ -138,6 +150,8 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
         -e 's/\/ggml-opencl\.h/\/src\/ggml-opencl.h/g' \
         -e 's/\/ggml-quants\.c/\/src\/ggml-quants.c/g' \
         -e 's/\/ggml-quants\.h/\/src\/ggml-quants.h/g' \
+        -e 's/\/ggml-rpc\.cpp/\/src\/ggml-rpc.cpp/g' \
+        -e 's/\/ggml-rpc\.h/\/src\/ggml-rpc.h/g' \
         -e 's/\/ggml-sycl\.cpp/\/src\/ggml-sycl.cpp/g' \
         -e 's/\/ggml-sycl\.h/\/src\/ggml-sycl.h/g' \
         -e 's/\/ggml-vulkan\.cpp/\/src\/ggml-vulkan.cpp/g' \
@@ -150,6 +164,8 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
         -e 's/\/tests\/test-quantize-fns\.cpp/\/tests\/test-quantize-fns.cpp/g' \
         -e 's/\/tests\/test-quantize-perf\.cpp/\/tests\/test-quantize-perf.cpp/g' \
         -e 's/\/tests\/test-backend-ops\.cpp/\/tests\/test-backend-ops.cpp/g' \
+        -e 's/\/LICENSE/\/LICENSE/g' \
+        -e 's/\/scripts\/gen-authors\.sh/\/scripts\/gen-authors.sh/g' \
         > llama-src.patch.tmp
     mv llama-src.patch.tmp llama-src.patch
 

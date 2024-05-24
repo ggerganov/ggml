@@ -4,6 +4,8 @@ cp -rpv ../llama.cpp/ggml.c              src/ggml.c
 cp -rpv ../llama.cpp/ggml-alloc.c        src/ggml-alloc.c
 cp -rpv ../llama.cpp/ggml-backend-impl.h src/ggml-backend-impl.h
 cp -rpv ../llama.cpp/ggml-backend.c      src/ggml-backend.c
+cp -rpv ../llama.cpp/ggml-common.h       src/ggml-common.h
+cp -rpv ../llama.cpp/ggml-cuda/*         src/ggml-cuda/
 cp -rpv ../llama.cpp/ggml-cuda.cu        src/ggml-cuda.cu
 cp -rpv ../llama.cpp/ggml-cuda.h         src/ggml-cuda.h
 cp -rpv ../llama.cpp/ggml-impl.h         src/ggml-impl.h
@@ -18,6 +20,8 @@ cp -rpv ../llama.cpp/ggml-opencl.cpp     src/ggml-opencl.cpp
 cp -rpv ../llama.cpp/ggml-opencl.h       src/ggml-opencl.h
 cp -rpv ../llama.cpp/ggml-quants.c       src/ggml-quants.c
 cp -rpv ../llama.cpp/ggml-quants.h       src/ggml-quants.h
+cp -rpv ../llama.cpp/ggml-rpc.cpp        src/ggml-rpc.cpp
+cp -rpv ../llama.cpp/ggml-rpc.h          src/ggml-rpc.h
 cp -rpv ../llama.cpp/ggml-sycl.cpp       src/ggml-sycl.cpp
 cp -rpv ../llama.cpp/ggml-sycl.h         src/ggml-sycl.h
 cp -rpv ../llama.cpp/ggml-vulkan.cpp     src/ggml-vulkan.cpp
@@ -31,3 +35,6 @@ cp -rpv ../llama.cpp/tests/test-grad0.cpp         tests/test-grad0.cpp
 cp -rpv ../llama.cpp/tests/test-quantize-fns.cpp  tests/test-quantize-fns.cpp
 cp -rpv ../llama.cpp/tests/test-quantize-perf.cpp tests/test-quantize-perf.cpp
 cp -rpv ../llama.cpp/tests/test-backend-ops.cpp   tests/test-backend-ops.cpp
+
+cp -rpv ../llama.cpp/LICENSE                ./LICENSE
+cp -rpv ../llama.cpp/scripts/gen-authors.sh ./scripts/gen-authors.sh

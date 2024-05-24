@@ -2,7 +2,7 @@
 #include "ggml/ggml-alloc.h"
 #include "ggml/ggml-backend.h"
 
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_CUDA
 #include "ggml-cuda.h"
 #endif
 
@@ -285,7 +285,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
     }
 
     // initialize the backend
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_CUDA
     if (n_gpu_layers > 0) {
         fprintf(stderr, "%s: using CUDA backend\n", __func__);
         model.backend = ggml_backend_cuda_init(0);
@@ -419,21 +419,19 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 
         // allocate the tensors into the backend buffer
         {
-            ggml_tallocr * alloc = ggml_tallocr_new(model.kv_cache.buffer);
+            ggml_tallocr alloc = ggml_tallocr_new(model.kv_cache.buffer);
 
             // this updates the pointers in the tensors to point to the correct location in the buffer
             // this is necessary since the ggml_context is .no_alloc == true
             // note that the buffer can actually be a device buffer, depending on the backend
-            ggml_tallocr_alloc(alloc, model.kv_cache.k);
-            ggml_tallocr_alloc(alloc, model.kv_cache.v);
-
-            ggml_tallocr_free(alloc);
+            ggml_tallocr_alloc(&alloc, model.kv_cache.k);
+            ggml_tallocr_alloc(&alloc, model.kv_cache.v);
         }
     }
 
     // load weights
     {
-        ggml_tallocr * alloc = ggml_tallocr_new(model.buffer_w);
+        ggml_tallocr alloc = ggml_tallocr_new(model.buffer_w);
 
         size_t total_size = 0;
 
@@ -495,7 +493,7 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
                 return false;
             }
 
-            ggml_tallocr_alloc(alloc, tensor);
+            ggml_tallocr_alloc(&alloc, tensor);
 
             if (ggml_backend_is_cpu  (model.backend)
 #ifdef GGML_USE_METAL
@@ -525,7 +523,6 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
             total_size += ggml_nbytes(tensor);
         }
 
-        ggml_tallocr_free(alloc);
         printf("%s: model size  = %8.2f MB\n", __func__, total_size/1024.0/1024.0);
     }
 
@@ -562,35 +559,35 @@ struct ggml_cgraph * gpt2_graph(
         /*.no_alloc   =*/ true, // the tensors will be allocated later by ggml_gallocr_alloc_graph()
     };
 
-    struct ggml_context * ctx0 = ggml_init(params);
+    struct ggml_context * ctx = ggml_init(params);
 
-    struct ggml_cgraph  * gf = ggml_new_graph_custom(ctx0, GPT2_MAX_NODES, false);
+    struct ggml_cgraph  * gf = ggml_new_graph_custom(ctx, GPT2_MAX_NODES, false);
 
     struct ggml_tensor * inpL;
     if (batch.token) {
-        struct ggml_tensor * inp_tokens = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
+        struct ggml_tensor * inp_tokens = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, n_tokens);
         ggml_set_name(inp_tokens, "inp_tokens");
         ggml_set_input(inp_tokens);
 
-        struct ggml_tensor * position = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
+        struct ggml_tensor * position = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, n_tokens);
         ggml_set_name(position, "position");
         ggml_set_input(position);
 
         // wte + wpe
         inpL =
-            ggml_add(ctx0,
-                    ggml_get_rows(ctx0, model.wte, inp_tokens),
-                    ggml_get_rows(ctx0, model.wpe, position));
+            ggml_add(ctx,
+                    ggml_get_rows(ctx, model.wte, inp_tokens),
+                    ggml_get_rows(ctx, model.wpe, position));
     } else {
         GGML_ASSERT(batch.embd);
 
-        inpL = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_embd, n_tokens);
+        inpL = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, n_embd, n_tokens);
         ggml_set_name(inpL, "embd");
         ggml_set_input(inpL);
     }
 
     // KQ_mask (mask for 1 head, it will be broadcasted to all heads)
-    struct ggml_tensor * KQ_mask = ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_kv, n_tokens, 1);
+    struct ggml_tensor * KQ_mask = ggml_new_tensor_3d(ctx, GGML_TYPE_F32, n_kv, n_tokens, 1);
     ggml_set_name(KQ_mask, "KQ_mask");
     ggml_set_input(KQ_mask);
 
@@ -601,12 +598,12 @@ struct ggml_cgraph * gpt2_graph(
         // norm
         {
             // [ 768, N]
-            cur = ggml_norm(ctx0, inpL, hparams.eps);
+            cur = ggml_norm(ctx, inpL, hparams.eps);
 
             // cur = ln_1_g*cur + ln_1_b
             // [ 768, N]
-            cur = ggml_add(ctx0,
-                    ggml_mul(ctx0,
+            cur = ggml_add(ctx,
+                    ggml_mul(ctx,
                         cur,
                         model.layers[il].ln_1_g),
                     model.layers[il].ln_1_b);
@@ -621,45 +618,45 @@ struct ggml_cgraph * gpt2_graph(
         // cur = attn_w*cur + attn_b
         // [2304, n_tokens]
         {
-            cur = ggml_mul_mat(ctx0,
+            cur = ggml_mul_mat(ctx,
                     model.layers[il].c_attn_attn_w,
                     cur);
 
-            cur = ggml_add(ctx0,
+            cur = ggml_add(ctx,
                     cur,
                     model.layers[il].c_attn_attn_b);
         }
 
         // self-attention
         {
-            struct ggml_tensor * Qcur = ggml_view_2d(ctx0, cur, n_embd, n_tokens, cur->nb[1], 0*sizeof(float)*n_embd);
-            struct ggml_tensor * Kcur = ggml_view_2d(ctx0, cur, n_embd, n_tokens, cur->nb[1], 1*sizeof(float)*n_embd);
-            struct ggml_tensor * Vcur = ggml_view_2d(ctx0, cur, n_embd, n_tokens, cur->nb[1], 2*sizeof(float)*n_embd);
+            struct ggml_tensor * Qcur = ggml_view_2d(ctx, cur, n_embd, n_tokens, cur->nb[1], 0*sizeof(float)*n_embd);
+            struct ggml_tensor * Kcur = ggml_view_2d(ctx, cur, n_embd, n_tokens, cur->nb[1], 1*sizeof(float)*n_embd);
+            struct ggml_tensor * Vcur = ggml_view_2d(ctx, cur, n_embd, n_tokens, cur->nb[1], 2*sizeof(float)*n_embd);
 
             // store key and value to memory
             if (n_tokens >= 1) {
-                struct ggml_tensor * k = ggml_view_1d(ctx0, model.kv_cache.k, n_tokens*n_embd, (ggml_element_size(model.kv_cache.k)*n_embd)*(il*n_ctx + kv_head));
-                struct ggml_tensor * v = ggml_view_1d(ctx0, model.kv_cache.v, n_tokens*n_embd, (ggml_element_size(model.kv_cache.v)*n_embd)*(il*n_ctx + kv_head));
+                struct ggml_tensor * k = ggml_view_1d(ctx, model.kv_cache.k, n_tokens*n_embd, (ggml_element_size(model.kv_cache.k)*n_embd)*(il*n_ctx + kv_head));
+                struct ggml_tensor * v = ggml_view_1d(ctx, model.kv_cache.v, n_tokens*n_embd, (ggml_element_size(model.kv_cache.v)*n_embd)*(il*n_ctx + kv_head));
 
-                ggml_build_forward_expand(gf, ggml_cpy(ctx0, Kcur, k));
-                ggml_build_forward_expand(gf, ggml_cpy(ctx0, Vcur, v));
+                ggml_build_forward_expand(gf, ggml_cpy(ctx, Kcur, k));
+                ggml_build_forward_expand(gf, ggml_cpy(ctx, Vcur, v));
             }
 
             // Q = Qcur.contiguous().view(n_embd/n_head, n_head, N).permute(0, 2, 1, 3)
             // [64, N, 12]
             struct ggml_tensor * Q =
-                ggml_permute(ctx0,
-                        ggml_cpy(ctx0,
+                ggml_permute(ctx,
+                        ggml_cont_3d(ctx,
                             Qcur,
-                            ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_embd/n_head, n_head, n_tokens)),
+                            n_embd/n_head, n_head, n_tokens),
                         0, 2, 1, 3);
 
             // K = Kmem.view(n_embd/n_head, n_head, n_kv).permute(0, 2, 1, 3)
             // [64, n_kv, 12]
             struct ggml_tensor * K =
-                ggml_permute(ctx0,
-                        ggml_reshape_3d(ctx0,
-                            ggml_view_1d(ctx0, model.kv_cache.k, n_kv*n_embd, il*n_ctx*ggml_element_size(model.kv_cache.k)*n_embd),
+                ggml_permute(ctx,
+                        ggml_reshape_3d(ctx,
+                            ggml_view_1d(ctx, model.kv_cache.k, n_kv*n_embd, il*n_ctx*ggml_element_size(model.kv_cache.k)*n_embd),
                             n_embd/n_head, n_head, n_kv),
                         0, 2, 1, 3);
 
@@ -677,47 +674,45 @@ struct ggml_cgraph * gpt2_graph(
 
             // K * Q
             // [n_kv, n_tokens, 12]
-            struct ggml_tensor * KQ = ggml_mul_mat(ctx0, K, Q);
+            struct ggml_tensor * KQ = ggml_mul_mat(ctx, K, Q);
 
             // KQ_scaled = KQ / sqrt(n_embd/n_head)
             // [n_kv, n_tokens, 12]
             struct ggml_tensor * KQ_scaled =
-                ggml_scale(ctx0,
+                ggml_scale(ctx,
                         KQ,
                         1.0f/sqrtf(float(n_embd)/n_head));
 
             // KQ_masked = mask_past(KQ_scaled)
             // [n_kv, n_tokens, 12]
-            struct ggml_tensor * KQ_masked = ggml_add(ctx0, KQ_scaled, KQ_mask);
+            struct ggml_tensor * KQ_masked = ggml_add(ctx, KQ_scaled, KQ_mask);
 
             // KQ = soft_max(KQ_masked)
             // [n_kv, N, 12]
-            struct ggml_tensor * KQ_soft_max = ggml_soft_max(ctx0, KQ_masked);
+            struct ggml_tensor * KQ_soft_max = ggml_soft_max(ctx, KQ_masked);
 
             // V_trans = Vmem.view(n_embd/n_head, n_head, n_kv).permute(1, 2, 0, 3).contiguous()
             // [n_kv, 64, 12]
             struct ggml_tensor * V_trans =
-                ggml_cpy(ctx0,
-                        ggml_permute(ctx0,
-                            ggml_reshape_3d(ctx0,
-                                ggml_view_1d(ctx0, model.kv_cache.v, n_kv*n_embd, il*n_ctx*ggml_element_size(model.kv_cache.v)*n_embd),
+                ggml_cont_3d(ctx,
+                        ggml_permute(ctx,
+                            ggml_reshape_3d(ctx,
+                                ggml_view_1d(ctx, model.kv_cache.v, n_kv*n_embd, il*n_ctx*ggml_element_size(model.kv_cache.v)*n_embd),
                                 n_embd/n_head, n_head, n_kv),
                             1, 2, 0, 3),
-                        ggml_new_tensor_3d(ctx0, model.kv_cache.v->type, n_kv, n_embd/n_head, n_head));
+                        n_kv, n_embd/n_head, n_head);
 
             // KQV = transpose(V) * KQ_soft_max
             // [64, n_tokens, 12]
-            struct ggml_tensor * KQV = ggml_mul_mat(ctx0, V_trans, KQ_soft_max);
+            struct ggml_tensor * KQV = ggml_mul_mat(ctx, V_trans, KQ_soft_max);
 
             // KQV_merged = KQV.permute(0, 2, 1, 3)
             // [64, 12, n_tokens]
-            struct ggml_tensor * KQV_merged = ggml_permute(ctx0, KQV, 0, 2, 1, 3);
+            struct ggml_tensor * KQV_merged = ggml_permute(ctx, KQV, 0, 2, 1, 3);
 
             // cur = KQV_merged.contiguous().view(n_embd, N)
             // [768, n_tokens]
-            cur = ggml_cpy(ctx0,
-                    KQV_merged,
-                    ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_embd, n_tokens));
+            cur = ggml_cont_2d(ctx, KQV_merged, n_embd, n_tokens);
         }
 
         // projection
@@ -729,17 +724,17 @@ struct ggml_cgraph * gpt2_graph(
         // cur = proj_w*cur + proj_b
         // [768, N]
         {
-            cur = ggml_mul_mat(ctx0,
+            cur = ggml_mul_mat(ctx,
                     model.layers[il].c_attn_proj_w,
                     cur);
 
-            cur = ggml_add(ctx0,
+            cur = ggml_add(ctx,
                     cur,
                     model.layers[il].c_attn_proj_b);
         }
 
         // add the input
-        cur = ggml_add(ctx0, cur, inpL);
+        cur = ggml_add(ctx, cur, inpL);
 
         struct ggml_tensor * inpFF = cur;
 
@@ -747,12 +742,12 @@ struct ggml_cgraph * gpt2_graph(
         {
             // norm
             {
-                cur = ggml_norm(ctx0, inpFF, hparams.eps);
+                cur = ggml_norm(ctx, inpFF, hparams.eps);
 
                 // cur = ln_2_g*cur + ln_2_b
                 // [ 768, N]
-                cur = ggml_add(ctx0,
-                        ggml_mul(ctx0,
+                cur = ggml_add(ctx,
+                        ggml_mul(ctx,
                             cur,
                             model.layers[il].ln_2_g),
                         model.layers[il].ln_2_b);
@@ -766,17 +761,17 @@ struct ggml_cgraph * gpt2_graph(
             //
             // cur = fc_w*cur + fc_b
             // [3072, N]
-            cur = ggml_mul_mat(ctx0,
+            cur = ggml_mul_mat(ctx,
                     model.layers[il].c_mlp_fc_w,
                     cur);
 
-            cur = ggml_add(ctx0,
+            cur = ggml_add(ctx,
                     cur,
                     model.layers[il].c_mlp_fc_b);
 
             // GELU activation
             // [3072, N]
-            cur = ggml_gelu(ctx0, cur);
+            cur = ggml_gelu(ctx, cur);
 
             // projection
             // [ 768, 3072] - model.layers[il].c_mlp_proj_w
@@ -786,28 +781,28 @@ struct ggml_cgraph * gpt2_graph(
             //
             // cur = proj_w*cur + proj_b
             // [768, N]
-            cur = ggml_mul_mat(ctx0,
+            cur = ggml_mul_mat(ctx,
                     model.layers[il].c_mlp_proj_w,
                     cur);
 
-            cur = ggml_add(ctx0,
+            cur = ggml_add(ctx,
                     cur,
                     model.layers[il].c_mlp_proj_b);
         }
 
         // input for next layer
-        inpL = ggml_add(ctx0, cur, inpFF);
+        inpL = ggml_add(ctx, cur, inpFF);
     }
 
     // norm
     {
         // [ 768, N]
-        inpL = ggml_norm(ctx0, inpL, hparams.eps);
+        inpL = ggml_norm(ctx, inpL, hparams.eps);
 
         // inpL = ln_f_g*inpL + ln_f_b
         // [ 768, N]
-        inpL = ggml_add(ctx0,
-                ggml_mul(ctx0,
+        inpL = ggml_add(ctx,
+                ggml_mul(ctx,
                     inpL,
                     model.ln_f_g),
                 model.ln_f_b);
@@ -816,14 +811,14 @@ struct ggml_cgraph * gpt2_graph(
     // inpL = WTE * inpL
     // [ 768, 50257] - model.lm_head
     // [ 768, N]     - inpL
-    inpL = ggml_mul_mat(ctx0, model.lm_head, inpL);
+    inpL = ggml_mul_mat(ctx, model.lm_head, inpL);
 
     // logits -> probs
     //inpL = ggml_soft_max(ctx0, inpL);
 
     ggml_build_forward_expand(gf, inpL);
 
-    ggml_free(ctx0);
+    ggml_free(ctx);
 
     return gf;
 }
