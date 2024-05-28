@@ -1742,12 +1742,8 @@ kernel void kernel_rope(
             if (ic < n_dims) {
                 const int64_t ib = 0;
 
-                // simplified from `(ib * n_dims + ic) * inv_ndims`
-                const float cur_rot = inv_ndims*ic - ib;
-
-                const float theta = theta_0 * pow(freq_base, cur_rot);
                 float cos_theta, sin_theta;
-                rope_yarn(theta, freq_scale, corr_dims, cur_rot, ext_factor, attn_factor, &cos_theta, &sin_theta);
+                rope_yarn(theta_0, freq_scale, corr_dims, ic, ext_factor, attn_factor, &cos_theta, &sin_theta);
 
                 const int64_t i0 = ib*n_dims + ic/2;
 
