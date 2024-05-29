@@ -14440,7 +14440,6 @@ static void ggml_compute_forward_rope_f32(
                     // TODO: this might be wrong for ne0 != n_dims - need double check
                     //       it seems we have to rope just the first n_dims elements and do nothing with the rest
                     // ref:  https://github.com/ml-explore/mlx/blob/dc2edc762c797e3b8de50b1dad4dc0a131691033/benchmarks/python/llama_jax_bench.py#L11-L26
-                    theta_base *= freq_scale;
                     for (int64_t ic = 0; ic < ne0; ic += 2) {
                         if (ic < n_dims) {
                             const int64_t ib = 0;
@@ -14621,7 +14620,6 @@ static void ggml_compute_forward_rope_f16(
                     // TODO: this might be wrong for ne0 != n_dims - need double check
                     //       it seems we have to rope just the first n_dims elements and do nothing with the rest
                     // ref:  https://github.com/ml-explore/mlx/blob/dc2edc762c797e3b8de50b1dad4dc0a131691033/benchmarks/python/llama_jax_bench.py#L11-L26
-                    theta_base *= freq_scale;
                     for (int64_t ic = 0; ic < ne0; ic += 2) {
                         if (ic < n_dims) {
                             const int64_t ib = 0;
