@@ -412,7 +412,7 @@ void detect(yolo_image & img, const yolo_model & model, float thresh, const std:
     print_shape(18, result);
     result = ggml_upscale(ctx0, result, 2);
     print_shape(19, result);
-    result = ggml_concat(ctx0, result, layer_8);
+    result = ggml_concat(ctx0, result, layer_8, 2);
     print_shape(20, result);
     result = apply_conv2d(ctx0, result, model.conv2d_layers[11]);
     print_shape(21, result);
