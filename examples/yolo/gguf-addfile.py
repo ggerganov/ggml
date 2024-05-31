@@ -17,7 +17,7 @@ if "NO_LOCAL_GGUF" not in os.environ and (Path(__file__).parent.parent.parent / 
     #print("add path", str(Path(__file__).parent.parent))
     sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from gguf import GGUFReader, GGUFWriter, ReaderField, GGUFEndian, GGUFValueType, Keys, NamedObject  # noqa: E402
+from gguf import GGUFReader, GGUFWriter, ReaderField, GGUFEndian, GGUFValueType, Keys  # noqa: E402
 
 logger = logging.getLogger("gguf-addfile")
 
@@ -49,10 +49,10 @@ def dump_metadata(reader: GGUFReader, args: argparse.Namespace) -> None:
         if len(field.types) == 1:
             curr_type = field.types[0]
             if curr_type == GGUFValueType.STRING:
-                print(' = {0}'.format(repr(str(bytes(field.parts[-1]), encoding='utf8')[:60])), end = '')
-            elif curr_type == GGUFValueType.NAMEDOBJECT:
-                print(' = {0}'.format(repr(str(bytes(field.parts[4]), encoding='utf8')[:60])), end = '')
-                print(', {0}'.format(int(field.parts[5]))[:20], end = '')
+                if not field.name[0] == Keys.General.FILE_MARK:
+                  print(' = {0}'.format(repr(str(bytes(field.parts[-1]), encoding='utf8')[:60])), end = '')
+                else:
+                  print(' = binary data', end = '')
             elif field.types[0] in reader.gguf_scalar_to_np:
                 print(' = {0}'.format(field.parts[-1][0]), end = '')
         print()
@@ -88,16 +88,17 @@ def dump_metadata_json(reader: GGUFReader, args: argparse.Namespace) -> None:
                 continue
             itype = field.types[-1]
             if itype == GGUFValueType.STRING:
-                curr["value"] = [str(bytes(field.parts[idx]), encoding="utf-8") for idx in field.data]
-            elif itype == GGUFValueType.NAMEDOBJECT:
-                curr["value"] = [str(bytes(field.parts[idx]), encoding="utf-8") for idx in field.data]
+                if not field.name[0] == Keys.General.FILE_MARK:
+                  curr["value"] = [str(bytes(field.parts[idx]), encoding="utf-8") for idx in field.data]
+                else:
+                  curr["value"] = [bytes(field.parts[idx]) for idx in field.data]
             else:
                 curr["value"] = [pv for idx in field.data for pv in field.parts[idx].tolist()]
         elif field.types[0] == GGUFValueType.STRING:
-            curr["value"] = str(bytes(field.parts[-1]), encoding="utf-8")
-        elif field.types[0] == GGUFValueType.NAMEDOBJECT:
-            curr["value"] = str(bytes(field.parts[4]), encoding="utf-8")
-            curr["value"] = int(field.parts[5])
+            if not field.name[0] == Keys.General.FILE_MARK:
+                curr["value"] = str(bytes(field.parts[-1]), encoding="utf-8")
+            else:
+                curr["value"] = bytes(field.parts[-1])
         else:
             curr["value"] = field.parts[-1].tolist()[0]
     if not args.no_tensors:
@@ -135,15 +136,17 @@ def decode_field(field: ReaderField) -> Any:
             sub_type = field.types[-1]
 
             if sub_type == GGUFValueType.STRING:
-                return [str(bytes(field.parts[idx]), encoding='utf8') for idx in field.data]
-            elif sub_type == GGUFValueType.NAMEDOBJECT:
-                return [str(bytes(field.parts[idx]), encoding='utf8') for idx in field.data]
+                if not field.name[0] == Keys.General.FILE_MARK:
+                    return [str(bytes(field.parts[idx]), encoding='utf8') for idx in field.data]
+                else:
+                    return [bytes(field.parts[idx]) for idx in field.data]
             else:
                 return [pv for idx in field.data for pv in field.parts[idx].tolist()]
         if main_type == GGUFValueType.STRING:
-            return str(bytes(field.parts[-1]), encoding='utf8')
-        elif main_type == GGUFValueType.NAMEDOBJECT:
-            return str(bytes(field.parts[4]), encoding='utf8')
+            if not field.name[0] == Keys.General.FILE_MARK:
+                return str(bytes(field.parts[-1]), encoding='utf8')
+            else:
+                return bytes(field.parts[-1])
         else:
             return field.parts[-1][0]
 
@@ -156,7 +159,7 @@ def get_field_data(reader: GGUFReader, key: str) -> Any:
     return decode_field(field)
 
 
-def copy_with_new_metadata(reader: gguf.GGUFReader, writer: gguf.GGUFWriter, new_metadata: Mapping[str, str], array: NamedObject[Any] | None = None) -> None:
+def copy_with_new_metadata(reader: gguf.GGUFReader, writer: gguf.GGUFWriter, new_metadata: Mapping[str, str]) -> None:
     for field in reader.fields.values():
         # Suppress virtual fields and fields written by GGUFWriter
         if field.name == Keys.General.ARCHITECTURE or field.name.startswith('GGUF.'):
@@ -186,18 +189,11 @@ def copy_with_new_metadata(reader: gguf.GGUFReader, writer: gguf.GGUFWriter, new
         writer.add_chat_template(new_metadata[Keys.Tokenizer.CHAT_TEMPLATE])
         del new_metadata[Keys.Tokenizer.CHAT_TEMPLATE]
 
-    if array is None:
-        for key, name in new_metadata.items():
-            logger.debug(f'Adding {key}: {name}')
-            # named object
-            with open(name, "rb") as f:
-                val = f.read()
-                writer.add_namedobject(key, val, name)
-    else:
-        for key, name in new_metadata.items():
-            logger.debug(f'Adding array {key}: {name}')
-            # named object
-            writer.add_namedobject(key, 'val', name, array=array)
+    for key, name in new_metadata.items():
+        logger.debug(f'Adding {key}: {name}')
+        with open(name, "rb") as f:
+            val = f.read()
+            writer.add_object(key, val)
     
     for tensor in reader.tensors:
         # Dimensions are written in reverse order, so flip them first
@@ -219,7 +215,6 @@ def main() -> None:
     parser.add_argument("input",        type=str,            help="GGUF format model input filename")
     parser.add_argument("output",       type=str,            help="GGUF format model output filename")
     parser.add_argument("addfiles",     type=str, nargs='+', help="add filenames ...")
-    parser.add_argument("--array",      action="store_true", help="add files to namedobject array")
     parser.add_argument("--no-tensors", action="store_true", help="Don't dump tensor metadata")
     parser.add_argument("--json",       action="store_true", help="Produce JSON output")
     parser.add_argument("--json-array", action="store_true", help="Include full array values in JSON output (long)")
@@ -242,27 +237,12 @@ def main() -> None:
 
     logger.info(f'* Adding: {args.addfiles}')
     new_metadata = {}
-    count = 0
-    if args.array is False:
-        for path in args.addfiles:
-            count += 1
-            key = Keys.General.NAMEDOBJECT + Keys.General.CONNECT + str(count)
-            new_metadata[key] = path
-            logger.info(f'* Adding: {key} = {path}')
-        copy_with_new_metadata(reader, writer, new_metadata)
-    else:
-        key = Keys.General.NAMEDOBJECT
-        # array is dummy
-        new_metadata[key] = 'array'
-        files = []
-        for path in args.addfiles:
-            with open(path, "rb") as f:
-                val = f.read()
-                #print(f'files[{count}] = {path}')
-                files.append(NamedObject(path, val))
-            logger.info(f'* Adding: {key}[{count}] = {path}')
-            count += 1
-        copy_with_new_metadata(reader, writer, new_metadata, array=files)
+    for path in args.addfiles:
+        # add FILE_MARK to key
+        key = Keys.General.FILE_MARK + path
+        new_metadata[key] = path
+        logger.info(f'* Adding: {key} = {path}')
+    copy_with_new_metadata(reader, writer, new_metadata)
 
     if args.json:
         dump_metadata_json(reader, args)
