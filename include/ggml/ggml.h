@@ -2258,28 +2258,20 @@ extern "C" {
     //
 
     enum gguf_type {
-        GGUF_TYPE_UINT8       = 0,
-        GGUF_TYPE_INT8        = 1,
-        GGUF_TYPE_UINT16      = 2,
-        GGUF_TYPE_INT16       = 3,
-        GGUF_TYPE_UINT32      = 4,
-        GGUF_TYPE_INT32       = 5,
-        GGUF_TYPE_FLOAT32     = 6,
-        GGUF_TYPE_BOOL        = 7,
-        GGUF_TYPE_STRING      = 8,
-        GGUF_TYPE_ARRAY       = 9,
-        GGUF_TYPE_UINT64      = 10,
-        GGUF_TYPE_INT64       = 11,
-        GGUF_TYPE_FLOAT64     = 12,
-        GGUF_TYPE_NAMEDOBJECT = 13,
+        GGUF_TYPE_UINT8   = 0,
+        GGUF_TYPE_INT8    = 1,
+        GGUF_TYPE_UINT16  = 2,
+        GGUF_TYPE_INT16   = 3,
+        GGUF_TYPE_UINT32  = 4,
+        GGUF_TYPE_INT32   = 5,
+        GGUF_TYPE_FLOAT32 = 6,
+        GGUF_TYPE_BOOL    = 7,
+        GGUF_TYPE_STRING  = 8,
+        GGUF_TYPE_ARRAY   = 9,
+        GGUF_TYPE_UINT64  = 10,
+        GGUF_TYPE_INT64   = 11,
+        GGUF_TYPE_FLOAT64 = 12,
         GGUF_TYPE_COUNT,       // marks the end of the enum
-    };
-
-    struct gguf_nobj {
-        uint64_t nname;
-        char   * name;
-        uint64_t n;
-        char   * data;
     };
 
     struct gguf_context;
@@ -2311,27 +2303,24 @@ extern "C" {
     GGML_API enum gguf_type gguf_get_kv_type (const struct gguf_context * ctx, int key_id);
     GGML_API enum gguf_type gguf_get_arr_type(const struct gguf_context * ctx, int key_id);
 
-    GGML_API struct gguf_nobj gguf_find_name_nobj(const struct gguf_context * ctx, const char * name);
-
     // will abort if the wrong type is used for the key
-    GGML_API uint8_t          gguf_get_val_u8  (const struct gguf_context * ctx, int key_id);
-    GGML_API int8_t           gguf_get_val_i8  (const struct gguf_context * ctx, int key_id);
-    GGML_API uint16_t         gguf_get_val_u16 (const struct gguf_context * ctx, int key_id);
-    GGML_API int16_t          gguf_get_val_i16 (const struct gguf_context * ctx, int key_id);
-    GGML_API uint32_t         gguf_get_val_u32 (const struct gguf_context * ctx, int key_id);
-    GGML_API int32_t          gguf_get_val_i32 (const struct gguf_context * ctx, int key_id);
-    GGML_API float            gguf_get_val_f32 (const struct gguf_context * ctx, int key_id);
-    GGML_API uint64_t         gguf_get_val_u64 (const struct gguf_context * ctx, int key_id);
-    GGML_API int64_t          gguf_get_val_i64 (const struct gguf_context * ctx, int key_id);
-    GGML_API double           gguf_get_val_f64 (const struct gguf_context * ctx, int key_id);
-    GGML_API bool             gguf_get_val_bool(const struct gguf_context * ctx, int key_id);
-    GGML_API const char *     gguf_get_val_str (const struct gguf_context * ctx, int key_id);
-    GGML_API struct gguf_nobj gguf_get_val_nobj(const struct gguf_context * ctx, int key_id);
-    GGML_API const void *     gguf_get_val_data(const struct gguf_context * ctx, int key_id);
-    GGML_API int              gguf_get_arr_n   (const struct gguf_context * ctx, int key_id);
-    GGML_API const void *     gguf_get_arr_data(const struct gguf_context * ctx, int key_id);
-    GGML_API const char *     gguf_get_arr_str (const struct gguf_context * ctx, int key_id, int i);
-    GGML_API struct gguf_nobj gguf_get_arr_nobj(const struct gguf_context * ctx, int key_id, int i);
+    GGML_API uint8_t          gguf_get_val_u8     (const struct gguf_context * ctx, int key_id);
+    GGML_API int8_t           gguf_get_val_i8     (const struct gguf_context * ctx, int key_id);
+    GGML_API uint16_t         gguf_get_val_u16    (const struct gguf_context * ctx, int key_id);
+    GGML_API int16_t          gguf_get_val_i16    (const struct gguf_context * ctx, int key_id);
+    GGML_API uint32_t         gguf_get_val_u32    (const struct gguf_context * ctx, int key_id);
+    GGML_API int32_t          gguf_get_val_i32    (const struct gguf_context * ctx, int key_id);
+    GGML_API float            gguf_get_val_f32    (const struct gguf_context * ctx, int key_id);
+    GGML_API uint64_t         gguf_get_val_u64    (const struct gguf_context * ctx, int key_id);
+    GGML_API int64_t          gguf_get_val_i64    (const struct gguf_context * ctx, int key_id);
+    GGML_API double           gguf_get_val_f64    (const struct gguf_context * ctx, int key_id);
+    GGML_API bool             gguf_get_val_bool   (const struct gguf_context * ctx, int key_id);
+    GGML_API const char *     gguf_get_val_str    (const struct gguf_context * ctx, int key_id);
+    GGML_API uint64_t         gguf_get_val_str_len(const struct gguf_context * ctx, int key_id);
+    GGML_API const void *     gguf_get_val_data   (const struct gguf_context * ctx, int key_id);
+    GGML_API int              gguf_get_arr_n      (const struct gguf_context * ctx, int key_id);
+    GGML_API const void *     gguf_get_arr_data   (const struct gguf_context * ctx, int key_id);
+    GGML_API const char *     gguf_get_arr_str    (const struct gguf_context * ctx, int key_id, int i);
 
     GGML_API int            gguf_get_n_tensors    (const struct gguf_context * ctx);
     GGML_API int            gguf_find_tensor      (const struct gguf_context * ctx, const char * name);
@@ -2355,10 +2344,9 @@ extern "C" {
     GGML_API void gguf_set_val_f64 (struct gguf_context * ctx, const char * key, double   val);
     GGML_API void gguf_set_val_bool(struct gguf_context * ctx, const char * key, bool     val);
     GGML_API void gguf_set_val_str (struct gguf_context * ctx, const char * key, const char * val);
-    GGML_API void gguf_set_val_nobj(struct gguf_context * ctx, const char * key, const char * name, const int len, const void * val);
+    GGML_API void gguf_set_val_data(struct gguf_context * ctx, const char * key, const char * val, int n);
     GGML_API void gguf_set_arr_data(struct gguf_context * ctx, const char * key, enum gguf_type type, const void * data, int n);
     GGML_API void gguf_set_arr_str (struct gguf_context * ctx, const char * key, const char ** data, int n);
-    GGML_API void gguf_set_arr_nobj(struct gguf_context * ctx, const char * key, const struct gguf_nobj * data, int n);
 
     // set or add KV pairs from another context
     GGML_API void gguf_set_kv(struct gguf_context * ctx, struct gguf_context * src);

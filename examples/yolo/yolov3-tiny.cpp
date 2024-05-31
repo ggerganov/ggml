@@ -159,11 +159,13 @@ static bool load_labels(const char * filename, std::vector<std::string> & labels
 
 static bool load_labels_kv(const struct gguf_context * ctx, const char * filename, std::vector<std::string> & labels)
 {
-    struct gguf_nobj nobj = gguf_find_name_nobj(ctx, filename);
-    if (nobj.n == 0) {
+    int key_id = gguf_find_key(ctx, filename);
+    if (key_id == -1) {
         return false;
     }
-    membuf buf(nobj.data, nobj.data + nobj.n);
+    const char * data = gguf_get_val_str(ctx, key_id);
+    uint64_t n = gguf_get_val_str_len(ctx, key_id);
+    membuf buf(data, data + n);
     std::istream file_in(&buf);
     if (!file_in) {
         return false;
@@ -198,13 +200,15 @@ static bool load_alphabet_kv(const struct gguf_context * ctx, std::vector<yolo_i
     for (int j = 0; j < 8; j++) {
         for (int i = 32; i < 127; i++) {
             char fname[256];
-            sprintf(fname, "data/labels/%d_%d.png", i, j);
-            struct gguf_nobj nobj = gguf_find_name_nobj(ctx, fname);
-            if (nobj.n == 0) {
+            sprintf(fname, "/data/labels/%d_%d.png", i, j);
+            int key_id = gguf_find_key(ctx, fname);
+            if (key_id == -1) {
                 fprintf(stderr, "Cannot find '%s'\n", fname);
                 return false;
             }
-            if (!load_image_from_memory(nobj.data, nobj.n, alphabet[j*128 + i])) {
+            const char * data = gguf_get_val_str(ctx, key_id);
+            uint64_t n = gguf_get_val_str_len(ctx, key_id);
+            if (!load_image_from_memory(data, n, alphabet[j*128 + i])) {
                 fprintf(stderr, "Cannot load '%s'\n", fname);
                 return false;
             }
@@ -586,8 +590,8 @@ int main(int argc, char *argv[])
         return 1;
     }
     std::vector<std::string> labels;
-    if (!load_labels_kv(model.ggufctx, "data/coco.names", labels)) {
-        fprintf(stderr, "%s: failed to load labels from 'data/coco.names' in model\n", __func__);
+    if (!load_labels_kv(model.ggufctx, "/data/coco.names", labels)) {
+        fprintf(stderr, "%s: failed to load labels from '/data/coco.names' in model\n", __func__);
         if (!load_labels("data/coco.names", labels)) {
             fprintf(stderr, "%s: failed to load labels from 'data/coco.names'\n", __func__);
             return 1;
