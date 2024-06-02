@@ -275,15 +275,12 @@ if (GGML_HIPBLAS)
         string(REGEX MATCH "hipcc(\.bat)?$" CXX_IS_HIPCC "${CMAKE_CXX_COMPILER}")
     endif()
 
-    if (NOT ${CMAKE_C_COMPILER_ID} MATCHES "Clang")
-        message(WARNING "Only LLVM is supported for HIP, hint: CC=/opt/rocm/llvm/bin/clang")
-    endif()
-    if (NOT ${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
-        message(WARNING "Only LLVM is supported for HIP, hint: CXX=/opt/rocm/llvm/bin/clang++")
-    endif()
-
     if (CXX_IS_HIPCC)
         if(LINUX)
+            if (NOT ${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
+                message(WARNING "Only LLVM is supported for HIP, hint: CXX=/opt/rocm/llvm/bin/clang++")
+            endif()
+
             message(WARNING "Setting hipcc as the C++ compiler is legacy behavior."
                     " Prefer setting the HIP compiler directly. See README for details.")
         endif()
