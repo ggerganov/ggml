@@ -258,7 +258,20 @@ endif()
 
 # TODO: do not build separate ggml-rocm target (see CUDA build above, or llama.cpp for reference)
 if (GGML_HIPBLAS)
-    list(APPEND CMAKE_PREFIX_PATH /opt/rocm)
+    if ($ENV{ROCM_PATH})
+        set(ROCM_PATH $ENV{ROCM_PATH})
+    else()
+        set(ROCM_PATH /opt/rocm)
+    endif()
+    list(APPEND CMAKE_PREFIX_PATH ${ROCM_PATH})
+    list(APPEND CMAKE_PREFIX_PATH "$ENV{ROCM_PATH}/lib64/cmake")
+
+    # CMake on Windows doesn't support the HIP language yet
+    if(WIN32)
+        set(CXX_IS_HIPCC TRUE)
+    else()
+        string(REGEX MATCH "hipcc(\.bat)?$" CXX_IS_HIPCC "${CMAKE_CXX_COMPILER}")
+    endif()
 
     if (NOT ${CMAKE_C_COMPILER_ID} MATCHES "Clang")
         message(WARNING "Only LLVM is supported for HIP, hint: CC=/opt/rocm/llvm/bin/clang")
@@ -267,40 +280,68 @@ if (GGML_HIPBLAS)
         message(WARNING "Only LLVM is supported for HIP, hint: CXX=/opt/rocm/llvm/bin/clang++")
     endif()
 
-    find_package(hip)
-    find_package(hipblas)
-    find_package(rocblas)
-
-    if (${hipblas_FOUND} AND ${hip_FOUND})
-        message(STATUS "HIP and hipBLAS found")
-
-        add_compile_definitions(GGML_USE_HIPBLAS GGML_USE_CUDA)
-
-        add_library(ggml-rocm OBJECT ggml-cuda.cu ggml-cuda.h)
-
-        if (BUILD_SHARED_LIBS)
-            set_target_properties(ggml-rocm PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    if (CXX_IS_HIPCC)
+        if(LINUX)
+            message(WARNING "Setting hipcc as the C++ compiler is legacy behavior."
+                    " Prefer setting the HIP compiler directly. See README for details.")
         endif()
-        if (GGML_CUDA_FORCE_DMMV)
-            target_compile_definitions(ggml-rocm PRIVATE GGML_CUDA_FORCE_DMMV)
-        endif()
-        if (GGML_CUDA_FORCE_MMQ)
-            target_compile_definitions(ggml-rocm PRIVATE GGML_CUDA_FORCE_MMQ)
-        endif()
-        target_compile_definitions(ggml-rocm PRIVATE GGML_CUDA_DMMV_X=${GGML_CUDA_DMMV_X})
-        target_compile_definitions(ggml-rocm PRIVATE GGML_CUDA_MMV_Y=${GGML_CUDA_MMV_Y})
-        target_compile_definitions(ggml-rocm PRIVATE K_QUANTS_PER_ITERATION=${GGML_CUDA_KQUANTS_ITER})
-        set_source_files_properties(ggml-cuda.cu PROPERTIES LANGUAGE CXX)
-        target_link_libraries(ggml-rocm PRIVATE hip::device PUBLIC hip::host roc::rocblas roc::hipblas)
-        target_include_directories(ggml-rocm PRIVATE . ../include ../include/ggml)
-
-        if (GGML_STATIC)
-            message(FATAL_ERROR "Static linking not supported for HIP/ROCm")
-        endif()
-        set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} ggml-rocm)
     else()
-        message(WARNING "hipBLAS or HIP not found. Try setting CMAKE_PREFIX_PATH=/opt/rocm")
+        # Forward AMDGPU_TARGETS to CMAKE_HIP_ARCHITECTURES.
+        if(AMDGPU_TARGETS AND NOT CMAKE_HIP_ARCHITECTURES)
+            set(CMAKE_HIP_ARCHITECTURES ${AMDGPU_TARGETS})
+        endif()
+        cmake_minimum_required(VERSION 3.21)
+        enable_language(HIP)
     endif()
+
+    find_package(hip     REQUIRED)
+    find_package(hipblas REQUIRED)
+    find_package(rocblas REQUIRED)
+
+    message(STATUS "HIP and hipBLAS found")
+
+    add_compile_definitions(GGML_USE_HIPBLAS GGML_USE_CUDA)
+
+    set(GGML_HEADERS_ROCM ggml-cuda.h)
+
+    file(GLOB GGML_SOURCES_ROCM "ggml-cuda/*.cu")
+    list(APPEND GGML_SOURCES_ROCM "ggml-cuda.cu")
+    list(APPEND GGML_SOURCES_ROCM ${SRCS})
+
+    add_compile_definitions(GGML_USE_HIPBLAS GGML_USE_CUDA)
+
+    if (GGML_CUDA_FORCE_DMMV)
+        add_compile_definitions(GGML_CUDA_FORCE_DMMV)
+    endif()
+
+    if (GGML_CUDA_FORCE_MMQ)
+        add_compile_definitions(GGML_CUDA_FORCE_MMQ)
+    endif()
+
+    add_compile_definitions(GGML_CUDA_DMMV_X=${GGML_CUDA_DMMV_X})
+    add_compile_definitions(GGML_CUDA_MMV_Y=${GGML_CUDA_MMV_Y})
+    add_compile_definitions(K_QUANTS_PER_ITERATION=${GGML_CUDA_KQUANTS_ITER})
+
+    add_library(ggml-rocm OBJECT ${GGML_SOURCES_ROCM} ${GGML_HEADERS_ROCM})
+
+    if (CXX_IS_HIPCC)
+        set_source_files_properties(${GGML_SOURCES_ROCM} PROPERTIES LANGUAGE CXX)
+        target_link_libraries(ggml-rocm PRIVATE hip::device)
+    else()
+        set_source_files_properties(${GGML_SOURCES_ROCM} PROPERTIES LANGUAGE HIP)
+    endif()
+
+    target_link_libraries(ggml-rocm PRIVATE hip::device PUBLIC hip::host roc::rocblas roc::hipblas)
+    target_include_directories(ggml-rocm PRIVATE . ../include ../include/ggml)
+
+    if (BUILD_SHARED_LIBS)
+        set_target_properties(ggml-rocm PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    endif()
+
+    if (GGML_STATIC)
+        message(FATAL_ERROR "Static linking not supported for HIP/ROCm")
+    endif()
+    set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} ggml-rocm)
 endif()
 
 if (GGML_METAL)
