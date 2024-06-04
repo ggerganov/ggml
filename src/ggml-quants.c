@@ -1078,7 +1078,6 @@ void quantize_row_q8_0(const float * restrict x, void * restrict vy, int64_t k) 
         }
         vec_xst(vec_pack(vec_pack(vi[0], vi[1]), vec_pack(vi[2], vi[3])),  0, &y[i].qs[0]);
         vec_xst(vec_pack(vec_pack(vi[4], vi[5]), vec_pack(vi[6], vi[7])), 16, &y[i].qs[0]);
-    }
 
 #elif defined(__loongarch_asx)
     for (int i = 0; i < nb; i++) {
@@ -1438,7 +1437,6 @@ void quantize_row_q8_1(const float * restrict x, void * restrict vy, int64_t k) 
         accv = vec_add(accv, vec_sld(accv, accv, 4));
         accv = vec_add(accv, vec_sld(accv, accv, 8));
         y[i].s = GGML_FP32_TO_FP16(d * vec_extract(accv, 0));
-    }
 
 #elif defined(__loongarch_asx)
     for (int i = 0; i < nb; i++) {
@@ -5986,8 +5984,6 @@ void ggml_vec_dot_q2_K_q8_K(int n, float * restrict s, size_t bs, const void * r
         vector signed int vsumi6 = vec_splats((int32_t)0);
         vector signed int vsumi7 = vec_splats((int32_t)0);
 
-        const uint8_t * restrict q2 = x[i].qs;
-        const int8_t  * restrict q8 = y[i].qs;
 
         for (int j = 0; j < QK_K/128; ++j) {
             __builtin_prefetch(q2, 0, 1);
