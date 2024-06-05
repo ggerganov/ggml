@@ -10,8 +10,6 @@
 #include <string.h>
 
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
 // backend buffer type
 
 const char * ggml_backend_buft_name(ggml_backend_buffer_type_t buft) {
