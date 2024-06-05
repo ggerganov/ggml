@@ -4,7 +4,7 @@
 
 Tensor library for machine learning
 
-***Note that this project is under active development. \
+***Note that this project is under active development.
 Some of the development is currently happening in the [llama.cpp](https://github.com/ggerganov/llama.cpp) and [whisper.cpp](https://github.com/ggerganov/whisper.cpp) repos***
 
 ## Features
@@ -39,6 +39,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [X] Example of ChatGLM inference [li-plus/chatglm.cpp](https://github.com/li-plus/chatglm.cpp)
 - [X] Example of Stable Diffusion inference [leejet/stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp)
 - [X] Example of Qwen inference [QwenLM/qwen.cpp](https://github.com/QwenLM/qwen.cpp)
+- [X] Example of superpoint inference [examples/superpoint]()
 - [X] Example of YOLO inference [examples/yolo](https://github.com/ggerganov/ggml/tree/master/examples/yolo)
 - [X] Example of ViT inference [staghado/vit.cpp](https://github.com/staghado/vit.cpp)
 - [X] Example of multiple LLMs inference [foldl/chatllm.cpp](https://github.com/foldl/chatllm.cpp)
@@ -51,8 +52,8 @@ With ggml you can efficiently run [Whisper](examples/whisper) inference on the C
 Memory requirements:
 
 | Model  | Disk   | Mem     |
-| ---    | ---    | ---     |
-| tiny   |  75 MB | ~280 MB |
+| ------ | ------ | ------- |
+| tiny   | 75 MB  | ~280 MB |
 | base   | 142 MB | ~430 MB |
 | small  | 466 MB | ~1.0 GB |
 | medium | 1.5 GB | ~2.6 GB |
@@ -92,13 +93,13 @@ python3 ../examples/gpt-2/convert-cerebras-to-ggml.py /path/to/Cerebras-GPT-111M
 The inference speeds that I get for the different models on my 32GB MacBook M1 Pro are as follows:
 
 | Model | Size  | Time / Token |
-| ---   | ---   | ---    |
-| GPT-2 |  117M |   5 ms |
-| GPT-2 |  345M |  12 ms |
-| GPT-2 |  774M |  23 ms |
-| GPT-2 | 1558M |  42 ms |
-| ---   | ---   | ---    |
-| GPT-J |    6B | 125 ms |
+| ----- | ----- | ------------ |
+| GPT-2 | 117M  | 5 ms         |
+| GPT-2 | 345M  | 12 ms        |
+| GPT-2 | 774M  | 23 ms        |
+| GPT-2 | 1558M | 42 ms        |
+| ---   | ---   | ---          |
+| GPT-J | 6B    | 125 ms       |
 
 For more information, checkout the corresponding programs in the [examples](examples) folder.
 
@@ -133,6 +134,7 @@ cmake -DCMAKE_C_COMPILER="$(hipconfig -l)/clang" -DCMAKE_CXX_COMPILER="$(hipconf
 ```bash
 cmake -DGGML_CLBLAST=ON ..
 ```
+
 ## Compiling for Android
 
 Download and unzip the NDK from this download [page](https://developer.android.com/ndk/downloads). Set the NDK_ROOT_PATH environment variable or provide the absolute path to the CMAKE_ANDROID_NDK in the command below.
