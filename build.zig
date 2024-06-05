@@ -4,14 +4,9 @@ const builtin = @import("builtin");
 // Zig Version: 0.11.0
 // Zig Build Command: zig build
 // Zig Run Command: zig build -h
-//     zig build run_dolly-v2
-//     zig build run_gpt-2
 //     zig build run_gpt-j
-//     zig build run_gpt-neox
 //     zig build run_mnist
-//     zig build run_mpt
-//     zig build run_replit
-//     zig build run_starcoder
+//     zig build run_magika
 //     zig build run_test-grad0
 //     zig build run_test-mul-mat0
 //     zig build run_test-mul-mat2
@@ -25,7 +20,7 @@ const builtin = @import("builtin");
 //     zig build run_zig_test1
 //     zig build run_zig_test2
 //     zig build run_zig_test3
-pub fn build(b: *std.build.Builder) void {
+pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     const lib = b.addStaticLibrary(.{
@@ -33,25 +28,27 @@ pub fn build(b: *std.build.Builder) void {
         .target = target,
         .optimize = optimize,
     });
-    lib.addIncludePath(.{ .path = "./include" });
-    lib.addIncludePath(.{ .path = "./include/ggml" });
-    lib.addCSourceFiles(&.{
+    lib.addIncludePath(b.path("./include"));
+    lib.addIncludePath(b.path("./include/ggml"));
+    lib.addCSourceFiles(.{ .files = &.{
         "src/ggml.c",
-    }, &.{"-std=c11"});
+        "src/ggml-alloc.c",
+        "src/ggml-backend.c",
+        "src/ggml-quants.c",
+    }, .flags = &.{
+        "-std=c11",
+        "-D_GNU_SOURCE",
+        "-D_XOPEN_SOURCE=600",
+    } });
     lib.linkLibC();
     lib.linkLibCpp();
     b.installArtifact(lib);
 
     // examples
     const examples = .{
-        "dolly-v2",
-        "gpt-2",
         "gpt-j",
-        "gpt-neox",
+        "magika",
         "mnist",
-        "mpt",
-        "replit",
-        "starcoder",
         // "whisper",
     };
     inline for (examples) |name| {
@@ -60,16 +57,19 @@ pub fn build(b: *std.build.Builder) void {
             .target = target,
             .optimize = optimize,
         });
-        exe.addIncludePath(.{ .path = "./include" });
-        exe.addIncludePath(.{ .path = "./include/ggml" });
-        exe.addIncludePath(.{ .path = "./examples" });
+        exe.addIncludePath(b.path("./include"));
+        exe.addIncludePath(b.path("./include/ggml"));
+        exe.addIncludePath(b.path("./examples"));
         // exe.addIncludePath("./examples/whisper");
-        exe.addCSourceFiles(&.{
-            std.fmt.comptimePrint("examples/{s}/main.cpp", .{name}),
-            "examples/common.cpp",
-            "examples/common-ggml.cpp",
-            // "examples/whisper/whisper.cpp",
-        }, &.{"-std=c++11"});
+        exe.addCSourceFiles(.{
+            .files = &.{
+                std.fmt.comptimePrint("examples/{s}/main.cpp", .{name}),
+                "examples/common.cpp",
+                "examples/common-ggml.cpp",
+                // "examples/whisper/whisper.cpp",
+            },
+            .flags = &.{"-std=c++11"},
+        });
         exe.linkLibrary(lib);
         b.installArtifact(exe);
         const run_cmd = b.addRunArtifact(exe);
@@ -88,7 +88,7 @@ pub fn build(b: *std.build.Builder) void {
         "test-mul-mat2",
         // "test-opt",
         // "test-svd0",
-        // "test-vec0",
+        "test-vec0",
         "test-vec1",
         // "test-vec2",
         "test0",
@@ -117,11 +117,13 @@ pub fn build(b: *std.build.Builder) void {
             .target = target,
             .optimize = optimize,
         });
-        exe.addIncludePath(.{ .path = "./include" });
-        exe.addIncludePath(.{ .path = "./include/ggml" });
-        exe.addCSourceFiles(&.{
+        exe.addIncludePath(b.path("./include"));
+        exe.addIncludePath(b.path("./include/ggml"));
+        exe.addCSourceFiles(.{ .files = &.{
             std.fmt.comptimePrint("tests/{s}.c", .{name}),
-        }, &.{"-std=c11"});
+        }, .flags = &.{
+            "-std=c11",
+        } });
         exe.linkLibrary(lib);
         b.installArtifact(exe);
         const run_cmd = b.addRunArtifact(exe);
@@ -141,12 +143,12 @@ pub fn build(b: *std.build.Builder) void {
     inline for (zig_tests) |name| {
         const exe = b.addExecutable(.{
             .name = name,
-            .root_source_file = .{ .path = std.fmt.comptimePrint("tests/{s}.zig", .{name}) },
+            .root_source_file = b.path(std.fmt.comptimePrint("tests/{s}.zig", .{name})),
             .target = target,
             .optimize = optimize,
         });
-        exe.addIncludePath(.{ .path = "./include" });
-        exe.addIncludePath(.{ .path = "./include/ggml" });
+        exe.addIncludePath(b.path("./include"));
+        exe.addIncludePath(b.path("./include/ggml"));
         exe.linkLibrary(lib);
         b.installArtifact(exe);
         const run_cmd = b.addRunArtifact(exe);
