@@ -1147,6 +1147,10 @@ extern "C" {
 
     // group normalize along ne0*ne1*n_groups
     // used in stable-diffusion
+    // calculated over first 2 dimensions
+    // To get normalization on first dimension only (pytorch default behavior),
+    // you can move the second dimension of tensor a to the third.
+    // https://github.com/ggerganov/ggml/issues/803
     // TODO: eps is hardcoded to 1e-6 for now
     GGML_API struct ggml_tensor * ggml_group_norm(
             struct ggml_context * ctx,
