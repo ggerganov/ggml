@@ -2695,7 +2695,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS_BACK",
 };
 
-static_assert(GGML_OP_COUNT == 74, "GGML_OP_COUNT != 74");
+static_assert(GGML_OP_COUNT == 75, "GGML_OP_COUNT != 75");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -2757,6 +2757,8 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "argsort(x)",
     "leaky_relu(x)",
 
+    "pad_reflect_1d(x)",
+
     "flash_attn_ext(x)",
     "flash_attn_back(x)",
     "ssm_conv(x)",
@@ -2783,7 +2785,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "cross_entropy_loss_back(x,y)",
 };
 
-static_assert(GGML_OP_COUNT == 74, "GGML_OP_COUNT != 74");
+static_assert(GGML_OP_COUNT == 75, "GGML_OP_COUNT != 75");
 
 static_assert(GGML_OP_POOL_COUNT == 2, "GGML_OP_POOL_COUNT != 2");
 
@@ -7268,6 +7270,34 @@ struct ggml_tensor * ggml_get_rel_pos(
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F16, 3, ne);
 
     result->op   = GGML_OP_GET_REL_POS;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->src[0] = a;
+
+    return result;
+}
+
+// ggml_pad_reflect_1d
+
+struct ggml_tensor * ggml_pad_reflect_1d(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        int                   p0,
+        int                   p1) {
+
+    bool is_node = false;
+
+    if (a->grad) {
+        GGML_ASSERT(false); // TODO: implement backward
+        is_node = true;
+    }
+
+    const int64_t ne[2] = { p0 + a->ne[0] + p1, a->ne[1] };
+    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 2, ne);
+
+    int32_t params[] = { p0, p1 };
+    ggml_set_op_params(result, params, sizeof(params));
+
+    result->op = GGML_OP_PAD_REFLECT_1D;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
 
@@ -13409,6 +13439,46 @@ static void ggml_compute_forward_diag_mask_f32(
     }
 }
 
+// ggml_compute_forward_pad_reflect_1d
+
+static void ggml_compute_forward_pad_reflect_1d(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src0,
+              struct ggml_tensor * dst) {
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+
+    const int32_t * opts = (const int32_t *) dst->op_params;
+    const int p0 = opts[0];
+    const int p1 = opts[1];
+    GGML_ASSERT(p0 >= 0);
+    GGML_ASSERT(p1 >= 0);
+
+    if (params->type == GGML_TASK_TYPE_INIT || params->type == GGML_TASK_TYPE_FINALIZE) {
+        return;
+    }
+
+    const int ne00 = src0->ne[0];
+
+    const int nb01 = src0->nb[1];
+
+    const int ne0 = dst->ne[0];
+    const int ne1 = dst->ne[1];
+
+    const int nb0 = dst->nb[0];
+    const int nb1 = dst->nb[1];
+
+    for (int i1 = 0; i1 < ne1; i1++) {
+        float * left  = (float *) ((char *) dst->data + i1*nb1 +         p0*nb0);
+        float * right = (float *) ((char *) dst->data + i1*nb1 + (ne0-p1-1)*nb0);
+
+        ggml_vec_cpy_f32(ne00, left, (float *) ((char *) src0->data + i1*nb01));
+
+        for (int i0 = 1; i0 <= p0; i0++) { left[-i0] = left[i0];   }
+        for (int i0 = 1; i0 <= p1; i0++) { right[i0] = right[-i0]; }
+    }
+}
+
 static void ggml_compute_forward_diag_mask_inf(
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
@@ -16679,6 +16749,10 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_conv_transpose_2d(params, tensor);
             } break;
+        case GGML_OP_PAD_REFLECT_1D:
+            {
+                ggml_compute_forward_pad_reflect_1d(params, tensor->src[0], tensor);
+            } break;
         case GGML_OP_POOL_1D:
             {
                 ggml_compute_forward_pool_1d(params, tensor);
@@ -17679,6 +17753,10 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             {
                 GGML_ASSERT(false); // TODO: not implemented
             } break;
+        case GGML_OP_PAD_REFLECT_1D:
+            {
+                GGML_ASSERT(false); // TODO: not implemented
+            } break;
         case GGML_OP_POOL_1D:
             {
                 GGML_ASSERT(false); // TODO: not implemented
@@ -18388,6 +18466,10 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
         case GGML_OP_CONV_TRANSPOSE_2D:
             {
                 n_tasks = n_threads;
+            } break;
+        case GGML_OP_PAD_REFLECT_1D:
+            {
+                n_tasks = 1;
             } break;
         case GGML_OP_POOL_1D:
         case GGML_OP_POOL_2D:
