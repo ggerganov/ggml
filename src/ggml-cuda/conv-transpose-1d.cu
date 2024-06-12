@@ -11,6 +11,7 @@ static  __global__ void conv_transpose_1d_kernel(
     if (global_index >= output_size) {
         return;
     }
+    //printf("idx: %d stride %d\n", global_index,s0);
 
     int out_index = global_index / dst_ne0;
 
@@ -22,7 +23,7 @@ static  __global__ void conv_transpose_1d_kernel(
         int kernel_offset = (src0_ne0 * src0_ne1 * out_index) + (c * src0_ne0);
         int input_offset = src1_ne0 * c;
 
-        if (global_index == 5)
+        if(global_index == 3 && s0 == 2)
         {
         printf("idx: %d ???: %d\n", global_index,src0_ne2);
 
@@ -30,28 +31,56 @@ static  __global__ void conv_transpose_1d_kernel(
         printf("idx: %d input offset: %d\n", global_index,input_offset);
         }
 
-        int upper_bound = idx > src1_ne0-1 ? src1_ne0-1 : idx; //inclusive
-        
-        int lower_bound = idx - src0_ne0 + 1 >= 0 ? idx - src0_ne0 + 1 : 0;
+        int upper_bound = idx > src1_ne0-1 ? src1_ne0-1 : (int)(idx/s0)*s0; //inclusive
+        /*
+        int upper_bound = 0;
+        while (upper_bound < idx){
+            upper_bound +=1;
+        }*/
+
+
+        int lower_bound = idx - src0_ne0 + 1 >= 0 ? (int)(idx/s0)*s0 - src0_ne0 + 1 : 0;
 
         int initial_weight_idx = idx > src0_ne0 -1 ? src0_ne0-1 : idx;
 
-        if(global_index == 5)
+        if(global_index == 3 && s0 == 2)
         {
         printf("idx: %d initial_weight_idx: %d\n", global_index,initial_weight_idx);
         printf("idx: %d upper bound: %d\n", global_index, upper_bound);
         printf("idx: %d lower bound: %d\n", global_index, lower_bound);
         }
 
-        for (int i = lower_bound; i <= upper_bound; i++)
+        for (int i = 0; i < src1_ne0; i++)
         {
-            if(global_index == 5)
+            if (!(idx >= i*s0 && idx < i*s0 + src0_ne0))
             {
-            printf("idx: %d partial sum: %d\n", global_index,src0[kernel_offset + (initial_weight_idx-(i-lower_bound))] * src1[input_offset+i]);
-            printf("idx: %d kernel_index: %d\n", global_index, kernel_offset + (initial_weight_idx-(i-lower_bound)));
+                continue;
+            }
+            int weight_idx = idx - i*s0;
+
+
+            if(global_index == 3 && s0 == 2)
+            {
+            //printf("idx: %d partial sum: %d x %d \n", global_index,src0[kernel_offset + (initial_weight_idx-(i-lower_bound))] , src1[input_offset+i]);
+            //printf("idx: %d kernel_index: %d\n", global_index, kernel_offset + (initial_weight_idx-(i-lower_bound)));
+            //printf("idx: %d input_index: %d\n", global_index, initial_weight_idx-(i-lower_bound));
+
+            //printf("idx: %d input_index: %d\n", global_index, input_offset+i);
 
             }
-            dst[global_index] += src0[kernel_offset + (initial_weight_idx-(i-lower_bound))] * src1[input_offset+i];
+            int test1 = src0[kernel_offset + weight_idx];
+            int test2 =  src1[input_offset+i];
+            if(global_index == 3 && s0 == 2)
+            {
+            //printf("idx: %d partial sum: %d x %d \n", global_index,src0[kernel_offset + (initial_weight_idx-(i-lower_bound))] , src1[input_offset+i]);
+            //printf("idx: %d kernel_index: %d\n", global_index, kernel_offset + (initial_weight_idx-(i-lower_bound)));
+            //printf("idx: %d input_index: %d\n", global_index, initial_weight_idx-(i-lower_bound));
+
+            //printf("idx: %d input_index: %d\n", global_index, input_offset+i);
+            printf("idx: %d test: %d x %d\n", global_index, test1, test2);
+
+            }
+            dst[global_index] += test1 * test2;
         }
         //dst[idx] = 7;
     }
@@ -89,7 +118,7 @@ void ggml_cuda_op_conv_transpose_1d(ggml_backend_cuda_context & ctx, ggml_tensor
 
     const int32_t * opts = (const int32_t *)dst->op_params;
 
-    const int s0 = 1;//opts[2];
+    const int s0 = dst->op_params[0];
     const int p0 = 0;//opts[3];
     const int d0 = 1;//opts[4];
 
