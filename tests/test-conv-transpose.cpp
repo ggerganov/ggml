@@ -2,8 +2,6 @@
 #include "ggml/ggml-alloc.h"
 #include "ggml/ggml-backend.h"
 
-#define GGML_USE_CUBLAS
-
 #ifdef GGML_USE_CUBLAS
 #include "ggml-cuda.h"
 #endif
