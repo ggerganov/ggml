@@ -15,15 +15,17 @@ static  __global__ void conv_transpose_1d_kernel(
 
     int out_index = global_index / dst_ne0;
 
+    dst[global_index] = 0;
+
     for (int c = 0; c < src0_ne2; c++)
     {
 
         int idx = global_index % dst_ne0;
 
-        int kernel_offset = (src0_ne0 * src0_ne1 * out_index) + (c * src0_ne0);
+        int kernel_offset = (src0_ne0 * src0_ne1 * c) + (out_index * src0_ne0);
         int input_offset = src1_ne0 * c;
 
-        if(global_index == 3 && s0 == 2)
+        if(global_index == 0 && output_size == 12)
         {
         printf("idx: %d ???: %d\n", global_index,src0_ne2);
 
@@ -43,7 +45,7 @@ static  __global__ void conv_transpose_1d_kernel(
 
         int initial_weight_idx = idx > src0_ne0 -1 ? src0_ne0-1 : idx;
 
-        if(global_index == 3 && s0 == 2)
+        if(global_index == 0 && output_size == 12)
         {
         printf("idx: %d initial_weight_idx: %d\n", global_index,initial_weight_idx);
         printf("idx: %d upper bound: %d\n", global_index, upper_bound);
@@ -59,7 +61,7 @@ static  __global__ void conv_transpose_1d_kernel(
             int weight_idx = idx - i*s0;
 
 
-            if(global_index == 3 && s0 == 2)
+            if(global_index == 0 && output_size == 12)
             {
             //printf("idx: %d partial sum: %d x %d \n", global_index,src0[kernel_offset + (initial_weight_idx-(i-lower_bound))] , src1[input_offset+i]);
             //printf("idx: %d kernel_index: %d\n", global_index, kernel_offset + (initial_weight_idx-(i-lower_bound)));
@@ -70,7 +72,7 @@ static  __global__ void conv_transpose_1d_kernel(
             }
             int test1 = src0[kernel_offset + weight_idx];
             int test2 =  src1[input_offset+i];
-            if(global_index == 3 && s0 == 2)
+            if(global_index == 0 && output_size == 12)
             {
             //printf("idx: %d partial sum: %d x %d \n", global_index,src0[kernel_offset + (initial_weight_idx-(i-lower_bound))] , src1[input_offset+i]);
             //printf("idx: %d kernel_index: %d\n", global_index, kernel_offset + (initial_weight_idx-(i-lower_bound)));
