@@ -1,8 +1,7 @@
 #include "conv-transpose-1d.cuh"
 
 static  __global__ void conv_transpose_1d_kernel(
-        const int s0, const int p0, const int d0,
-        const int kernel_size, const int input_size, const int output_size,
+        const int s0, const int p0, const int d0, const int output_size,
         const int src0_ne0, const int src0_ne1, const int src0_ne2, const int src0_ne3,
         const int src1_ne0, const int src1_ne1, const int src1_ne2, const int src1_ne3,
         const int dst_ne0, const int dst_ne1, const int dst_ne2, const int dst_ne3,
@@ -45,8 +44,7 @@ static  __global__ void conv_transpose_1d_kernel(
 }
 
 static void conv_transpose_1d_f32_f32_cuda(
-        const int s0, const int p0, const int d0,
-        const int kernel_size, const int input_size, const int output_size,
+        const int s0, const int p0, const int d0, const int output_size,
         const int src0_ne0, const int src0_ne1, const int src0_ne2, const int src0_ne3,
         const int src1_ne0, const int src1_ne1, const int src1_ne2, const int src1_ne3,
         const int dst_ne0, const int dst_ne1, const int dst_ne2, const int dst_ne3,
@@ -54,7 +52,7 @@ static void conv_transpose_1d_f32_f32_cuda(
         cudaStream_t stream) {
 
     const int num_blocks = (output_size + CUDA_CONV_TRANPOSE_1D_BLOCK_SIZE - 1) / CUDA_CONV_TRANPOSE_1D_BLOCK_SIZE;
-    conv_transpose_1d_kernel<<<num_blocks,CUDA_CONV_TRANPOSE_1D_BLOCK_SIZE, 0, stream>>>(s0,p0,d0,kernel_size, input_size, output_size,
+    conv_transpose_1d_kernel<<<num_blocks,CUDA_CONV_TRANPOSE_1D_BLOCK_SIZE, 0, stream>>>(s0,p0,d0,output_size,
     src0_ne0, src0_ne1,  src0_ne2, src0_ne3,
     src1_ne0, src1_ne1,  src1_ne2, src1_ne3,
     dst_ne0,  dst_ne1,   dst_ne2,  dst_ne3,
@@ -85,7 +83,7 @@ void ggml_cuda_op_conv_transpose_1d(ggml_backend_cuda_context & ctx, ggml_tensor
     const int64_t output_size =  ggml_nelements(dst);
 
 
-    conv_transpose_1d_f32_f32_cuda( s0,p0,d0,kernel_size, input_size, output_size, 
+    conv_transpose_1d_f32_f32_cuda( s0,p0,d0,output_size, 
     src0->ne[0],src0->ne[1],src0->ne[2],src0->ne[3],
     src1->ne[0],src1->ne[1],src1->ne[2],src1->ne[3],
     dst->ne[0],dst->ne[1],dst->ne[2],dst->ne[3],

@@ -591,6 +591,7 @@ int main(void)
 
     printf("ggml_conv_1d_transpose (%d): %s\n", (int) ggml_nelements(conv1d_transpose_res_0), passed && (ggml_nelements(conv1d_transpose_res_0) == n_conv_transpose_1d_test_0) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
     
+    passed = true;
     for(int i = 0; i < n_conv_transpose_1d_test_1; i++) {
         if(
             conv1d_transpose_data_1[i] != expected_conv1d_1[i]) {
@@ -603,7 +604,7 @@ int main(void)
 
     printf("ggml_conv_1d_transpose (%d): %s\n", (int) ggml_nelements(conv1d_transpose_res_1), passed && (ggml_nelements(conv1d_transpose_res_1) == n_conv_transpose_1d_test_1) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
 
-
+    passed = true;
     for(int i = 0; i < n_conv_transpose_1d_test_2; i++) {
         if(
             conv1d_transpose_data_2[i] != expected_conv1d_2[i]) {
@@ -617,7 +618,7 @@ int main(void)
     printf("ggml_conv_1d_transpose (%d): %s\n", (int) ggml_nelements(conv1d_transpose_res_2), passed && (ggml_nelements(conv1d_transpose_res_2) == n_conv_transpose_1d_test_2) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
 
 
-
+    passed = true;
     for(int i = 0; i < n_conv_transpose_1d_test_3; i++) {
         if(
             conv1d_transpose_data_3[i] != expected_conv1d_3[i]) {
@@ -630,7 +631,7 @@ int main(void)
 
     printf("ggml_conv_1d_transpose (%d): %s\n", (int) ggml_nelements(conv1d_transpose_res_3), passed && (ggml_nelements(conv1d_transpose_res_3) == n_conv_transpose_1d_test_3) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
 
-
+    passed = true;
     for(int i = 0; i < n_conv_transpose_1d_test_4; i++) {
         if(
             conv1d_transpose_data_4[i] != expected_conv1d_4[i]) {
@@ -643,6 +644,7 @@ int main(void)
 
     printf("ggml_conv_1d_transpose (%d): %s\n", (int) ggml_nelements(conv1d_transpose_res_4), passed && (ggml_nelements(conv1d_transpose_res_4) == n_conv_transpose_1d_test_4) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
 
+    passed = true;
     for(int i = 0; i < n_conv_transpose_1d_test_5; i++) {
         if(
             conv1d_transpose_data_5[i] != expected_conv1d_5[i]) {
@@ -655,7 +657,7 @@ int main(void)
 
     printf("ggml_conv_1d_transpose (%d): %s\n", (int) ggml_nelements(conv1d_transpose_res_5), passed && (ggml_nelements(conv1d_transpose_res_5) == n_conv_transpose_1d_test_5) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
 
-
+    passed = true;
     for(int i = 0; i < n_conv_transpose_1d_test_6; i++) {
         if(
             conv1d_transpose_data_6[i] != expected_conv1d_6[i]) {
@@ -670,7 +672,7 @@ int main(void)
     printf("ggml_conv_1d_transpose (%d): %s\n", (int) ggml_nelements(conv1d_transpose_res_6), passed && (ggml_nelements(conv1d_transpose_res_6) == n_conv_transpose_1d_test_6) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
 
 
-
+    passed = true;
     for(int i = 0; i < n_conv_transpose_1d_test_7; i++) {
         if(
             fabs(conv1d_transpose_data_7[i] - expected_conv1d_7[i])/fabs(expected_conv1d_7[i]) > .000001) {
