@@ -197,7 +197,7 @@ if (GGML_CLBLAST)
         set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${CLBLAST_LIB} ${OPENCL_LIB})
         set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CLBLAST)
 
-        set(GGML_OPENCL_SOURCES ggml-opencl.cpp ggml-opencl.h)
+        set(GGML_SOURCES_OPENCL ggml-opencl.cpp ggml-opencl.h)
 
         link_libraries("-Wl,--copy-dt-needed-entries")
     else()
@@ -217,11 +217,44 @@ if (GGML_CUDA)
     if (CUDAToolkit_FOUND)
         message(STATUS "CUDA found")
 
+        if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+            # 52 == lowest CUDA 12 standard
+            # 60 == f16 CUDA intrinsics
+            # 61 == integer CUDA intrinsics
+            # 70 == compute capability at which unrolling a loop in mul_mat_q kernels is faster
+            if (LLAMA_CUDA_F16 OR LLAMA_CUDA_DMMV_F16)
+                set(CMAKE_CUDA_ARCHITECTURES "60;61;70") # needed for f16 CUDA intrinsics
+            else()
+                set(CMAKE_CUDA_ARCHITECTURES "52;61;70") # lowest CUDA 12 standard + lowest for integer intrinsics
+                #set(CMAKE_CUDA_ARCHITECTURES "OFF") # use this to compile much faster, but only F16 models work
+            endif()
+        endif()
+
+        message(STATUS "Using CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
+
         enable_language(CUDA)
 
-        file(GLOB   GGML_CUDA_SOURCES "ggml-cuda/*.cu")
-        list(APPEND GGML_CUDA_SOURCES  ggml-cuda.h)
-        list(APPEND GGML_CUDA_SOURCES  ggml-cuda.cu)
+        file(GLOB   GGML_SOURCES_CUDA "ggml-cuda/*.cu")
+        list(APPEND GGML_SOURCES_CUDA  ggml-cuda.h)
+        list(APPEND GGML_SOURCES_CUDA  ggml-cuda.cu)
+
+        file(GLOB SRCS "ggml-cuda/template-instances/fattn-wmma*.cu")
+        list(APPEND GGML_SOURCES_CUDA ${SRCS})
+        file(GLOB SRCS "ggml-cuda/template-instances/mmq*.cu")
+        list(APPEND GGML_SOURCES_CUDA ${SRCS})
+
+        if (GGML_CUDA_FA_ALL_QUANTS)
+            file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*.cu")
+            list(APPEND GGML_SOURCES_CUDA ${SRCS})
+            add_compile_definitions(GGML_CUDA_FA_ALL_QUANTS)
+        else()
+            file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*q4_0-q4_0.cu")
+            list(APPEND GGML_SOURCES_CUDA ${SRCS})
+            file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*q8_0-q8_0.cu")
+            list(APPEND GGML_SOURCES_CUDA ${SRCS})
+            file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*f16-f16.cu")
+            list(APPEND GGML_SOURCES_CUDA ${SRCS})
+        endif()
 
         set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CUDA)
 
@@ -309,6 +342,24 @@ if (GGML_HIPBLAS)
     list(APPEND GGML_SOURCES_ROCM "ggml-cuda.cu")
     list(APPEND GGML_SOURCES_ROCM ${SRCS})
 
+    file(GLOB SRCS "ggml-cuda/template-instances/fattn-wmma*.cu")
+    list(APPEND GGML_SOURCES_ROCM ${SRCS})
+    file(GLOB SRCS "ggml-cuda/template-instances/mmq*.cu")
+    list(APPEND GGML_SOURCES_ROCM ${SRCS})
+
+    if (GGML_CUDA_FA_ALL_QUANTS)
+        file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*.cu")
+        list(APPEND GGML_SOURCES_ROCM ${SRCS})
+        add_compile_definitions(GGML_CUDA_FA_ALL_QUANTS)
+    else()
+        file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*q4_0-q4_0.cu")
+        list(APPEND GGML_SOURCES_ROCM ${SRCS})
+        file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*q8_0-q8_0.cu")
+        list(APPEND GGML_SOURCES_ROCM ${SRCS})
+        file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*f16-f16.cu")
+        list(APPEND GGML_SOURCES_ROCM ${SRCS})
+    endif()
+
     add_compile_definitions(GGML_USE_HIPBLAS GGML_USE_CUDA)
 
     if (GGML_CUDA_FORCE_DMMV)
@@ -351,7 +402,7 @@ if (GGML_METAL)
     find_library(METALKIT_FRAMEWORK         MetalKit                REQUIRED)
     find_library(METALPERFORMANCE_FRAMEWORK MetalPerformanceShaders REQUIRED)
 
-    set(GGML_METAL_SOURCES ggml-metal.m ggml-metal.h)
+    set(GGML_SOURCES_METAL ggml-metal.m ggml-metal.h)
 
     set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_METAL)
 
@@ -391,7 +442,7 @@ if (GGML_METAL)
             COMMENT "Generate assembly for embedded Metal library"
         )
 
-        set(GGML_METAL_SOURCES ${GGML_METAL_SOURCES} ${METALLIB_EMBED_ASM})
+    set(GGML_SOURCES_METAL ${GGML_SOURCES_METAL} ${METALLIB_EMBED_ASM})
     else()
         if (GGML_METAL_SHADER_DEBUG)
             # custom command to do the following:
@@ -451,7 +502,7 @@ if (GGML_RPC)
         set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} ws2_32)
     endif()
 
-    set(GGML_RPC_SOURCES ggml-rpc.cpp)
+    set(GGML_SOURCES_RPC ggml-rpc.cpp)
 endif()
 
 if (GGML_VULKAN)
@@ -490,10 +541,10 @@ add_library(${TARGET}
     ../include/ggml/ggml.h
     ../include/ggml/ggml-alloc.h
     ../include/ggml/ggml-backend.h
-    ${GGML_CUDA_SOURCES}
-    ${GGML_OPENCL_SOURCES}
-    ${GGML_METAL_SOURCES}
-    ${GGML_RPC_SOURCES}
+    ${GGML_SOURCES_CUDA}
+    ${GGML_SOURCES_OPENCL}
+    ${GGML_SOURCES_METAL}
+    ${GGML_SOURCES_RPC}
     )
 
 target_include_directories(${TARGET} PUBLIC
@@ -540,7 +591,7 @@ if (MINGW)
         )
 endif()
 
-if (GGML_CUDA_SOURCES)
+if (GGML_SOURCES_CUDA)
     message(STATUS "GGML CUDA sources found")
     if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
         # Only configure gmml CUDA architectures is not globally set
