@@ -8,15 +8,17 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Any
+#from typing import Any
+from typing import Any, Literal, NamedTuple, TypeVar, Union
 
 import numpy as np
+import numpy.typing as npt
 
 # Necessary to load the local gguf package
 if "NO_LOCAL_GGUF" not in os.environ and (Path(__file__).parent.parent.parent / 'gguf-py').exists():
     sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from gguf import GGUFReader, GGUFWriter, ReaderField, GGUFEndian, GGUFValueType, Keys  # noqa: E402
+from gguf import GGUFReader, GGUFWriter, ReaderField, GGMLQuantizationType, GGUFEndian, GGUFValueType, Keys  # noqa: E402
 
 logger = logging.getLogger("gguf-addfile")
 
@@ -54,17 +56,11 @@ def decode_field(field: ReaderField) -> Any:
             sub_type = field.types[-1]
 
             if sub_type == GGUFValueType.STRING:
-                if not field.name[0] == Keys.General.FILE_MARK:
-                    return [str(bytes(field.parts[idx]), encoding='utf8') for idx in field.data]
-                else:
-                    return [bytes(field.parts[idx]) for idx in field.data]
+                return [str(bytes(field.parts[idx]), encoding='utf8') for idx in field.data]
             else:
                 return [pv for idx in field.data for pv in field.parts[idx].tolist()]
         if main_type == GGUFValueType.STRING:
-            if not field.name[0] == Keys.General.FILE_MARK:
-                return str(bytes(field.parts[-1]), encoding='utf8')
-            else:
-                return bytes(field.parts[-1])
+            return str(bytes(field.parts[-1]), encoding='utf8')
         else:
             return field.parts[-1][0]
 
@@ -77,7 +73,7 @@ def get_field_data(reader: GGUFReader, key: str) -> Any:
     return decode_field(field)
 
 
-def copy_with_new_metadata(reader: gguf.GGUFReader, writer: gguf.GGUFWriter, new_metadata: Mapping[str, str]) -> None:
+def copy_with_filename(reader: gguf.GGUFReader, writer: gguf.GGUFWriter, new_metadata: Mapping[str, str], filename: str[Any]) -> None:
     for field in reader.fields.values():
         # Suppress virtual fields and fields written by GGUFWriter
         if field.name == Keys.General.ARCHITECTURE or field.name.startswith('GGUF.'):
@@ -107,16 +103,32 @@ def copy_with_new_metadata(reader: gguf.GGUFReader, writer: gguf.GGUFWriter, new
         writer.add_chat_template(new_metadata[Keys.Tokenizer.CHAT_TEMPLATE])
         del new_metadata[Keys.Tokenizer.CHAT_TEMPLATE]
 
-    for key, name in new_metadata.items():
-        logger.debug(f'Adding {key}: {name}')
-        with open(name, "rb") as f:
-            val = f.read()
-            writer.add_object(key, val)
+    # add filenames to kv
+    writer.add_array(Keys.EMBEDDED_FILES, filename)
     
     for tensor in reader.tensors:
         # Dimensions are written in reverse order, so flip them first
         shape = np.flipud(tensor.shape)
         writer.add_tensor_info(tensor.name, shape, tensor.data.dtype, tensor.data.nbytes, tensor.tensor_type)
+
+    offset_next = 0
+    len_last = 0
+    offset_last = 0
+    for n, tensor in enumerate(reader.tensors, 1):
+        len_last = tensor.n_bytes
+        offset_last = tensor.data_offset
+        offset_next = max(offset_next, writer.ggml_pad(offset_last + int(len_last), writer.data_alignment))
+
+    offs = offset_next
+    # add file info as tensor_info
+    for path in filename:
+        logger.debug(f'Adding {path}')
+        with open(path, "rb") as f:
+            data = f.read()
+            data_len = len(data)
+            dims = [data_len]
+            raw_dtype = GGMLQuantizationType.I8
+            writer.add_tensor_info(path, dims, np.float16, data_len, raw_dtype)
 
     writer.write_header_to_file()
     writer.write_kv_data_to_file()
@@ -124,6 +136,15 @@ def copy_with_new_metadata(reader: gguf.GGUFReader, writer: gguf.GGUFWriter, new
 
     for tensor in reader.tensors:
         writer.write_tensor_data(tensor.data)
+
+    # write file body as tensor data
+    for path in filename:
+        logger.debug(f'Adding {path}')
+        with open(path, "rb") as f:
+            data = f.read()
+            data_len = len(data)
+            # write data with padding
+            writer.write_data(data)
 
     writer.close()
 
@@ -152,12 +173,12 @@ def main() -> None:
 
     logger.info(f'* Adding: {args.addfiles}')
     new_metadata = {}
+    filename = []
     for path in args.addfiles:
-        # add FILE_MARK to key
-        key = Keys.General.FILE_MARK + path
-        new_metadata[key] = path
-        logger.info(f'* Adding: {key} = {path}')
-    copy_with_new_metadata(reader, writer, new_metadata)
+        filename.append(path)
+        logger.info(f'* Adding: {path}')
+    #new_metadata[Keys.EMBEDDED_FILES] = path
+    copy_with_filename(reader, writer, new_metadata, filename)
 
 
 if __name__ == '__main__':
