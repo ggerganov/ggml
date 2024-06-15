@@ -13,7 +13,7 @@ static  __global__ void conv_transpose_1d_kernel(
 
     int out_index = global_index / dst_ne0;
 
-    int accumulator = 0;
+    float accumulator = 0;
 
     for (int c = 0; c < src0_ne2; c++)
     {
@@ -34,8 +34,8 @@ static  __global__ void conv_transpose_1d_kernel(
             int weight_idx = idx - i*s0;
 
          
-            int kernel_weight = src0[kernel_offset + weight_idx];
-            int input_value =  src1[input_offset+i];
+            float kernel_weight = src0[kernel_offset + weight_idx];
+            float input_value =  src1[input_offset+i];
           
             accumulator += kernel_weight * input_value;
         }
