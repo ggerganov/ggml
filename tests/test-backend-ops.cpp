@@ -1233,7 +1233,7 @@ struct test_conv_transpose_1d : public test_case {
         return VARS_TO_STR5(ne_input, ne_kernel, s0, p0, d0);
     }
 
-    test_conv_transpose_1d(std::array<int64_t, 4> ne_input = {197, 32, 3, 1}, // [input_width, input_height, input_channels, 1]
+    test_conv_transpose_1d(std::array<int64_t, 4> ne_input = {197, 32, 1, 1}, // [input_width, input_height, input_channels, 1]
                            std::array<int64_t, 4> ne_kernel = {16, 32, 32, 1}, // [kernel_width, kernel_height, input_channels, 1]
                            int s0 = 1, int p0 = 0, int d0 = 1)
         : ne_input(ne_input), ne_kernel(ne_kernel), s0(s0), p0(p0), d0(d0) {}
@@ -2058,7 +2058,7 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
     test_cases.emplace_back(new test_im2col(GGML_TYPE_F32, GGML_TYPE_F16, GGML_TYPE_F32));
     test_cases.emplace_back(new test_im2col(GGML_TYPE_F32, GGML_TYPE_F16, GGML_TYPE_F16));
 
-    test_cases.emplace_back(new test_im2col());
+    test_cases.emplace_back(new test_conv_transpose_1d());
 
 
     test_cases.emplace_back(new test_repeat(GGML_TYPE_F32, {10, 10, 10, 10}, {1, 1, 1, 1}));
