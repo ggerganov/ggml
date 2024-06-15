@@ -20,10 +20,13 @@ cp -rpv ../llama.cpp/ggml-opencl.cpp     src/ggml-opencl.cpp
 cp -rpv ../llama.cpp/ggml-opencl.h       src/ggml-opencl.h
 cp -rpv ../llama.cpp/ggml-quants.c       src/ggml-quants.c
 cp -rpv ../llama.cpp/ggml-quants.h       src/ggml-quants.h
+cp -rpv ../llama.cpp/ggml-rpc.cpp        src/ggml-rpc.cpp
+cp -rpv ../llama.cpp/ggml-rpc.h          src/ggml-rpc.h
 cp -rpv ../llama.cpp/ggml-sycl.cpp       src/ggml-sycl.cpp
 cp -rpv ../llama.cpp/ggml-sycl.h         src/ggml-sycl.h
 cp -rpv ../llama.cpp/ggml-vulkan.cpp     src/ggml-vulkan.cpp
 cp -rpv ../llama.cpp/ggml-vulkan.h       src/ggml-vulkan.h
+cp -rpv ../llama.cpp/ggml_vk_generate_shaders.py       src/ggml_vk_generate_shaders.py
 cp -rpv ../llama.cpp/ggml.h              include/ggml/ggml.h
 cp -rpv ../llama.cpp/ggml-alloc.h        include/ggml/ggml-alloc.h
 cp -rpv ../llama.cpp/ggml-backend.h      include/ggml/ggml-backend.h

@@ -18,6 +18,94 @@ GGUF is a format based on the existing GGJT, but makes a few changes to the form
 
 The key difference between GGJT and GGUF is the use of a key-value structure for the hyperparameters (now referred to as metadata), rather than a list of untyped values. This allows for new metadata to be added without breaking compatibility with existing models, and to annotate the model with additional information that may be useful for inference or for identifying the model.
 
+### GGUF Naming Convention
+
+GGUF follow a naming convention of `<Model>(-<Version>)-(<ExpertsCount>x)<Parameters>-<EncodingScheme>(-<Shard>).gguf`
+
+The components are:
+1. **Model**: A descriptive name for the model type or architecture.
+    - This can be derived from gguf metadata `general.name` substituting spaces for dashes.
+2. **Version**: (Optional) Denotes the model version number, formatted as `v<Major>.<Minor>`
+    - If model is missing a version number then assume `v0.0` (Prerelease)
+    - This can be derived from gguf metadata `general.version`
+3. **ExpertsCount**: (Optional) Indicates the number of experts found in a Mixture of Experts based model.
+    - This can be derived from gguf metadata `llama.expert_count`
+4. **Parameters**: Indicates the number of parameters and their scale, represented as `<count><scale-prefix>`:
+    - `Q`: Quadrillion parameters.
+    - `T`: Trillion parameters.
+    - `B`: Billion parameters.
+    - `M`: Million parameters.
+    - `K`: Thousand parameters.
+5. **EncodingScheme**: Indicates the weights encoding scheme that was applied to the model. Content, type mixture and arrangement however are determined by user code and can vary depending on project needs.
+6. **Shard**: (Optional) Indicates and denotes that the model has been split into multiple shards, formatted as `<ShardNum>-of-<ShardTotal>`.
+    - *ShardNum* : Shard position in this model. Must be 5 digits padded by zeros.
+      - Shard number always starts from `00001` onwards (e.g. First shard always starts at `00001-of-XXXXX` rather than `00000-of-XXXXX`).
+    - *ShardTotal* : Total number of shards in this model. Must be 5 digits padded by zeros.
+
+#### Parsing Above Naming Convention
+
+To correctly parse a well formed naming convention based gguf filename, it is recommended to read from right to left using `-` as the delimiter. This strategy allow for the most flexibility in model name to include dashes if they so choose, while at the same time allowing for version string to be optional. This approach also gives some future proofing to extend the format if needed in the future.
+
+For example:
+
+  * `Mixtral-v0.1-8x7B-Q2_K.gguf`:
+    - Model Name: Mixtral
+    - Version Number: v0.1
+    - Expert Count: 8
+    - Parameter Count: 7B
+    - Weight Encoding Scheme: Q2_K
+    - Shard: N/A
+
+  * `Hermes-2-Pro-Llama-3-8B-F16.gguf`:
+    - Model Name: Hermes 2 Pro Llama 3
+    - Version Number: v0.0
+    - Expert Count: 0
+    - Parameter Count: 8B
+    - Weight Encoding Scheme: F16
+    - Shard: N/A
+
+  * `Grok-v1.0-100B-Q4_0-00003-of-00009.gguf"`
+    - Model Name: Grok
+    - Version Number: v1.0
+    - Expert Count: 0
+    - Parameter Count: 100B
+    - Weight Encoding Scheme: Q4_0
+    - Shard: 3 out of 9 total shards
+
+You can also try using `/^(?<model_name>[A-Za-z0-9\s-]+)(?:-v(?<major>\d+)\.(?<minor>\d+))?-(?:(?<experts_count>\d+)x)?(?<parameters>\d+[A-Za-z]?)-(?<encoding_scheme>[\w_]+)(?:-(?<shard>\d{5})-of-(?<shardTotal>\d{5}))?\.gguf$/` regular expression to extract all the values above as well. Just don't forget to convert `-` to ` ` for the model name.
+
+<details><summary>Example Node.js Regex Function</summary>
+
+```js
+#!/usr/bin/env node
+const ggufRegex = /^(?<model_name>[A-Za-z0-9\s-]+)(?:-v(?<major>\d+)\.(?<minor>\d+))?-(?:(?<experts_count>\d+)x)?(?<parameters>\d+[A-Za-z]?)-(?<encoding_scheme>[\w_]+)(?:-(?<shard>\d{5})-of-(?<shardTotal>\d{5}))?\.gguf$/;
+
+function parseGGUFFilename(filename) {
+  const match = ggufRegex.exec(filename);
+  if (!match)
+    return null;
+  const {model_name, major = '0', minor = '0', experts_count = null, parameters, encoding_scheme, shard = null, shardTotal = null} = match.groups;
+  return {modelName: model_name.trim().replace(/-/g, ' '), version: `v${major}.${minor}`, expertsCount: experts_count ? +experts_count : null, parameters, encodingScheme: encoding_scheme, shard: shard ? +shard : null, shardTotal: shardTotal ? +shardTotal : null};
+}
+
+const testCases = [
+  {filename: 'Mixtral-v0.1-8x7B-Q2_K.gguf',              expected: { modelName: 'Mixtral',              version: 'v0.1',   expertsCount: 8,    parameters: '7B',   encodingScheme: 'Q2_K',  shard: null,    shardTotal: null }},
+  {filename: 'Grok-v1.0-100B-Q4_0-00003-of-00009.gguf', expected: { modelName: 'Grok',                 version: 'v1.0',   expertsCount: null, parameters: '100B', encodingScheme: 'Q4_0', shard: 3,       shardTotal: 9    }},
+  {filename: 'Hermes-2-Pro-Llama-3-8B-F16.gguf',        expected: { modelName: 'Hermes 2 Pro Llama 3', version: 'v0.0',   expertsCount: null, parameters: '8B',   encodingScheme: 'F16',  shard: null,    shardTotal: null }},
+  {filename: 'Hermes-2-Pro-Llama-3-v32.33-8Q-F16.gguf', expected: { modelName: 'Hermes 2 Pro Llama 3', version: 'v32.33', expertsCount: null, parameters: '8Q',   encodingScheme: 'F16',  shard: null,    shardTotal: null }},
+  {filename: 'not-a-known-arrangement.gguf', expected: null},
+];
+
+testCases.forEach(({ filename, expected }) => {
+  const result = parseGGUFFilename(filename);
+  const passed = JSON.stringify(result) === JSON.stringify(expected);
+  console.log(`${filename}: ${passed ? "PASS" : "FAIL"}`);
+});
+```
+
+</details>
+
+
 ### File Structure
 
 ![image](https://github.com/ggerganov/ggml/assets/1991296/c3623641-3a1d-408e-bfaf-1b7c4e16aa63)

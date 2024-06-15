@@ -50,6 +50,8 @@ option(GGML_METAL                   "ggml: use Metal"                         OF
 option(GGML_METAL_NDEBUG            "ggml: disable Metal debugging"           OFF)
 option(GGML_METAL_SHADER_DEBUG      "ggml: compile Metal with -fno-fast-math" OFF)
 option(GGML_METAL_EMBED_LIBRARY     "ggml: embed Metal library"               OFF)
+option(GGML_RPC                     "ggml: use RPC"                           OFF)
+option(GGML_VULKAN                  "ggml: use Vulkan"                        OFF)
 
 option(GGML_CUDA_FORCE_DMMV                 "ggml: use dmmv instead of mmvq CUDA kernels"     OFF)
 option(GGML_CUDA_FORCE_MMQ                  "ggml: use mmq kernels instead of cuBLAS"         OFF)
