@@ -177,34 +177,6 @@ if (GGML_OPENBLAS)
     endif()
 endif()
 
-if (GGML_CLBLAST)
-    if(NOT CLBLAST_HOME)
-        set(CLBLAST_HOME
-            /usr
-            /usr/local
-            $ENV{CLBLAST_HOME}
-            )
-    endif()
-
-    find_path(CLBLAST_INC NAMES clblast.h PATHS ${CLBLAST_HOME} PATH_SUFFIXES include)
-    find_library(CLBLAST_LIB NAMES clblast PATHS ${CLBLAST_HOME} PATH_SUFFIXES build)
-    find_path(OPENCL_INC NAMES CL/opencl.h PATHS ${OPENCL_ROOT})
-    find_library(OPENCL_LIB NAMES OpenCL)
-    if (CLBLAST_LIB AND OPENCL_LIB AND CLBLAST_INC AND OPENCL_INC)
-        message(STATUS "clBLAST found")
-
-        set(GGML_EXTRA_INCS  ${GGML_EXTRA_INCS}  ${CLBLAST_INC} ${OPENCL_INC})
-        set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${CLBLAST_LIB} ${OPENCL_LIB})
-        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CLBLAST)
-
-        set(GGML_SOURCES_OPENCL ggml-opencl.cpp ggml-opencl.h)
-
-        link_libraries("-Wl,--copy-dt-needed-entries")
-    else()
-        message(WARNING "clBLAST not found")
-    endif()
-endif()
-
 if (GGML_CUBLAS)
     message(WARNING "GGML_CUBLAS is deprecated and will be removed in the future.\nUse GGML_CUDA instead")
     set(GGML_CUDA ON)
@@ -542,7 +514,6 @@ add_library(${TARGET}
     ../include/ggml/ggml-alloc.h
     ../include/ggml/ggml-backend.h
     ${GGML_SOURCES_CUDA}
-    ${GGML_SOURCES_OPENCL}
     ${GGML_SOURCES_METAL}
     ${GGML_SOURCES_RPC}
     )
