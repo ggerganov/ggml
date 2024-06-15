@@ -122,6 +122,12 @@ cmake -DGGML_METAL=ON -DBUILD_SHARED_LIBS=Off ..
 cmake -DGGML_CUBLAS=ON -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.1/bin/nvcc ..
 ```
 
+## Using hipBLAS
+
+```bash
+cmake -DCMAKE_C_COMPILER="$(hipconfig -l)/clang" -DCMAKE_CXX_COMPILER="$(hipconfig -l)/clang++" -DGGML_HIPBLAS=ON
+```
+
 ## Using clBLAST
 
 ```bash

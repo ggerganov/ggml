@@ -6,18 +6,18 @@ const c = @cImport({
 });
 
 fn is_close(a: f32, b: f32, epsilon: f32) bool {
-    return std.math.fabs(a - b) < epsilon;
+    return @abs(a - b) < epsilon;
 }
 
 pub fn main() !void {
     const params = .{
-        .mem_size   = 128*1024*1024,
+        .mem_size = 128 * 1024 * 1024,
         .mem_buffer = null,
-        .no_alloc   = false,
+        .no_alloc = false,
     };
 
-    var opt_params = c.ggml_opt_default_params(c.GGML_OPT_LBFGS);
-    
+    var opt_params = c.ggml_opt_default_params(c.GGML_OPT_TYPE_LBFGS);
+
     const nthreads = try Thread.getCpuCount();
     opt_params.n_threads = @intCast(nthreads);
 
@@ -38,15 +38,14 @@ pub fn main() !void {
     const l_data_pointer: [*]f32 = @ptrCast(@alignCast(l.*.data));
     const f_data_pointer: [*]f32 = @ptrCast(@alignCast(F.*.data));
     for (0..NP) |j| {
-        const ll = if (j < NP/2) @as(f32, 1.0) else @as(f32, -1.0);
+        const ll = if (j < NP / 2) @as(f32, 1.0) else @as(f32, -1.0);
         l_data_pointer[j] = ll;
-        
+
         for (0..NF) |i| {
             const c_rand: f32 = @floatFromInt(c.rand());
-            f_data_pointer[j*NF + i] = 
-                ((if (ll > 0 and i < NF/2) @as(f32, 1.0) else 
-                    if (ll < 0 and i >= NF/2) @as(f32, 1.0) else @as(f32, 0.0)) + 
-                        (c_rand/c.RAND_MAX - 0.5) * 0.1) / (0.5 * NF);
+            f_data_pointer[j * NF + i] =
+                ((if (ll > 0 and i < NF / 2) @as(f32, 1.0) else if (ll < 0 and i >= NF / 2) @as(f32, 1.0) else @as(f32, 0.0)) +
+                (c_rand / c.RAND_MAX - 0.5) * 0.1) / (0.5 * NF);
         }
     }
 
@@ -58,39 +57,25 @@ pub fn main() !void {
 
         // f = sum[(fj*x - l)^2]/n + lambda*|x^2|
         const f =
-            c.ggml_add(ctx0,
-                    c.ggml_div(ctx0,
-                        c.ggml_sum(ctx0,
-                            c.ggml_sqr(ctx0,
-                                c.ggml_sub(ctx0,
-                                    c.ggml_mul_mat(ctx0, F, x),
-                                    l)
-                                )
-                            ),
-                        c.ggml_new_f32(ctx0, @as(f32, NP))
-                        ),
-                    c.ggml_mul(ctx0,
-                        c.ggml_sum(ctx0, c.ggml_sqr(ctx0, x)),
-                        lambda)
-                    );
+            c.ggml_add(ctx0, c.ggml_div(ctx0, c.ggml_sum(ctx0, c.ggml_sqr(ctx0, c.ggml_sub(ctx0, c.ggml_mul_mat(ctx0, F, x), l))), c.ggml_new_f32(ctx0, @as(f32, NP))), c.ggml_mul(ctx0, c.ggml_sum(ctx0, c.ggml_sqr(ctx0, x)), lambda));
 
         const res = c.ggml_opt(null, opt_params, f);
 
-        try std.testing.expect(res == c.GGML_OPT_OK);
+        try std.testing.expect(res == c.GGML_OPT_RESULT_OK);
 
         const x_data_pointer: [*]f32 = @ptrCast(@alignCast(x.*.data));
         // print results
         for (0..16) |i| {
-            std.debug.print("x[{d:3}] = {d:.6}\n", .{i, x_data_pointer[i]});
+            std.debug.print("x[{d:3}] = {d:.6}\n", .{ i, x_data_pointer[i] });
         }
         std.debug.print("...\n", .{});
         for (NF - 16..NF) |i| {
-            std.debug.print("x[{d:3}] = {d:.6}\n", .{i, x_data_pointer[i]});
+            std.debug.print("x[{d:3}] = {d:.6}\n", .{ i, x_data_pointer[i] });
         }
         std.debug.print("\n", .{});
 
         for (0..NF) |i| {
-            if (i < NF/2) {
+            if (i < NF / 2) {
                 try std.testing.expect(is_close(x_data_pointer[i], 1.0, 1e-2));
             } else {
                 try std.testing.expect(is_close(x_data_pointer[i], -1.0, 1e-2));

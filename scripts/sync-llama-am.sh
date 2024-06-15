@@ -156,6 +156,7 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
         -e 's/\/ggml-sycl\.h/\/src\/ggml-sycl.h/g' \
         -e 's/\/ggml-vulkan\.cpp/\/src\/ggml-vulkan.cpp/g' \
         -e 's/\/ggml-vulkan\.h/\/src\/ggml-vulkan.h/g' \
+        -e 's/\/ggml_vk_generate_shaders\.py/\/src\/ggml_vk_generate_shaders.py/g' \
         -e 's/\/ggml\.h/\/include\/ggml\/ggml.h/g' \
         -e 's/\/ggml-alloc\.h/\/include\/ggml\/ggml-alloc.h/g' \
         -e 's/\/ggml-backend\.h/\/include\/ggml\/ggml-backend.h/g' \
