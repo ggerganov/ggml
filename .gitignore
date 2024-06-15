@@ -30,6 +30,7 @@ tests/arm_neon.h
 zig-out/
 zig-cache/
 
+*.o
 *.dot
 
 *.sw?
