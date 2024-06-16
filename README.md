@@ -24,7 +24,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 
 - [X] Example of GPT-2 inference [examples/gpt-2](https://github.com/ggerganov/ggml/tree/master/examples/gpt-2)
 - [X] Example of GPT-J inference [examples/gpt-j](https://github.com/ggerganov/ggml/tree/master/examples/gpt-j)
-- [X] Example of Whisper inference [examples/whisper](https://github.com/ggerganov/ggml/tree/master/examples/whisper)
+- [X] Example of Whisper inference [ggerganov/whisper.cpp](https://github.com/ggerganov/whisper.cpp)
 - [X] Example of LLaMA inference [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp)
 - [X] Example of LLaMA training [ggerganov/llama.cpp/examples/baby-llama](https://github.com/ggerganov/llama.cpp/tree/master/examples/baby-llama)
 - [X] Example of Falcon inference [cmp-nct/ggllm.cpp](https://github.com/cmp-nct/ggllm.cpp)
@@ -43,20 +43,6 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [X] Example of ViT inference [staghado/vit.cpp](https://github.com/staghado/vit.cpp)
 - [X] Example of multiple LLMs inference [foldl/chatllm.cpp](https://github.com/foldl/chatllm.cpp)
 - [X] SeamlessM4T inference *(in development)* https://github.com/facebookresearch/seamless_communication/tree/main/ggml
-
-## Whisper inference (example)
-
-With ggml you can efficiently run [Whisper](examples/whisper) inference on the CPU.
-
-Memory requirements:
-
-| Model  | Disk   | Mem     |
-| ---    | ---    | ---     |
-| tiny   |  75 MB | ~280 MB |
-| base   | 142 MB | ~430 MB |
-| small  | 466 MB | ~1.0 GB |
-| medium | 1.5 GB | ~2.6 GB |
-| large  | 2.9 GB | ~4.7 GB |
 
 ## GPT inference (example)
 
