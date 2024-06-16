@@ -110,12 +110,11 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
     # ggml-kompute.h      -> src/ggml-kompute.h
     # ggml-metal.h        -> src/ggml-metal.h
     # ggml-metal.m        -> src/ggml-metal.m
-    # ggml-mpi.h          -> src/ggml-mpi.h
-    # ggml-mpi.c          -> src/ggml-mpi.c
     # ggml-quants.c       -> src/ggml-quants.c
     # ggml-quants.h       -> src/ggml-quants.h
     # ggml-rpc.cpp        -> src/ggml-rpc.cpp
     # ggml-rpc.h          -> src/ggml-rpc.h
+    # ggml-sycl/*         -> src/ggml-sycl/*
     # ggml-sycl.cpp       -> src/ggml-sycl.cpp
     # ggml-sycl.h         -> src/ggml-sycl.h
     # ggml-vulkan.cpp     -> src/ggml-vulkan.cpp
@@ -153,12 +152,11 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
         -e 's/\/ggml-kompute\.h/\/src\/ggml-kompute.h/g' \
         -e 's/\/ggml-metal\.h/\/src\/ggml-metal.h/g' \
         -e 's/\/ggml-metal\.m/\/src\/ggml-metal.m/g' \
-        -e 's/\/ggml-mpi\.h/\/src\/ggml-mpi.h/g' \
-        -e 's/\/ggml-mpi\.c/\/src\/ggml-mpi.c/g' \
         -e 's/\/ggml-quants\.c/\/src\/ggml-quants.c/g' \
         -e 's/\/ggml-quants\.h/\/src\/ggml-quants.h/g' \
         -e 's/\/ggml-rpc\.cpp/\/src\/ggml-rpc.cpp/g' \
         -e 's/\/ggml-rpc\.h/\/src\/ggml-rpc.h/g' \
+        -e 's/\/ggml-sycl\//\/src\/ggml-sycl\//g' \
         -e 's/\/ggml-sycl\.cpp/\/src\/ggml-sycl.cpp/g' \
         -e 's/\/ggml-sycl\.h/\/src\/ggml-sycl.h/g' \
         -e 's/\/ggml-vulkan\.cpp/\/src\/ggml-vulkan.cpp/g' \

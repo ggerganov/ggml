@@ -106,8 +106,6 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     # ggml-kompute.h      -> src/ggml-kompute.h
     # ggml-metal.h        -> src/ggml-metal.h
     # ggml-metal.m        -> src/ggml-metal.m
-    # ggml-mpi.h          -> src/ggml-mpi.h
-    # ggml-mpi.c          -> src/ggml-mpi.c
     # ggml-quants.c       -> src/ggml-quants.c
     # ggml-quants.h       -> src/ggml-quants.h
     # ggml-rpc.cpp        -> src/ggml-rpc.cpp
@@ -144,8 +142,6 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
         -e 's/\/ggml-kompute\.h/\/src\/ggml-kompute.h/g' \
         -e 's/\/ggml-metal\.h/\/src\/ggml-metal.h/g' \
         -e 's/\/ggml-metal\.m/\/src\/ggml-metal.m/g' \
-        -e 's/\/ggml-mpi\.h/\/src\/ggml-mpi.h/g' \
-        -e 's/\/ggml-mpi\.c/\/src\/ggml-mpi.c/g' \
         -e 's/\/ggml-quants\.c/\/src\/ggml-quants.c/g' \
         -e 's/\/ggml-quants\.h/\/src\/ggml-quants.h/g' \
         -e 's/\/ggml-rpc\.cpp/\/src\/ggml-rpc.cpp/g' \

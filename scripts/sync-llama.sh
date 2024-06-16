@@ -14,8 +14,6 @@ cp -rpv ../llama.cpp/ggml-kompute.h      src/ggml-kompute.h
 cp -rpv ../llama.cpp/ggml-metal.h        src/ggml-metal.h
 cp -rpv ../llama.cpp/ggml-metal.m        src/ggml-metal.m
 cp -rpv ../llama.cpp/ggml-metal.metal    src/ggml-metal.metal
-#cp -rpv ../llama.cpp/ggml-mpi.h          src/ggml-mpi.h
-#cp -rpv ../llama.cpp/ggml-mpi.c          src/ggml-mpi.c
 cp -rpv ../llama.cpp/ggml-opencl.cpp     src/ggml-opencl.cpp
 cp -rpv ../llama.cpp/ggml-opencl.h       src/ggml-opencl.h
 cp -rpv ../llama.cpp/ggml-quants.c       src/ggml-quants.c

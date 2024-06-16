@@ -14,14 +14,13 @@ cp -rpv ../whisper.cpp/ggml-kompute.h                 src/ggml-kompute.h
 cp -rpv ../whisper.cpp/ggml-metal.h                   src/ggml-metal.h
 cp -rpv ../whisper.cpp/ggml-metal.m                   src/ggml-metal.m
 cp -rpv ../whisper.cpp/ggml-metal.metal               src/ggml-metal.metal
-#cp -rpv ../whisper.cpp/ggml-mpi.h                     src/ggml-mpi.h
-#cp -rpv ../whisper.cpp/ggml-mpi.m                     src/ggml-mpi.m
 cp -rpv ../whisper.cpp/ggml-opencl.cpp                src/ggml-opencl.cpp
 cp -rpv ../whisper.cpp/ggml-opencl.h                  src/ggml-opencl.h
 cp -rpv ../whisper.cpp/ggml-quants.c                  src/ggml-quants.c
 cp -rpv ../whisper.cpp/ggml-quants.h                  src/ggml-quants.h
 cp -rpv ../whisper.cpp/ggml-rpc.cpp                   src/ggml-rpc.cpp
 cp -rpv ../whisper.cpp/ggml-rpc.h                     src/ggml-rpc.h
+cp -rpv ../whisper.cpp/ggml-sycl/*                    src/ggml-sycl/
 cp -rpv ../whisper.cpp/ggml-sycl.cpp                  src/ggml-sycl.cpp
 cp -rpv ../whisper.cpp/ggml-sycl.h                    src/ggml-sycl.h
 cp -rpv ../whisper.cpp/ggml-vulkan.cpp                src/ggml-vulkan.cpp
