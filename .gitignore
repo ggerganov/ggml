@@ -1,4 +1,5 @@
 build/
+build-blas/
 build-debug/
 build-release/
 build-sanitize-addr/
