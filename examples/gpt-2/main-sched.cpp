@@ -10,6 +10,10 @@
 #include "ggml-metal.h"
 #endif
 
+#ifdef GGML_USE_BLAS
+#include "ggml-blas.h"
+#endif
+
 #include "common.h"
 #include "common-ggml.h"
 
@@ -130,6 +134,16 @@ void init_backends(gpt2_model & model, const gpt_params & params) {
     if (gpu_backend) {
         model.backends.push_back(gpu_backend);
     }
+
+#ifdef GGML_USE_BLAS
+    ggml_backend_t blas_backend = ggml_backend_blas_init();
+    if (!blas_backend) {
+        fprintf(stderr, "%s: failed to initialize BLAS backend\n", __func__);
+    } else {
+        ggml_backend_blas_set_n_threads(blas_backend, params.n_threads);
+        model.backends.push_back(blas_backend);
+    }
+#endif
 
     // always add the CPU backend as a fallback
     ggml_backend_t cpu_backend = ggml_backend_cpu_init();
