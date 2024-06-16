@@ -60,6 +60,7 @@ while read c; do
         ggml*.metal \
         ggml*.cu \
         ggml-cuda/* \
+        ggml-sycl/* \
         tests/test-opt.cpp \
         tests/test-grad0.cpp \
         tests/test-quantize-fns.cpp \
@@ -111,6 +112,7 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     # ggml-quants.h       -> src/ggml-quants.h
     # ggml-rpc.cpp        -> src/ggml-rpc.cpp
     # ggml-rpc.h          -> src/ggml-rpc.h
+    # ggml-sycl/*         -> src/ggml-sycl/*
     # ggml-sycl.cpp       -> src/ggml-sycl.cpp
     # ggml-sycl.h         -> src/ggml-sycl.h
     # ggml-vulkan.cpp     -> src/ggml-vulkan.cpp
@@ -148,6 +150,7 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
         -e 's/\/ggml-quants\.h/\/src\/ggml-quants.h/g' \
         -e 's/\/ggml-rpc\.cpp/\/src\/ggml-rpc.cpp/g' \
         -e 's/\/ggml-rpc\.h/\/src\/ggml-rpc.h/g' \
+        -e 's/\/ggml-sycl\//\/src\/ggml-sycl\//g' \
         -e 's/\/ggml-sycl\.cpp/\/src\/ggml-sycl.cpp/g' \
         -e 's/\/ggml-sycl\.h/\/src\/ggml-sycl.h/g' \
         -e 's/\/ggml-vulkan\.cpp/\/src\/ggml-vulkan.cpp/g' \
