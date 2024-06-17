@@ -25,6 +25,16 @@ endif()
 
 # options
 
+if (APPLE)
+    set(GGML_METAL_DEFAULT ON)
+    set(GGML_BLAS_DEFAULT ON)
+    set(GGML_BLAS_VENDOR_DEFAULT "Apple")
+else()
+    set(GGML_METAL_DEFAULT OFF)
+    set(GGML_BLAS_DEFAULT OFF)
+    set(GGML_BLAS_VENDOR_DEFAULT "Generic")
+endif()
+
 option(BUILD_SHARED_LIBS            "ggml: build shared libs" ${BUILD_SHARED_LIBS_DEFAULT})
 
 option(GGML_ALL_WARNINGS            "ggml: enable all compiler warnings"                   ON)
@@ -41,12 +51,13 @@ option(GGML_TEST_COVERAGE           "ggml: enable test coverage" OFF)
 
 option(GGML_PERF                    "ggml: enable perf timings"               OFF)
 option(GGML_NO_ACCELERATE           "ggml: disable Accelerate framework"      OFF)
-option(GGML_OPENBLAS                "ggml: use OpenBLAS"                      OFF)
-option(GGML_CLBLAST                 "ggml: use clBLAST"                       OFF)
+option(GGML_BLAS                    "ggml: use BLAS"                          ${GGML_BLAS_DEFAULT})
+set(GGML_BLAS_VENDOR ${GGML_BLAS_VENDOR_DEFAULT} CACHE STRING
+                                    "ggml: BLAS library vendor")
 option(GGML_HIPBLAS                 "ggml: use hipBLAS"                       OFF)
 option(GGML_CUDA                    "ggml: use CUDA"                          OFF)
 option(GGML_CUBLAS                  "ggml: use CUDA (deprecated)"             OFF)
-option(GGML_METAL                   "ggml: use Metal"                         OFF)
+option(GGML_METAL                   "ggml: use Metal"                         ${GGML_METAL_DEFAULT})
 option(GGML_METAL_NDEBUG            "ggml: disable Metal debugging"           OFF)
 option(GGML_METAL_SHADER_DEBUG      "ggml: compile Metal with -fno-fast-math" OFF)
 option(GGML_METAL_EMBED_LIBRARY     "ggml: embed Metal library"               OFF)

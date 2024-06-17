@@ -61,7 +61,7 @@ jobs:
 
     - name: Configure CMake
       working-directory: ./build
-      run: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DGGML_TEST_COVERAGE=ON ..
+      run: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DGGML_TEST_COVERAGE=ON -DGGML_METAL=OFF ..
 
     - name: Build
       working-directory: ./build
@@ -112,7 +112,7 @@ jobs:
 
     - name: Configure CMake
       working-directory: ./build
-      run: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DGGML_TEST_COVERAGE=ON ..
+      run: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DGGML_TEST_COVERAGE=ON -DGGML_METAL=OFF ..
 
     - name: Build
       working-directory: ./build
