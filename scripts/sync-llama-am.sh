@@ -60,6 +60,7 @@ while read c; do
         ggml*.metal \
         ggml*.cu \
         ggml-cuda/* \
+        ggml-sycl/* \
         tests/test-opt.cpp \
         tests/test-grad0.cpp \
         tests/test-quantize-fns.cpp \
@@ -96,6 +97,8 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     # ggml-alloc.c        -> src/ggml-alloc.c
     # ggml-backend-impl.h -> src/ggml-backend-impl.h
     # ggml-backend.c      -> src/ggml-backend.c
+    # ggml-blas.cpp       -> src/ggml-blas.cpp
+    # ggml-blas.h         -> src/ggml-blas.h
     # ggml-common.h       -> src/ggml-common.h
     # ggml-cuda/*         -> src/ggml-cuda/*
     # ggml-cuda.cu        -> src/ggml-cuda.cu
@@ -105,14 +108,11 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     # ggml-kompute.h      -> src/ggml-kompute.h
     # ggml-metal.h        -> src/ggml-metal.h
     # ggml-metal.m        -> src/ggml-metal.m
-    # ggml-mpi.h          -> src/ggml-mpi.h
-    # ggml-mpi.c          -> src/ggml-mpi.c
-    # ggml-opencl.cpp     -> src/ggml-opencl.cpp
-    # ggml-opencl.h       -> src/ggml-opencl.h
     # ggml-quants.c       -> src/ggml-quants.c
     # ggml-quants.h       -> src/ggml-quants.h
     # ggml-rpc.cpp        -> src/ggml-rpc.cpp
     # ggml-rpc.h          -> src/ggml-rpc.h
+    # ggml-sycl/*         -> src/ggml-sycl/*
     # ggml-sycl.cpp       -> src/ggml-sycl.cpp
     # ggml-sycl.h         -> src/ggml-sycl.h
     # ggml-vulkan.cpp     -> src/ggml-vulkan.cpp
@@ -135,6 +135,8 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
         -e 's/\/ggml-alloc\.c/\/src\/ggml-alloc.c/g' \
         -e 's/\/ggml-backend-impl\.h/\/src\/ggml-backend-impl.h/g' \
         -e 's/\/ggml-backend\.c/\/src\/ggml-backend.c/g' \
+        -e 's/\/ggml-blas\.cpp/\/src\/ggml-blas.cpp/g' \
+        -e 's/\/ggml-blas\.h/\/src\/ggml-blas.h/g' \
         -e 's/\/ggml-common\.h/\/src\/ggml-common.h/g' \
         -e 's/\/ggml-cuda\//\/src\/ggml-cuda\//g' \
         -e 's/\/ggml-cuda\.cu/\/src\/ggml-cuda.cu/g' \
@@ -144,14 +146,11 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
         -e 's/\/ggml-kompute\.h/\/src\/ggml-kompute.h/g' \
         -e 's/\/ggml-metal\.h/\/src\/ggml-metal.h/g' \
         -e 's/\/ggml-metal\.m/\/src\/ggml-metal.m/g' \
-        -e 's/\/ggml-mpi\.h/\/src\/ggml-mpi.h/g' \
-        -e 's/\/ggml-mpi\.c/\/src\/ggml-mpi.c/g' \
-        -e 's/\/ggml-opencl\.cpp/\/src\/ggml-opencl.cpp/g' \
-        -e 's/\/ggml-opencl\.h/\/src\/ggml-opencl.h/g' \
         -e 's/\/ggml-quants\.c/\/src\/ggml-quants.c/g' \
         -e 's/\/ggml-quants\.h/\/src\/ggml-quants.h/g' \
         -e 's/\/ggml-rpc\.cpp/\/src\/ggml-rpc.cpp/g' \
         -e 's/\/ggml-rpc\.h/\/src\/ggml-rpc.h/g' \
+        -e 's/\/ggml-sycl\//\/src\/ggml-sycl\//g' \
         -e 's/\/ggml-sycl\.cpp/\/src\/ggml-sycl.cpp/g' \
         -e 's/\/ggml-sycl\.h/\/src\/ggml-sycl.h/g' \
         -e 's/\/ggml-vulkan\.cpp/\/src\/ggml-vulkan.cpp/g' \

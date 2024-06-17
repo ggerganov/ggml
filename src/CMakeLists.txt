@@ -152,56 +152,89 @@ if (APPLE AND NOT GGML_NO_ACCELERATE)
     endif()
 endif()
 
-if (GGML_OPENBLAS)
-    set(OPENBLAS_INCLUDE_SEARCH_PATHS
-        /usr/include
-        /usr/include/openblas
-        /usr/include/openblas-base
-        /usr/local/include
-        /usr/local/include/openblas
-        /usr/local/include/openblas-base
-        /opt/OpenBLAS/include
-        $ENV{OpenBLAS_HOME}
-        $ENV{OpenBLAS_HOME}/include
-        )
-    find_path(OPENBLAS_INC NAMES cblas.h PATHS ${OPENBLAS_INCLUDE_SEARCH_PATHS})
-    find_library(OPENBLAS_LIB NAMES openblas libopenblas)
-    if (OPENBLAS_LIB)
-        message(STATUS "OpenBLAS found")
-
-        set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${OPENBLAS_LIB})
-        set(GGML_EXTRA_INCS  ${GGML_EXTRA_INCS}  ${OPENBLAS_INC})
-        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_OPENBLAS)
-    else()
-        message(WARNING "OpenBLAS not found")
+if (GGML_BLAS)
+    if (GGML_STATIC)
+        set(BLA_STATIC ON)
     endif()
-endif()
+    #if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.22)
+    #    set(BLA_SIZEOF_INTEGER 8)
+    #endif()
 
-if (GGML_CLBLAST)
-    if(NOT CLBLAST_HOME)
-        set(CLBLAST_HOME
-            /usr
-            /usr/local
-            $ENV{CLBLAST_HOME}
-            )
-    endif()
+    set(BLA_VENDOR ${GGML_BLAS_VENDOR})
+    find_package(BLAS)
 
-    find_path(CLBLAST_INC NAMES clblast.h PATHS ${CLBLAST_HOME} PATH_SUFFIXES include)
-    find_library(CLBLAST_LIB NAMES clblast PATHS ${CLBLAST_HOME} PATH_SUFFIXES build)
-    find_path(OPENCL_INC NAMES CL/opencl.h PATHS ${OPENCL_ROOT})
-    find_library(OPENCL_LIB NAMES OpenCL)
-    if (CLBLAST_LIB AND OPENCL_LIB AND CLBLAST_INC AND OPENCL_INC)
-        message(STATUS "clBLAST found")
+    if (BLAS_FOUND)
+        message(STATUS "BLAS found, Libraries: ${BLAS_LIBRARIES}")
 
-        set(GGML_EXTRA_INCS  ${GGML_EXTRA_INCS}  ${CLBLAST_INC} ${OPENCL_INC})
-        set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${CLBLAST_LIB} ${OPENCL_LIB})
-        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CLBLAST)
+        if (("${BLAS_INCLUDE_DIRS}" STREQUAL "") AND NOT (${GGML_BLAS_VENDOR} MATCHES "Apple"))
+            # BLAS_INCLUDE_DIRS is missing in FindBLAS.cmake.
+            # see https://gitlab.kitware.com/cmake/cmake/-/issues/20268
+            find_package(PkgConfig REQUIRED)
+            if (${GGML_BLAS_VENDOR} MATCHES "Generic")
+                pkg_check_modules(DepBLAS REQUIRED blas)
+            elseif (${GGML_BLAS_VENDOR} MATCHES "OpenBLAS")
+                # As of openblas v0.3.22, the 64-bit is named openblas64.pc
+                pkg_check_modules(DepBLAS openblas64)
+                if (NOT DepBLAS_FOUND)
+                    pkg_check_modules(DepBLAS REQUIRED openblas)
+                endif()
+            elseif (${GGML_BLAS_VENDOR} MATCHES "FLAME")
+                pkg_check_modules(DepBLAS REQUIRED blis)
+            elseif (${GGML_BLAS_VENDOR} MATCHES "ATLAS")
+                pkg_check_modules(DepBLAS REQUIRED blas-atlas)
+            elseif (${GGML_BLAS_VENDOR} MATCHES "FlexiBLAS")
+                pkg_check_modules(DepBLAS REQUIRED flexiblas_api)
+            elseif (${GGML_BLAS_VENDOR} MATCHES "Intel")
+                # all Intel* libraries share the same include path
+                pkg_check_modules(DepBLAS REQUIRED mkl-sdl)
+            elseif (${GGML_BLAS_VENDOR} MATCHES "NVHPC")
+                # this doesn't provide pkg-config
+                # suggest to assign BLAS_INCLUDE_DIRS on your own
+                if ("${NVHPC_VERSION}" STREQUAL "")
+                    message(WARNING "Better to set NVHPC_VERSION")
+                else()
+                    set(DepBLAS_FOUND ON)
+                    set(DepBLAS_INCLUDE_DIRS "/opt/nvidia/hpc_sdk/${CMAKE_SYSTEM_NAME}_${CMAKE_SYSTEM_PROCESSOR}/${NVHPC_VERSION}/math_libs/include")
+                endif()
+            endif()
+            if (DepBLAS_FOUND)
+                set(BLAS_INCLUDE_DIRS ${DepBLAS_INCLUDE_DIRS})
+            else()
+                message(WARNING "BLAS_INCLUDE_DIRS neither been provided nor been automatically"
+                " detected by pkgconfig, trying to find cblas.h from possible paths...")
+                find_path(BLAS_INCLUDE_DIRS
+                    NAMES cblas.h
+                    HINTS
+                        /usr/include
+                        /usr/local/include
+                        /usr/include/openblas
+                        /opt/homebrew/opt/openblas/include
+                        /usr/local/opt/openblas/include
+                        /usr/include/x86_64-linux-gnu/openblas/include
+                )
+            endif()
+        endif()
 
-        set(GGML_OPENCL_SOURCES ggml-opencl.cpp ggml-opencl.h)
+        message(STATUS "BLAS found, Includes: ${BLAS_INCLUDE_DIRS}")
 
-        link_libraries("-Wl,--copy-dt-needed-entries")
+        add_compile_options(${BLAS_LINKER_FLAGS})
+
+        add_compile_definitions(GGML_USE_BLAS)
+
+        if (${BLAS_INCLUDE_DIRS} MATCHES "mkl" AND (${GGML_BLAS_VENDOR} MATCHES "Generic" OR ${GGML_BLAS_VENDOR} MATCHES "Intel"))
+            add_compile_definitions(GGML_BLAS_USE_MKL)
+        endif()
+
+        set(GGML_HEADERS_BLAS ggml-blas.h)
+        set(GGML_SOURCES_BLAS ggml-blas.cpp)
+
+        set(GGML_EXTRA_LIBS     ${GGML_EXTRA_LIBS}     ${BLAS_LIBRARIES})
+        set(GGML_EXTRA_INCLUDES ${GGML_EXTRA_INCLUDES} ${BLAS_INCLUDE_DIRS})
+        set(GGML_EXTRA_FLAGS    ${GGML_EXTRA_FLAGS} -DGGML_USE_BLAS)
     else()
-        message(WARNING "clBLAST not found")
+        message(WARNING "BLAS not found, please refer to "
+        "https://cmake.org/cmake/help/latest/module/FindBLAS.html#blas-lapack-vendors"
+        " to set correct GGML_BLAS_VENDOR")
     endif()
 endif()
 
@@ -217,11 +250,44 @@ if (GGML_CUDA)
     if (CUDAToolkit_FOUND)
         message(STATUS "CUDA found")
 
+        if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+            # 52 == lowest CUDA 12 standard
+            # 60 == f16 CUDA intrinsics
+            # 61 == integer CUDA intrinsics
+            # 70 == compute capability at which unrolling a loop in mul_mat_q kernels is faster
+            if (GGML_CUDA_F16 OR GGML_CUDA_DMMV_F16)
+                set(CMAKE_CUDA_ARCHITECTURES "60;61;70") # needed for f16 CUDA intrinsics
+            else()
+                set(CMAKE_CUDA_ARCHITECTURES "52;61;70") # lowest CUDA 12 standard + lowest for integer intrinsics
+                #set(CMAKE_CUDA_ARCHITECTURES "OFF") # use this to compile much faster, but only F16 models work
+            endif()
+        endif()
+
+        message(STATUS "Using CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
+
         enable_language(CUDA)
 
-        file(GLOB   GGML_CUDA_SOURCES "ggml-cuda/*.cu")
-        list(APPEND GGML_CUDA_SOURCES  ggml-cuda.h)
-        list(APPEND GGML_CUDA_SOURCES  ggml-cuda.cu)
+        file(GLOB   GGML_SOURCES_CUDA "ggml-cuda/*.cu")
+        list(APPEND GGML_SOURCES_CUDA  ggml-cuda.h)
+        list(APPEND GGML_SOURCES_CUDA  ggml-cuda.cu)
+
+        file(GLOB SRCS "ggml-cuda/template-instances/fattn-wmma*.cu")
+        list(APPEND GGML_SOURCES_CUDA ${SRCS})
+        file(GLOB SRCS "ggml-cuda/template-instances/mmq*.cu")
+        list(APPEND GGML_SOURCES_CUDA ${SRCS})
+
+        if (GGML_CUDA_FA_ALL_QUANTS)
+            file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*.cu")
+            list(APPEND GGML_SOURCES_CUDA ${SRCS})
+            add_compile_definitions(GGML_CUDA_FA_ALL_QUANTS)
+        else()
+            file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*q4_0-q4_0.cu")
+            list(APPEND GGML_SOURCES_CUDA ${SRCS})
+            file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*q8_0-q8_0.cu")
+            list(APPEND GGML_SOURCES_CUDA ${SRCS})
+            file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*f16-f16.cu")
+            list(APPEND GGML_SOURCES_CUDA ${SRCS})
+        endif()
 
         set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CUDA)
 
@@ -309,6 +375,24 @@ if (GGML_HIPBLAS)
     list(APPEND GGML_SOURCES_ROCM "ggml-cuda.cu")
     list(APPEND GGML_SOURCES_ROCM ${SRCS})
 
+    file(GLOB SRCS "ggml-cuda/template-instances/fattn-wmma*.cu")
+    list(APPEND GGML_SOURCES_ROCM ${SRCS})
+    file(GLOB SRCS "ggml-cuda/template-instances/mmq*.cu")
+    list(APPEND GGML_SOURCES_ROCM ${SRCS})
+
+    if (GGML_CUDA_FA_ALL_QUANTS)
+        file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*.cu")
+        list(APPEND GGML_SOURCES_ROCM ${SRCS})
+        add_compile_definitions(GGML_CUDA_FA_ALL_QUANTS)
+    else()
+        file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*q4_0-q4_0.cu")
+        list(APPEND GGML_SOURCES_ROCM ${SRCS})
+        file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*q8_0-q8_0.cu")
+        list(APPEND GGML_SOURCES_ROCM ${SRCS})
+        file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*f16-f16.cu")
+        list(APPEND GGML_SOURCES_ROCM ${SRCS})
+    endif()
+
     add_compile_definitions(GGML_USE_HIPBLAS GGML_USE_CUDA)
 
     if (GGML_CUDA_FORCE_DMMV)
@@ -351,7 +435,7 @@ if (GGML_METAL)
     find_library(METALKIT_FRAMEWORK         MetalKit                REQUIRED)
     find_library(METALPERFORMANCE_FRAMEWORK MetalPerformanceShaders REQUIRED)
 
-    set(GGML_METAL_SOURCES ggml-metal.m ggml-metal.h)
+    set(GGML_SOURCES_METAL ggml-metal.m ggml-metal.h)
 
     set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_METAL)
 
@@ -391,7 +475,7 @@ if (GGML_METAL)
             COMMENT "Generate assembly for embedded Metal library"
         )
 
-        set(GGML_METAL_SOURCES ${GGML_METAL_SOURCES} ${METALLIB_EMBED_ASM})
+    set(GGML_SOURCES_METAL ${GGML_SOURCES_METAL} ${METALLIB_EMBED_ASM})
     else()
         if (GGML_METAL_SHADER_DEBUG)
             # custom command to do the following:
@@ -451,7 +535,7 @@ if (GGML_RPC)
         set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} ws2_32)
     endif()
 
-    set(GGML_RPC_SOURCES ggml-rpc.cpp)
+    set(GGML_SOURCES_RPC ggml-rpc.cpp)
 endif()
 
 if (GGML_VULKAN)
@@ -490,10 +574,10 @@ add_library(${TARGET}
     ../include/ggml/ggml.h
     ../include/ggml/ggml-alloc.h
     ../include/ggml/ggml-backend.h
-    ${GGML_CUDA_SOURCES}
-    ${GGML_OPENCL_SOURCES}
-    ${GGML_METAL_SOURCES}
-    ${GGML_RPC_SOURCES}
+    ${GGML_SOURCES_CUDA}  ${GGML_HEADERS_CUDA}
+    ${GGML_SOURCES_METAL} ${GGML_HEADERS_METAL}
+    ${GGML_SOURCES_RPC}   ${GGML_HEADERS_RPC}
+    ${GGML_SOURCES_BLAS}  ${GGML_HEADERS_BLAS}
     )
 
 target_include_directories(${TARGET} PUBLIC
@@ -540,7 +624,7 @@ if (MINGW)
         )
 endif()
 
-if (GGML_CUDA_SOURCES)
+if (GGML_SOURCES_CUDA)
     message(STATUS "GGML CUDA sources found")
     if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
         # Only configure gmml CUDA architectures is not globally set
