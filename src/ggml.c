@@ -6857,7 +6857,7 @@ struct ggml_tensor * ggml_upscale_ext(
 struct ggml_tensor * ggml_pad(
     struct ggml_context * ctx,
     struct ggml_tensor  * a,
-    int p00, int p01, int p10, int p11, int p20, int p21, int p30, int p31) {
+    int p00, int p01, int p10, int p11) {
     bool is_node = false;
 
     if (a->grad) {
@@ -6868,15 +6868,15 @@ struct ggml_tensor * ggml_pad(
     struct ggml_tensor * result = ggml_new_tensor_4d(ctx, a->type,
             a->ne[0] + p00 + p01,
             a->ne[1] + p10 + p11,
-            a->ne[2] + p20 + p21,
-            a->ne[3] + p30 + p31);
+            a->ne[2],
+            a->ne[3]);
 
     result->op = GGML_OP_PAD;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
 
 
-    int32_t params[] = { p00,p01,p10,p11,p20,p21,p30,p31 };
+    int32_t params[] = { p00,p01,p10,p11};
     ggml_set_op_params(result, params, sizeof(params));
 
     return result;
@@ -15473,17 +15473,7 @@ static void ggml_compute_forward_pad_f32(
 
 
     const int32_t p00 = opts[0];
-    const int32_t p01 = opts[1];
     const int32_t p10 = opts[2];
-    const int32_t p11 = opts[3];
-    const int32_t p20 = opts[4];
-    const int32_t p21 = opts[5];
-    const int32_t p30 = opts[6];
-    const int32_t p31 = opts[7];
-
-
-    printf("%d,%d,%d,%d,%d,%d,%d,%d\n",p00,p01,p10,p11,p20,p21,p30,p31);
-
 
     GGML_TENSOR_UNARY_OP_LOCALS
 
@@ -15497,19 +15487,11 @@ static void ggml_compute_forward_pad_f32(
                 for (int64_t i3 = 0; i3 < ne3; ++i3) {
                     const int64_t dst_idx = i3*(ne0*ne1*ne2) + i2*(ne0*ne1) + i1*ne0 + i0;
 
-                    const float * src_ptr = (const float *)((char *) src0->data + (i3-p30)*nb03 + (i2-p20)*nb02 + (i1-p10)*nb01 + (i0-p00)*nb00);
+                    const float * src_ptr = (const float *)((char *) src0->data + (i3)*nb03 + (i2)*nb02 + (i1-p10)*nb01 + (i0-p00)*nb00);
 
-                    if (p00==1 && p01 == 1 && p10 == 1 && p11 == 1)
-                    {
-                    printf("%d,%d,%d,%d\n",i0,i1,i2,i3);
-                    }
-
-                    if (i0 < ne00 + p00 && i1 < ne01 + p10 && i2 < ne02 && i3 < ne03 && i0 >= p00 && i1 >= p10 && i2 >= p20 && i3 >= p30) {
+                    if (i0 < ne00 + p00 && i1 < ne01 + p10 && i2 < ne02 && i3 < ne03 && i0 >= p00 && i1 >= p10) {
                         dst_ptr[dst_idx] = *src_ptr;
                     } else {
-                                            if (p00==1 && p01 == 1 && p10 == 1 && p11 == 1){
-
-                        printf("zeroing: %d,%d,%d,%d\n",i0,i1,i2,i3);}
                         dst_ptr[dst_idx] = 0;
                     }
                 }

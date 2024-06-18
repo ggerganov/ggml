@@ -187,12 +187,8 @@ struct ggml_cgraph * build_graph(const test_model& model) {
     int p01 = 6;
     int p10 = 0;
     int p11 = 0;
-    int p20 = 0;
-    int p21 = 0;
-    int p30 = 0;
-    int p31 = 0;
 
-    struct ggml_tensor* pad_reflect_1d_res_0 = ggml_pad(ctx0, model.a_0, p00, p01, p10, p11, p20, p21, p30, p31);
+    struct ggml_tensor* pad_reflect_1d_res_0 = ggml_pad(ctx0, model.a_0, p00, p01, p10, p11);
     ggml_set_name(pad_reflect_1d_res_0, "pad_reflect_1d_res_0");
     ggml_build_forward_expand(gf, pad_reflect_1d_res_0);
 
@@ -200,12 +196,9 @@ struct ggml_cgraph * build_graph(const test_model& model) {
     p01 = 0;
     p10 = 0;
     p11 = 0;
-    p20 = 0;
-    p21 = 0;
-    p30 = 0;
-    p31 = 0;
 
-    struct ggml_tensor* pad_reflect_1d_res_1 = ggml_pad(ctx0, model.a_1, p00, p01, p10, p11, p20, p21, p30, p31);
+
+    struct ggml_tensor* pad_reflect_1d_res_1 = ggml_pad(ctx0, model.a_1, p00, p01, p10, p11);
     ggml_set_name(pad_reflect_1d_res_1, "pad_reflect_1d_res_1");
     ggml_build_forward_expand(gf, pad_reflect_1d_res_1);
 
@@ -213,12 +206,8 @@ struct ggml_cgraph * build_graph(const test_model& model) {
     p01 = 3;
     p10 = 0;
     p11 = 0;
-    p20 = 0;
-    p21 = 0;
-    p30 = 0;
-    p31 = 0;
 
-    struct ggml_tensor* pad_reflect_1d_res_2 = ggml_pad(ctx0, model.a_2, p00, p01, p10, p11, p20, p21, p30, p31);
+    struct ggml_tensor* pad_reflect_1d_res_2 = ggml_pad(ctx0, model.a_2, p00, p01, p10, p11);
     ggml_set_name(pad_reflect_1d_res_2, "pad_reflect_1d_res_2");
     ggml_build_forward_expand(gf, pad_reflect_1d_res_2);
 
@@ -226,12 +215,8 @@ struct ggml_cgraph * build_graph(const test_model& model) {
     p01 = 1;
     p10 = 1;
     p11 = 1;
-    p20 = 0;
-    p21 = 0;
-    p30 = 0;
-    p31 = 0;
 
-    struct ggml_tensor* pad_reflect_1d_res_3 = ggml_pad(ctx0, model.a_0, p00, p01, p10, p11, p20, p21, p30, p31);
+    struct ggml_tensor* pad_reflect_1d_res_3 = ggml_pad(ctx0, model.a_0, p00, p01, p10, p11);
     ggml_set_name(pad_reflect_1d_res_3, "pad_reflect_1d_res_3");
     ggml_build_forward_expand(gf, pad_reflect_1d_res_3);
 
@@ -239,12 +224,9 @@ struct ggml_cgraph * build_graph(const test_model& model) {
     p01 = 0;
     p10 = 2;
     p11 = 4;
-    p20 = 0;
-    p21 = 0;
-    p30 = 0;
-    p31 = 0;
 
-    struct ggml_tensor* pad_reflect_1d_res_4 = ggml_pad(ctx0, model.a_1, p00, p01, p10, p11, p20, p21, p30, p31);
+
+    struct ggml_tensor* pad_reflect_1d_res_4 = ggml_pad(ctx0, model.a_1, p00, p01, p10, p11);
     ggml_set_name(pad_reflect_1d_res_4, "pad_reflect_1d_res_4");
     ggml_build_forward_expand(gf, pad_reflect_1d_res_4);
 
@@ -253,12 +235,9 @@ struct ggml_cgraph * build_graph(const test_model& model) {
     p01 = 5;
     p10 = 5;
     p11 = 3;
-    p20 = 0;
-    p21 = 0;
-    p30 = 0;
-    p31 = 0;
 
-    struct ggml_tensor* pad_reflect_1d_res_5 = ggml_pad(ctx0, model.a_3, p00, p01, p10, p11, p20, p21, p30, p31);
+
+    struct ggml_tensor* pad_reflect_1d_res_5 = ggml_pad(ctx0, model.a_3, p00, p01, p10, p11);
     ggml_set_name(pad_reflect_1d_res_5, "pad_reflect_1d_res_5");
     ggml_build_forward_expand(gf, pad_reflect_1d_res_5);
 
