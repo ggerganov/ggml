@@ -1734,7 +1734,11 @@ extern "C" {
             int                  p00,
             int                  p01,
             int                  p10,
-            int                  p11);
+            int                  p11,
+            int                  p20,
+            int                  p21,
+            int                  p30,
+            int                  p31);
 
     // Ref: https://github.com/CompVis/stable-diffusion/blob/main/ldm/modules/diffusionmodules/util.py#L151
     // timesteps: [N,]
