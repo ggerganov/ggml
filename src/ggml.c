@@ -6852,9 +6852,8 @@ struct ggml_tensor * ggml_upscale_ext(
     return ggml_upscale_impl(ctx, a, ne0, ne1, ne2, ne3);
 }
 
-// ggml_pad
 
-struct ggml_tensor * ggml_pad(
+struct ggml_tensor * ggml_pad_impl(
     struct ggml_context * ctx,
     struct ggml_tensor  * a,
     int p00, int p01, int p10, int p11, int p20, int p21, int p30, int p31) {
@@ -6881,6 +6880,30 @@ struct ggml_tensor * ggml_pad(
 
     return result;
 }
+
+// ggml_pad
+
+struct ggml_tensor * ggml_pad(
+    struct ggml_context * ctx,
+    struct ggml_tensor * a,
+    int p0,
+    int p1,
+    int p2,
+    int p3) {
+    return ggml_pad_impl(ctx, a, 0,p0,0,p1,0,p2,0,p3);
+}
+
+struct ggml_tensor * ggml_pad_ext(
+    struct ggml_context * ctx,
+    struct ggml_tensor * a, 
+    int p00, int p01, int p10, int p11,
+    int p20, int p21, int p30, int p31) 
+    {
+    return ggml_pad_impl(ctx, a,p00,p01,p10,p11,p20,p21,p30,p31);
+}
+
+
+
 
 // ggml_arange
 
