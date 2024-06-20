@@ -7,10 +7,7 @@
 extern "C" {
 #endif
 
-    typedef struct ggml_backend_buffer_type * ggml_backend_buffer_type_t;
-    typedef struct ggml_backend_buffer * ggml_backend_buffer_t;
     typedef struct ggml_backend_event * ggml_backend_event_t;
-    typedef struct ggml_backend * ggml_backend_t;
     typedef void * ggml_backend_graph_plan_t;
 
     //
