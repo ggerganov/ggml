@@ -1,13 +1,5 @@
 build/
-build-blas/
-build-debug/
-build-release/
-build-sanitize-addr/
-build-sanitize-thread/
-build-cov/
-build-ci-debug/
-build-ci-release/
-build-cublas/
+build-*/
 out/
 tmp/
 models/

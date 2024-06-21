@@ -1,6 +1,6 @@
 #import "main-mtl.h"
 
-#import "ggml/ggml.h"
+#import "ggml.h"
 
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
