@@ -15506,6 +15506,10 @@ static void ggml_compute_forward_unfold_1d(
     float * src0_ptr = (float *) src0->data;
 
 
+    const int32_t * opts = (const int32_t *)dst->op_params;
+    const int s = opts[1];
+
+
     // TODO: optimize
 
     for (int64_t i2 = 0; i2 < ne2; ++i2) {
@@ -15513,7 +15517,10 @@ static void ggml_compute_forward_unfold_1d(
             for (int64_t i0 = 0; i0 < ne0; ++i0) {
                 for (int64_t i3 = 0; i3 < ne3; ++i3) {
                     const int64_t dst_idx = i3*(ne0*ne1*ne2) + i2*(ne0*ne1) + i1*ne0 + i0;    
-                    dst_ptr[dst_idx] = 7;
+                    
+                    const int64_t src_idx = i3 *(ne00*ne01) + i2 * (ne00) + i1*s + i0;
+                    
+                    dst_ptr[dst_idx] = src0_ptr[src_idx];
                     
                 }
             }

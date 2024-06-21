@@ -32,10 +32,6 @@ static void ggml_log_callback_default(ggml_log_level level, const char * text, v
 struct test_model {
     struct ggml_tensor * a_0;
     struct ggml_tensor * a_1;
-    struct ggml_tensor * a_2;
-    struct ggml_tensor * a_3;
-    struct ggml_tensor * a_4;
-    struct ggml_tensor * a_5;
 
 
 
@@ -61,6 +57,10 @@ void load_model(test_model & model, bool use_gpu = false) {
     size_t buffer_size = 0;
     {
         buffer_size += 2 * 6 * ggml_type_size(GGML_TYPE_F32); // tensor a_0
+
+        buffer_size += 2 * 2 * 4 * ggml_type_size(GGML_TYPE_F32); // tensor a_1
+
+    
     
         buffer_size += 1024;
     }
@@ -68,7 +68,7 @@ void load_model(test_model & model, bool use_gpu = false) {
     printf("%s: ggml tensor size    = %d bytes\n", __func__, (int) sizeof(ggml_tensor));
     printf("%s: backend buffer size = %0.2f MB\n", __func__, (buffer_size/ 1024.f/ 1024.f));
 
-    int num_tensors = 1;
+    int num_tensors = 2;
     struct ggml_init_params params {
             /*.mem_size   =*/ ggml_tensor_overhead() * num_tensors,
             /*.mem_buffer =*/ NULL,
@@ -109,6 +109,7 @@ void load_model(test_model & model, bool use_gpu = false) {
 
     // create tensors
     model.a_0 = ggml_new_tensor_2d(model.ctx, GGML_TYPE_F32, 6,2);
+    model.a_1 = ggml_new_tensor_3d(model.ctx, GGML_TYPE_F32, 4,2,2);
 
 
     // create a allocator
@@ -122,6 +123,16 @@ void load_model(test_model & model, bool use_gpu = false) {
         memcpy(model.a_0->data, data, ggml_nbytes(model.a_0));
     } else {
         ggml_backend_tensor_set(model.a_0, data, 0, ggml_nbytes(model.a_0));
+    }
+
+     // alloc memory
+    ggml_tallocr_alloc(&alloc, model.a_1);
+
+    // load data to buffer
+    if(ggml_backend_is_cpu(model.backend)) {
+        memcpy(model.a_1->data, data, ggml_nbytes(model.a_1));
+    } else {
+        ggml_backend_tensor_set(model.a_1, data, 0, ggml_nbytes(model.a_1));
     }
 
 
@@ -148,6 +159,14 @@ struct ggml_cgraph * build_graph(const test_model& model) {
     struct ggml_tensor* pad_res_0 = ggml_unfold_1d(ctx0, model.a_0, k, s);
     ggml_set_name(pad_res_0, "pad_res_0");
     ggml_build_forward_expand(gf, pad_res_0);
+
+
+    k = 2;
+    s = 1;
+
+    struct ggml_tensor* pad_res_1 = ggml_unfold_1d(ctx0, model.a_1, k, s);
+    ggml_set_name(pad_res_1, "pad_res_1");
+    ggml_build_forward_expand(gf, pad_res_1);
 
 
     // delete the temporally context used to build the graph
@@ -216,7 +235,23 @@ int main(void)
 
     const int n_pad_test_0 = 2 *2 * 3;
 
-    float expected_pad_reflect_0[n_pad_test_0] = {7.0,7.0,7.0,7.0,7.0,7.0,7.0,7.0,7.0,7.0,7.0,7.0};
+    float expected_pad_reflect_0[n_pad_test_0] = {0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0};
+
+    struct ggml_tensor * pad_res_1 = NULL;
+
+    for(int i = 0; i < gf_res->n_nodes; i++) {
+       if(strcmp(ggml_get_name(gf_res->nodes[i]), "pad_res_1") == 0) {
+            pad_res_1 = gf_res->nodes[i];
+        }
+    }
+
+    float* pad_data_1 = new float[ggml_nelements(pad_res_1)];
+
+    ggml_backend_tensor_get(pad_res_1, pad_data_1, 0, ggml_nbytes(pad_res_1));
+
+    const int n_pad_test_1 = 3* 2 *2 *2;
+
+    float expected_pad_reflect_1[n_pad_test_1] = {0.0,1.0,1.0,2.0,2.0,3.0,4.0,5.0,5.0,6.0,6.0,7.0,8.0,9.0,9.0,10.0,10.0,11.0,12.0,13.0,13.0,14.0,14.0,15.0};
 
     printf("\nPerforming test:\n");
 
@@ -232,9 +267,22 @@ int main(void)
         }
     }
 
-    std::cout << ggml_nelements(pad_res_0) << std::endl;
-
     printf("ggml_pad_ext (%d): %s\n", (int) ggml_nelements(pad_res_0), passed && (ggml_nelements(pad_res_0) == n_pad_test_0) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
+
+
+    passed = true;
+    for(int i = 0; i < n_pad_test_1; i++) {
+        if(
+            pad_data_1[i] != expected_pad_reflect_1[i]) {
+            std::cout << "index: " << i << std::endl;
+            std::cout << "expected: " << expected_pad_reflect_1[i] << std::endl;
+            std::cout << "actual: " << pad_data_1[i] << std::endl;
+            passed = false;
+            break;
+        }
+    }
+
+    printf("ggml_pad_ext (%d): %s\n", (int) ggml_nelements(pad_res_1), passed && (ggml_nelements(pad_res_1) == n_pad_test_1) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
 
 
     ggml_free(model.ctx);
