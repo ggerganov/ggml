@@ -474,6 +474,7 @@ extern "C" {
         GGML_OP_CONV_TRANSPOSE_2D,
         GGML_OP_POOL_1D,
         GGML_OP_POOL_2D,
+        GGML_OP_UNFOLD_1D,
         GGML_OP_UPSCALE, // nearest interpolate
         GGML_OP_PAD,
         GGML_OP_ARANGE,
@@ -1707,6 +1708,14 @@ extern "C" {
             int                   s1,
             float                 p0,
             float                 p1);
+
+
+    GGML_API struct ggml_tensor * ggml_unfold_1d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            int                   k,
+            int                   s);
+
 
     // nearest interpolate
     // multiplies ne0 and ne1 by scale factor

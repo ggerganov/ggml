@@ -2696,7 +2696,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS_BACK",
 };
 
-static_assert(GGML_OP_COUNT == 74, "GGML_OP_COUNT != 74");
+static_assert(GGML_OP_COUNT == 75, "GGML_OP_COUNT != 75");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -2752,6 +2752,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "pool_1d(x)",
     "pool_2d(x)",
     "upscale(x)",
+    "unfold_1d(x)",
     "pad(x)",
     "arange(start, stop, step)",
     "timestep_embedding(timesteps, dim, max_period)",
@@ -2784,7 +2785,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "cross_entropy_loss_back(x,y)",
 };
 
-static_assert(GGML_OP_COUNT == 74, "GGML_OP_COUNT != 74");
+static_assert(GGML_OP_COUNT == 75, "GGML_OP_COUNT != 75");
 
 static_assert(GGML_OP_POOL_COUNT == 2, "GGML_OP_POOL_COUNT != 2");
 
@@ -6851,6 +6852,43 @@ struct ggml_tensor * ggml_upscale_ext(
     int ne3) {
     return ggml_upscale_impl(ctx, a, ne0, ne1, ne2, ne3);
 }
+
+
+// ggml_unfold_1d
+
+struct ggml_tensor * ggml_unfold_1d(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        int                   k,
+        int                   s) {
+
+    bool is_node = false;
+
+    if (a->grad) {
+        GGML_ASSERT(false); // TODO: implement backward
+        is_node = true;
+    }
+
+    GGML_ASSERT(a->ne[3] == 1); // we only allow up to 3d input tensors, since this operations adds a dimension
+
+    GGML_ASSERT((a->ne[0] - k) % s == 0);// are the stride and kernel size valid given the unfold dimension
+
+
+    const int64_t ne[4] = { k, ((a->ne[0] - k) / s) + 1 ,a->ne[1], a->ne[2]};
+    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
+
+    int32_t params[] = { k, s };
+    ggml_set_op_params(result, params, sizeof(params));
+
+    result->op = GGML_OP_UNFOLD_1D;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->src[0] = a;
+
+    return result;
+}
+
+
+
 
 // ggml_pad
 
@@ -15445,6 +15483,44 @@ static void ggml_compute_forward_upscale(
     }
 }
 
+// ggml_compute_forward_unfold_1d
+
+static void ggml_compute_forward_unfold_1d(
+    const struct ggml_compute_params * params,
+          struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src0 = dst->src[0];
+
+    if (params->type == GGML_TASK_TYPE_INIT || params->type == GGML_TASK_TYPE_FINALIZE) {
+        return;
+    }
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    GGML_TENSOR_UNARY_OP_LOCALS
+
+    float * dst_ptr = (float *) dst->data;
+    float * src0_ptr = (float *) src0->data;
+
+
+    // TODO: optimize
+
+    for (int64_t i2 = 0; i2 < ne2; ++i2) {
+        for (int64_t i1 = ith; i1 < ne1; i1 += nth) {
+            for (int64_t i0 = 0; i0 < ne0; ++i0) {
+                for (int64_t i3 = 0; i3 < ne3; ++i3) {
+                    const int64_t dst_idx = i3*(ne0*ne1*ne2) + i2*(ne0*ne1) + i1*ne0 + i0;    
+                    dst_ptr[dst_idx] = 7;
+                    
+                }
+            }
+        }
+    }
+}
+
 
 // ggml_compute_forward_pad
 
@@ -17453,6 +17529,10 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_upscale(params, tensor);
             } break;
+        case GGML_OP_UNFOLD_1D:
+            {
+                ggml_compute_forward_unfold_1d(params, tensor);
+            } break;
         case GGML_OP_PAD:
             {
                 ggml_compute_forward_pad(params, tensor);
@@ -18463,6 +18543,10 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             {
                 GGML_ASSERT(false); // TODO: not implemented
             } break;
+         case GGML_OP_UNFOLD_1D:
+            {
+                GGML_ASSERT(false); // TODO: not implemented
+            } break;
         case GGML_OP_PAD:
             {
                 GGML_ASSERT(false); // TODO: not implemented
@@ -19205,6 +19289,10 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads, int n_cur_
         case GGML_OP_UPSCALE:
             {
                 n_tasks = n_threads;
+            } break;
+         case GGML_OP_UNFOLD_1D:
+            {
+                n_tasks = 1;
             } break;
         case GGML_OP_PAD:
             {
