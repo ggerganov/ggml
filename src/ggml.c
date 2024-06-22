@@ -21977,21 +21977,6 @@ size_t gguf_get_tensor_size(const struct gguf_context * ctx, int i) {
     return ctx->infos[i].size;
 }
 
-<<<<<<< HEAD
-=======
-int gguf_find_and_get_tensor(const struct gguf_context * ctx, const char * name, char ** data, size_t * size) {
-    int tensor = gguf_find_tensor(ctx, name);
-    if (tensor != -1) {
-        const size_t offset = gguf_get_tensor_offset(ctx, tensor);
-        char * _data = (char *)gguf_get_data(ctx);
-        *data = _data + offset;
-        *size = gguf_get_tensor_size(ctx, tensor);
-    }
-
-    return tensor;
-}
-
->>>>>>> 2210bb0ccfdbf848bd4ba52ec0797bea5c1acd8d
 // returns the index
 static int gguf_get_or_add_key(struct gguf_context * ctx, const char * key) {
     const int idx = gguf_find_key(ctx, key);
