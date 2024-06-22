@@ -2,7 +2,7 @@
 #include "ggml/ggml-alloc.h"
 #include "ggml/ggml-backend.h"
 
-#define GGML_USE_CUBLAS
+//#define GGML_USE_CUBLAS
 
 
 #ifdef GGML_USE_CUBLAS
@@ -261,7 +261,7 @@ int main(void)
             std::cout << "expected: " << expected_pad_reflect_0[i] << std::endl;
             std::cout << "actual: " << pad_data_0[i] << std::endl;
             passed = false;
-            //break;
+            break;
         }
     }
 
