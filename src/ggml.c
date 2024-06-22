@@ -21562,6 +21562,13 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
             ok = ok && gguf_fread_el (file, &info->type,   sizeof(info->type),    &offset);
             ok = ok && gguf_fread_el (file, &info->offset, sizeof(info->offset),  &offset);
 
+            // set tensor size
+            size_t size = 1;
+            for (uint32_t j = 0; j < info->n_dims; ++j) {
+                size *= info->ne[j];
+            }
+            info->size = size;
+
             // TODO: return an error instead of crashing with GGML_ASSERT
             gguf_tensor_info_sanitize(info);
 
@@ -21784,6 +21791,37 @@ int gguf_find_key(const struct gguf_context * ctx, const char * key) {
     return keyfound;
 }
 
+int gguf_find_key_array(const struct gguf_context * ctx, const char * key, const char * val) {
+    // return -1 if key not found
+    int keyfound = -1;
+    int key_id = -1;
+
+    const int n_kv = gguf_get_n_kv(ctx);
+
+    for (int i = 0; i < n_kv; ++i) {
+        if (strcmp(key, gguf_get_key(ctx, i)) == 0) {
+            key_id = i;
+            break;
+        }
+    }
+
+    if (key_id != -1) {
+        if (ctx->kv[key_id].type == GGUF_TYPE_ARRAY) {
+            const int n = gguf_get_arr_n(ctx, key_id); 
+            struct gguf_kv * kv = &ctx->kv[key_id];
+
+            for (int i = 0; i < n; ++i) {
+                struct gguf_str * str = &((struct gguf_str *) kv->value.arr.data)[i];
+                if (strcmp(val, str->data) == 0) {
+                    keyfound = i;
+                }
+            }
+        }
+    }
+
+    return keyfound;
+}
+
 const char * gguf_get_key(const struct gguf_context * ctx, int key_id) {
     GGML_ASSERT(key_id >= 0 && key_id < gguf_get_n_kv(ctx));
     return ctx->kv[key_id].key.data;
@@ -21920,15 +21958,23 @@ int gguf_find_tensor(const struct gguf_context * ctx, const char * name) {
 }
 
 size_t gguf_get_tensor_offset(const struct gguf_context * ctx, int i) {
+    GGML_ASSERT(i >= 0 && i < gguf_get_n_tensors(ctx));
     return ctx->infos[i].offset;
 }
 
 char * gguf_get_tensor_name(const struct gguf_context * ctx, int i) {
+    GGML_ASSERT(i >= 0 && i < gguf_get_n_tensors(ctx));
     return ctx->infos[i].name.data;
 }
 
 enum ggml_type gguf_get_tensor_type(const struct gguf_context * ctx, int i) {
+    GGML_ASSERT(i >= 0 && i < gguf_get_n_tensors(ctx));
     return ctx->infos[i].type;
+}
+
+size_t gguf_get_tensor_size(const struct gguf_context * ctx, int i) {
+    GGML_ASSERT(i >= 0 && i < gguf_get_n_tensors(ctx));
+    return ctx->infos[i].size;
 }
 
 // returns the index
@@ -22242,7 +22288,7 @@ static void gguf_write_to_buf(const struct gguf_context * ctx, struct gguf_buf *
         gguf_bwrite_el (buf, &kv->type, sizeof(kv->type));
 
         switch (kv->type) {
-            case GGUF_TYPE_UINT8:   gguf_bwrite_el( buf, &kv->value.uint8,   sizeof(kv->value.uint8)  ); break;
+            case GGUF_TYPE_UINT8:   gguf_bwrite_el (buf, &kv->value.uint8,   sizeof(kv->value.uint8)  ); break;
             case GGUF_TYPE_INT8:    gguf_bwrite_el (buf, &kv->value.int8,    sizeof(kv->value.int8)   ); break;
             case GGUF_TYPE_UINT16:  gguf_bwrite_el (buf, &kv->value.uint16,  sizeof(kv->value.uint16) ); break;
             case GGUF_TYPE_INT16:   gguf_bwrite_el (buf, &kv->value.int16,   sizeof(kv->value.int16)  ); break;
