@@ -2329,12 +2329,22 @@ extern "C" {
     GGML_API const void * gguf_get_arr_data(const struct gguf_context * ctx, int key_id);
     GGML_API const char * gguf_get_arr_str (const struct gguf_context * ctx, int key_id, int i);
 
+<<<<<<< HEAD
     GGML_API int            gguf_get_n_tensors    (const struct gguf_context * ctx);
     GGML_API int            gguf_find_tensor      (const struct gguf_context * ctx, const char * name);
     GGML_API size_t         gguf_get_tensor_offset(const struct gguf_context * ctx, int i);
     GGML_API char *         gguf_get_tensor_name  (const struct gguf_context * ctx, int i);
     GGML_API enum ggml_type gguf_get_tensor_type  (const struct gguf_context * ctx, int i);
     GGML_API size_t         gguf_get_tensor_size  (const struct gguf_context * ctx, int i);
+=======
+    GGML_API int            gguf_get_n_tensors      (const struct gguf_context * ctx);
+    GGML_API int            gguf_find_tensor        (const struct gguf_context * ctx, const char * name);
+    GGML_API size_t         gguf_get_tensor_offset  (const struct gguf_context * ctx, int i);
+    GGML_API char *         gguf_get_tensor_name    (const struct gguf_context * ctx, int i);
+    GGML_API enum ggml_type gguf_get_tensor_type    (const struct gguf_context * ctx, int i);
+    GGML_API size_t         gguf_get_tensor_size    (const struct gguf_context * ctx, int i);
+    GGML_API int            gguf_find_and_get_tensor(const struct gguf_context * ctx, const char * name, char ** data, size_t * size);
+>>>>>>> 2210bb0ccfdbf848bd4ba52ec0797bea5c1acd8d
 
     // removes key if it exists
     GGML_API void gguf_remove_key(struct gguf_context * ctx, const char * key);
