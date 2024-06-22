@@ -5211,6 +5211,7 @@ static struct ggml_tensor * ggml_norm_impl(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         float eps,
+        bool sub_mean,
         bool inplace) {
     bool is_node = false;
 
@@ -5221,7 +5222,9 @@ static struct ggml_tensor * ggml_norm_impl(
 
     struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
 
-    ggml_set_op_params(result, &eps, sizeof(eps));
+    float params[2] = {eps, 0};
+    memcpy((char*)&params[1], &sub_mean, sizeof(sub_mean));
+    ggml_set_op_params(result, &params, sizeof(params));
 
     result->op   = GGML_OP_NORM;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
@@ -5230,18 +5233,34 @@ static struct ggml_tensor * ggml_norm_impl(
     return result;
 }
 
+struct ggml_tensor * ggml_norm_ext(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        float eps,
+        bool sub_mean) {
+    return ggml_norm_impl(ctx, a, eps, sub_mean, false);
+}
+
+struct ggml_tensor * ggml_norm_ext_inplace(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        float eps,
+        bool sub_mean) {
+    return ggml_norm_impl(ctx, a, eps, sub_mean, true);
+}
+
 struct ggml_tensor * ggml_norm(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         float eps) {
-    return ggml_norm_impl(ctx, a, eps, false);
+    return ggml_norm_impl(ctx, a, eps, true, false);
 }
 
 struct ggml_tensor * ggml_norm_inplace(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         float eps) {
-    return ggml_norm_impl(ctx, a, eps, true);
+    return ggml_norm_impl(ctx, a, eps, true, true);
 }
 
 // ggml_rms_norm
@@ -11724,7 +11743,9 @@ static void ggml_compute_forward_norm_f32(
     GGML_TENSOR_UNARY_OP_LOCALS
 
     float eps;
+    bool sub_mean;
     memcpy(&eps, dst->op_params, sizeof(float));
+    memcpy(&sub_mean, (char*)dst->op_params + sizeof(float), sizeof(bool));
 
     GGML_ASSERT(eps > 0.0f);
 
@@ -11734,18 +11755,26 @@ static void ggml_compute_forward_norm_f32(
             for (int64_t i01 = ith; i01 < ne01; i01 += nth) {
                 const float * x = (float *) ((char *) src0->data + i01*nb01 + i02*nb02 + i03*nb03);
 
-                ggml_float sum = 0.0;
-                for (int64_t i00 = 0; i00 < ne00; i00++) {
-                    sum += (ggml_float)x[i00];
-                }
+                float mean = 0.0f;
+                if (sub_mean) {
+                    ggml_float sum = 0.0;
+                    for (int64_t i00 = 0; i00 < ne00; i00++) {
+                        sum += (ggml_float)x[i00];
+                    }
 
-                float mean = sum/ne00;
+                    mean = sum/ne00;
+                }
 
                 float * y = (float *) ((char *) dst->data + i01*nb1 + i02*nb2 + i03*nb3);
 
                 ggml_float sum2 = 0.0;
                 for (int64_t i00 = 0; i00 < ne00; i00++) {
-                    float v = x[i00] - mean;
+                    float v;
+                    if (sub_mean) {
+                       v = x[i00] - mean;
+                    } else {
+                       v = x[i00];
+                    }
                     y[i00] = v;
                     sum2 += (ggml_float)(v*v);
                 }

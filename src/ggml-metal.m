@@ -2264,7 +2264,9 @@ static enum ggml_status ggml_metal_graph_compute(
                         GGML_ASSERT(ggml_is_contiguous_1(src0));
 
                         float eps;
+                        bool sub_mean;
                         memcpy(&eps, dst->op_params, sizeof(float));
+                        memcpy(&sub_mean, (char*)dst->op_params + sizeof(float), sizeof(bool));
 
                         const int nth = MIN(256, ne00);
 
@@ -2276,6 +2278,7 @@ static enum ggml_status ggml_metal_graph_compute(
                         [encoder setBytes:&ne00    length:sizeof( int64_t) atIndex:2];
                         [encoder setBytes:&nb01    length:sizeof(uint64_t) atIndex:3];
                         [encoder setBytes:&eps     length:sizeof(   float) atIndex:4];
+                        [encoder setBytes:&sub_mean length:sizeof(   bool) atIndex:5];
                         [encoder setThreadgroupMemoryLength:GGML_PAD(nth*sizeof(float), 16) atIndex:0];
 
                         const int64_t nrows = ggml_nrows(src0);

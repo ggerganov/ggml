@@ -1117,6 +1117,18 @@ extern "C" {
             struct ggml_tensor  * a);
 
     // normalize along rows
+    GGML_API struct ggml_tensor * ggml_norm_ext(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            float                 eps,
+            bool                  sub_mean);
+    
+    GGML_API struct ggml_tensor * ggml_norm_ext_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            float                 eps,
+            bool                  sub_mean);
+
     GGML_API struct ggml_tensor * ggml_norm(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,

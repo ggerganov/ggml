@@ -1,6 +1,6 @@
 #include "norm.hpp"
 
-static void norm_f32(const float* x, float* dst, const int ncols, const float eps,
+static void norm_f32(const float* x, float* dst, const int ncols, const float eps, const bool sub_mean,
     const sycl::nd_item<3>& item_ct1, sycl::float2* s_sum, int block_size) {
     const int row = item_ct1.get_group(2) * item_ct1.get_local_range(1) +
         item_ct1.get_local_id(1);
@@ -13,7 +13,9 @@ static void norm_f32(const float* x, float* dst, const int ncols, const float ep
 
     for (int col = tid; col < ncols; col += block_size) {
         const float xi = x[row * ncols + col];
-        mean_var.x() += xi;
+        if (sub_mean) {
+            mean_var.x() += xi;
+        }
         mean_var.y() += xi * xi;
     }
 
@@ -184,7 +186,7 @@ static void rms_norm_f32(const float* x, float* dst, const int ncols, const floa
 }
 
 static void norm_f32_sycl(const float* x, float* dst, const int ncols,
-    const int nrows, const float eps,
+    const int nrows, const float eps, const bool sub_mean,
     queue_ptr stream, int device) {
     GGML_ASSERT(ncols % WARP_SIZE == 0);
     if (ncols < 1024) {
@@ -195,7 +197,7 @@ static void norm_f32_sycl(const float* x, float* dst, const int ncols,
                     block_dims),
                 [=](sycl::nd_item<3> item_ct1)
                 [[intel::reqd_sub_group_size(WARP_SIZE)]] {
-                    norm_f32(x, dst, ncols, eps, item_ct1,
+                    norm_f32(x, dst, ncols, eps, sub_mean, item_ct1,
                         nullptr, WARP_SIZE);
                 });
             });
@@ -217,7 +219,7 @@ static void norm_f32_sycl(const float* x, float* dst, const int ncols,
                     block_dims),
                 [=](sycl::nd_item<3> item_ct1)
                 [[intel::reqd_sub_group_size(WARP_SIZE)]] {
-                    norm_f32(x, dst, ncols, eps, item_ct1,
+                    norm_f32(x, dst, ncols, eps, sub_mean, item_ct1,
                         get_pointer(s_sum_acc_ct1), work_group_size);
                 });
             });
@@ -324,9 +326,11 @@ void ggml_sycl_op_norm(ggml_backend_sycl_context& ctx, const ggml_tensor* src0, 
     const int64_t nrows = ggml_nrows(src0);
 
     float eps;
+    bool sub_mean;
     memcpy(&eps, dst->op_params, sizeof(float));
+    memcpy(&sub_mean, (char*)dst->op_params + sizeof(float), sizeof(bool));
 
-    norm_f32_sycl(src0_dd, dst_dd, ne00, nrows, eps, main_stream, ctx.device);
+    norm_f32_sycl(src0_dd, dst_dd, ne00, nrows, eps, sub_mean, main_stream, ctx.device);
 
     (void)src1;
     (void)dst;

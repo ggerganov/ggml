@@ -1,7 +1,7 @@
 #include "norm.cuh"
 
 template <int block_size>
-static __global__ void norm_f32(const float * x, float * dst, const int ncols, const float eps) {
+static __global__ void norm_f32(const float * x, float * dst, const int ncols, const float eps, const bool sub_mean) {
     const int row = blockIdx.x*blockDim.y + threadIdx.y;
     const int tid = threadIdx.x;
 
@@ -27,7 +27,10 @@ static __global__ void norm_f32(const float * x, float * dst, const int ncols, c
         mean_var = warp_reduce_sum(mean_var);
     }
 
-    const float mean = mean_var.x / ncols;
+    float mean = 0;
+    if (sub_mean) {
+        mean = mean_var.x / ncols;
+    }
     const float var = mean_var.y / ncols - mean * mean;
     const float inv_std = rsqrtf(var + eps);
 
@@ -131,14 +134,14 @@ static __global__ void rms_norm_f32(const float * x, float * dst, const int ncol
     }
 }
 
-static void norm_f32_cuda(const float * x, float * dst, const int ncols, const int nrows, const float eps, cudaStream_t stream) {
+static void norm_f32_cuda(const float * x, float * dst, const int ncols, const int nrows, const float eps, const bool sub_mean, cudaStream_t stream) {
     GGML_ASSERT(ncols % WARP_SIZE == 0);
     if (ncols < 1024) {
         const dim3 block_dims(WARP_SIZE, 1, 1);
-        norm_f32<WARP_SIZE><<<nrows, block_dims, 0, stream>>>(x, dst, ncols, eps);
+        norm_f32<WARP_SIZE><<<nrows, block_dims, 0, stream>>>(x, dst, ncols, eps, sub_mean);
     } else {
         const dim3 block_dims(1024, 1, 1);
-        norm_f32<1024><<<nrows, block_dims, 0, stream>>>(x, dst, ncols, eps);
+        norm_f32<1024><<<nrows, block_dims, 0, stream>>>(x, dst, ncols, eps, sub_mean);
     }
 }
 
@@ -179,9 +182,11 @@ void ggml_cuda_op_norm(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     const int64_t nrows = ggml_nrows(src0);
 
     float eps;
+    bool sub_mean;
     memcpy(&eps, dst->op_params, sizeof(float));
+    memcpy(&sub_mean, (char*)dst->op_params + sizeof(float), sizeof(bool));
 
-    norm_f32_cuda(src0_d, dst_d, ne00, nrows, eps, stream);
+    norm_f32_cuda(src0_d, dst_d, ne00, nrows, eps, sub_mean, stream);
 }
 
 void ggml_cuda_op_group_norm(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {

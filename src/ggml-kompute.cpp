@@ -835,8 +835,9 @@ static void ggml_vk_norm_(
     const std::shared_ptr<kp::Tensor>& out,
     uint32_t inOff, uint32_t outOff,
     int32_t ne00, int32_t nb01,
-    int32_t nrows, float epsilon
+    int32_t nrows, float epsilon, bool sub_mean
 ) {
+    // TODO: handle sub_mean
     GGML_ASSERT(nb01%sizeof(float) == 0);
     GGML_ASSERT(ne00%sizeof(float) == 0);
 
@@ -1592,8 +1593,10 @@ static void ggml_vk_graph_compute(struct ggml_kompute_context * ctx, struct ggml
                 case GGML_OP_NORM:
                     {
                         float eps;
+                        bool sub_mean;
                         memcpy(&eps, dst->op_params, sizeof(float));
-                        ggml_vk_norm(seq, id_src0, id_dst, off_src0, off_dst, ne00, nb01, ggml_nrows(src0), eps);
+                        memcpy(&sub_mean, (char*)dst->op_params + sizeof(float), sizeof(bool));
+                        ggml_vk_norm(seq, id_src0, id_dst, off_src0, off_dst, ne00, nb01, ggml_nrows(src0), eps, sub_mean);
                     } break;
                 case GGML_OP_RMS_NORM:
                     {
@@ -1601,7 +1604,7 @@ static void ggml_vk_graph_compute(struct ggml_kompute_context * ctx, struct ggml
 
                         float eps;
                         memcpy(&eps, dst->op_params, sizeof(float));
-                        ggml_vk_rms_norm(seq, id_src0, id_dst, off_src0, off_dst, ne00, nb01, ggml_nrows(src0), eps);
+                        ggml_vk_rms_norm(seq, id_src0, id_dst, off_src0, off_dst, ne00, nb01, ggml_nrows(src0), eps, true);
                     } break;
                 case GGML_OP_MUL_MAT:
                     {

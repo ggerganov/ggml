@@ -673,6 +673,7 @@ kernel void kernel_norm(
         constant   int64_t & ne00,
         constant  uint64_t & nb01,
         constant     float & eps,
+        constant     bool  & sub_mean,
         threadgroup float  * sum [[threadgroup(0)]],
         uint tgpig[[threadgroup_position_in_grid]],
         uint tpitg[[thread_position_in_threadgroup]],
@@ -681,16 +682,18 @@ kernel void kernel_norm(
     // MEAN
     // parallel sum
     sum[tpitg] = 0.0f;
-    for (int i00 = tpitg; i00 < ne00; i00 += ntg) {
-        sum[tpitg] += x[i00];
-    }
-    // reduce
-    threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint i = ntg/2; i > 0; i /= 2) {
-        if (tpitg < i) {
-            sum[tpitg] += sum[tpitg + i];
+    if (sub_mean) {
+        for (int i00 = tpitg; i00 < ne00; i00 += ntg) {
+            sum[tpitg] += x[i00];
         }
+        // reduce
         threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint i = ntg/2; i > 0; i /= 2) {
+            if (tpitg < i) {
+                sum[tpitg] += sum[tpitg + i];
+            }
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+        }
     }
     const float mean  = sum[0] / ne00;
 
