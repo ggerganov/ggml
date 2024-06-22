@@ -2,7 +2,7 @@
 #include "ggml/ggml-alloc.h"
 #include "ggml/ggml-backend.h"
 
-//#define GGML_USE_CUBLAS
+#define GGML_USE_CUBLAS
 
 
 #ifdef GGML_USE_CUBLAS
@@ -60,8 +60,6 @@ void load_model(test_model & model, bool use_gpu = false) {
 
         buffer_size += 2 * 2 * 4 * ggml_type_size(GGML_TYPE_F32); // tensor a_1
 
-    
-    
         buffer_size += 1024;
     }
 
@@ -263,7 +261,7 @@ int main(void)
             std::cout << "expected: " << expected_pad_reflect_0[i] << std::endl;
             std::cout << "actual: " << pad_data_0[i] << std::endl;
             passed = false;
-            break;
+            //break;
         }
     }
 
