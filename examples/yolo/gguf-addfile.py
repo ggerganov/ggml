@@ -8,8 +8,8 @@ import argparse
 import os
 import sys
 from pathlib import Path
-#from typing import Any
-from typing import Any, Literal, NamedTuple, TypeVar, Union
+from typing import Any
+#from typing import Any, Literal, NamedTuple, TypeVar, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -111,15 +111,6 @@ def copy_with_filename(reader: gguf.GGUFReader, writer: gguf.GGUFWriter, new_met
         shape = np.flipud(tensor.shape)
         writer.add_tensor_info(tensor.name, shape, tensor.data.dtype, tensor.data.nbytes, tensor.tensor_type)
 
-    offset_next = 0
-    len_last = 0
-    offset_last = 0
-    for n, tensor in enumerate(reader.tensors, 1):
-        len_last = tensor.n_bytes
-        offset_last = tensor.data_offset
-        offset_next = max(offset_next, writer.ggml_pad(offset_last + int(len_last), writer.data_alignment))
-
-    offs = offset_next
     # add file info as tensor_info
     for path in filename:
         logger.debug(f'Adding {path}')
@@ -177,7 +168,6 @@ def main() -> None:
     for path in args.addfiles:
         filename.append(path)
         logger.info(f'* Adding: {path}')
-    #new_metadata[Keys.EMBEDDED_FILES] = path
     copy_with_filename(reader, writer, new_metadata, filename)
 
 
