@@ -6852,8 +6852,7 @@ struct ggml_tensor * ggml_upscale_ext(
     return ggml_upscale_impl(ctx, a, ne0, ne1, ne2, ne3);
 }
 
-
-struct ggml_tensor * ggml_pad_impl(
+static struct ggml_tensor * ggml_pad_impl(
     struct ggml_context * ctx,
     struct ggml_tensor  * a,
     int p00, int p01, int p10, int p11, int p20, int p21, int p30, int p31) {
@@ -6874,8 +6873,7 @@ struct ggml_tensor * ggml_pad_impl(
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
 
-
-    int32_t params[] = { p00,p01,p10,p11,p20,p21,p30,p31};
+    int32_t params[] = { p00, p10, p20, p30, }; // the pX1 values can be derived
     ggml_set_op_params(result, params, sizeof(params));
 
     return result;
@@ -6890,20 +6888,16 @@ struct ggml_tensor * ggml_pad(
     int p1,
     int p2,
     int p3) {
-    return ggml_pad_impl(ctx, a, 0,p0,0,p1,0,p2,0,p3);
+    return ggml_pad_impl(ctx, a, 0, p0, 0, p1, 0, p2, 0, p3);
 }
 
 struct ggml_tensor * ggml_pad_ext(
     struct ggml_context * ctx,
-    struct ggml_tensor * a, 
+    struct ggml_tensor * a,
     int p00, int p01, int p10, int p11,
-    int p20, int p21, int p30, int p31) 
-    {
-    return ggml_pad_impl(ctx, a,p00,p01,p10,p11,p20,p21,p30,p31);
+    int p20, int p21, int p30, int p31) {
+    return ggml_pad_impl(ctx, a, p00, p01, p10, p11, p20, p21, p30, p31);
 }
-
-
-
 
 // ggml_arange
 
@@ -15491,14 +15485,12 @@ static void ggml_compute_forward_pad_f32(
     const int ith = params->ith;
     const int nth = params->nth;
 
-
     const int32_t * opts = (const int32_t *)dst->op_params;
 
-
     const int32_t p00 = opts[0];
-    const int32_t p10 = opts[2];
-    const int32_t p20 = opts[4];
-    const int32_t p30 = opts[6];
+    const int32_t p10 = opts[1];
+    const int32_t p20 = opts[2];
+    const int32_t p30 = opts[3];
 
     GGML_TENSOR_UNARY_OP_LOCALS
 
@@ -15512,9 +15504,10 @@ static void ggml_compute_forward_pad_f32(
                 for (int64_t i3 = 0; i3 < ne3; ++i3) {
                     const int64_t dst_idx = i3*(ne0*ne1*ne2) + i2*(ne0*ne1) + i1*ne0 + i0;
 
-                    const float * src_ptr = (const float *)((char *) src0->data + (i3-p30)*nb03 + (i2-p20)*nb02 + (i1-p10)*nb01 + (i0-p00)*nb00);
+                    const float * src_ptr = (const float *)((char *) src0->data + (i3 - p30)*nb03 + (i2 - p20)*nb02 + (i1 - p10)*nb01 + (i0 - p00)*nb00);
 
-                    if (i0 < ne00 + p00 && i1 < ne01 + p10 && i2 < ne02 + p20 && i3 < ne03 + p30 && i0 >= p00 && i1 >= p10 && i2 >= p20 && i3 >= p30) {
+                    if (i0 <  ne00 + p00 && i1 <  ne01 + p10 && i2 <  ne02 + p20 && i3 <  ne03 + p30 &&
+                        i0 >=        p00 && i1 >=        p10 && i2 >=        p20 && i3 >=        p30) {
                         dst_ptr[dst_idx] = *src_ptr;
                     } else {
                         dst_ptr[dst_idx] = 0.0;

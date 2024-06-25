@@ -1448,21 +1448,22 @@ struct test_acc : public test_case {
 struct test_pad : public test_case {
     const ggml_type type;
     const std::array<int64_t, 4> ne_a;
-    const int pad_0;
-    const int pad_1;
+    const std::array<int64_t, 4> p0;
+    const std::array<int64_t, 4> p1;
 
     std::string vars() override {
-        return VARS_TO_STR4(type, ne_a, pad_0, pad_1);
+        return VARS_TO_STR4(type, ne_a, p0, p1);
     }
 
     test_pad(ggml_type type = GGML_TYPE_F32,
             std::array<int64_t, 4> ne_a = {512, 512, 1, 1},
-            int pad_0 = 1, int pad_1 = 1)
-        : type(type), ne_a(ne_a), pad_0(pad_0), pad_1(pad_1)  {}
+            std::array<int64_t, 4> p0 = {3, 2, 4, 0},
+            std::array<int64_t, 4> p1 = {2, 5, 1, 0})
+        : type(type), ne_a(ne_a), p0(p0), p1(p1) {}
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
         ggml_tensor * a = ggml_new_tensor(ctx, type, 4, ne_a.data());
-        ggml_tensor * out = ggml_pad(ctx, a, pad_0, pad_1,0,0);
+        ggml_tensor * out = ggml_pad_ext(ctx, a, p0[0], p1[0], p0[1], p1[1], p0[2], p1[2], p0[3], p1[3]);
         return out;
     }
 };
