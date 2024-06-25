@@ -2305,7 +2305,6 @@ extern "C" {
 
     GGML_API int          gguf_get_n_kv(const struct gguf_context * ctx);
     GGML_API int          gguf_find_key(const struct gguf_context * ctx, const char * key);
-    GGML_API int          gguf_find_key_array(const struct gguf_context * ctx, const char * key, const char * val);
     GGML_API const char * gguf_get_key (const struct gguf_context * ctx, int key_id);
 
     GGML_API enum gguf_type gguf_get_kv_type (const struct gguf_context * ctx, int key_id);

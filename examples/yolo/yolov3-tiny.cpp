@@ -159,10 +159,6 @@ static bool load_labels(const char * filename, std::vector<std::string> & labels
 
 static bool load_labels_gguf(const struct gguf_context * ctx, const char * filename, std::vector<std::string> & labels)
 {
-    int key_id = gguf_find_key_array(ctx, "embedded_files", filename);
-    if (key_id == -1) {
-        return false;
-    }
     int tensor = gguf_find_tensor(ctx, filename);
     if (tensor == -1) {
         return false;
@@ -206,11 +202,6 @@ static bool load_alphabet_gguf(const struct gguf_context * ctx, std::vector<yolo
         for (int i = 32; i < 127; i++) {
             char fname[256];
             sprintf(fname, "data/labels/%d_%d.png", i, j);
-            int key_id = gguf_find_key_array(ctx, "embedded_files", fname);
-            if (key_id == -1) {
-                fprintf(stderr, "Cannot find '%s' in embedded_files\n", fname);
-                return false;
-            }
             int tensor = gguf_find_tensor(ctx, fname);
             if (tensor == -1) {
                 fprintf(stderr, "Cannot find '%s' in tensor\n", fname);
@@ -602,7 +593,7 @@ int main(int argc, char *argv[])
     }
     std::vector<std::string> labels;
     if (!load_labels_gguf(model.ctx_gguf, "data/coco.names", labels)) {
-        fprintf(stderr, "%s: failed to load labels from 'data/coco.names' in model\n", __func__);
+        fprintf(stderr, "%s: skipped loading labels from 'data/coco.names' in model\n", __func__);
         if (!load_labels("data/coco.names", labels)) {
             fprintf(stderr, "%s: failed to load labels from 'data/coco.names'\n", __func__);
             return 1;
@@ -610,7 +601,7 @@ int main(int argc, char *argv[])
     }
     std::vector<yolo_image> alphabet;
     if (!load_alphabet_gguf(model.ctx_gguf, alphabet)) {
-        fprintf(stderr, "%s: failed to load alphabet from model\n", __func__);
+        fprintf(stderr, "%s: skipped loading alphabet from model\n", __func__);
         if (!load_alphabet(alphabet)) {
             fprintf(stderr, "%s: failed to load alphabet\n", __func__);
             return 1;

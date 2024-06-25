@@ -21791,37 +21791,6 @@ int gguf_find_key(const struct gguf_context * ctx, const char * key) {
     return keyfound;
 }
 
-int gguf_find_key_array(const struct gguf_context * ctx, const char * key, const char * val) {
-    // return -1 if key not found
-    int keyfound = -1;
-    int key_id = -1;
-
-    const int n_kv = gguf_get_n_kv(ctx);
-
-    for (int i = 0; i < n_kv; ++i) {
-        if (strcmp(key, gguf_get_key(ctx, i)) == 0) {
-            key_id = i;
-            break;
-        }
-    }
-
-    if (key_id != -1) {
-        if (ctx->kv[key_id].type == GGUF_TYPE_ARRAY) {
-            const int n = gguf_get_arr_n(ctx, key_id); 
-            struct gguf_kv * kv = &ctx->kv[key_id];
-
-            for (int i = 0; i < n; ++i) {
-                struct gguf_str * str = &((struct gguf_str *) kv->value.arr.data)[i];
-                if (strcmp(val, str->data) == 0) {
-                    keyfound = i;
-                }
-            }
-        }
-    }
-
-    return keyfound;
-}
-
 const char * gguf_get_key(const struct gguf_context * ctx, int key_id) {
     GGML_ASSERT(key_id >= 0 && key_id < gguf_get_n_kv(ctx));
     return ctx->kv[key_id].key.data;
