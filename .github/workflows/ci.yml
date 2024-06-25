@@ -29,7 +29,7 @@ jobs:
 
     - name: Configure CMake
       working-directory: ./build
-      run: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DGGML_TEST_COVERAGE=ON -DGGML_CLBLAST=ON ..
+      run: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DGGML_CLBLAST=ON ..
 
     - name: Build
       working-directory: ./build
@@ -38,13 +38,6 @@ jobs:
     - name: Test
       working-directory: ./build
       run: ctest --verbose --timeout 900
-
-    - name: Test Coverage
-      working-directory: ./build
-      run: |
-        llvm-profdata merge -sparse tests/*.profraw -o ggml.profdata
-        llvm-cov      report ./bin/test-grad0 -instr-profile=ggml.profdata
-        llvm-cov      report ./bin/test-opt   -instr-profile=ggml.profdata
 
   test-macos-metal:
     runs-on: macos-13
@@ -61,7 +54,7 @@ jobs:
 
     - name: Configure CMake
       working-directory: ./build
-      run: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DGGML_TEST_COVERAGE=ON -DGGML_METAL=OFF ..
+      run: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DGGML_METAL=OFF ..
 
     - name: Build
       working-directory: ./build
@@ -70,13 +63,6 @@ jobs:
     - name: Test
       working-directory: ./build
       run: ctest --verbose --timeout 900
-
-    - name: Test Coverage
-      working-directory: ./build
-      run: |
-        xcrun llvm-profdata merge -sparse tests/*.profraw -o ggml.profdata
-        xcrun llvm-cov      report ./bin/test-grad0 -instr-profile=ggml.profdata
-        xcrun llvm-cov      report ./bin/test-opt   -instr-profile=ggml.profdata
 
   build:
 
@@ -112,7 +98,7 @@ jobs:
 
     - name: Configure CMake
       working-directory: ./build
-      run: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DGGML_TEST_COVERAGE=ON -DGGML_METAL=OFF ..
+      run: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DGGML_METAL=OFF ..
 
     - name: Build
       working-directory: ./build
@@ -121,19 +107,3 @@ jobs:
     - name: Test
       working-directory: ./build
       run: ctest --verbose --timeout 900
-
-    - name: Test Coverage for Ubuntu
-      if: matrix.os == 'ubuntu-latest'
-      working-directory: ./build
-      run: |
-        llvm-profdata merge -sparse tests/*.profraw -o ggml.profdata
-        llvm-cov      report ./bin/test-grad0 -instr-profile=ggml.profdata
-        llvm-cov      report ./bin/test-opt   -instr-profile=ggml.profdata
-
-    - name: Test Coverage for MacOS
-      if: matrix.os == 'macos-latest'
-      working-directory: ./build
-      run: |
-        xcrun llvm-profdata merge -sparse tests/*.profraw -o ggml.profdata
-        xcrun llvm-cov      report ./bin/test-grad0 -instr-profile=ggml.profdata
-        xcrun llvm-cov      report ./bin/test-opt   -instr-profile=ggml.profdata
