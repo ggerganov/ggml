@@ -1,11 +1,10 @@
-#include <cstring>
 #include <ggml.h>
 #include <ggml-alloc.h>
 #include <ggml-backend.h>
-#include <ggml-backend-impl.h>
-#include <stdio.h>
-#include <stdlib.h>
 
+#include <cstring>
+#include <cstdio>
+#include <cstdlib>
 
 static bool is_pow2(size_t x) {
     return (x & (x - 1)) == 0;
