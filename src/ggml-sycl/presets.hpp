@@ -15,11 +15,7 @@
 
 #define GGML_SYCL_MAX_STREAMS       8
 #define GGML_SYCL_MAX_BUFFERS       256
-#define GGML_SYCL_MAX_DEVICES       48
-#define GGML_SYCL_NAME "SYCL"
 
-// FIXME: 1024 from cuda
-#define GROUP_SIZE 1024
 #define WARP_SIZE 32
 #define MATRIX_ROW_PADDING 512 // last row of quant. matrices is a multiple of this to avoid out-of-bounds memory accesses
 

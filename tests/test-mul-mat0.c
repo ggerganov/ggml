@@ -1,5 +1,5 @@
 #define _CRT_SECURE_NO_DEPRECATE // Disables ridiculous "unsafe" warnigns on Windows
-#include "ggml/ggml.h"
+#include "ggml.h"
 
 #include <math.h>
 #include <stdio.h>

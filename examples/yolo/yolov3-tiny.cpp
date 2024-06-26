@@ -1,4 +1,4 @@
-#include "ggml/ggml.h"
+#include "ggml.h"
 #include "yolo-image.h"
 
 #include <cmath>

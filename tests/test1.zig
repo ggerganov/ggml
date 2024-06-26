@@ -1,6 +1,6 @@
 const std = @import("std");
 const c = @cImport({
-    @cInclude("ggml/ggml.h");
+    @cInclude("ggml.h");
 });
 
 pub fn main() !void {

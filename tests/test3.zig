@@ -2,7 +2,7 @@ const std = @import("std");
 const Thread = std.Thread;
 const c = @cImport({
     @cInclude("stdlib.h");
-    @cInclude("ggml/ggml.h");
+    @cInclude("ggml.h");
 });
 
 fn is_close(a: f32, b: f32, epsilon: f32) bool {

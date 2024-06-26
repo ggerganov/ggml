@@ -1,4 +1,4 @@
-#include "ggml/ggml.h"
+#include "ggml.h"
 
 #include <string.h>
 #include <stdio.h>
