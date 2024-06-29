@@ -13460,10 +13460,6 @@ static void ggml_compute_forward_pad_reflect_1d(
     GGML_ASSERT(p0 >= 0);
     GGML_ASSERT(p1 >= 0);
 
-    if (params->type == GGML_TASK_TYPE_INIT || params->type == GGML_TASK_TYPE_FINALIZE) {
-        return;
-    }
-
     const int ne00 = src0->ne[0];
 
     const int nb01 = src0->nb[1];
