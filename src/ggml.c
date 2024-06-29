@@ -7294,6 +7294,8 @@ struct ggml_tensor * ggml_pad_reflect_1d(
     GGML_ASSERT(p0 < a->ne[0]); // padding length on each size must be less than the 
     GGML_ASSERT(p1 < a->ne[0]); // existing length of the dimension being padded
 
+    GGML_ASSERT(ggml_is_contiguous(a));
+
 
     const int64_t ne[2] = { p0 + a->ne[0] + p1, a->ne[1] };
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 2, ne);

@@ -2350,6 +2350,10 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
     test_cases.emplace_back(new test_acc());
     test_cases.emplace_back(new test_pad());
     test_cases.emplace_back(new test_pad_reflect_1d());
+    test_cases.emplace_back(new test_pad_reflect_1d(GGML_TYPE_F32, {1024}, 5 , 6));
+    test_cases.emplace_back(new test_pad_reflect_1d(GGML_TYPE_F32, {2}, 1 , 0));
+    test_cases.emplace_back(new test_pad_reflect_1d(GGML_TYPE_F32, {10}, 7 , 3));
+
     test_cases.emplace_back(new test_arange());
     test_cases.emplace_back(new test_timestep_embedding());
     test_cases.emplace_back(new test_leaky_relu());
