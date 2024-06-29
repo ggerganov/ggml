@@ -157,15 +157,19 @@ static bool load_labels(const char * filename, std::vector<std::string> & labels
     return true;
 }
 
-static bool load_labels_gguf(const struct gguf_context * ctx, const char * filename, std::vector<std::string> & labels)
+static bool load_labels_gguf(struct ggml_context * ctx, const struct gguf_context * ctx_gguf, const char * filename, std::vector<std::string> & labels)
 {
-    int tensor = gguf_find_tensor(ctx, filename);
-    if (tensor == -1) {
+    struct ggml_tensor * tensor = ggml_get_tensor(ctx, filename);
+    if (tensor == NULL) {
         return false;
     }
-    const size_t offset = gguf_get_tensor_offset(ctx, tensor);
-    const size_t len = gguf_get_tensor_size(ctx, tensor);
-    const char * data = (char *)gguf_get_data(ctx);
+    int tensoridx = gguf_find_tensor(ctx_gguf, filename);
+    if (tensoridx == -1) {
+        return false;
+    }
+    const size_t len = ggml_nelements(tensor);
+    const size_t offset = gguf_get_tensor_offset(ctx_gguf, tensoridx);
+    const char * data = (char *)gguf_get_data(ctx_gguf);
     membuf buf(data + offset, data + offset + len);
     std::istream file_in(&buf);
     if (!file_in) {
@@ -195,21 +199,26 @@ static bool load_alphabet(std::vector<yolo_image> & alphabet)
     return true;
 }
 
-static bool load_alphabet_gguf(const struct gguf_context * ctx, std::vector<yolo_image> & alphabet)
+static bool load_alphabet_gguf(struct ggml_context * ctx, const struct gguf_context * ctx_gguf, std::vector<yolo_image> & alphabet)
 {
     alphabet.resize(8 * 128);
     for (int j = 0; j < 8; j++) {
         for (int i = 32; i < 127; i++) {
             char fname[256];
             sprintf(fname, "data/labels/%d_%d.png", i, j);
-            int tensor = gguf_find_tensor(ctx, fname);
-            if (tensor == -1) {
+            struct ggml_tensor * tensor = ggml_get_tensor(ctx, fname);
+            if (tensor == NULL) {
                 fprintf(stderr, "Cannot find '%s' in tensor\n", fname);
                 return false;
             }
-            const size_t offset = gguf_get_tensor_offset(ctx, tensor);
-            const size_t len = gguf_get_tensor_size(ctx, tensor);
-            const char * data = (char *)gguf_get_data(ctx);
+            int tensoridx = gguf_find_tensor(ctx_gguf, fname);
+            if (tensoridx == -1) {
+                fprintf(stderr, "Cannot find '%s' in tensor\n", fname);
+                return false;
+            }
+            const size_t len = ggml_nelements(tensor);
+            const size_t offset = gguf_get_tensor_offset(ctx_gguf, tensoridx);
+            const char * data = (char *)gguf_get_data(ctx_gguf);
             if (!load_image_from_memory(data + offset, len, alphabet[j*128 + i])) {
                 fprintf(stderr, "Cannot load '%s'\n", fname);
                 return false;
@@ -592,7 +601,7 @@ int main(int argc, char *argv[])
         return 1;
     }
     std::vector<std::string> labels;
-    if (!load_labels_gguf(model.ctx_gguf, "data/coco.names", labels)) {
+    if (!load_labels_gguf(model.ctx, model.ctx_gguf, "data/coco.names", labels)) {
         fprintf(stderr, "%s: skipped loading labels from 'data/coco.names' in model\n", __func__);
         if (!load_labels("data/coco.names", labels)) {
             fprintf(stderr, "%s: failed to load labels from 'data/coco.names'\n", __func__);
@@ -600,7 +609,7 @@ int main(int argc, char *argv[])
         }
     }
     std::vector<yolo_image> alphabet;
-    if (!load_alphabet_gguf(model.ctx_gguf, alphabet)) {
+    if (!load_alphabet_gguf(model.ctx, model.ctx_gguf, alphabet)) {
         fprintf(stderr, "%s: skipped loading alphabet from model\n", __func__);
         if (!load_alphabet(alphabet)) {
             fprintf(stderr, "%s: failed to load alphabet\n", __func__);

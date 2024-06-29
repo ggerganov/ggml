@@ -21941,11 +21941,6 @@ enum ggml_type gguf_get_tensor_type(const struct gguf_context * ctx, int i) {
     return ctx->infos[i].type;
 }
 
-size_t gguf_get_tensor_size(const struct gguf_context * ctx, int i) {
-    GGML_ASSERT(i >= 0 && i < gguf_get_n_tensors(ctx));
-    return ctx->infos[i].size;
-}
-
 // returns the index
 static int gguf_get_or_add_key(struct gguf_context * ctx, const char * key) {
     const int idx = gguf_find_key(ctx, key);

@@ -2333,7 +2333,6 @@ extern "C" {
     GGML_API size_t         gguf_get_tensor_offset(const struct gguf_context * ctx, int i);
     GGML_API char *         gguf_get_tensor_name  (const struct gguf_context * ctx, int i);
     GGML_API enum ggml_type gguf_get_tensor_type  (const struct gguf_context * ctx, int i);
-    GGML_API size_t         gguf_get_tensor_size  (const struct gguf_context * ctx, int i);
 
     // removes key if it exists
     GGML_API void gguf_remove_key(struct gguf_context * ctx, const char * key);
