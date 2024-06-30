@@ -105,7 +105,7 @@ cmake -DGGML_METAL=ON -DBUILD_SHARED_LIBS=Off ..
 
 ```bash
 # fix the path to point to your CUDA compiler
-cmake -DGGML_CUBLAS=ON -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.1/bin/nvcc ..
+cmake -DGGML_CUDA=ON -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.1/bin/nvcc ..
 ```
 
 ## Using hipBLAS
