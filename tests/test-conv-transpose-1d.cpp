@@ -691,5 +691,9 @@ int main(void)
     ggml_backend_buffer_free(model.buffer);
     ggml_backend_free(model.backend);
     ggml_gallocr_free(allocr);
-    return 0;
+
+    if (passed) {
+        return 0;
+    }
+    return 1;
 }
