@@ -33,7 +33,7 @@ SRC=`pwd`
 CMAKE_EXTRA=""
 
 if [ ! -z ${GG_BUILD_CUDA} ]; then
-    CMAKE_EXTRA="${CMAKE_EXTRA} -DGGML_CUBLAS=ON"
+    CMAKE_EXTRA="${CMAKE_EXTRA} -DGGML_CUDA=ON"
 fi
 
 if [ ! -z ${GG_BUILD_METAL} ]; then
