@@ -1,6 +1,6 @@
-#include "ggml/ggml.h"
-#include "ggml/ggml-alloc.h"
-#include "ggml/ggml-backend.h"
+#include "ggml.h"
+#include "ggml-alloc.h"
+#include "ggml-backend.h"
 
 #ifdef GGML_USE_CUDA
 #include "ggml-cuda.h"
@@ -8,6 +8,10 @@
 
 #ifdef GGML_USE_METAL
 #include "ggml-metal.h"
+#endif
+
+#ifdef GGML_USE_BLAS
+#include "ggml-blas.h"
 #endif
 
 #include "common.h"
@@ -130,6 +134,16 @@ void init_backends(gpt2_model & model, const gpt_params & params) {
     if (gpu_backend) {
         model.backends.push_back(gpu_backend);
     }
+
+#ifdef GGML_USE_BLAS
+    ggml_backend_t blas_backend = ggml_backend_blas_init();
+    if (!blas_backend) {
+        fprintf(stderr, "%s: failed to initialize BLAS backend\n", __func__);
+    } else {
+        ggml_backend_blas_set_n_threads(blas_backend, params.n_threads);
+        model.backends.push_back(blas_backend);
+    }
+#endif
 
     // always add the CPU backend as a fallback
     ggml_backend_t cpu_backend = ggml_backend_cpu_init();

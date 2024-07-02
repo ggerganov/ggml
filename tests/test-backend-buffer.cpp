@@ -1,11 +1,10 @@
-#include <cstring>
 #include <ggml.h>
 #include <ggml-alloc.h>
 #include <ggml-backend.h>
-#include <ggml-backend-impl.h>
-#include <stdio.h>
-#include <stdlib.h>
 
+#include <cstring>
+#include <cstdio>
+#include <cstdlib>
 
 static bool is_pow2(size_t x) {
     return (x & (x - 1)) == 0;
@@ -14,7 +13,7 @@ static bool is_pow2(size_t x) {
 static void test_buffer(ggml_backend_t backend, ggml_backend_buffer_type_t buft) {
     GGML_ASSERT(ggml_backend_get_default_buffer_type(backend) == buft);
 
-    GGML_ASSERT(ggml_backend_buft_supports_backend(buft, backend));
+    GGML_ASSERT(ggml_backend_supports_buft(backend, buft));
 
     //ggml_backend_buffer_t buffer = ggml_backend_alloc_buffer(backend, 1024);
     ggml_backend_buffer_t buffer = ggml_backend_buft_alloc_buffer(buft, 1024);

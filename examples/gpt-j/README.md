@@ -147,7 +147,7 @@ sys.    0m7.103s
 ## Implementation details
 
 The high level implementation of the model is contained in the [main.cpp](main.cpp) file. The core computations are
-performed by the [ggml](https://github.com/ggerganov/ggml/blob/master/include/ggml/ggml.h) library.
+performed by the [ggml](https://github.com/ggerganov/ggml/blob/master/include/ggml.h) library.
 
 
 #### Matrix multiplication
