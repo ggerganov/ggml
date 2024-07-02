@@ -2798,13 +2798,14 @@ GGML_CALL static bool ggml_backend_cuda_supports_op(ggml_backend_t backend, cons
                 return src0_type != GGML_TYPE_I32 && src0_type != GGML_TYPE_I16;
             } break;
         case GGML_OP_CONV_TRANSPOSE_1D:
-        {
-            ggml_type src0_type = op->src[0]->type;
-            ggml_type src1_type = op->src[1]->type;
-            if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_F32) {
-                return true;
-            }
-        } break;
+            {
+                ggml_type src0_type = op->src[0]->type;
+                ggml_type src1_type = op->src[1]->type;
+                if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_F32) {
+                    return true;
+                }
+                return false;
+            } break;
         case GGML_OP_NONE:
         case GGML_OP_RESHAPE:
         case GGML_OP_VIEW:
