@@ -20867,6 +20867,13 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
             ok = ok && gguf_fread_el (file, &info->type,   sizeof(info->type),    &offset);
             ok = ok && gguf_fread_el (file, &info->offset, sizeof(info->offset),  &offset);
 
+            // set tensor size
+            size_t size = 1;
+            for (uint32_t j = 0; j < info->n_dims; ++j) {
+                size *= info->ne[j];
+            }
+            info->size = size;
+
             // TODO: return an error instead of crashing with GGML_ASSERT
             gguf_tensor_info_sanitize(info);
 
@@ -21225,14 +21232,17 @@ int gguf_find_tensor(const struct gguf_context * ctx, const char * name) {
 }
 
 size_t gguf_get_tensor_offset(const struct gguf_context * ctx, int i) {
+    GGML_ASSERT(i >= 0 && i < gguf_get_n_tensors(ctx));
     return ctx->infos[i].offset;
 }
 
 char * gguf_get_tensor_name(const struct gguf_context * ctx, int i) {
+    GGML_ASSERT(i >= 0 && i < gguf_get_n_tensors(ctx));
     return ctx->infos[i].name.data;
 }
 
 enum ggml_type gguf_get_tensor_type(const struct gguf_context * ctx, int i) {
+    GGML_ASSERT(i >= 0 && i < gguf_get_n_tensors(ctx));
     return ctx->infos[i].type;
 }
 
@@ -21547,7 +21557,7 @@ static void gguf_write_to_buf(const struct gguf_context * ctx, struct gguf_buf *
         gguf_bwrite_el (buf, &kv->type, sizeof(kv->type));
 
         switch (kv->type) {
-            case GGUF_TYPE_UINT8:   gguf_bwrite_el( buf, &kv->value.uint8,   sizeof(kv->value.uint8)  ); break;
+            case GGUF_TYPE_UINT8:   gguf_bwrite_el (buf, &kv->value.uint8,   sizeof(kv->value.uint8)  ); break;
             case GGUF_TYPE_INT8:    gguf_bwrite_el (buf, &kv->value.int8,    sizeof(kv->value.int8)   ); break;
             case GGUF_TYPE_UINT16:  gguf_bwrite_el (buf, &kv->value.uint16,  sizeof(kv->value.uint16) ); break;
             case GGUF_TYPE_INT16:   gguf_bwrite_el (buf, &kv->value.int16,   sizeof(kv->value.int16)  ); break;

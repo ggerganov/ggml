@@ -88,6 +88,31 @@ bool load_image(const char *fname, yolo_image & img)
     return true;
 }
 
+bool load_image_from_memory(const char *buffer, int len, yolo_image & img)
+{
+    int w, h, c;
+    uint8_t * data = stbi_load_from_memory((uint8_t *)buffer, len, &w, &h, &c, 3);
+    if (!data) {
+        return false;
+    }
+    c = 3;
+    img.w = w;
+    img.h = h;
+    img.c = c;
+    img.data.resize(w*h*c);
+    for (int k = 0; k < c; ++k){
+        for (int j = 0; j < h; ++j){
+            for (int i = 0; i < w; ++i){
+                int dst_index = i + w*j + w*h*k;
+                int src_index = k + c*i + c*w*j;
+                img.data[dst_index] = (float)data[src_index]/255.;
+            }
+        }
+    }
+    stbi_image_free(data);
+    return true;
+}
+
 static yolo_image resize_image(const yolo_image & im, int w, int h)
 {
     yolo_image resized(w, h, im.c);
