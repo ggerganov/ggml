@@ -1246,8 +1246,6 @@ struct test_conv_transpose_1d : public test_case {
     }
 };
 
-
-
 // GGML_OP_IM2COL
 struct test_im2col : public test_case {
     const ggml_type type_input;
