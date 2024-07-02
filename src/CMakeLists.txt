@@ -246,6 +246,24 @@ if (GGML_LLAMAFILE)
     set(GGML_SOURCES_LLAMAFILE sgemm.cpp)
 endif()
 
+if (GGML_DNNL)
+    find_package(dnnl)
+    if (dnnl_FOUND)
+        message(STATUS "OneDNN found")
+
+        add_compile_definitions(GGML_USE_DNNL)
+
+        set(GGML_HEADERS_DNNL ../include/ggml-dnnl.h)
+        set(GGML_SOURCES_DNNL ggml-dnnl.cpp)
+
+        set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS} DNNL::dnnl)
+        list(APPEND GGML_CDEF_PUBLIC GGML_USE_DNNL)
+
+    else()
+        message(WARNING "OneDNN not found")
+    endif()
+endif()
+
 if (GGML_CUDA)
     cmake_minimum_required(VERSION 3.18)  # for CMAKE_CUDA_ARCHITECTURES
 
@@ -1151,6 +1169,7 @@ add_library(ggml
             ${GGML_SOURCES_ROCM}      ${GGML_HEADERS_ROCM}
             ${GGML_SOURCES_BLAS}      ${GGML_HEADERS_BLAS}
             ${GGML_SOURCES_LLAMAFILE} ${GGML_HEADERS_LLAMAFILE}
+            ${GGML_SOURCES_DNNL}      ${GGML_HEADERS_DNNL}
             )
 
 if (EMSCRIPTEN)

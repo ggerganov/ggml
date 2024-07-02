@@ -14,6 +14,10 @@
 #include "ggml-blas.h"
 #endif
 
+#ifdef GGML_USE_DNNL
+#include "ggml-dnnl.h"
+#endif
+
 #include "common.h"
 #include "common-ggml.h"
 
@@ -142,6 +146,15 @@ void init_backends(gpt2_model & model, const gpt_params & params) {
     } else {
         ggml_backend_blas_set_n_threads(blas_backend, params.n_threads);
         model.backends.push_back(blas_backend);
+    }
+#endif
+
+#ifdef GGML_USE_DNNL
+    ggml_backend_t dnnl_backend = ggml_backend_dnnl_init();
+    if (!dnnl_backend) {
+        fprintf(stderr, "%s: failed to initialize DNNL backend\n", __func__);
+    } else {
+        model.backends.push_back(dnnl_backend);
     }
 #endif
 
