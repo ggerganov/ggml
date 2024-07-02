@@ -2,7 +2,7 @@
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
 
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_CUDA
 #include "ggml-cuda.h"
 #endif
 
@@ -22,7 +22,7 @@ int main(int /*argc*/, const char** /*argv*/) {
         ggml_backend_t backend = NULL;
         //ggml_backend_buffer_t buffer;
 
-        #ifdef GGML_USE_CUBLAS
+        #ifdef GGML_USE_CUDA
         if (use_gpu) {
             fprintf(stderr, "%s: using CUDA backend\n", __func__);
             backend = ggml_backend_cuda_init(0);
