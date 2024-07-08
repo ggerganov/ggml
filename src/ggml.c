@@ -21562,13 +21562,6 @@ struct gguf_context * gguf_init_from_file(const char * fname, struct gguf_init_p
             ok = ok && gguf_fread_el (file, &info->type,   sizeof(info->type),    &offset);
             ok = ok && gguf_fread_el (file, &info->offset, sizeof(info->offset),  &offset);
 
-            // set tensor size
-            size_t size = 1;
-            for (uint32_t j = 0; j < info->n_dims; ++j) {
-                size *= info->ne[j];
-            }
-            info->size = size;
-
             // TODO: return an error instead of crashing with GGML_ASSERT
             gguf_tensor_info_sanitize(info);
 

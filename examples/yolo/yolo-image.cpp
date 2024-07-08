@@ -88,7 +88,7 @@ bool load_image(const char *fname, yolo_image & img)
     return true;
 }
 
-bool load_image_from_memory(const char *buffer, int len, yolo_image & img)
+bool load_image_from_memory(const char * buffer, int len, yolo_image & img)
 {
     int w, h, c;
     uint8_t * data = stbi_load_from_memory((uint8_t *)buffer, len, &w, &h, &c, 3);
