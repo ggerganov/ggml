@@ -2,8 +2,9 @@
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
 
+//#define GGML_CUDA
 
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_CUDA
 #include "ggml-cuda.h"
 #endif
 
@@ -31,6 +32,7 @@ struct test_model {
     struct ggml_tensor * a_0;
     struct ggml_tensor * a_1;
     struct ggml_tensor * a_2;
+    struct ggml_tensor * a_3;
 
 
 
@@ -58,6 +60,7 @@ void load_model(test_model & model, bool use_gpu = false) {
         buffer_size += 1024* ggml_type_size(GGML_TYPE_F32); // tensor a_0
         buffer_size += 2* ggml_type_size(GGML_TYPE_F32); // tensor a_0
         buffer_size += 10* ggml_type_size(GGML_TYPE_F32); // tensor a_0
+        buffer_size += 5* 2 *  ggml_type_size(GGML_TYPE_F32); // tensor a_0
 
 
 
@@ -70,7 +73,7 @@ void load_model(test_model & model, bool use_gpu = false) {
     printf("%s: ggml tensor size    = %d bytes\n", __func__, (int) sizeof(ggml_tensor));
     printf("%s: backend buffer size = %0.2f MB\n", __func__, (buffer_size/ 1024.f/ 1024.f));
 
-    int num_tensors = 3;
+    int num_tensors = 4;
     struct ggml_init_params params {
             /*.mem_size   =*/ ggml_tensor_overhead() * num_tensors,
             /*.mem_buffer =*/ NULL,
@@ -78,7 +81,7 @@ void load_model(test_model & model, bool use_gpu = false) {
     };
 
     // initialize the backend
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_CUDA
     if (use_gpu) {
         fprintf(stderr, "%s: using CUDA backend\n", __func__);
         model.backend = ggml_backend_cuda_init(0);
@@ -113,6 +116,7 @@ void load_model(test_model & model, bool use_gpu = false) {
     model.a_0 = ggml_new_tensor_1d(model.ctx, GGML_TYPE_F32, 1024);
     model.a_1 = ggml_new_tensor_1d(model.ctx, GGML_TYPE_F32, 2);
     model.a_2 = ggml_new_tensor_1d(model.ctx, GGML_TYPE_F32, 10);
+    model.a_3 = ggml_new_tensor_2d(model.ctx, GGML_TYPE_F32, 5,2);
 
 
 
@@ -148,6 +152,16 @@ void load_model(test_model & model, bool use_gpu = false) {
     } else {
         ggml_backend_tensor_set(model.a_2, data, 0, ggml_nbytes(model.a_2));
     }
+      // alloc memory
+    ggml_tallocr_alloc(&alloc, model.a_3);
+
+    // load data to buffer
+    if(ggml_backend_is_cpu(model.backend)) {
+        memcpy(model.a_3->data, data, ggml_nbytes(model.a_3));
+    } else {
+        ggml_backend_tensor_set(model.a_3, data, 0, ggml_nbytes(model.a_3));
+    }
+
 
 
 }
@@ -187,6 +201,13 @@ struct ggml_cgraph * build_graph(const test_model& model) {
     struct ggml_tensor* pad_reflect_1d_res_2 = ggml_pad_reflect_1d(ctx0, model.a_2, p0, p1);
     ggml_set_name(pad_reflect_1d_res_2, "pad_reflect_1d_res_2");
     ggml_build_forward_expand(gf, pad_reflect_1d_res_2);
+
+    p0 = 2;
+    p1 = 3;
+
+    struct ggml_tensor* pad_reflect_1d_res_3 = ggml_pad_reflect_1d(ctx0, model.a_3, p0, p1);
+    ggml_set_name(pad_reflect_1d_res_3, "pad_reflect_1d_res_3");
+    ggml_build_forward_expand(gf, pad_reflect_1d_res_3);
 
 
 
@@ -291,6 +312,23 @@ int main(void)
 
     float expected_pad_reflect_2[n_pad_reflect_1d_test_2] = {7.0,6.0,5.0,4.0,3.0,2.0,1.0,0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,8.0,7.0,6.0};
 
+    struct ggml_tensor * pad_reflect_1d_res_3 = NULL;
+
+    for(int i = 0; i < gf_res->n_nodes; i++) {
+       if(strcmp(ggml_get_name(gf_res->nodes[i]), "pad_reflect_1d_res_3") == 0) {
+            pad_reflect_1d_res_3 = gf_res->nodes[i];
+        }
+    }
+
+    float* pad_reflect_1d_data_3 = new float[ggml_nelements(pad_reflect_1d_res_3)];
+
+    ggml_backend_tensor_get(pad_reflect_1d_res_3, pad_reflect_1d_data_3, 0, ggml_nbytes(pad_reflect_1d_res_3));
+
+    const int n_pad_reflect_1d_test_3 = 20;
+
+    float expected_pad_reflect_3[n_pad_reflect_1d_test_3] = {2.0,1.0,0.0,1.0,2.0,3.0,4.0,3.0,2.0,1.0,7.0,6.0,5.0,6.0,7.0,8.0,9.0,8.0,7.0,6.0};
+
+
 
 
 
@@ -309,7 +347,7 @@ int main(void)
         }
     }
 
-    printf("ggml_pad_reflect_1d_transpose (%d): %s\n", (int) ggml_nelements(pad_reflect_1d_res_0), passed && (ggml_nelements(pad_reflect_1d_res_0) == n_pad_reflect_1d_test_0) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
+    printf("ggml_pad_reflect_1d (%d): %s\n", (int) ggml_nelements(pad_reflect_1d_res_0), passed && (ggml_nelements(pad_reflect_1d_res_0) == n_pad_reflect_1d_test_0) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
     
     passed = true;
     for(int i = 0; i < n_pad_reflect_1d_test_1; i++) {
@@ -323,7 +361,7 @@ int main(void)
         }
     }
 
-    printf("ggml_pad_reflect_1d_transpose (%d): %s\n", (int) ggml_nelements(pad_reflect_1d_res_1), passed && (ggml_nelements(pad_reflect_1d_res_1) == n_pad_reflect_1d_test_1) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
+    printf("ggml_pad_reflect_1d (%d): %s\n", (int) ggml_nelements(pad_reflect_1d_res_1), passed && (ggml_nelements(pad_reflect_1d_res_1) == n_pad_reflect_1d_test_1) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
     
     passed = true;
     for(int i = 0; i < n_pad_reflect_1d_test_2; i++) {
@@ -337,8 +375,22 @@ int main(void)
         }
     }
 
-    printf("ggml_pad_reflect_1d_transpose (%d): %s\n", (int) ggml_nelements(pad_reflect_1d_res_2), passed && (ggml_nelements(pad_reflect_1d_res_2) == n_pad_reflect_1d_test_2) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
+    printf("ggml_pad_reflect_1d (%d): %s\n", (int) ggml_nelements(pad_reflect_1d_res_2), passed && (ggml_nelements(pad_reflect_1d_res_2) == n_pad_reflect_1d_test_2) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
     
+    passed = true;
+    for(int i = 0; i < n_pad_reflect_1d_test_3; i++) {
+        if(
+            pad_reflect_1d_data_3[i] != expected_pad_reflect_3[i]) {
+            std::cout << "index: " << i << std::endl;
+            std::cout << "expected: " << expected_pad_reflect_3[i] << std::endl;
+            std::cout << "actual: " << pad_reflect_1d_data_3[i] << std::endl;
+            passed = false;
+            break;
+        }
+    }
+
+    printf("ggml_pad_reflect_1d (%d): %s\n", (int) ggml_nelements(pad_reflect_1d_res_3), passed && (ggml_nelements(pad_reflect_1d_res_3) == n_pad_reflect_1d_test_3) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
+
 
     ggml_free(model.ctx);
 
