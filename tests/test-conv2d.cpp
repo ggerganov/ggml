@@ -19,12 +19,14 @@
 #include <string>
 #include <vector>
 
+#ifdef GGML_USE_METAL
 static void ggml_log_callback_default(ggml_log_level level, const char * text, void * user_data) {
     (void) level;
     (void) user_data;
     fputs(text, stderr);
     fflush(stderr);
 }
+#endif
 
 struct test_model {
     struct ggml_tensor * a;
