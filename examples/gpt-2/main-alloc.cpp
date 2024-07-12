@@ -59,8 +59,8 @@ struct gpt2_model {
     struct ggml_tensor * ln_f_g;
     struct ggml_tensor * ln_f_b;
 
-    struct ggml_tensor * wte;     // position embedding
-    struct ggml_tensor * wpe;     //    token embedding
+    struct ggml_tensor * wte;     // token embedding
+    struct ggml_tensor * wpe;     // position embedding
     struct ggml_tensor * lm_head; // language model head
 
     std::vector<gpt2_layer> layers;
