@@ -105,13 +105,25 @@ cmake -DGGML_METAL=ON -DBUILD_SHARED_LIBS=Off ..
 
 ```bash
 # fix the path to point to your CUDA compiler
-cmake -DGGML_CUBLAS=ON -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.1/bin/nvcc ..
+cmake -DGGML_CUDA=ON -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.1/bin/nvcc ..
 ```
 
 ## Using hipBLAS
 
 ```bash
 cmake -DCMAKE_C_COMPILER="$(hipconfig -l)/clang" -DCMAKE_CXX_COMPILER="$(hipconfig -l)/clang++" -DGGML_HIPBLAS=ON
+```
+
+## Using SYCL
+
+```bash
+# linux
+source /opt/intel/oneapi/setvars.sh
+cmake -G "Ninja" -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx -DGGML_SYCL=ON ..
+
+# windows
+"C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
+cmake -G "Ninja" -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=icx -DGGML_SYCL=ON ..
 ```
 
 ## Compiling for Android

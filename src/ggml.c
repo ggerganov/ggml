@@ -5314,7 +5314,7 @@ void ggml_mul_mat_set_prec(
     as  -> [cols, rows, n_expert]
     ids -> [n_experts_used, n_tokens] (i32)
     b   -> [cols, n_expert_used, n_tokens]
-    c   -> [cols, n_expert_used, n_tokens]
+    c   -> [rows, n_expert_used, n_tokens]
 
     in b, n_experts_used can be broadcasted to match the n_expert_used of ids
 
@@ -18038,7 +18038,6 @@ static void ggml_build_forward_impl(struct ggml_cgraph * cgraph, struct ggml_ten
     }
 
     const int n0 = cgraph->n_nodes;
-    UNUSED(n0);
 
     ggml_visit_parents(cgraph, tensor);
 
