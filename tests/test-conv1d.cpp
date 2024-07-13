@@ -1,10 +1,8 @@
 #include "ggml.h"
-#include "ggml/ggml-alloc.h"
-#include "ggml/ggml-backend.h"
+#include "ggml-alloc.h"
+#include "ggml-backend.h"
 
-// #define GGML_USE_CUBLAS
-
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_CUDA
 #include "ggml-cuda.h"
 #endif
 
@@ -75,7 +73,7 @@ void load_model(test_model & model, bool use_gpu = false) {
     };
 
     // initialize the backend
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_CUDA
     if (use_gpu) {
         fprintf(stderr, "%s: using CUDA backend\n", __func__);
         model.backend = ggml_backend_cuda_init(0);

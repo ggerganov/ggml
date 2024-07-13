@@ -33,7 +33,7 @@ SRC=`pwd`
 CMAKE_EXTRA=""
 
 if [ ! -z ${GG_BUILD_CUDA} ]; then
-    CMAKE_EXTRA="${CMAKE_EXTRA} -DGGML_CUBLAS=ON"
+    CMAKE_EXTRA="${CMAKE_EXTRA} -DGGML_CUDA=ON"
 fi
 
 if [ ! -z ${GG_BUILD_METAL} ]; then
@@ -218,39 +218,6 @@ function gg_sum_mnist {
     gg_printf '```\n'
 }
 
-# whisper
-
-function gg_run_whisper {
-    cd ${SRC}
-
-    gg_wget models-mnt/whisper/ https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
-    gg_wget models-mnt/whisper/ https://github.com/ggerganov/whisper.cpp/raw/master/samples/jfk.wav
-
-    cd build-ci-release
-
-    set -e
-
-    path_models="../models-mnt/whisper/"
-    model_f16="${path_models}/ggml-base.en.bin"
-    audio_0="${path_models}/jfk.wav"
-
-    (time ./bin/whisper -m ${model_f16} -f ${audio_0} ) 2>&1 | tee -a $OUT/${ci}-main.log
-
-    grep -q "And so my fellow Americans" $OUT/${ci}-main.log
-
-    set +e
-}
-
-function gg_sum_whisper {
-    gg_printf '### %s\n\n' "${ci}"
-
-    gg_printf 'Runs short Whisper transcription\n'
-    gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
-    gg_printf '```\n'
-    gg_printf '%s\n' "$(cat $OUT/${ci}-main.log)"
-    gg_printf '```\n'
-}
-
 # sam
 
 function gg_run_sam {
@@ -344,11 +311,12 @@ if [ ! -z ${GG_BUILD_METAL} ]; then
     export GGML_METAL_PATH_RESOURCES="${SRC}/build-ci-release/bin"
 fi
 
-test $ret -eq 0 && gg_run gpt_2
-test $ret -eq 0 && gg_run mnist
-test $ret -eq 0 && gg_run whisper
-test $ret -eq 0 && gg_run sam
-test $ret -eq 0 && gg_run yolo
+if [ -z ${GG_BUILD_NO_DOWNLOAD} ]; then
+    test $ret -eq 0 && gg_run gpt_2
+    test $ret -eq 0 && gg_run mnist
+    test $ret -eq 0 && gg_run sam
+    test $ret -eq 0 && gg_run yolo
+fi
 
 if [ -z $GG_BUILD_LOW_PERF ]; then
     if [ -z ${GG_BUILD_VRAM_GB} ] || [ ${GG_BUILD_VRAM_GB} -ge 16 ]; then

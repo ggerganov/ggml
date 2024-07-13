@@ -10,7 +10,7 @@
 // $ ./bin/mnist-mtl ./models/mnist/mnist.ggml ../examples/mnist/models/mnist/t10k-images.idx3-ubyte
 //
 
-#include "ggml/ggml.h"
+#include "ggml.h"
 
 #include "main-mtl.h"
 
