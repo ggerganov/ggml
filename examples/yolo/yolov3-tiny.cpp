@@ -125,9 +125,9 @@ struct membuf : std::streambuf {
     virtual pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::in) override {
         if(dir == std::ios_base::cur) {
             gbump(off);
-        } else if(dir == std::ios_base::end) {
+        } else if (dir == std::ios_base::end) {
             setg(begin, end + off, end);
-        } else if(dir == std::ios_base::beg) {
+        } else if (dir == std::ios_base::beg) {
             setg(begin, begin + off, end);
         }
 
