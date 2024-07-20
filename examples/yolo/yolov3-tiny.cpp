@@ -120,7 +120,7 @@ static bool load_alphabet(std::vector<yolo_image> & alphabet)
     for (int j = 0; j < 8; j++) {
         for (int i = 32; i < 127; i++) {
             char fname[256];
-            sprintf(fname, "data/labels/%d_%d.png", i, j);
+            snprintf(fname, sizeof(fname), "data/labels/%d_%d.png", i, j);
             if (!load_image(fname, alphabet[j*128 + i])) {
                 fprintf(stderr, "Cannot load '%s'\n", fname);
                 return false;
