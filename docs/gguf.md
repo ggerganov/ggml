@@ -342,11 +342,25 @@ By convention, most counts/lengths/etc are `uint64` unless otherwise specified. 
 
 #### General metadata
 
-- `general.name`: The name of the model. This should be a human-readable name that can be used to identify the model. It should be unique within the community that the model is defined in.
-- `general.author`: The author of the model.
-- `general.url`: URL to the model's homepage. This can be a GitHub repo, a paper, etc.
+- `general.name: string`: The name of the model. This should be a human-readable name that can be used to identify the model. It should be unique within the community that the model is defined in.
+- `general.author: string`: The author of the model.
+- `general.version: string`: The version of the model.
+- `general.organization: string`: The organization of the model.
+- `general.basename: string`: The base model name / architecture of the model
+- `general.finetune: string`: What has the base model been optimized toward.
 - `general.description: string`: free-form description of the model including anything that isn't covered by the other fields
+- `general.quantized_by: string`: The name of the individual who quantized the model
+- `general.size_label: string`: Size class of the model, such as number of weights and experts. (Useful for leader boards)
 - `general.license: string`: License of the model, expressed as a [SPDX license expression](https://spdx.github.io/spdx-spec/v2-draft/SPDX-license-expressions/) (e.g. `"MIT OR Apache-2.0`). Do not include any other information, such as the license text or the URL to the license.
+- `general.license.name: string`: Human friendly license name
+- `general.license.link: string`: URL to the license.
+- `general.url: string`: URL to the model's homepage. This can be a GitHub repo, a paper, etc.
+- `general.doi: string`: Digital Object Identifier (DOI) https://www.doi.org/
+- `general.uuid: string`: [Universally unique identifier](https://en.wikipedia.org/wiki/Universally_unique_identifier)
+- `general.repo_url: string`: URL to the model's repository such as a GitHub repo or HuggingFace repo
+- `general.tags: string[]`: List of tags that can be used as search terms for a search engine or social media
+- `general.languages: string[]`: What languages can the model speak. Encoded as [ISO 639](https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes) two letter codes
+- `general.datasets: string[]`: Links or references to datasets that the model was trained upon
 - `general.file_type: uint32`: An enumerated value describing the type of the majority of the tensors in the file. Optional; can be inferred from the tensor types.
   - `ALL_F32 = 0`
   - `MOSTLY_F16 = 1`
@@ -372,8 +386,20 @@ By convention, most counts/lengths/etc are `uint64` unless otherwise specified. 
 
 Information about where this model came from. This is useful for tracking the provenance of the model, and for finding the original source if the model is modified. For a model that was converted from GGML, for example, these keys would point to the model that was converted from.
 
-- `general.source.url: string`: URL to the source of the model. Can be a GitHub repo, a paper, etc.
-- `general.source.huggingface.repository: string`: Hugging Face model repository that this model is either hosted on or based on
+- `general.source.url: string`: URL to the source of the model's homepage. This can be a GitHub repo, a paper, etc.
+- `general.source.doi: string`: Source Digital Object Identifier (DOI) https://www.doi.org/
+- `general.source.uuid: string`: Source [Universally unique identifier](https://en.wikipedia.org/wiki/Universally_unique_identifier)
+- `general.source.repo_url: string`: URL to the source of the model's repository such as a GitHub repo or HuggingFace repo
+
+- `general.base_model.count: uint32`: Number of parent models
+- `general.base_model.{id}.name: string`: The name of the parent model.
+- `general.base_model.{id}.author: string`: The author of the parent model.
+- `general.base_model.{id}.version: string`: The version of the parent model.
+- `general.base_model.{id}.organization: string`: The organization of the parent model.
+- `general.base_model.{id}.url: string`: URL to the source of the parent model's homepage. This can be a GitHub repo, a paper, etc.
+- `general.base_model.{id}.doi: string`: Parent Digital Object Identifier (DOI) https://www.doi.org/
+- `general.base_model.{id}.uuid: string`: Parent [Universally unique identifier](https://en.wikipedia.org/wiki/Universally_unique_identifier)
+- `general.base_model.{id}.repo_url: string`: URL to the source of the parent model's repository such as a GitHub repo or HuggingFace repo
 
 ### LLM
 
