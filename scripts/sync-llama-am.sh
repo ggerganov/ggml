@@ -102,6 +102,8 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     # ggml/cmake/FindSIMD.cmake -> cmake/FindSIMD.cmake
     #
     # ggml/src/ggml.c              -> src/ggml.c
+    # ggml/src/ggml-aarch64.c      -> src/ggml-aarch64.c
+    # ggml/src/ggml-aarch64.h      -> src/ggml-aarch64.h
     # ggml/src/ggml-alloc.c        -> src/ggml-alloc.c
     # ggml/src/ggml-backend-impl.h -> src/ggml-backend-impl.h
     # ggml/src/ggml-backend.c      -> src/ggml-backend.c
@@ -145,7 +147,10 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
         -e 's/\/ggml\/src\/CMakeLists\.txt/\/src\/CMakeLists.txt/g' \
         -e 's/\/ggml\/cmake\/FindSIMD\.cmake/\/cmake\/FindSIMD.cmake/g' \
         -e 's/\/ggml\/src\/ggml\.c/\/src\/ggml.c/g' \
+        -e 's/\/ggml\/src\/ggml-aarch64\.c/\/src\/ggml-aarch64.c/g' \
+        -e 's/\/ggml\/src\/ggml-aarch64\.h/\/src\/ggml-aarch64.h/g' \
         -e 's/\/ggml\/src\/ggml-alloc\.c/\/src\/ggml-alloc.c/g' \
+        -e 's/\/ggml\/src\/ggml-aarch64/\/src\/ggml-aarch64/g' \
         -e 's/\/ggml\/src\/ggml-backend-impl\.h/\/src\/ggml-backend-impl.h/g' \
         -e 's/\/ggml\/src\/ggml-backend\.c/\/src\/ggml-backend.c/g' \
         -e 's/\/ggml\/src\/ggml-blas\.cpp/\/src\/ggml-blas.cpp/g' \
