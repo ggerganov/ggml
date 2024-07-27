@@ -3804,7 +3804,7 @@ static void ggml_vk_mul_mat_id(ggml_backend_vk_context * ctx, vk_context * subct
 }
 
 static void ggml_vk_op_repeat(ggml_backend_vk_context * ctx, vk_context * subctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
-    // guaranteed to be an integer due to the check in ggml_can_repeat
+    VK_LOG_DEBUG("ggml_vk_op_repeat(" << src0 << ", " << src1 << ", " << dst << ")");
     const uint64_t ne0 = dst->ne[0];
     const uint64_t ne1 = dst->ne[1];
     const uint64_t ne2 = dst->ne[2];
@@ -3825,6 +3825,7 @@ static void ggml_vk_op_repeat(ggml_backend_vk_context * ctx, vk_context * subctx
     const uint64_t nb02 = src0->nb[2];
     const uint64_t nb03 = src0->nb[3];
 
+    // guaranteed to be an integer due to the check in ggml_can_repeat
     const uint64_t nr0 = ne0/ne00;
     const uint64_t nr1 = ne1/ne01;
     const uint64_t nr2 = ne2/ne02;
@@ -3852,8 +3853,8 @@ static void ggml_vk_op_repeat(ggml_backend_vk_context * ctx, vk_context * subctx
                         for     (uint64_t k1 = 0; k1 < ne01; k1++) {
                             for (uint64_t i0 = 0; i0 < nr0;  i0++) {
                                 copies.push_back({
-                                    src_offset + (i3*ne03 + k3)*nb3  + (i2*ne02 + k2)*nb2  + (i1*ne01 + k1)*nb1  + (i0*ne00)*nb0,
-                                    dst_offset + (          k3)*nb03 + (          k2)*nb02 + (          k1)*nb01,
+                                    src_offset + (          k3)*nb03 + (          k2)*nb02 + (          k1)*nb01,
+                                    dst_offset + (i3*ne03 + k3)*nb3  + (i2*ne02 + k2)*nb2  + (i1*ne01 + k1)*nb1 + (i0*ne00)*nb0,
                                     ne00*nb0,
                                 });
                             }
@@ -4286,8 +4287,8 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context * subctx, c
     }
 }
 
-static void ggml_vk_repeat(ggml_backend_vk_context * ctx, vk_context * subctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
-    ggml_vk_op_f32<vk_op_push_constants>(ctx, subctx, src0, src1, nullptr, dst, GGML_OP_REPEAT, { (uint32_t)ggml_nelements(src0), (uint32_t)ggml_nelements(src1), 0.0f, 0.0f });
+static void ggml_vk_repeat(ggml_backend_vk_context * ctx, vk_context * subctx, const ggml_tensor * src0, ggml_tensor * dst) {
+    ggml_vk_op_f32<vk_op_push_constants>(ctx, subctx, src0, nullptr, nullptr, dst, GGML_OP_REPEAT, {});
 }
 
 static void ggml_vk_get_rows(ggml_backend_vk_context * ctx, vk_context * subctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
@@ -5497,7 +5498,7 @@ static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * nod
 
     switch (node->op) {
     case GGML_OP_REPEAT:
-        ggml_vk_repeat(ctx, ctx->compute_ctx, src0, src1, node);
+        ggml_vk_repeat(ctx, ctx->compute_ctx, src0, node);
 
         break;
     case GGML_OP_GET_ROWS:
@@ -5626,6 +5627,7 @@ static bool ggml_vk_compute_forward(ggml_backend_vk_context * ctx, ggml_tensor *
     case GGML_OP_NONE:
     case GGML_OP_ARGSORT:
     case GGML_OP_SUM_ROWS:
+    case GGML_OP_REPEAT:
         extra = (ggml_tensor_extra_gpu *) tensor->extra;
 
         break;
@@ -6270,11 +6272,11 @@ GGML_CALL static bool ggml_backend_vk_supports_op(ggml_backend_t backend, const 
                 }
                 return false;
             } break;
-        // case GGML_OP_REPEAT:
-        //     {
-        //         ggml_type src0_type = op->src[0]->type;
-        //         return src0_type != GGML_TYPE_I32 && src0_type != GGML_TYPE_I16;
-        //     } break;
+        case GGML_OP_REPEAT:
+            {
+                ggml_type src0_type = op->src[0]->type;
+                return src0_type != GGML_TYPE_I32 && src0_type != GGML_TYPE_I16;
+            } break;
         case GGML_OP_ROPE:
             return ggml_is_contiguous(op->src[0]);
         case GGML_OP_NONE:
