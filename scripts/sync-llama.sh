@@ -5,6 +5,8 @@ cp -rpv ../llama.cpp/ggml/src/CMakeLists.txt   src/CMakeLists.txt
 cp -rpv ../llama.cpp/ggml/cmake/FindSIMD.cmake cmake/FindSIMD.cmake
 
 cp -rpv ../llama.cpp/ggml/src/ggml.c              src/ggml.c
+cp -rpv ../llama.cpp/ggml/src/ggml-aarch64.c      src/ggml-aarch64.c
+cp -rpv ../llama.cpp/ggml/src/ggml-aarch64.h      src/ggml-aarch64.h
 cp -rpv ../llama.cpp/ggml/src/ggml-alloc.c        src/ggml-alloc.c
 cp -rpv ../llama.cpp/ggml/src/ggml-backend-impl.h src/ggml-backend-impl.h
 cp -rpv ../llama.cpp/ggml/src/ggml-backend.c      src/ggml-backend.c
