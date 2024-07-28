@@ -393,6 +393,9 @@ void process_shaders(std::vector<std::future<void>>& tasks) {
         string_to_spv("gelu_f32", "gelu.comp", {{"A_TYPE", "float"}, {"D_TYPE", "float"}});
     }));
     tasks.push_back(std::async(std::launch::async, [] {
+        string_to_spv("gelu_quick_f32", "gelu_quick.comp", {{"A_TYPE", "float"}, {"D_TYPE", "float"}});
+    }));
+    tasks.push_back(std::async(std::launch::async, [] {
         string_to_spv("silu_f32", "silu.comp", {{"A_TYPE", "float"}, {"D_TYPE", "float"}});
     }));
     tasks.push_back(std::async(std::launch::async, [] {
