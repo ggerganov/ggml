@@ -186,6 +186,7 @@ struct vk_device_struct {
     vk_pipeline pipeline_clamp_f32;
     vk_pipeline pipeline_cpy_f32_f32, pipeline_cpy_f32_f16, pipeline_cpy_f16_f16;
     vk_pipeline pipeline_norm_f32;
+    vk_pipeline pipeline_group_norm_f32;
     vk_pipeline pipeline_rms_norm_f32;
     vk_pipeline pipeline_gelu_f32;
     vk_pipeline pipeline_gelu_quick_f32;
@@ -1614,6 +1615,7 @@ static void ggml_vk_load_shaders(vk_device& device) {
     ggml_vk_create_pipeline(device, device->pipeline_mul_mat_vec_nc_f16_f32, "mul_mat_vec_nc_f16_f32", mul_mat_vec_nc_f16_f32_len, mul_mat_vec_nc_f16_f32_data, "main", 3, 7 * sizeof(uint32_t), {1, 1, 1}, {}, 1);
 
     ggml_vk_create_pipeline(device, device->pipeline_norm_f32, "norm_f32", norm_f32_len, norm_f32_data, "main", 2, sizeof(vk_op_push_constants), {1, 1, 1}, {}, 1);
+    ggml_vk_create_pipeline(device, device->pipeline_group_norm_f32, "group_norm_f32", group_norm_f32_len, group_norm_f32_data, "main", 2, sizeof(vk_op_push_constants), {1, 1, 1}, {}, 1);
     ggml_vk_create_pipeline(device, device->pipeline_rms_norm_f32, "rms_norm_f32", rms_norm_f32_len, rms_norm_f32_data, "main", 2, sizeof(vk_op_push_constants), {1, 1, 1}, {}, 1);
 
     ggml_vk_create_pipeline(device, device->pipeline_cpy_f32_f32, "cpy_f32_f32", cpy_f32_f32_len, cpy_f32_f32_data, "main", 2, sizeof(vk_op_unary_push_constants), {512, 1, 1}, {}, 1);
@@ -3952,6 +3954,11 @@ static vk_pipeline ggml_vk_op_get_pipeline(ggml_backend_vk_context * ctx, const 
             return ctx->device->pipeline_norm_f32;
         }
         return nullptr;
+    case GGML_OP_GROUP_NORM:
+        if (src0->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {
+            return ctx->device->pipeline_group_norm_f32;
+        }
+        return nullptr;
     case GGML_OP_RMS_NORM:
         if (src0->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {
             return ctx->device->pipeline_rms_norm_f32;
@@ -4219,6 +4226,7 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context * subctx, c
 
         switch (dst->op) {
         case GGML_OP_NORM:
+        case GGML_OP_GROUP_NORM:
         case GGML_OP_RMS_NORM:
         case GGML_OP_SOFT_MAX:
         case GGML_OP_SUM_ROWS:
@@ -4318,6 +4326,7 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context * subctx, c
 
         switch (dst->op) {
         case GGML_OP_NORM:
+        case GGML_OP_GROUP_NORM:
         case GGML_OP_RMS_NORM:
             elements = { (uint32_t)ne01, 1, 1 };
             break;
@@ -4494,6 +4503,16 @@ static void ggml_vk_norm(ggml_backend_vk_context * ctx, vk_context * subctx, con
     float * op_params = (float *)dst->op_params;
 
     ggml_vk_op_f32<vk_op_push_constants>(ctx, subctx, src0, nullptr, nullptr, dst, GGML_OP_NORM, { (uint32_t)src0->ne[0], (uint32_t)src0->ne[1], op_params[0], 0.0f });
+}
+
+static void ggml_vk_group_norm(ggml_backend_vk_context * ctx, vk_context * subctx, const ggml_tensor * src0, ggml_tensor * dst) {
+    int * op_params = (int *)dst->op_params;
+
+    uint32_t num_groups = op_params[0];
+    uint32_t group_size = src0->ne[0] * src0->ne[1] * ((src0->ne[2] + num_groups - 1) / num_groups);
+    static const float eps = 1e-6f;
+
+    ggml_vk_op_f32<vk_op_push_constants>(ctx, subctx, src0, nullptr, nullptr, dst, GGML_OP_GROUP_NORM, { group_size, 0, eps, 0.0f });
 }
 
 static void ggml_vk_rms_norm(ggml_backend_vk_context * ctx, vk_context * subctx, const ggml_tensor * src0, ggml_tensor * dst) {
@@ -5336,6 +5355,7 @@ static void ggml_vk_preallocate_buffers_graph(ggml_backend_vk_context * ctx, ggm
     case GGML_OP_DIV:
     case GGML_OP_CONCAT:
     case GGML_OP_NORM:
+    case GGML_OP_GROUP_NORM:
     case GGML_OP_RMS_NORM:
     case GGML_OP_DIAG_MASK_INF:
     case GGML_OP_SOFT_MAX:
@@ -5598,6 +5618,7 @@ static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * nod
     case GGML_OP_CONT:
     case GGML_OP_DUP:
     case GGML_OP_NORM:
+    case GGML_OP_GROUP_NORM:
     case GGML_OP_RMS_NORM:
     case GGML_OP_DIAG_MASK_INF:
     case GGML_OP_SOFT_MAX:
@@ -5664,6 +5685,10 @@ static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * nod
         break;
     case GGML_OP_NORM:
         ggml_vk_norm(ctx, ctx->compute_ctx, src0, node);
+
+        break;
+    case GGML_OP_GROUP_NORM:
+        ggml_vk_group_norm(ctx, ctx->compute_ctx, src0, node);
 
         break;
     case GGML_OP_RMS_NORM:
@@ -5749,6 +5774,7 @@ static bool ggml_vk_compute_forward(ggml_backend_vk_context * ctx, ggml_tensor *
     case GGML_OP_CONT:
     case GGML_OP_DUP:
     case GGML_OP_NORM:
+    case GGML_OP_GROUP_NORM:
     case GGML_OP_RMS_NORM:
     case GGML_OP_DIAG_MASK_INF:
     case GGML_OP_SOFT_MAX:
@@ -6421,11 +6447,12 @@ GGML_CALL static bool ggml_backend_vk_supports_op(ggml_backend_t backend, const 
         case GGML_OP_PERMUTE:
         case GGML_OP_TRANSPOSE:
         case GGML_OP_NORM:
+        case GGML_OP_GROUP_NORM:
+        case GGML_OP_RMS_NORM:
         case GGML_OP_ADD:
         case GGML_OP_MUL:
         case GGML_OP_DIV:
         case GGML_OP_CONCAT:
-        case GGML_OP_RMS_NORM:
         case GGML_OP_SCALE:
         case GGML_OP_SQR:
         case GGML_OP_CLAMP:
@@ -6904,6 +6931,8 @@ static void ggml_vk_check_results_0(ggml_tensor * tensor) {
         tensor_clone = ggml_add(ggml_ctx, src0_clone, src1_clone);
     } else if (tensor->op == GGML_OP_NORM) {
         tensor_clone = ggml_norm(ggml_ctx, src0_clone, *(float *)tensor->op_params);
+    } else if (tensor->op == GGML_OP_GROUP_NORM) {
+        tensor_clone = ggml_group_norm(ggml_ctx, src0_clone, *(int *)tensor->op_params);
     } else if (tensor->op == GGML_OP_RMS_NORM) {
         tensor_clone = ggml_rms_norm(ggml_ctx, src0_clone, *(float *)tensor->op_params);
     } else if (tensor->op == GGML_OP_SOFT_MAX) {

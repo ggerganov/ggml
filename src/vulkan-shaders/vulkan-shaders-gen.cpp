@@ -341,6 +341,9 @@ void process_shaders(std::vector<std::future<void>>& tasks) {
         string_to_spv("norm_f32", "norm.comp", merge_maps(base_dict, {{"A_TYPE", "float"}, {"D_TYPE", "float"}}));
     }));
     tasks.push_back(std::async(std::launch::async, [=] {
+        string_to_spv("group_norm_f32", "group_norm.comp", merge_maps(base_dict, {{"A_TYPE", "float"}, {"D_TYPE", "float"}}));
+    }));
+    tasks.push_back(std::async(std::launch::async, [=] {
         string_to_spv("rms_norm_f32", "rms_norm.comp", merge_maps(base_dict, {{"A_TYPE", "float"}, {"D_TYPE", "float"}}));
     }));
 
