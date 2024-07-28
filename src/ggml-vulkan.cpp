@@ -181,6 +181,7 @@ struct vk_device_struct {
     vk_pipeline pipeline_mul_f32;
     vk_pipeline pipeline_div_f32;
     vk_pipeline pipeline_concat_f32, pipeline_concat_i32;
+    vk_pipeline pipeline_upscale_f32;
     vk_pipeline pipeline_scale_f32;
     vk_pipeline pipeline_sqr_f32;
     vk_pipeline pipeline_clamp_f32;
@@ -389,6 +390,13 @@ struct vk_staging_memcpy {
     void * dst;
     const void * src;
     size_t n;
+};
+
+struct vk_op_upscale_push_constants {
+    uint32_t ne; uint32_t d_offset;
+    uint32_t nb00; uint32_t nb01; uint32_t nb02; uint32_t nb03;
+    uint32_t ne10; uint32_t ne11; uint32_t ne12; uint32_t ne13;
+    float sf0; float sf1; float sf2; float sf3;
 };
 
 struct vk_context {
@@ -1635,6 +1643,8 @@ static void ggml_vk_load_shaders(vk_device& device) {
 
     ggml_vk_create_pipeline(device, device->pipeline_concat_f32, "concat_f32", concat_f32_len, concat_f32_data, "main", 3, sizeof(vk_op_binary_push_constants), {512, 1, 1}, {}, 1);
     ggml_vk_create_pipeline(device, device->pipeline_concat_i32, "concat_i32", concat_i32_len, concat_i32_data, "main", 3, sizeof(vk_op_binary_push_constants), {512, 1, 1}, {}, 1);
+
+    ggml_vk_create_pipeline(device, device->pipeline_upscale_f32, "upscale_f32", upscale_f32_len, upscale_f32_data, "main", 2, sizeof(vk_op_upscale_push_constants), {512, 1, 1}, {}, 1);
 
     ggml_vk_create_pipeline(device, device->pipeline_scale_f32, "scale_f32", scale_f32_len, scale_f32_data, "main", 2, sizeof(vk_op_unary_push_constants), {512, 1, 1}, {}, 1);
 
@@ -3939,6 +3949,11 @@ static vk_pipeline ggml_vk_op_get_pipeline(ggml_backend_vk_context * ctx, const 
             return ctx->device->pipeline_concat_i32;
         }
         return nullptr;
+    case GGML_OP_UPSCALE:
+        if (src0->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {
+            return ctx->device->pipeline_upscale_f32;
+        }
+        return nullptr;
     case GGML_OP_SCALE:
         if (src0->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {
             return ctx->device->pipeline_scale_f32;
@@ -4083,6 +4098,7 @@ static bool ggml_vk_op_supports_incontiguous(ggml_op op) {
     case GGML_OP_MUL:
     case GGML_OP_DIV:
     case GGML_OP_CONCAT:
+    case GGML_OP_UPSCALE:
     case GGML_OP_SCALE:
     case GGML_OP_SQR:
     case GGML_OP_CLAMP:
@@ -4257,6 +4273,7 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context * subctx, c
             elements = { (uint32_t)ne00, (uint32_t)ggml_nrows(src0), 1 };
             break;
         case GGML_OP_CONCAT:
+        case GGML_OP_UPSCALE:
             elements = { (uint32_t)ggml_nelements(dst), 1, 1 };
             break;
         case GGML_OP_IM2COL:
@@ -4460,6 +4477,22 @@ static void ggml_vk_concat(ggml_backend_vk_context * ctx, vk_context * subctx, c
         (uint32_t) dst->ne[0], (uint32_t) dst->ne[1], (uint32_t) dst->ne[2],(uint32_t) dst->ne[3], (uint32_t) dst->nb[0] /  dst_type_size, (uint32_t) dst->nb[1] /  dst_type_size, (uint32_t) dst->nb[2] /  dst_type_size, (uint32_t) dst->nb[3] /  dst_type_size,
         0,
         0.0f, 0.0f, op_params[0],
+    });
+}
+
+static void ggml_vk_upscale(ggml_backend_vk_context * ctx, vk_context * subctx, const ggml_tensor * src0, ggml_tensor * dst) {
+    const uint32_t src0_type_size = ggml_type_size(src0->type);
+
+    const float sf0 = (float)dst->ne[0] / src0->ne[0];
+    const float sf1 = (float)dst->ne[1] / src0->ne[1];
+    const float sf2 = (float)dst->ne[2] / src0->ne[2];
+    const float sf3 = (float)dst->ne[3] / src0->ne[3];
+
+    ggml_vk_op_f32<vk_op_upscale_push_constants>(ctx, subctx, src0, nullptr, nullptr, dst, GGML_OP_UPSCALE, {
+        (uint32_t)ggml_nelements(dst), 0,
+        (uint32_t)src0->nb[0] / src0_type_size, (uint32_t)src0->nb[1] / src0_type_size, (uint32_t)src0->nb[2] / src0_type_size, (uint32_t)src0->nb[3] / src0_type_size,
+        (uint32_t)dst->ne[0], (uint32_t)dst->ne[1], (uint32_t)dst->ne[2],(uint32_t)dst->ne[3],
+        sf0, sf1, sf2, sf3,
     });
 }
 
@@ -5384,6 +5417,7 @@ static void ggml_vk_preallocate_buffers_graph(ggml_backend_vk_context * ctx, ggm
     case GGML_OP_MUL:
     case GGML_OP_DIV:
     case GGML_OP_CONCAT:
+    case GGML_OP_UPSCALE:
     case GGML_OP_NORM:
     case GGML_OP_GROUP_NORM:
     case GGML_OP_RMS_NORM:
@@ -5642,6 +5676,7 @@ static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * nod
     case GGML_OP_MUL:
     case GGML_OP_DIV:
     case GGML_OP_CONCAT:
+    case GGML_OP_UPSCALE:
     case GGML_OP_SCALE:
     case GGML_OP_SQR:
     case GGML_OP_CLAMP:
@@ -5695,6 +5730,10 @@ static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * nod
         break;
     case GGML_OP_CONCAT:
         ggml_vk_concat(ctx, ctx->compute_ctx, src0, src1, node);
+
+        break;
+    case GGML_OP_UPSCALE:
+        ggml_vk_upscale(ctx, ctx->compute_ctx, src0, node);
 
         break;
     case GGML_OP_SCALE:
@@ -5803,6 +5842,7 @@ static bool ggml_vk_compute_forward(ggml_backend_vk_context * ctx, ggml_tensor *
     case GGML_OP_MUL:
     case GGML_OP_DIV:
     case GGML_OP_CONCAT:
+    case GGML_OP_UPSCALE:
     case GGML_OP_SCALE:
     case GGML_OP_SQR:
     case GGML_OP_CLAMP:
@@ -6490,6 +6530,7 @@ GGML_CALL static bool ggml_backend_vk_supports_op(ggml_backend_t backend, const 
         case GGML_OP_MUL:
         case GGML_OP_DIV:
         case GGML_OP_CONCAT:
+        case GGML_OP_UPSCALE:
         case GGML_OP_SCALE:
         case GGML_OP_SQR:
         case GGML_OP_CLAMP:
@@ -6959,6 +7000,8 @@ static void ggml_vk_check_results_0(ggml_tensor * tensor) {
         tensor_clone = ggml_div(ggml_ctx, src0_clone, src1_clone);
     } else if (tensor->op == GGML_OP_CONCAT) {
         tensor_clone = ggml_concat(ggml_ctx, src0_clone, src1_clone, *(int *)tensor->op_params);
+    } else if (tensor->op == GGML_OP_UPSCALE) {
+        tensor_clone = ggml_upscale_ext(ggml_ctx, src0_clone, tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3]);
     } else if (tensor->op == GGML_OP_SCALE) {
         tensor_clone = ggml_scale(ggml_ctx, src0_clone, ((float *)tensor->op_params)[0]);
     } else if (tensor->op == GGML_OP_SQR) {
