@@ -444,6 +444,10 @@ void process_shaders(std::vector<std::future<void>>& tasks) {
     tasks.push_back(std::async(std::launch::async, [=] {
         string_to_spv("im2col_f32_f16", "im2col.comp", merge_maps(base_dict, {{"A_TYPE", "float"}, {"D_TYPE", "float16_t"}}));
     }));
+
+    tasks.push_back(std::async(std::launch::async, [=] {
+        string_to_spv("timestep_embedding_f32", "timestep_embedding.comp", merge_maps(base_dict, {{"A_TYPE", "float"}, {"D_TYPE", "float"}}));
+    }));
 }
 
 void write_output_files() {

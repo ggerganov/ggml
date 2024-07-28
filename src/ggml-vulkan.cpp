@@ -199,6 +199,7 @@ struct vk_device_struct {
     vk_pipeline pipeline_argsort_f32;
     vk_pipeline pipeline_sum_rows_f32;
     vk_pipeline pipeline_im2col_f32, pipeline_im2col_f32_f16;
+    vk_pipeline pipeline_timestep_embedding_f32;
 
     std::vector<vk_pipeline_ref> pipelines;
 
@@ -373,6 +374,12 @@ struct vk_op_im2col_push_constants {
     int32_t s0; int32_t s1;
     int32_t p0; int32_t p1;
     int32_t d0; int32_t d1;
+};
+
+struct vk_op_timestep_embedding_push_constants {
+    uint32_t nb1;
+    uint32_t dim;
+    uint32_t max_period;
 };
 
 // Allow pre-recording command buffers
@@ -1657,6 +1664,8 @@ static void ggml_vk_load_shaders(vk_device& device) {
 
     ggml_vk_create_pipeline(device, device->pipeline_im2col_f32, "im2col_f32", im2col_f32_len, im2col_f32_data, "main", 2, sizeof(vk_op_im2col_push_constants), {256, 1, 1}, {}, 1);
     ggml_vk_create_pipeline(device, device->pipeline_im2col_f32_f16, "im2col_f32_f16", im2col_f32_f16_len, im2col_f32_f16_data, "main", 2, sizeof(vk_op_im2col_push_constants), {256, 1, 1}, {}, 1);
+
+    ggml_vk_create_pipeline(device, device->pipeline_timestep_embedding_f32, "timestep_embedding_f32", timestep_embedding_f32_len, timestep_embedding_f32_data, "main", 2, sizeof(vk_op_timestep_embedding_push_constants), {256, 1, 1}, {}, 1);
 }
 
 static vk_device ggml_vk_get_device(size_t idx) {
@@ -4045,6 +4054,11 @@ static vk_pipeline ggml_vk_op_get_pipeline(ggml_backend_vk_context * ctx, const 
             return ctx->device->pipeline_im2col_f32_f16;
         }
         return nullptr;
+    case GGML_OP_TIMESTEP_EMBEDDING:
+        if (src0->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {
+            return ctx->device->pipeline_timestep_embedding_f32;
+        }
+        return nullptr;
     default:
         return nullptr;
     }
@@ -4247,7 +4261,7 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context * subctx, c
             break;
         case GGML_OP_IM2COL:
             {
-                const bool is_2D = ((const int32_t*)(dst->op_params))[6] == 1;
+                const bool is_2D = dst->op_params[6] == 1;
 
                 const uint32_t IC = src1->ne[is_2D ? 2 : 1];
 
@@ -4260,6 +4274,12 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context * subctx, c
                 const uint32_t batch = src1->ne[3];
 
                 elements = { OW * KW * KH, OH, batch * IC };
+            } break;
+        case GGML_OP_TIMESTEP_EMBEDDING:
+            {
+                const uint32_t dim = dst->op_params[0];
+                uint32_t half_ceil = (dim + 1) / 2;
+                elements = { half_ceil, (uint32_t)src0->ne[0], 1 };
             } break;
         default:
             elements = { (uint32_t)ggml_nelements(src0), 1, 1 };
@@ -4602,14 +4622,14 @@ static void ggml_vk_sum_rows(ggml_backend_vk_context * ctx, vk_context * subctx,
 }
 
 static void ggml_vk_im2col(ggml_backend_vk_context * ctx, vk_context * subctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
-    const int32_t s0 = ((const int32_t*)(dst->op_params))[0];
-    const int32_t s1 = ((const int32_t*)(dst->op_params))[1];
-    const int32_t p0 = ((const int32_t*)(dst->op_params))[2];
-    const int32_t p1 = ((const int32_t*)(dst->op_params))[3];
-    const int32_t d0 = ((const int32_t*)(dst->op_params))[4];
-    const int32_t d1 = ((const int32_t*)(dst->op_params))[5];
+    const int32_t s0 = dst->op_params[0];
+    const int32_t s1 = dst->op_params[1];
+    const int32_t p0 = dst->op_params[2];
+    const int32_t p1 = dst->op_params[3];
+    const int32_t d0 = dst->op_params[4];
+    const int32_t d1 = dst->op_params[5];
 
-    const bool is_2D = ((const int32_t*)(dst->op_params))[6] == 1;
+    const bool is_2D = dst->op_params[6] == 1;
 
     const uint32_t IC = src1->ne[is_2D ? 2 : 1];
     const uint32_t IH = is_2D ? src1->ne[1] : 1;
@@ -4632,6 +4652,16 @@ static void ggml_vk_im2col(ggml_backend_vk_context * ctx, vk_context * subctx, c
         pelements,
         IC * KH * KW,
         s0, s1, p0, p1, d0, d1,
+    });
+}
+
+static void ggml_vk_timestep_embedding(ggml_backend_vk_context * ctx, vk_context * subctx, const ggml_tensor * src0, ggml_tensor * dst) {
+    const uint32_t dim = dst->op_params[0];
+    const uint32_t max_period = dst->op_params[1];
+    const uint32_t nb1 = dst->nb[1] / ggml_type_size(dst->type);
+
+    ggml_vk_op_f32<vk_op_timestep_embedding_push_constants>(ctx, subctx, src0, nullptr, nullptr, dst, GGML_OP_TIMESTEP_EMBEDDING, {
+        nb1, dim, max_period,
     });
 }
 
@@ -5363,6 +5393,7 @@ static void ggml_vk_preallocate_buffers_graph(ggml_backend_vk_context * ctx, ggm
     case GGML_OP_ARGSORT:
     case GGML_OP_SUM_ROWS:
     case GGML_OP_IM2COL:
+    case GGML_OP_TIMESTEP_EMBEDDING:
         break;
     case GGML_OP_UNARY:
         switch (ggml_get_unary_op(node)) {
@@ -5628,6 +5659,7 @@ static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * nod
     case GGML_OP_ARGSORT:
     case GGML_OP_SUM_ROWS:
     case GGML_OP_IM2COL:
+    case GGML_OP_TIMESTEP_EMBEDDING:
         break;
     default:
         std::cerr << "ggml_vulkan: Error: Missing op: " << ggml_op_name(node->op) << std::endl;
@@ -5731,6 +5763,10 @@ static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * nod
         ggml_vk_im2col(ctx, ctx->compute_ctx, src0, src1, node);
 
         break;
+    case GGML_OP_TIMESTEP_EMBEDDING:
+        ggml_vk_timestep_embedding(ctx, ctx->compute_ctx, src0, node);
+
+        break;
     case GGML_OP_MUL_MAT:
         ggml_vk_mul_mat(ctx, ctx->compute_ctx, src0, src1, node);
 
@@ -5787,6 +5823,7 @@ static bool ggml_vk_compute_forward(ggml_backend_vk_context * ctx, ggml_tensor *
     case GGML_OP_ARGSORT:
     case GGML_OP_SUM_ROWS:
     case GGML_OP_IM2COL:
+    case GGML_OP_TIMESTEP_EMBEDDING:
     case GGML_OP_REPEAT:
         extra = (ggml_tensor_extra_gpu *) tensor->extra;
 
@@ -6462,6 +6499,7 @@ GGML_CALL static bool ggml_backend_vk_supports_op(ggml_backend_t backend, const 
         case GGML_OP_ARGSORT:
         case GGML_OP_SUM_ROWS:
         case GGML_OP_IM2COL:
+        case GGML_OP_TIMESTEP_EMBEDDING:
             return true;
         default:
             return false;
@@ -6998,15 +7036,19 @@ static void ggml_vk_check_results_0(ggml_tensor * tensor) {
     } else if (tensor->op == GGML_OP_SUM_ROWS) {
         tensor_clone = ggml_sum_rows(ggml_ctx, src0_clone);
     } else if (tensor->op == GGML_OP_IM2COL) {
-        const int32_t s0 = ((const int32_t*)(tensor->op_params))[0];
-        const int32_t s1 = ((const int32_t*)(tensor->op_params))[1];
-        const int32_t p0 = ((const int32_t*)(tensor->op_params))[2];
-        const int32_t p1 = ((const int32_t*)(tensor->op_params))[3];
-        const int32_t d0 = ((const int32_t*)(tensor->op_params))[4];
-        const int32_t d1 = ((const int32_t*)(tensor->op_params))[5];
+        const int32_t s0 = tensor->op_params[0];
+        const int32_t s1 = tensor->op_params[1];
+        const int32_t p0 = tensor->op_params[2];
+        const int32_t p1 = tensor->op_params[3];
+        const int32_t d0 = tensor->op_params[4];
+        const int32_t d1 = tensor->op_params[5];
 
-        const bool is_2D = ((const int32_t*)(tensor->op_params))[6] == 1;
+        const bool is_2D = tensor->op_params[6] == 1;
         tensor_clone = ggml_im2col(ggml_ctx, src0_clone, src2_clone, s0, s1, p0, p1, d0, d1, is_2D, tensor->type);
+    } else if (tensor->op == GGML_OP_TIMESTEP_EMBEDDING) {
+        const int32_t dim = tensor->op_params[0];
+        const int32_t max_period = tensor->op_params[1];
+        tensor_clone = ggml_timestep_embedding(ggml_ctx, src0_clone, dim, max_period);
     } else {
         std::cerr << "Missing vk_check_results OP: " << ggml_op_name(tensor->op) << std::endl;
         GGML_ABORT("fatal error");
