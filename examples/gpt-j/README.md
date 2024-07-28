@@ -24,7 +24,7 @@ typically consists of 1 or 2 tokens).
 
 Here is a sample run with prompt `int main(int argc, char ** argv) {`:
 
-```
+```bash
 $ time ./bin/gpt-j -p "int main(int argc, char ** argv) {"
 
 gptj_model_load: loading model from 'models/gpt-j-6B/ggml-model.bin' - please wait ...
@@ -76,7 +76,7 @@ looks like to be the beginning of a networking program in C. Pretty cool!
 
 Here is another run, just for fun:
 
-```
+```bash
 time ./bin/gpt-j -n 500 -t 8 -p "Ask HN: Inherited the worst code and tech team I have ever seen. How to fix it?
 "
 
@@ -199,13 +199,6 @@ that is not important).
 If you want to give this a try and you are on Linux or Mac OS, simply follow these instructions:
 
 ```bash
-# Clone the ggml library and build the gpt-j example
-git clone https://github.com/ggerganov/ggml
-cd ggml
-mkdir build && cd build
-cmake ..
-make -j4 gpt-j
-
 # Download the ggml-compatible GPT-J 6B model (requires 12GB disk space)
 ../examples/gpt-j/download-ggml-model.sh 6B
 
