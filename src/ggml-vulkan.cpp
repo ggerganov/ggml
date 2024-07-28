@@ -196,6 +196,7 @@ struct vk_device_struct {
     vk_pipeline pipeline_rope_neox_f32, pipeline_rope_neox_f16;
     vk_pipeline pipeline_argsort_f32;
     vk_pipeline pipeline_sum_rows_f32;
+    vk_pipeline pipeline_im2col_f32, pipeline_im2col_f32_f16;
 
     std::vector<vk_pipeline_ref> pipelines;
 
@@ -321,7 +322,7 @@ struct vk_op_binary_push_constants {
     uint32_t ne10; uint32_t ne11; uint32_t ne12; uint32_t ne13; uint32_t nb10; uint32_t nb11; uint32_t nb12; uint32_t nb13;
     uint32_t ne20; uint32_t ne21; uint32_t ne22; uint32_t ne23; uint32_t nb20; uint32_t nb21; uint32_t nb22; uint32_t nb23;
     uint32_t d_offset;
-    float param1; float param2; int param3;
+    float param1; float param2; int32_t param3;
 };
 
 struct vk_op_diag_mask_push_constants {
@@ -357,6 +358,19 @@ struct vk_op_argsort_push_constants {
     uint32_t ncols;
     uint32_t ncols_pad;
     int32_t order;
+};
+
+struct vk_op_im2col_push_constants {
+    uint32_t batch_offset; uint32_t offset_delta;
+    uint32_t IC;
+    uint32_t IW; uint32_t IH;
+    uint32_t OW; uint32_t OH;
+    uint32_t KW; uint32_t KH;
+    uint32_t pelements;
+    uint32_t CHW;
+    int32_t s0; int32_t s1;
+    int32_t p0; int32_t p1;
+    int32_t d0; int32_t d1;
 };
 
 // Allow pre-recording command buffers
@@ -1636,6 +1650,9 @@ static void ggml_vk_load_shaders(vk_device& device) {
     ggml_vk_create_pipeline(device, device->pipeline_argsort_f32, "argsort_f32", argsort_f32_len, argsort_f32_data, "main", 2, sizeof(vk_op_argsort_push_constants), {1024, 1, 1}, {}, 1);
 
     ggml_vk_create_pipeline(device, device->pipeline_sum_rows_f32, "sum_rows_f32", sum_rows_f32_len, sum_rows_f32_data, "main", 2, sizeof(vk_op_push_constants), {1, 1, 1}, { device->subgroup_size }, 1);
+
+    ggml_vk_create_pipeline(device, device->pipeline_im2col_f32, "im2col_f32", im2col_f32_len, im2col_f32_data, "main", 2, sizeof(vk_op_im2col_push_constants), {256, 1, 1}, {}, 1);
+    ggml_vk_create_pipeline(device, device->pipeline_im2col_f32_f16, "im2col_f32_f16", im2col_f32_f16_len, im2col_f32_f16_data, "main", 2, sizeof(vk_op_im2col_push_constants), {256, 1, 1}, {}, 1);
 }
 
 static vk_device ggml_vk_get_device(size_t idx) {
@@ -4006,6 +4023,14 @@ static vk_pipeline ggml_vk_op_get_pipeline(ggml_backend_vk_context * ctx, const 
             return ctx->device->pipeline_sum_rows_f32;
         }
         return nullptr;
+    case GGML_OP_IM2COL:
+        if (src1->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {
+            return ctx->device->pipeline_im2col_f32;
+        }
+        if (src1->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F16) {
+            return ctx->device->pipeline_im2col_f32_f16;
+        }
+        return nullptr;
     default:
         return nullptr;
     }
@@ -4205,6 +4230,22 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context * subctx, c
         case GGML_OP_CONCAT:
             elements = { (uint32_t)ggml_nelements(dst), 1, 1 };
             break;
+        case GGML_OP_IM2COL:
+            {
+                const bool is_2D = ((const int32_t*)(dst->op_params))[6] == 1;
+
+                const uint32_t IC = src1->ne[is_2D ? 2 : 1];
+
+                const uint32_t KH = is_2D ? src0->ne[1] : 1;
+                const uint32_t KW =         src0->ne[0];
+
+                const uint32_t OH = is_2D ? dst->ne[2] : 1;
+                const uint32_t OW =         dst->ne[1];
+
+                const uint32_t batch = src1->ne[3];
+
+                elements = { OW * KW * KH, OH, batch * IC };
+            } break;
         default:
             elements = { (uint32_t)ggml_nelements(src0), 1, 1 };
             break;
@@ -4247,6 +4288,10 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context * subctx, c
 
             ggml_vk_sync_buffers(subctx);
             ggml_vk_dispatch_pipeline(ctx, subctx, pipeline, { { d_X, x_buf_offset, x_sz }, { d_Y, y_buf_offset, y_sz }, subbuf_z, { d_D, d_buf_offset, d_sz } }, sizeof(PC), &pc, elements);
+        } else if (op == GGML_OP_IM2COL) {
+            // im2col uses only src1 and dst buffers
+            ggml_vk_sync_buffers(subctx);
+            ggml_vk_dispatch_pipeline(ctx, subctx, pipeline, { { d_Y, y_buf_offset, y_sz }, { d_D, d_buf_offset, d_sz } }, sizeof(PC), &pc, elements);
         } else if (use_src2) {
             ggml_vk_sync_buffers(subctx);
             ggml_vk_dispatch_pipeline(ctx, subctx, pipeline, { { d_X, x_buf_offset, x_sz }, { d_Y, y_buf_offset, y_sz }, { d_Z, z_buf_offset, z_sz }, { d_D, d_buf_offset, d_sz } }, sizeof(PC), &pc, elements);
@@ -4528,6 +4573,40 @@ static void ggml_vk_argsort(ggml_backend_vk_context * ctx, vk_context * subctx, 
 
 static void ggml_vk_sum_rows(ggml_backend_vk_context * ctx, vk_context * subctx, const ggml_tensor * src0, ggml_tensor * dst) {
     ggml_vk_op_f32<vk_op_push_constants>(ctx, subctx, src0, nullptr, nullptr, dst, GGML_OP_SUM_ROWS, { (uint32_t)src0->ne[0], 0, 0.0f, 0.0f });
+}
+
+static void ggml_vk_im2col(ggml_backend_vk_context * ctx, vk_context * subctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+    const int32_t s0 = ((const int32_t*)(dst->op_params))[0];
+    const int32_t s1 = ((const int32_t*)(dst->op_params))[1];
+    const int32_t p0 = ((const int32_t*)(dst->op_params))[2];
+    const int32_t p1 = ((const int32_t*)(dst->op_params))[3];
+    const int32_t d0 = ((const int32_t*)(dst->op_params))[4];
+    const int32_t d1 = ((const int32_t*)(dst->op_params))[5];
+
+    const bool is_2D = ((const int32_t*)(dst->op_params))[6] == 1;
+
+    const uint32_t IC = src1->ne[is_2D ? 2 : 1];
+    const uint32_t IH = is_2D ? src1->ne[1] : 1;
+    const uint32_t IW =         src1->ne[0];
+
+    const uint32_t KH = is_2D ? src0->ne[1] : 1;
+    const uint32_t KW =         src0->ne[0];
+
+    const uint32_t OH = is_2D ? dst->ne[2] : 1;
+    const uint32_t OW =         dst->ne[1];
+
+    const uint32_t offset_delta = src1->nb[is_2D ? 2 : 1] / 4; // nb is byte offset, src is type float32
+    const uint32_t batch_offset = src1->nb[3] / 4; // nb is byte offset, src is type float32
+
+    const uint32_t pelements = OW * KW * KH;
+
+    ggml_vk_op_f32<vk_op_im2col_push_constants>(ctx, subctx, src0, src1, nullptr, dst, GGML_OP_IM2COL, {
+        batch_offset, offset_delta,
+        IC, IW, IH, OW, OH, KW, KH,
+        pelements,
+        IC * KH * KW,
+        s0, s1, p0, p1, d0, d1,
+    });
 }
 
 #ifdef GGML_VULKAN_RUN_TESTS
@@ -5256,6 +5335,7 @@ static void ggml_vk_preallocate_buffers_graph(ggml_backend_vk_context * ctx, ggm
     case GGML_OP_ROPE:
     case GGML_OP_ARGSORT:
     case GGML_OP_SUM_ROWS:
+    case GGML_OP_IM2COL:
         break;
     case GGML_OP_UNARY:
         switch (ggml_get_unary_op(node)) {
@@ -5517,6 +5597,7 @@ static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * nod
     case GGML_OP_MUL_MAT_ID:
     case GGML_OP_ARGSORT:
     case GGML_OP_SUM_ROWS:
+    case GGML_OP_IM2COL:
         break;
     default:
         std::cerr << "ggml_vulkan: Error: Missing op: " << ggml_op_name(node->op) << std::endl;
@@ -5611,6 +5692,10 @@ static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * nod
         ggml_vk_sum_rows(ctx, ctx->compute_ctx, src0, node);
 
         break;
+    case GGML_OP_IM2COL:
+        ggml_vk_im2col(ctx, ctx->compute_ctx, src0, src1, node);
+
+        break;
     case GGML_OP_MUL_MAT:
         ggml_vk_mul_mat(ctx, ctx->compute_ctx, src0, src1, node);
 
@@ -5665,6 +5750,7 @@ static bool ggml_vk_compute_forward(ggml_backend_vk_context * ctx, ggml_tensor *
     case GGML_OP_NONE:
     case GGML_OP_ARGSORT:
     case GGML_OP_SUM_ROWS:
+    case GGML_OP_IM2COL:
     case GGML_OP_REPEAT:
         extra = (ggml_tensor_extra_gpu *) tensor->extra;
 
@@ -6336,6 +6422,7 @@ GGML_CALL static bool ggml_backend_vk_supports_op(ggml_backend_t backend, const 
         case GGML_OP_SOFT_MAX:
         case GGML_OP_ARGSORT:
         case GGML_OP_SUM_ROWS:
+        case GGML_OP_IM2COL:
             return true;
         default:
             return false;
@@ -6866,6 +6953,16 @@ static void ggml_vk_check_results_0(ggml_tensor * tensor) {
         tensor_clone = ggml_argsort(ggml_ctx, src0_clone, (ggml_sort_order) *(int *)tensor->op_params);
     } else if (tensor->op == GGML_OP_SUM_ROWS) {
         tensor_clone = ggml_sum_rows(ggml_ctx, src0_clone);
+    } else if (tensor->op == GGML_OP_IM2COL) {
+        const int32_t s0 = ((const int32_t*)(tensor->op_params))[0];
+        const int32_t s1 = ((const int32_t*)(tensor->op_params))[1];
+        const int32_t p0 = ((const int32_t*)(tensor->op_params))[2];
+        const int32_t p1 = ((const int32_t*)(tensor->op_params))[3];
+        const int32_t d0 = ((const int32_t*)(tensor->op_params))[4];
+        const int32_t d1 = ((const int32_t*)(tensor->op_params))[5];
+
+        const bool is_2D = ((const int32_t*)(tensor->op_params))[6] == 1;
+        tensor_clone = ggml_im2col(ggml_ctx, src0_clone, src2_clone, s0, s1, p0, p1, d0, d1, is_2D, tensor->type);
     } else {
         std::cerr << "Missing vk_check_results OP: " << ggml_op_name(tensor->op) << std::endl;
         GGML_ABORT("fatal error");

@@ -431,6 +431,13 @@ void process_shaders(std::vector<std::future<void>>& tasks) {
     tasks.push_back(std::async(std::launch::async, [=] {
         string_to_spv("sum_rows_f32", "sum_rows.comp", merge_maps(base_dict, {{"A_TYPE", "float"}, {"D_TYPE", "float"}}));
     }));
+
+    tasks.push_back(std::async(std::launch::async, [=] {
+        string_to_spv("im2col_f32", "im2col.comp", merge_maps(base_dict, {{"A_TYPE", "float"}, {"D_TYPE", "float"}}));
+    }));
+    tasks.push_back(std::async(std::launch::async, [=] {
+        string_to_spv("im2col_f32_f16", "im2col.comp", merge_maps(base_dict, {{"A_TYPE", "float"}, {"D_TYPE", "float16_t"}}));
+    }));
 }
 
 void write_output_files() {
