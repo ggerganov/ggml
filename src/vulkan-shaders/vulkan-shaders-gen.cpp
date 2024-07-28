@@ -383,6 +383,13 @@ void process_shaders(std::vector<std::future<void>>& tasks) {
     }));
 
     tasks.push_back(std::async(std::launch::async, [] {
+        string_to_spv("concat_f32", "concat.comp", {{"A_TYPE", "float"}, {"B_TYPE", "float"}, {"D_TYPE", "float"}});
+    }));
+    tasks.push_back(std::async(std::launch::async, [] {
+        string_to_spv("concat_i32", "concat.comp", {{"A_TYPE", "int"}, {"B_TYPE", "int"}, {"D_TYPE", "int"}});
+    }));
+
+    tasks.push_back(std::async(std::launch::async, [] {
         string_to_spv("gelu_f32", "gelu.comp", {{"A_TYPE", "float"}, {"D_TYPE", "float"}});
     }));
     tasks.push_back(std::async(std::launch::async, [] {
