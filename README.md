@@ -44,6 +44,21 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [X] Example of multiple LLMs inference [foldl/chatllm.cpp](https://github.com/foldl/chatllm.cpp)
 - [X] SeamlessM4T inference *(in development)* https://github.com/facebookresearch/seamless_communication/tree/main/ggml
 
+## Python environment setup and building the examples
+
+```bash
+git clone https://github.com/ggerganov/ggml
+cd ggml
+# Install python dependencies in a virtual environment
+python3.10 -m venv ggml_env
+source ./ggml_env/bin/activate
+pip install -r requirements.txt
+# Build the examples
+mkdir build && cd build
+cmake ..
+cmake --build . --config Release -j 8
+```
+
 ## GPT inference (example)
 
 With ggml you can efficiently run [GPT-2](examples/gpt-2) and [GPT-J](examples/gpt-j) inference on the CPU.
@@ -51,13 +66,6 @@ With ggml you can efficiently run [GPT-2](examples/gpt-2) and [GPT-J](examples/g
 Here is how to run the example programs:
 
 ```bash
-# Build ggml + examples
-git clone https://github.com/ggerganov/ggml
-cd ggml
-mkdir build && cd build
-cmake ..
-make -j4 gpt-2-backend gpt-j
-
 # Run the GPT-2 small 117M model
 ../examples/gpt-2/download-ggml-model.sh 117M
 ./bin/gpt-2-backend -m models/gpt-2-117M/ggml-model.bin -p "This is an example"
@@ -65,9 +73,6 @@ make -j4 gpt-2-backend gpt-j
 # Run the GPT-J 6B model (requires 12GB disk space and 16GB CPU RAM)
 ../examples/gpt-j/download-ggml-model.sh 6B
 ./bin/gpt-j -m models/gpt-j-6B/ggml-model.bin -p "This is an example"
-
-# Install Python dependencies
-python3 -m pip install -r ../requirements.txt
 
 # Run the Cerebras-GPT 111M model
 # Download from: https://huggingface.co/cerebras

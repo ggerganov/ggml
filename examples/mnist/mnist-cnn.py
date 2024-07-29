@@ -5,7 +5,11 @@ import numpy as np
 from tensorflow import keras
 from tensorflow.keras import layers
 
+
 def train(model_name):
+    if not model_name.endswith(".keras") and not model_name.endswith(".h5"):
+        model_name += ".keras"
+
     # Model / data parameters
     num_classes = 10
     input_shape = (28, 28, 1)
@@ -52,9 +56,19 @@ def train(model_name):
     model.save(model_name)
     print("Keras model saved to '" + model_name + "'")
 
+
 def convert(model_name):
+    if not model_name.endswith(".keras") and not model_name.endswith(".h5"):
+        model_name += ".keras"
+
     model = keras.models.load_model(model_name)
-    gguf_model_name = model_name + ".gguf"
+    if model_name.endswith(".keras"):
+        gguf_model_name = model_name[:-6] + ".gguf"
+    elif model_name.endswith(".h5"):
+        gguf_model_name = model_name[:-3] + ".gguf"
+    else:
+        gguf_model_name = model_name + ".gguf"
+
     gguf_writer = gguf.GGUFWriter(gguf_model_name, "mnist-cnn")
 
     kernel1 = model.layers[0].weights[0].numpy()
@@ -87,6 +101,7 @@ def convert(model_name):
     gguf_writer.write_tensors_to_file()
     gguf_writer.close()
     print("Model converted and saved to '{}'".format(gguf_model_name))
+
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:

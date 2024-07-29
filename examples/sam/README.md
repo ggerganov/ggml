@@ -20,22 +20,14 @@ The example currently supports only the [ViT-B SAM model checkpoint](https://hug
 - [ ] GPU support
 
 ## Quick start
+Setup Python and build examples according to main README.
+
 ```bash
-git clone https://github.com/ggerganov/ggml
-cd ggml
-
-# Install Python dependencies
-python3 -m pip install -r requirements.txt
-
 # Download PTH model
 wget -P examples/sam/ https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth
 
 # Convert PTH model to ggml
 python examples/sam/convert-pth-to-ggml.py examples/sam/sam_vit_b_01ec64.pth examples/sam/ 1
-
-# Build ggml + examples
-mkdir build && cd build
-cmake .. && make -j4
 
 # run inference
 ./bin/sam -t 16 -i ../examples/sam/example.jpg -m ../examples/sam/ggml-model-f16.bin

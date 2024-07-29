@@ -3,30 +3,16 @@
 These are simple examples of how to use GGML for inferencing.
 The first example uses convolutional neural network (CNN), the second one uses fully connected neural network.
 
-## Python environment setup and build the examples
-
-```bash
-git clone https://github.com/ggerganov/ggml
-cd ggml
-# Install python dependencies in a virtual environment
-python3 -m venv ggml_env
-source ./ggml_env/bin/activate
-pip install -r requirements.txt
-# Build the examples
-mkdir build && cd build
-cmake ..
-make -j4 mnist-cnn mnist
-```
-
 ## MNIST with CNN
 
 This implementation achieves ~99% accuracy on the MNIST test set.
 
 ### Training the model
 
+Setup the Python environemt and build the examples according to the main README.
 Use the `mnist-cnn.py` script to train the model and convert it to GGUF format:
 
-```
+```bash
 $ python3 ../examples/mnist/mnist-cnn.py train mnist-cnn-model
 ...
 Keras model saved to 'mnist-cnn-model'
@@ -34,7 +20,7 @@ Keras model saved to 'mnist-cnn-model'
 
 Convert the model to GGUF format:
 
-```
+```bash
 $ python3 ../examples/mnist/mnist-cnn.py convert mnist-cnn-model
 ...
 Model converted and saved to 'mnist-cnn-model.gguf'
