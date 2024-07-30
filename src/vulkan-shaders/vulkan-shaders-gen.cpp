@@ -363,6 +363,9 @@ void process_shaders(std::vector<std::future<void>>& tasks) {
     tasks.push_back(std::async(std::launch::async, [] {
         string_to_spv("add_f32", "add.comp", {{"A_TYPE", "float"}, {"B_TYPE", "float"}, {"D_TYPE", "float"}, {"FLOAT_TYPE", "float"}});
     }));
+    tasks.push_back(std::async(std::launch::async, [] {
+        string_to_spv("add_f16_f32_f16", "add.comp", {{"A_TYPE", "float16_t"}, {"B_TYPE", "float"}, {"D_TYPE", "float16_t"}, {"FLOAT_TYPE", "float"}});
+    }));
 
     tasks.push_back(std::async(std::launch::async, [] {
         string_to_spv("split_k_reduce", "mul_mat_split_k_reduce.comp", {});
