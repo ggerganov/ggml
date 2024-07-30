@@ -194,6 +194,7 @@ struct vk_device_struct {
     vk_pipeline pipeline_gelu_quick_f32;
     vk_pipeline pipeline_silu_f32;
     vk_pipeline pipeline_relu_f32;
+    vk_pipeline pipeline_tanh_f32;
     vk_pipeline pipeline_diag_mask_inf_f32;
     vk_pipeline pipeline_soft_max_f32, pipeline_soft_max_f32_f16;
     vk_pipeline pipeline_rope_norm_f32, pipeline_rope_norm_f16;
@@ -1654,6 +1655,7 @@ static void ggml_vk_load_shaders(vk_device& device) {
     ggml_vk_create_pipeline(device, device->pipeline_gelu_quick_f32, "gelu_quick_f32", gelu_quick_f32_len, gelu_quick_f32_data, "main", 2, sizeof(vk_op_push_constants), {512, 1, 1}, {}, 1);
     ggml_vk_create_pipeline(device, device->pipeline_silu_f32, "silu_f32", silu_f32_len, silu_f32_data, "main", 2, sizeof(vk_op_push_constants), {512, 1, 1}, {}, 1);
     ggml_vk_create_pipeline(device, device->pipeline_relu_f32, "relu_f32", relu_f32_len, relu_f32_data, "main", 2, sizeof(vk_op_push_constants), {512, 1, 1}, {}, 1);
+    ggml_vk_create_pipeline(device, device->pipeline_tanh_f32, "tanh_f32", tanh_f32_len, tanh_f32_data, "main", 2, sizeof(vk_op_push_constants), {512, 1, 1}, {}, 1);
 
     ggml_vk_create_pipeline(device, device->pipeline_diag_mask_inf_f32, "diag_mask_inf_f32", diag_mask_inf_f32_len, diag_mask_inf_f32_data, "main", 2, sizeof(vk_op_diag_mask_push_constants), {512, 1, 1}, {}, 1);
 
@@ -4002,6 +4004,11 @@ static vk_pipeline ggml_vk_op_get_pipeline(ggml_backend_vk_context * ctx, const 
                     return ctx->device->pipeline_relu_f32;
                 }
                 break;
+            case GGML_UNARY_OP_TANH:
+                if (src0->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {
+                    return ctx->device->pipeline_tanh_f32;
+                }
+                break;
             default:
                 break;
         }
@@ -5427,6 +5434,7 @@ static void ggml_vk_preallocate_buffers_graph(ggml_backend_vk_context * ctx, ggm
         case GGML_UNARY_OP_GELU:
         case GGML_UNARY_OP_GELU_QUICK:
         case GGML_UNARY_OP_RELU:
+        case GGML_UNARY_OP_TANH:
             break;
         default:
             return;
@@ -5657,6 +5665,7 @@ static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * nod
         case GGML_UNARY_OP_GELU:
         case GGML_UNARY_OP_GELU_QUICK:
         case GGML_UNARY_OP_RELU:
+        case GGML_UNARY_OP_TANH:
             break;
         default:
             return;
@@ -5769,6 +5778,7 @@ static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * nod
         case GGML_UNARY_OP_GELU:
         case GGML_UNARY_OP_GELU_QUICK:
         case GGML_UNARY_OP_RELU:
+        case GGML_UNARY_OP_TANH:
             ggml_vk_unary(ctx, compute_ctx, src0, node);
             break;
         default:
@@ -5871,6 +5881,7 @@ static bool ggml_vk_compute_forward(ggml_backend_vk_context * ctx, ggml_tensor *
         case GGML_UNARY_OP_GELU:
         case GGML_UNARY_OP_GELU_QUICK:
         case GGML_UNARY_OP_RELU:
+        case GGML_UNARY_OP_TANH:
             extra = (ggml_tensor_extra_gpu *) tensor->extra;
             break;
         default:
@@ -6427,7 +6438,11 @@ GGML_CALL static ggml_status ggml_backend_vk_graph_compute(ggml_backend_t backen
 
         bool ok = ggml_vk_compute_forward(ctx, node);
         if (!ok) {
-            fprintf(stderr, "%s: error: op not supported %s (%s)\n", __func__, node->name, ggml_op_name(node->op));
+            if (node->op == GGML_OP_UNARY) {
+                std::cerr << __func__ << ": error: op not supported UNARY " << node->name << " (" << ggml_unary_op_name(static_cast<ggml_unary_op>(node->op_params[0])) << ")" << std::endl;
+            } else {
+                std::cerr << __func__ << ": error: op not supported " << node->name << " (" << ggml_op_name(node->op) << ")" << std::endl;
+            }
         }
 #ifdef GGML_VULKAN_CHECK_RESULTS
         else {
@@ -6454,6 +6469,7 @@ GGML_CALL static bool ggml_backend_vk_supports_op(ggml_backend_t backend, const 
                 case GGML_UNARY_OP_GELU_QUICK:
                 case GGML_UNARY_OP_SILU:
                 case GGML_UNARY_OP_RELU:
+                case GGML_UNARY_OP_TANH:
                     return ggml_is_contiguous(op->src[0]);
                 default:
                     return false;
@@ -7031,6 +7047,9 @@ static void ggml_vk_check_results_0(ggml_tensor * tensor) {
             break;
         case GGML_UNARY_OP_RELU:
             tensor_clone = ggml_relu(ggml_ctx, src0_clone);
+            break;
+        case GGML_UNARY_OP_TANH:
+            tensor_clone = ggml_tanh(ggml_ctx, src0_clone);
             break;
         default:
             std::cerr << "Missing vk_check_results OP: " << ggml_op_name(tensor->op) << std::endl;

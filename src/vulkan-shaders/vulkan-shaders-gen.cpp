@@ -414,6 +414,9 @@ void process_shaders(std::vector<std::future<void>>& tasks) {
     tasks.push_back(std::async(std::launch::async, [] {
         string_to_spv("relu_f32", "relu.comp", {{"A_TYPE", "float"}, {"D_TYPE", "float"}});
     }));
+    tasks.push_back(std::async(std::launch::async, [] {
+        string_to_spv("tanh_f32", "tanh.comp", {{"A_TYPE", "float"}, {"D_TYPE", "float"}});
+    }));
 
     tasks.push_back(std::async(std::launch::async, [] {
         string_to_spv("diag_mask_inf_f32", "diag_mask_inf.comp", {{"A_TYPE", "float"}, {"D_TYPE", "float"}});
