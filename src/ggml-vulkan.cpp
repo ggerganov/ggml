@@ -944,6 +944,10 @@ static uint32_t find_properties(const vk::PhysicalDeviceMemoryProperties* mem_pr
 
 static vk_buffer ggml_vk_create_buffer(vk_device& device, size_t size, vk::MemoryPropertyFlags req_flags, vk::MemoryPropertyFlags fallback_flags = vk::MemoryPropertyFlags(0)) {
     VK_LOG_DEBUG("ggml_vk_create_buffer(" << device->name << ", " << size << ", " << to_string(req_flags) << ", " << to_string(fallback_flags) << ")");
+    if (size > device->max_memory_allocation_size) {
+        throw vk::OutOfDeviceMemoryError("Requested buffer size exceeds device memory allocation limit");
+    }
+
     std::lock_guard<std::mutex> guard(device->mutex);
 
     vk_buffer buf = std::make_shared<vk_buffer_struct>();
@@ -2165,7 +2169,9 @@ static vk_matmul_pipeline ggml_vk_get_mul_mat_mat_pipeline(ggml_backend_vk_conte
         return ctx->device->pipeline_matmul_f16;
     }
 
-    GGML_ASSERT(src1_type == GGML_TYPE_F32);
+    if (src1_type == GGML_TYPE_F32) {
+        return nullptr;
+    }
 
     switch (src0_type) {
         case GGML_TYPE_Q4_0:
@@ -4204,7 +4210,7 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context& subctx, co
     vk_buffer d_D = extra->buffer_gpu.lock();
 
     // Workaround for tiny tensor inputs on ROPE
-    if (use_src1 && y_sz > d_D->size) {
+    if (op == GGML_OP_ROPE && use_src1 && y_sz > d_D->size) {
         y_sz = VK_WHOLE_SIZE;
     }
 
@@ -4253,7 +4259,7 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context& subctx, co
     if (op_supports_incontiguous || (ggml_is_contiguous(src0) && (src1 == nullptr || ggml_is_contiguous(src1)))) {
         ggml_pipeline_allocate_descriptor_sets(ctx->device, pipeline, 1);
 
-        switch (dst->op) {
+        switch (op) {
         case GGML_OP_NORM:
         case GGML_OP_RMS_NORM:
         case GGML_OP_SOFT_MAX:
@@ -4304,8 +4310,6 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context& subctx, co
         case GGML_OP_SQR:
         case GGML_OP_CLAMP:
         case GGML_OP_CPY:
-        case GGML_OP_CONT:
-        case GGML_OP_DUP:
         case GGML_OP_CONCAT:
         case GGML_OP_UPSCALE:
         case GGML_OP_UNARY:
@@ -4345,7 +4349,7 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context& subctx, co
             if (use_src1) {
                 subbuf_y = { d_Y, y_buf_offset, y_sz };
             } else {
-                subbuf_y = { d_X, 0, d_X->size };
+                subbuf_y = { d_X, 0, x_sz };
             }
 
             ggml_vk_sync_buffers(subctx);
@@ -4356,7 +4360,7 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context& subctx, co
             if (use_src2) {
                 subbuf_z = { d_Z, z_buf_offset, z_sz };
             } else {
-                subbuf_z = { d_X, 0, d_X->size };
+                subbuf_z = { d_X, 0, x_sz };
             }
 
             ggml_vk_sync_buffers(subctx);
@@ -4382,7 +4386,7 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context& subctx, co
 
         ggml_pipeline_allocate_descriptor_sets(ctx->device, pipeline, ne02 * ne03);
 
-        switch (dst->op) {
+        switch (op) {
         case GGML_OP_NORM:
         case GGML_OP_GROUP_NORM:
         case GGML_OP_RMS_NORM:
@@ -5396,7 +5400,7 @@ static void ggml_vk_preallocate_buffers_graph(ggml_backend_vk_context * ctx, ggm
 
     const bool y_f32_kernel = use_src1 && src1->type == GGML_TYPE_F32 && !y_non_contig;
 
-    bool mmp = (use_src0 && use_src1 && src1_type == GGML_TYPE_F32) ? ggml_vk_get_mul_mat_mat_pipeline(ctx, src0_type, y_non_contig ? GGML_TYPE_F16 : src1->type) != nullptr : false;
+    bool mmp = (use_src0 && use_src1) ? ggml_vk_get_mul_mat_mat_pipeline(ctx, src0_type, y_non_contig ? GGML_TYPE_F16 : src1->type) != nullptr : false;
 
     const bool qx_needs_dequant = use_src0 && (!mmp || x_non_contig);
     const bool qy_needs_dequant = use_src1 && ((src1->type != GGML_TYPE_F16 && !y_f32_kernel) || y_non_contig);
@@ -5464,6 +5468,13 @@ static void ggml_vk_preallocate_buffers_graph(ggml_backend_vk_context * ctx, ggm
         break;
     case GGML_OP_MUL_MAT:
     case GGML_OP_MUL_MAT_ID:
+        if (
+                x_sz > ctx->device->max_memory_allocation_size ||
+                y_sz > ctx->device->max_memory_allocation_size ||
+                d_sz > ctx->device->max_memory_allocation_size ||
+                split_k_size > ctx->device->max_memory_allocation_size) {
+            GGML_ABORT("Requested preallocation size is too large");
+        }
         if (ctx->prealloc_size_x < x_sz) {
             ctx->prealloc_size_x = x_sz;
         }
