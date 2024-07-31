@@ -4264,8 +4264,16 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context& subctx, co
         case GGML_OP_RMS_NORM:
         case GGML_OP_SOFT_MAX:
         case GGML_OP_SUM_ROWS:
-            elements = { (uint32_t)ggml_nrows(src0), 1, 1 };
-            break;
+            {
+                const uint32_t nr = ggml_nrows(src0);
+                if (nr > 262144) {
+                    elements = { 512, 512, CEIL_DIV(nr, 262144) };
+                } else if (nr > 512) {
+                    elements = { 512, CEIL_DIV(nr, 512), 1 };
+                } else {
+                    elements = { nr, 1, 1 };
+                }
+            } break;
         case GGML_OP_GROUP_NORM:
             {
                 const uint32_t num_groups = dst->op_params[0];
