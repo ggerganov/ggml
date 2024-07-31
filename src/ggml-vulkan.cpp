@@ -4255,12 +4255,16 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context& subctx, co
 
         switch (dst->op) {
         case GGML_OP_NORM:
-        case GGML_OP_GROUP_NORM:
         case GGML_OP_RMS_NORM:
         case GGML_OP_SOFT_MAX:
         case GGML_OP_SUM_ROWS:
             elements = { (uint32_t)ggml_nrows(src0), 1, 1 };
             break;
+        case GGML_OP_GROUP_NORM:
+            {
+                const uint32_t num_groups = dst->op_params[0];
+                elements = { num_groups * (uint32_t)src0->ne[3], 1, 1 };
+            } break;
         case GGML_OP_DIAG_MASK_INF:
         case GGML_OP_ROPE:
             elements = { (uint32_t)ggml_nrows(src0), (uint32_t)ne00, 1 };
@@ -4270,10 +4274,6 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context& subctx, co
             break;
         case GGML_OP_ARGSORT:
             elements = { (uint32_t)ne00, (uint32_t)ggml_nrows(src0), 1 };
-            break;
-        case GGML_OP_CONCAT:
-        case GGML_OP_UPSCALE:
-            elements = { (uint32_t)ggml_nelements(dst), 1, 1 };
             break;
         case GGML_OP_IM2COL:
             {
@@ -4296,6 +4296,28 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context& subctx, co
                 const uint32_t dim = dst->op_params[0];
                 uint32_t half_ceil = (dim + 1) / 2;
                 elements = { half_ceil, (uint32_t)src0->ne[0], 1 };
+            } break;
+        case GGML_OP_ADD:
+        case GGML_OP_DIV:
+        case GGML_OP_MUL:
+        case GGML_OP_SCALE:
+        case GGML_OP_SQR:
+        case GGML_OP_CLAMP:
+        case GGML_OP_CPY:
+        case GGML_OP_CONT:
+        case GGML_OP_DUP:
+        case GGML_OP_CONCAT:
+        case GGML_OP_UPSCALE:
+        case GGML_OP_UNARY:
+            {
+                const uint32_t ne = ggml_nelements(dst);
+                if (ne > 262144) {
+                    elements = { 512, 512, CEIL_DIV(ne, 262144) };
+                } else if (ne > 512) {
+                    elements = { 512, CEIL_DIV(ne, 512), 1 };
+                } else {
+                    elements = { ne, 1, 1 };
+                }
             } break;
         default:
             elements = { (uint32_t)ggml_nelements(src0), 1, 1 };
@@ -6841,7 +6863,7 @@ static void ggml_vk_check_results_0(ggml_tensor * tensor) {
     ggml_tensor * src2 = tensor->src[2];
 
     struct ggml_init_params iparams = {
-        /*.mem_size   =*/ 1024*1024*1024,
+        /*.mem_size   =*/ 2ul*1024ul*1024ul*1024ul,
         /*.mem_buffer =*/ NULL,
         /*.no_alloc   =*/ false,
     };
@@ -7088,7 +7110,7 @@ static void ggml_vk_check_results_0(ggml_tensor * tensor) {
         const int32_t d1 = tensor->op_params[5];
 
         const bool is_2D = tensor->op_params[6] == 1;
-        tensor_clone = ggml_im2col(ggml_ctx, src0_clone, src2_clone, s0, s1, p0, p1, d0, d1, is_2D, tensor->type);
+        tensor_clone = ggml_im2col(ggml_ctx, src0_clone, src1_clone, s0, s1, p0, p1, d0, d1, is_2D, tensor->type);
     } else if (tensor->op == GGML_OP_TIMESTEP_EMBEDDING) {
         const int32_t dim = tensor->op_params[0];
         const int32_t max_period = tensor->op_params[1];

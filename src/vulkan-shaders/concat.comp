@@ -4,7 +4,7 @@
 #include "generic_binary_head.comp"
 
 void main() {
-    const uint idx = gl_GlobalInvocationID.x;
+    const uint idx = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
     const int dim = p.param3;
 
     if (idx >= p.ne) {
