@@ -2169,7 +2169,7 @@ static vk_matmul_pipeline ggml_vk_get_mul_mat_mat_pipeline(ggml_backend_vk_conte
         return ctx->device->pipeline_matmul_f16;
     }
 
-    if (src1_type == GGML_TYPE_F32) {
+    if (src1_type != GGML_TYPE_F32) {
         return nullptr;
     }
 
