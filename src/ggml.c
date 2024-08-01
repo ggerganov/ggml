@@ -3773,6 +3773,7 @@ static struct ggml_tensor * ggml_new_tensor_impl(
     }
 
     struct ggml_object * const obj_new = ggml_new_object(ctx, GGML_OBJECT_TYPE_TENSOR, GGML_TENSOR_SIZE + obj_alloc_size);
+    GGML_ASSERT(obj_new);
 
     // TODO: for recoverable errors, we would need to free the data allocated from the scratch buffer here
 
@@ -18375,6 +18376,7 @@ void ggml_build_forward_expand(struct ggml_cgraph * cgraph, struct ggml_tensor *
 
 void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * gf, struct ggml_cgraph * gb, bool keep) {
     GGML_ASSERT(gf->n_nodes > 0);
+    GGML_ASSERT(gf->grads);
 
     // if we are keeping the gradient graph, we have to detach the gradient nodes from the original graph
     if (keep) {
@@ -20701,6 +20703,8 @@ enum ggml_opt_result ggml_opt(
         struct ggml_context * ctx,
         struct ggml_opt_params params,
         struct ggml_tensor * f) {
+    GGML_ASSERT(f->grad && "ggml_set_param called for at least one parent tensor.");
+
     bool free_ctx = false;
     if (ctx == NULL) {
         struct ggml_init_params params_ctx = {
