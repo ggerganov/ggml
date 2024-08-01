@@ -4832,15 +4832,25 @@ void ggml_vec_dot_q5_0_q8_0(int n, float * restrict s, size_t bs, const void * r
         int sumi0 = 0;
         int sumi1 = 0;
 
-        for (int j = 0; j < qk/2; ++j) {
-            const uint8_t xh_0 = ((qh & (1u << (j + 0 ))) >> (j + 0 )) << 4;
-            const uint8_t xh_1 = ((qh & (1u << (j + 16))) >> (j + 12));
+        if (qh) {
+            for (int j = 0; j < qk/2; ++j) {
+                const uint8_t xh_0 = ((qh & (1u << (j + 0 ))) >> (j + 0 )) << 4;
+                const uint8_t xh_1 = ((qh & (1u << (j + 16))) >> (j + 12));
 
-            const int32_t x0 = (int8_t)(((x[ib].qs[j] & 0x0F) | xh_0) - 16);
-            const int32_t x1 = (int8_t)(((x[ib].qs[j] >>   4) | xh_1) - 16);
+                const int32_t x0 = (int8_t)(((x[ib].qs[j] & 0x0F) | xh_0) - 16);
+                const int32_t x1 = (int8_t)(((x[ib].qs[j] >>   4) | xh_1) - 16);
 
-            sumi0 += (x0 * y[ib].qs[j]);
-            sumi1 += (x1 * y[ib].qs[j + qk/2]);
+                sumi0 += (x0 * y[ib].qs[j]);
+                sumi1 += (x1 * y[ib].qs[j + qk/2]);
+            }
+        } else {
+            for (int j = 0; j < qk/2; ++j) {
+                const int32_t x0 = (int8_t)((x[ib].qs[j] & 0x0F) - 16);
+                const int32_t x1 = (int8_t)((x[ib].qs[j] >>   4) - 16);
+
+                sumi0 += (x0 * y[ib].qs[j]);
+                sumi1 += (x1 * y[ib].qs[j + qk/2]);
+            }
         }
 
         int sumi = sumi0 + sumi1;
@@ -5206,15 +5216,25 @@ void ggml_vec_dot_q5_1_q8_1(int n, float * restrict s, size_t bs, const void * r
         int sumi0 = 0;
         int sumi1 = 0;
 
-        for (int j = 0; j < qk/2; ++j) {
-            const uint8_t xh_0 = ((qh >> (j +  0)) << 4) & 0x10;
-            const uint8_t xh_1 = ((qh >> (j + 12))     ) & 0x10;
+        if (qh) {
+            for (int j = 0; j < qk/2; ++j) {
+                const uint8_t xh_0 = ((qh >> (j +  0)) << 4) & 0x10;
+                const uint8_t xh_1 = ((qh >> (j + 12))     ) & 0x10;
 
-            const int32_t x0 = (x[ib].qs[j] & 0xF) | xh_0;
-            const int32_t x1 = (x[ib].qs[j] >>  4) | xh_1;
+                const int32_t x0 = (x[ib].qs[j] & 0xF) | xh_0;
+                const int32_t x1 = (x[ib].qs[j] >>  4) | xh_1;
 
-            sumi0 += (x0 * y[ib].qs[j]);
-            sumi1 += (x1 * y[ib].qs[j + qk/2]);
+                sumi0 += (x0 * y[ib].qs[j]);
+                sumi1 += (x1 * y[ib].qs[j + qk/2]);
+            }
+        } else {
+            for (int j = 0; j < qk/2; ++j) {
+                const int32_t x0 = (x[ib].qs[j] & 0xF);
+                const int32_t x1 = (x[ib].qs[j] >>  4);
+
+                sumi0 += (x0 * y[ib].qs[j]);
+                sumi1 += (x1 * y[ib].qs[j + qk/2]);
+            }
         }
 
         int sumi = sumi0 + sumi1;
