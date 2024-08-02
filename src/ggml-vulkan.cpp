@@ -19,7 +19,6 @@
 #include <map>
 #include <memory>
 #include <mutex>
-#include <unordered_map>
 
 #include "ggml.h"
 #include "ggml-backend-impl.h"
@@ -406,7 +405,7 @@ struct vk_context_struct {
     vk_submission * s;
     std::vector<vk_sequence> seqs;
 
-    ggml_tensor * exit_tensor;
+    int exit_tensor_idx;
 
     std::vector<vk_staging_memcpy> in_memcpys;
     std::vector<vk_staging_memcpy> out_memcpys;
@@ -494,7 +493,7 @@ struct ggml_backend_vk_context {
     vk_context_ref compute_ctx;
     vk_context_ref transfer_ctx;
 
-    std::unordered_map<ggml_tensor *, vk_context_ref> tensor_ctxs;
+    std::vector<vk_context_ref> tensor_ctxs;
 };
 
 #ifdef GGML_VULKAN_MEMORY_DEBUG
@@ -5701,7 +5700,7 @@ static void ggml_vk_preallocate_buffers(ggml_backend_vk_context * ctx) {
     }
 }
 
-static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * node, bool last_node){
+static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * node, int node_idx, bool last_node){
     ggml_tensor_extra_gpu * extra = (ggml_tensor_extra_gpu *) node->extra;
 
     if (ggml_is_empty(node) || extra == nullptr) {
@@ -5895,7 +5894,7 @@ static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * nod
         return;
     }
 
-    ctx->tensor_ctxs[node] = compute_ctx;
+    ctx->tensor_ctxs[node_idx] = compute_ctx;
 
 #ifdef GGML_VULKAN_CHECK_RESULTS
     // Force context reset on each node so that each tensor ends up in its own context
@@ -5905,12 +5904,12 @@ static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * nod
 
     if (last_node) {
         ggml_vk_ctx_end(compute_ctx);
-        compute_ctx->exit_tensor = node;
+        compute_ctx->exit_tensor_idx = node_idx;
         ctx->compute_ctx.reset();
     }
 }
 
-static bool ggml_vk_compute_forward(ggml_backend_vk_context * ctx, ggml_tensor * tensor){
+static bool ggml_vk_compute_forward(ggml_backend_vk_context * ctx, ggml_tensor * tensor, int tensor_idx){
     ggml_tensor_extra_gpu * extra = nullptr;
 
     switch (tensor->op) {
@@ -5978,7 +5977,7 @@ static bool ggml_vk_compute_forward(ggml_backend_vk_context * ctx, ggml_tensor *
     ggml_vk_check_results_0(tensor);
 #endif
 
-    vk_context subctx = ctx->tensor_ctxs[tensor].lock();
+    vk_context subctx = ctx->tensor_ctxs[tensor_idx].lock();
 
     // Only run if ctx hasn't been submitted yet
     if (!subctx->seqs.empty()) {
@@ -5990,7 +5989,7 @@ static bool ggml_vk_compute_forward(ggml_backend_vk_context * ctx, ggml_tensor *
         ggml_vk_submit(subctx, ctx->fence);
     }
 
-    if (tensor == subctx->exit_tensor) {
+    if (tensor_idx == subctx->exit_tensor_idx) {
         VK_CHECK(ctx->device->device.waitForFences({ ctx->fence }, true, UINT64_MAX), "ggml_vk_compute_forward waitForFences");
         ctx->device->device.resetFences({ ctx->fence });
 
@@ -6001,8 +6000,6 @@ static bool ggml_vk_compute_forward(ggml_backend_vk_context * ctx, ggml_tensor *
         subctx->in_memcpys.clear();
         subctx->out_memcpys.clear();
     }
-
-    ctx->tensor_ctxs.erase(tensor);
 
     return true;
 }
@@ -6496,8 +6493,11 @@ GGML_CALL static ggml_status ggml_backend_vk_graph_compute(ggml_backend_t backen
         last_node -= 1;
     }
 
+    // Reserve tensor context space for all nodes
+    ctx->tensor_ctxs.resize(cgraph->n_nodes);
+
     for (int i = 0; i < cgraph->n_nodes; i++) {
-        ggml_vk_build_graph(ctx,cgraph->nodes[i], i == last_node);
+        ggml_vk_build_graph(ctx, cgraph->nodes[i], i, i == last_node);
     }
 
     for (int i = 0; i < cgraph->n_nodes; i++) {
@@ -6507,7 +6507,7 @@ GGML_CALL static ggml_status ggml_backend_vk_graph_compute(ggml_backend_t backen
             continue;
         }
 
-        bool ok = ggml_vk_compute_forward(ctx, node);
+        bool ok = ggml_vk_compute_forward(ctx, node, i);
         if (!ok) {
             if (node->op == GGML_OP_UNARY) {
                 std::cerr << __func__ << ": error: op not supported UNARY " << node->name << " (" << ggml_unary_op_name(static_cast<ggml_unary_op>(node->op_params[0])) << ")" << std::endl;
