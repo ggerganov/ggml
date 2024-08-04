@@ -194,6 +194,7 @@ struct vk_device_struct {
     vk_pipeline pipeline_gelu_quick_f32;
     vk_pipeline pipeline_silu_f32;
     vk_pipeline pipeline_relu_f32;
+    vk_pipeline pipeline_leaky_relu_f32;
     vk_pipeline pipeline_tanh_f32;
     vk_pipeline pipeline_diag_mask_inf_f32;
     vk_pipeline pipeline_soft_max_f32, pipeline_soft_max_f32_f16;
@@ -1662,6 +1663,7 @@ static void ggml_vk_load_shaders(vk_device& device) {
     ggml_vk_create_pipeline(device, device->pipeline_gelu_quick_f32, "gelu_quick_f32", gelu_quick_f32_len, gelu_quick_f32_data, "main", 2, sizeof(vk_op_push_constants), {512, 1, 1}, {}, 1);
     ggml_vk_create_pipeline(device, device->pipeline_silu_f32, "silu_f32", silu_f32_len, silu_f32_data, "main", 2, sizeof(vk_op_push_constants), {512, 1, 1}, {}, 1);
     ggml_vk_create_pipeline(device, device->pipeline_relu_f32, "relu_f32", relu_f32_len, relu_f32_data, "main", 2, sizeof(vk_op_push_constants), {512, 1, 1}, {}, 1);
+    ggml_vk_create_pipeline(device, device->pipeline_leaky_relu_f32, "leaky_relu_f32", leaky_relu_f32_len, leaky_relu_f32_data, "main", 2, sizeof(vk_op_push_constants), {512, 1, 1}, {}, 1);
     ggml_vk_create_pipeline(device, device->pipeline_tanh_f32, "tanh_f32", tanh_f32_len, tanh_f32_data, "main", 2, sizeof(vk_op_push_constants), {512, 1, 1}, {}, 1);
 
     ggml_vk_create_pipeline(device, device->pipeline_diag_mask_inf_f32, "diag_mask_inf_f32", diag_mask_inf_f32_len, diag_mask_inf_f32_data, "main", 2, sizeof(vk_op_diag_mask_push_constants), {512, 1, 1}, {}, 1);
@@ -4090,6 +4092,11 @@ static vk_pipeline ggml_vk_op_get_pipeline(ggml_backend_vk_context * ctx, const 
             return ctx->device->pipeline_timestep_embedding_f32;
         }
         return nullptr;
+    case GGML_OP_LEAKY_RELU:
+        if (src0->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {
+            return ctx->device->pipeline_leaky_relu_f32;
+        }
+        return nullptr;
     default:
         return nullptr;
     }
@@ -4755,6 +4762,11 @@ static void ggml_vk_timestep_embedding(ggml_backend_vk_context * ctx, vk_context
     ggml_vk_op_f32<vk_op_timestep_embedding_push_constants>(ctx, subctx, src0, nullptr, nullptr, dst, GGML_OP_TIMESTEP_EMBEDDING, {
         nb1, dim, max_period,
     });
+}
+
+static void ggml_vk_leaky_relu(ggml_backend_vk_context * ctx, vk_context& subctx, const ggml_tensor * src0, ggml_tensor * dst) {
+    const float * op_params = (const float *)dst->op_params;
+    ggml_vk_op_f32<vk_op_push_constants>(ctx, subctx, src0, nullptr, nullptr, dst, GGML_OP_LEAKY_RELU, { (uint32_t)ggml_nelements(src0), 0, op_params[0], 0.0f });
 }
 
 #ifdef GGML_VULKAN_RUN_TESTS
@@ -5488,6 +5500,7 @@ static void ggml_vk_preallocate_buffers_graph(ggml_backend_vk_context * ctx, ggm
     case GGML_OP_SUM_ROWS:
     case GGML_OP_IM2COL:
     case GGML_OP_TIMESTEP_EMBEDDING:
+    case GGML_OP_LEAKY_RELU:
         break;
     case GGML_OP_UNARY:
         switch (ggml_get_unary_op(node)) {
@@ -5765,6 +5778,7 @@ static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * nod
     case GGML_OP_SUM_ROWS:
     case GGML_OP_IM2COL:
     case GGML_OP_TIMESTEP_EMBEDDING:
+    case GGML_OP_LEAKY_RELU:
         break;
     default:
         std::cerr << "ggml_vulkan: Error: Missing op: " << ggml_op_name(node->op) << std::endl;
@@ -5886,6 +5900,10 @@ static void ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_tensor * nod
         ggml_vk_timestep_embedding(ctx, compute_ctx, src0, node);
 
         break;
+    case GGML_OP_LEAKY_RELU:
+        ggml_vk_leaky_relu(ctx, compute_ctx, src0, node);
+
+        break;
     case GGML_OP_MUL_MAT:
         ggml_vk_mul_mat(ctx, compute_ctx, src0, src1, node);
 
@@ -5945,6 +5963,7 @@ static bool ggml_vk_compute_forward(ggml_backend_vk_context * ctx, ggml_tensor *
     case GGML_OP_SUM_ROWS:
     case GGML_OP_IM2COL:
     case GGML_OP_TIMESTEP_EMBEDDING:
+    case GGML_OP_LEAKY_RELU:
     case GGML_OP_REPEAT:
         extra = (ggml_tensor_extra_gpu *) tensor->extra;
 
@@ -6648,6 +6667,7 @@ GGML_CALL static bool ggml_backend_vk_supports_op(ggml_backend_t backend, const 
         case GGML_OP_SUM_ROWS:
         case GGML_OP_IM2COL:
         case GGML_OP_TIMESTEP_EMBEDDING:
+        case GGML_OP_LEAKY_RELU:
             return true;
         default:
             return false;
@@ -7105,12 +7125,12 @@ static void ggml_vk_check_results_0(ggml_tensor * tensor) {
         const int mode        = ((int32_t *) tensor->op_params)[2];
         //const int n_ctx_ggml       = ((int32_t *) tensor->op_params)[3];
         const int n_ctx_orig_ggml  = ((int32_t *) tensor->op_params)[4];
-        float freq_base       = ((float *)   tensor->op_params)[5];
-        float freq_scale      = ((float *)   tensor->op_params)[6];
-        float ext_factor      = ((float *)   tensor->op_params)[7];
-        float attn_factor     = ((float *)   tensor->op_params)[8];
-        float beta_fast       = ((float *)   tensor->op_params)[9];
-        float beta_slow       = ((float *)   tensor->op_params)[10];
+        const float freq_base       = ((float *) tensor->op_params)[5];
+        const float freq_scale      = ((float *) tensor->op_params)[6];
+        const float ext_factor      = ((float *) tensor->op_params)[7];
+        const float attn_factor     = ((float *) tensor->op_params)[8];
+        const float beta_fast       = ((float *) tensor->op_params)[9];
+        const float beta_slow       = ((float *) tensor->op_params)[10];
         tensor_clone = ggml_rope_ext(ggml_ctx, src0_clone, src1_clone, src2_clone, n_dims, mode, n_ctx_orig_ggml, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow);
     } else if (tensor->op == GGML_OP_UNARY) {
         switch (ggml_get_unary_op(tensor)) {
@@ -7171,6 +7191,9 @@ static void ggml_vk_check_results_0(ggml_tensor * tensor) {
         const int32_t dim = tensor->op_params[0];
         const int32_t max_period = tensor->op_params[1];
         tensor_clone = ggml_timestep_embedding(ggml_ctx, src0_clone, dim, max_period);
+    } else if (tensor->op == GGML_OP_LEAKY_RELU) {
+        const float * op_params = (const float *)tensor->op_params;
+        tensor_clone = ggml_leaky_relu(ggml_ctx, src0_clone, op_params[0], false);
     } else {
         std::cerr << "Missing vk_check_results OP: " << ggml_op_name(tensor->op) << std::endl;
         GGML_ABORT("fatal error");
