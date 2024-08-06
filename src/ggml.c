@@ -19324,9 +19324,11 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
 
                 const uint32_t type   = tensor->type;
                 const uint32_t op     = tensor->op;
+                const int32_t  flags  = tensor->flags;
 
                 fwrite(&type,   sizeof(uint32_t), 1, fout);
                 fwrite(&op,     sizeof(uint32_t), 1, fout);
+                fwrite(&flags,  sizeof(int32_t),  1, fout);
 
                 for (int j = 0; j < GGML_MAX_DIMS; ++j) {
                     const uint64_t ne = tensor->ne[j];
@@ -19356,9 +19358,11 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
 
                 const uint32_t type   = tensor->type;
                 const uint32_t op     = tensor->op;
+                const int32_t  flags  = tensor->flags;
 
                 fwrite(&type,   sizeof(uint32_t), 1, fout);
                 fwrite(&op,     sizeof(uint32_t), 1, fout);
+                fwrite(&flags,  sizeof(int32_t),  1, fout);
 
                 for (int j = 0; j < GGML_MAX_DIMS; ++j) {
                     const uint64_t ne = tensor->ne[j];
@@ -19416,6 +19420,14 @@ void ggml_graph_export(const struct ggml_cgraph * cgraph, const char * fname) {
                             fwrite(&nul, sizeof(int32_t), 1, fout);
                         }
                     }
+                }
+
+                // dump the data
+                // TODO: pad this to 32 byte boundary
+                if ((flags & GGML_TENSOR_FLAG_PARAM)) {
+                    const size_t size = ggml_nbytes(tensor);
+
+                    fwrite(tensor->data, sizeof(char), size, fout);
                 }
             }
         }
@@ -19530,10 +19542,12 @@ struct ggml_cgraph * ggml_graph_import(const char * fname, struct ggml_context *
         {
             uint32_t type;
             uint32_t op;
+            int32_t  flags;
 
             for (uint32_t i = 0; i < n_leafs; ++i) {
                 type   = *(const uint32_t *) ptr; ptr += sizeof(type);
                 op     = *(const uint32_t *) ptr; ptr += sizeof(op);
+                flags  = *(const int32_t  *) ptr; ptr += sizeof(flags);
 
                 int64_t ne[GGML_MAX_DIMS];
                 size_t  nb[GGML_MAX_DIMS];
@@ -19551,20 +19565,19 @@ struct ggml_cgraph * ggml_graph_import(const char * fname, struct ggml_context *
 
                 struct ggml_tensor * tensor = ggml_new_tensor(*ctx_eval, (enum ggml_type) type, GGML_MAX_DIMS, ne);
 
-                tensor->op = (enum ggml_op) op;
+                tensor->op    = (enum ggml_op) op;
+                tensor->flags = flags;
 
                 memcpy(tensor->name,      ptr, GGML_MAX_NAME);      ptr += GGML_MAX_NAME;
                 memcpy(tensor->op_params, ptr, GGML_MAX_OP_PARAMS); ptr += GGML_MAX_OP_PARAMS;
-
-                tensor->data = (void *) ptr;
 
                 for (int j = 0; j < GGML_MAX_DIMS; ++j) {
                     tensor->nb[j] = nb[j];
                 }
 
-                result->leafs[i] = tensor;
+                tensor->data = (void *) ptr; ptr += ggml_nbytes(tensor);
 
-                ptr += ggml_nbytes(tensor);
+                result->leafs[i] = tensor;
 
                 fprintf(stderr, "%s: loaded leaf %u: '%16s', %9zu bytes\n", __func__, i, tensor->name, ggml_nbytes(tensor));
             }
@@ -19576,10 +19589,12 @@ struct ggml_cgraph * ggml_graph_import(const char * fname, struct ggml_context *
         {
             uint32_t type;
             uint32_t op;
+            int32_t  flags;
 
             for (uint32_t i = 0; i < n_nodes; ++i) {
                 type   = *(const uint32_t *) ptr; ptr += sizeof(type);
                 op     = *(const uint32_t *) ptr; ptr += sizeof(op);
+                flags  = *(const int32_t  *) ptr; ptr += sizeof(flags);
 
                 enum ggml_op eop = (enum ggml_op) op;
 
@@ -19668,6 +19683,11 @@ struct ggml_cgraph * ggml_graph_import(const char * fname, struct ggml_context *
                 }
 
                 result->nodes[i] = tensor;
+
+                // TODO tensor data is be duplicated due to ggml_new_tensor call above
+                if (flags & GGML_TENSOR_FLAG_PARAM) {
+                    tensor->data = (void *) ptr; ptr += ggml_nbytes(tensor);
+                }
 
                 fprintf(stderr, "%s: loaded node %u: '%16s', %9zu bytes\n", __func__, i, tensor->name, ggml_nbytes(tensor));
             }
