@@ -10038,7 +10038,7 @@ static void ggml_compute_forward_sub_f32(
     const struct ggml_tensor * src0 = dst->src[0];
     const struct ggml_tensor * src1 = dst->src[1];
 
-    GGML_ASSERT(ggml_can_repeat(src1, src0) && ggml_are_same_shape(src0, dst));
+    assert(ggml_can_repeat(src1, src0) && ggml_are_same_shape(src0, dst));
 
     const int ith = params->ith;
     const int nth = params->nth;
