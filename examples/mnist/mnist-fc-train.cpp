@@ -1,8 +1,5 @@
-#include "ggml.h"
-
 #include "mnist-common.h"
 
-#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -21,7 +18,7 @@ int main(int argc, char ** argv) {
 
     std::vector<float> images;
     images.resize(MNIST_NTRAIN*MNIST_NINPUT);
-    if (!mnist_image_load(argv[1], images.data(), MNIST_NTRAIN, false)) {
+    if (!mnist_image_load(argv[1], images.data(), MNIST_NTRAIN)) {
         return 1;
     }
 

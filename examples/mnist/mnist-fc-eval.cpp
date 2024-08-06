@@ -3,6 +3,7 @@
 #include "mnist-common.h"
 
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
@@ -59,25 +60,12 @@ int main(int argc, char ** argv) {
 
     if (argc != 4) {
         fprintf(stderr, "Usage: %s models/MNIST/mnist-fc-f32.gguf data/MNIST/raw/t10k-images-idx3-ubyte data/MNIST/raw/t10k-labels-idx1-ubyte\n", argv[0]);
-        exit(0);
-    }
-
-    mnist_model model;
-
-    // load the model
-    {
-        const int64_t t_start_us = ggml_time_us();
-
-        model = mnist_model_init(argv[1], 1);
-
-        const int64_t t_load_us = ggml_time_us() - t_start_us;
-
-        fprintf(stdout, "%s: loaded model in %8.2f ms\n", __func__, t_load_us / 1000.0f);
+        exit(1);
     }
 
     std::vector<float> images;
     images.resize(MNIST_NTEST*MNIST_NINPUT);
-    if (!mnist_image_load(argv[2], images.data(), MNIST_NTEST, false)) {
+    if (!mnist_image_load(argv[2], images.data(), MNIST_NTEST)) {
         return 1;
     }
 
@@ -92,13 +80,33 @@ int main(int argc, char ** argv) {
 
     mnist_image_print(stdout, images.data() + iex*MNIST_NINPUT);
 
-    const mnist_eval_result result_eval = mnist_model_eval(model, images.data(), labels.data(), MNIST_NTEST);
+    mnist_eval_result result_eval = mnist_graph_eval(argv[1], images.data(), labels.data(), MNIST_NTEST);
+
+    mnist_model model;
+    if (!result_eval.success) {
+
+        // load the model
+        {
+            const int64_t t_start_us = ggml_time_us();
+
+            model = mnist_model_init(argv[1], MNIST_NBATCH);
+
+            const int64_t t_load_us = ggml_time_us() - t_start_us;
+
+            fprintf(stdout, "%s: loaded model in %8.2f ms\n", __func__, t_load_us / 1000.0f);
+        }
+
+        result_eval = mnist_model_eval(model, images.data(), labels.data(), MNIST_NTEST);
+
+        mnist_model_free(model);
+    }
     fprintf(stdout, "%s: predicted digit is %d\n", __func__, result_eval.pred[iex]);
 
-    std::pair<double, double> result_acc = mnist_accuracy(result_eval, labels.data());
-    fprintf(stdout, "%s: test_acc=%.2f+-%.2f%%\n", __func__, 100.0*result_acc.first, 100.0*result_acc.second);
+    std::pair<double, double> result_loss = mnist_loss(result_eval);
+    fprintf(stdout, "%s: test_loss=%.6lf+-%.6lf\n", __func__, result_loss.first, result_loss.second);
 
-    mnist_model_free(model);
+    std::pair<double, double> result_acc = mnist_accuracy(result_eval, labels.data());
+    fprintf(stdout, "%s: test_acc=%.2lf+-%.2lf%%\n", __func__, 100.0*result_acc.first, 100.0*result_acc.second);
 
     return 0;
 }
