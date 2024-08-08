@@ -5,6 +5,8 @@ cp -rpv ../whisper.cpp/ggml/src/CMakeLists.txt   src/CMakeLists.txt
 cp -rpv ../whisper.cpp/ggml/cmake/FindSIMD.cmake cmake/FindSIMD.cmake
 
 cp -rpv ../whisper.cpp/ggml/src/ggml.c              src/ggml.c
+cp -rpv ../whisper.cpp/ggml/src/ggml-aarch64.c      src/ggml-aarch64.c
+cp -rpv ../whisper.cpp/ggml/src/ggml-aarch64.h      src/ggml-aarch64.h
 cp -rpv ../whisper.cpp/ggml/src/ggml-alloc.c        src/ggml-alloc.c
 cp -rpv ../whisper.cpp/ggml/src/ggml-backend-impl.h src/ggml-backend-impl.h
 cp -rpv ../whisper.cpp/ggml/src/ggml-backend.c      src/ggml-backend.c
@@ -23,6 +25,7 @@ cp -rpv ../whisper.cpp/ggml/src/ggml-rpc.cpp        src/ggml-rpc.cpp
 cp -rpv ../whisper.cpp/ggml/src/ggml-sycl/*         src/ggml-sycl/
 cp -rpv ../whisper.cpp/ggml/src/ggml-sycl.cpp       src/ggml-sycl.cpp
 cp -rpv ../whisper.cpp/ggml/src/ggml-vulkan.cpp     src/ggml-vulkan.cpp
+cp -rpv ../whisper.cpp/ggml/src/vulkan-shaders/*    src/vulkan-shaders/
 
 cp -rpv ../whisper.cpp/ggml/include/ggml.h         include/ggml.h
 cp -rpv ../whisper.cpp/ggml/include/ggml-alloc.h   include/ggml-alloc.h

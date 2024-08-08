@@ -25,7 +25,6 @@ cp -rpv ../llama.cpp/ggml/src/ggml-rpc.cpp        src/ggml-rpc.cpp
 cp -rpv ../llama.cpp/ggml/src/ggml-sycl/*         src/ggml-sycl/
 cp -rpv ../llama.cpp/ggml/src/ggml-sycl.cpp       src/ggml-sycl.cpp
 cp -rpv ../llama.cpp/ggml/src/ggml-vulkan.cpp     src/ggml-vulkan.cpp
-cp -rpv ../llama.cpp/ggml/src/ggml-vulkan.cpp     src/ggml-vulkan.cpp
 cp -rpv ../llama.cpp/ggml/src/vulkan-shaders/*    src/vulkan-shaders/
 
 cp -rpv ../llama.cpp/ggml/include/ggml.h         include/ggml.h

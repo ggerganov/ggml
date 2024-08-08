@@ -100,11 +100,12 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
     # ggml/cmake/FindSIMD.cmake -> cmake/FindSIMD.cmake
     #
     # ggml/src/ggml.c              -> src/ggml.c
+    # ggml/src/ggml-aarch64.c      -> src/ggml-aarch64.c
+    # ggml/src/ggml-aarch64.h      -> src/ggml-aarch64.h
     # ggml/src/ggml-alloc.c        -> src/ggml-alloc.c
     # ggml/src/ggml-backend-impl.h -> src/ggml-backend-impl.h
     # ggml/src/ggml-backend.c      -> src/ggml-backend.c
     # ggml/src/ggml-blas.cpp       -> src/ggml-blas.cpp
-    # ggml/src/ggml-blas.h         -> src/ggml-blas.h
     # ggml/src/ggml-common.h       -> src/ggml-common.h
     # ggml/src/ggml-cuda/*         -> src/ggml-cuda/*
     # ggml/src/ggml-cuda.cu        -> src/ggml-cuda.cu
@@ -117,6 +118,7 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
     # ggml/src/ggml-sycl/*         -> src/ggml-sycl/*
     # ggml/src/ggml-sycl.cpp       -> src/ggml-sycl.cpp
     # ggml/src/ggml-vulkan.cpp     -> src/ggml-vulkan.cpp
+    # ggml/src/vulkan-shaders/*    -> src/vulkan-shaders/*
     #
     # ggml/include/ggml.h         -> include/ggml.h
     # ggml/include/ggml-alloc.h   -> include/ggml-alloc.h
@@ -142,11 +144,12 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
         -e 's/\/ggml\/src\/CMakeLists\.txt/\/src\/CMakeLists.txt/g' \
         -e 's/\/ggml\/cmake\/FindSIMD\.cmake/\/cmake\/FindSIMD.cmake/g' \
         -e 's/\/ggml\/src\/ggml\.c/\/src\/ggml.c/g' \
+        -e 's/\/ggml\/src\/ggml-aarch64\.c/\/src\/ggml-aarch64.c/g' \
+        -e 's/\/ggml\/src\/ggml-aarch64\.h/\/src\/ggml-aarch64.h/g' \
         -e 's/\/ggml\/src\/ggml-alloc\.c/\/src\/ggml-alloc.c/g' \
         -e 's/\/ggml\/src\/ggml-backend-impl\.h/\/src\/ggml-backend-impl.h/g' \
         -e 's/\/ggml\/src\/ggml-backend\.c/\/src\/ggml-backend.c/g' \
         -e 's/\/ggml\/src\/ggml-blas\.cpp/\/src\/ggml-blas.cpp/g' \
-        -e 's/\/ggml\/src\/ggml-blas\.h/\/src\/ggml-blas.h/g' \
         -e 's/\/ggml\/src\/ggml-common\.h/\/src\/ggml-common.h/g' \
         -e 's/\/ggml\/src\/ggml-cuda\//\/src\/ggml-cuda\//g' \
         -e 's/\/ggml\/src\/ggml-cuda\.cu/\/src\/ggml-cuda.cu/g' \
@@ -159,6 +162,7 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
         -e 's/\/ggml\/src\/ggml-sycl\//\/src\/ggml-sycl\//g' \
         -e 's/\/ggml\/src\/ggml-sycl\.cpp/\/src\/ggml-sycl.cpp/g' \
         -e 's/\/ggml\/src\/ggml-vulkan\.cpp/\/src\/ggml-vulkan.cpp/g' \
+        -e 's/\/ggml\/src\/vulkan-shaders\//\/src\/vulkan-shaders\//g' \
         -e 's/\/ggml\/include\/ggml\.h/\/include\/ggml.h/g' \
         -e 's/\/ggml\/include\/ggml-alloc\.h/\/include\/ggml-alloc.h/g' \
         -e 's/\/ggml\/include\/ggml-backend\.h/\/include\/ggml-backend.h/g' \
