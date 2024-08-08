@@ -11,6 +11,8 @@ cp -rpv ../llama.cpp/ggml/src/ggml-alloc.c        src/ggml-alloc.c
 cp -rpv ../llama.cpp/ggml/src/ggml-backend-impl.h src/ggml-backend-impl.h
 cp -rpv ../llama.cpp/ggml/src/ggml-backend.c      src/ggml-backend.c
 cp -rpv ../llama.cpp/ggml/src/ggml-blas.cpp       src/ggml-blas.cpp
+cp -rpv ../llama.cpp/ggml/src/ggml-cann/*         src/ggml-cann/
+cp -rpv ../llama.cpp/ggml/src/ggml-cann.cpp       src/ggml-cann.cpp
 cp -rpv ../llama.cpp/ggml/src/ggml-common.h       src/ggml-common.h
 cp -rpv ../llama.cpp/ggml/src/ggml-cuda/*         src/ggml-cuda/
 cp -rpv ../llama.cpp/ggml/src/ggml-cuda.cu        src/ggml-cuda.cu
@@ -30,6 +32,7 @@ cp -rpv ../llama.cpp/ggml/include/ggml.h         include/ggml.h
 cp -rpv ../llama.cpp/ggml/include/ggml-alloc.h   include/ggml-alloc.h
 cp -rpv ../llama.cpp/ggml/include/ggml-backend.h include/ggml-backend.h
 cp -rpv ../llama.cpp/ggml/include/ggml-blas.h    include/ggml-blas.h
+cp -rpv ../llama.cpp/ggml/include/ggml-cann.h    include/ggml-cann.h
 cp -rpv ../llama.cpp/ggml/include/ggml-cuda.h    include/ggml-cuda.h
 cp -rpv ../llama.cpp/ggml/include/ggml-kompute.h include/ggml-kompute.h
 cp -rpv ../llama.cpp/ggml/include/ggml-metal.h   include/ggml-metal.h
