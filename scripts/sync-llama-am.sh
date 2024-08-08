@@ -62,6 +62,7 @@ while read c; do
         ggml/src/ggml*.m \
         ggml/src/ggml*.metal \
         ggml/src/ggml*.cu \
+        ggml/src/ggml-cann/* \
         ggml/src/ggml-cuda/* \
         ggml/src/ggml-sycl/* \
         ggml/include/ggml*.h \
@@ -108,6 +109,8 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     # ggml/src/ggml-backend-impl.h -> src/ggml-backend-impl.h
     # ggml/src/ggml-backend.c      -> src/ggml-backend.c
     # ggml/src/ggml-blas.cpp       -> src/ggml-blas.cpp
+    # ggml/src/ggml-cann/*         -> src/ggml-cann/*
+    # ggml/src/ggml-cann.cpp       -> src/ggml-cann.cpp
     # ggml/src/ggml-common.h       -> src/ggml-common.h
     # ggml/src/ggml-cuda/*         -> src/ggml-cuda/*
     # ggml/src/ggml-cuda.cu        -> src/ggml-cuda.cu
@@ -126,6 +129,7 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     # ggml/include/ggml-alloc.h   -> include/ggml-alloc.h
     # ggml/include/ggml-backend.h -> include/ggml-backend.h
     # ggml/include/ggml-blas.h    -> include/ggml-blas.h
+    # ggml/include/ggml-cann.h    -> include/ggml-cann.h
     # ggml/include/ggml-cuda.h    -> include/ggml-cuda.h
     # ggml/include/ggml-kompute.h -> include/ggml-kompute.h
     # ggml/include/ggml-metal.h   -> include/ggml-metal.h
@@ -153,6 +157,8 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
         -e 's/\/ggml\/src\/ggml-backend-impl\.h/\/src\/ggml-backend-impl.h/g' \
         -e 's/\/ggml\/src\/ggml-backend\.c/\/src\/ggml-backend.c/g' \
         -e 's/\/ggml\/src\/ggml-blas\.cpp/\/src\/ggml-blas.cpp/g' \
+        -e 's/\/ggml\/src\/ggml-cann\//\/src\/ggml-cann\//g' \
+        -e 's/\/ggml\/src\/ggml-cann\.cpp/\/src\/ggml-cann.cpp/g' \
         -e 's/\/ggml\/src\/ggml-common\.h/\/src\/ggml-common.h/g' \
         -e 's/\/ggml\/src\/ggml-cuda\//\/src\/ggml-cuda\//g' \
         -e 's/\/ggml\/src\/ggml-cuda\.cu/\/src\/ggml-cuda.cu/g' \
@@ -170,6 +176,7 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
         -e 's/\/ggml\/include\/ggml-alloc\.h/\/include\/ggml-alloc.h/g' \
         -e 's/\/ggml\/include\/ggml-backend\.h/\/include\/ggml-backend.h/g' \
         -e 's/\/ggml\/include\/ggml-blas\.h/\/include\/ggml-blas.h/g' \
+        -e 's/\/ggml\/include\/ggml-cann\.h/\/include\/ggml-cann.h/g' \
         -e 's/\/ggml\/include\/ggml-cuda\.h/\/include\/ggml-cuda.h/g' \
         -e 's/\/ggml\/include\/ggml-kompute\.h/\/include\/ggml-kompute.h/g' \
         -e 's/\/ggml\/include\/ggml-metal\.h/\/include\/ggml-metal.h/g' \
