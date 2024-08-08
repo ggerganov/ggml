@@ -63,6 +63,7 @@ while read c; do
         ggml/src/ggml*.metal \
         ggml/src/ggml*.cu \
         ggml/src/ggml-cuda/* \
+        ggml/src/ggml-sycl/* \
         ggml/include/ggml*.h \
         examples/common.h \
         examples/common.cpp \
