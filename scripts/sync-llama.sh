@@ -11,7 +11,6 @@ cp -rpv ../llama.cpp/ggml/src/ggml-alloc.c        src/ggml-alloc.c
 cp -rpv ../llama.cpp/ggml/src/ggml-backend-impl.h src/ggml-backend-impl.h
 cp -rpv ../llama.cpp/ggml/src/ggml-backend.c      src/ggml-backend.c
 cp -rpv ../llama.cpp/ggml/src/ggml-blas.cpp       src/ggml-blas.cpp
-cp -rpv ../llama.cpp/ggml/src/ggml-blas.h         src/ggml-blas.h
 cp -rpv ../llama.cpp/ggml/src/ggml-common.h       src/ggml-common.h
 cp -rpv ../llama.cpp/ggml/src/ggml-cuda/*         src/ggml-cuda/
 cp -rpv ../llama.cpp/ggml/src/ggml-cuda.cu        src/ggml-cuda.cu
