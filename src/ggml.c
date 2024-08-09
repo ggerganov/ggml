@@ -17588,12 +17588,28 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             } break;
         case GGML_OP_SIN:
             {
-                GGML_ABORT("fatal error"); // TODO: implement
-            }
+                if (src0->grad) {
+                    src0->grad =
+                        ggml_add_or_set(ctx,
+                                src0->grad,
+                                ggml_mul(ctx,
+                                    tensor->grad,
+                                    ggml_cos(ctx, src0)),
+                                zero_table);
+                }
+            } break;
         case GGML_OP_COS:
             {
-                GGML_ABORT("fatal error"); // TODO: implement
-            }
+                if (src0->grad) {
+                    src0->grad =
+                        ggml_sub_or_set(ctx,
+                                src0->grad,
+                                ggml_mul(ctx,
+                                    tensor->grad,
+                                    ggml_sin(ctx, src0)),
+                                zero_table);
+                }
+            } break;
         case GGML_OP_SUM:
             {
                 if (src0->grad) {
