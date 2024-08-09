@@ -32,6 +32,7 @@ struct yolo_image {
 };
 
 bool load_image(const char *fname, yolo_image & img);
+bool load_image_from_memory(const char * buffer, int len, yolo_image & img);
 void draw_box_width(yolo_image & a, int x1, int y1, int x2, int y2, int w, float r, float g, float b);
 yolo_image letterbox_image(const yolo_image & im, int w, int h);
 bool save_image(const yolo_image & im, const char *name, int quality);
