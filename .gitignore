@@ -12,6 +12,7 @@ CMakeSettings.json
 .clangd
 
 .venv/
+ggml_env/
 .exrc
 .cache
 .DS_Store
