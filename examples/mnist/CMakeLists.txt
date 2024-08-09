@@ -6,32 +6,18 @@ add_library(${TEST_TARGET} mnist-common.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml common)
 
 #
-# mnist-fc-eval
+# mnist-eval
 
-set(TEST_TARGET mnist-fc-eval)
-add_executable(${TEST_TARGET} mnist-fc-eval.cpp)
+set(TEST_TARGET mnist-eval)
+add_executable(${TEST_TARGET} mnist-eval.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml common mnist-common)
 
 #
-# mnist-fc-train
+# mnist-train
 
-set(TEST_TARGET mnist-fc-train)
-add_executable(${TEST_TARGET} mnist-fc-train.cpp)
+set(TEST_TARGET mnist-train)
+add_executable(${TEST_TARGET} mnist-train.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml common mnist-common)
-
-#
-# mnist-cnn
-
-set(TEST_TARGET mnist-cnn)
-add_executable(${TEST_TARGET} main-cnn.cpp)
-target_link_libraries(${TEST_TARGET} PRIVATE ggml common)
-
-#
-# mnist-cpu
-
-set(TEST_TARGET mnist-cpu)
-add_executable(${TEST_TARGET} main-cpu.cpp)
-target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 
 if (APPLE)
     #
