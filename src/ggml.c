@@ -5007,7 +5007,6 @@ struct ggml_tensor * ggml_mean(
     bool is_node = false;
 
     if (a->grad) {
-        GGML_ABORT("fatal error"); // TODO: implement
         is_node = true;
     }
 
@@ -17650,6 +17649,17 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                 }
             } break;
         case GGML_OP_MEAN:
+            {
+                if (src0->grad) {
+                    src0->grad =
+                        ggml_add_or_set(ctx,
+                                src0->grad,
+                                ggml_repeat(ctx,
+                                    ggml_scale(ctx, tensor->grad, 1.0f / src0->ne[0]),
+                                    src0->grad),
+                                zero_table);
+                }
+            } break;
         case GGML_OP_ARGMAX:
             {
                 GGML_ABORT("fatal error"); // TODO: implement
