@@ -18212,8 +18212,15 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                         } break;
                     case GGML_UNARY_OP_TANH:
                         {
-                            GGML_ABORT("fatal error"); // TODO: not implemented
-                        }
+                            if (src0->grad) {
+                                src0->grad = ggml_add_or_set(ctx,
+                                        src0->grad,
+                                        ggml_sub(ctx,
+                                            tensor->grad,
+                                            ggml_mul(ctx, ggml_sqr(ctx, tensor), tensor->grad)),
+                                        zero_table);
+                            }
+                        } break;
                     case GGML_UNARY_OP_ELU:
                         {
                             GGML_ABORT("fatal error"); // TODO: not implemented
@@ -18231,8 +18238,15 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                         } break;
                     case GGML_UNARY_OP_SIGMOID:
                         {
-                            GGML_ABORT("fatal error"); // TODO: not implemented
-                        }
+                            if (src0->grad) {
+                                src0->grad = ggml_add_or_set(ctx,
+                                        src0->grad,
+                                        ggml_sub(ctx,
+                                            ggml_mul(ctx, tensor, tensor->grad),
+                                            ggml_mul(ctx, ggml_sqr(ctx, tensor), tensor->grad)),
+                                        zero_table);
+                            }
+                        } break;
                     case GGML_UNARY_OP_GELU:
                         {
                             GGML_ABORT("fatal error"); // TODO: not implemented
