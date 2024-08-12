@@ -488,6 +488,7 @@ extern "C" {
         GGML_OP_ROPE,
         GGML_OP_ROPE_BACK,
         GGML_OP_CLAMP,
+        GGML_OP_CLAMP_BACK,
         GGML_OP_CONV_TRANSPOSE_1D,
         GGML_OP_IM2COL,
         GGML_OP_CONV_TRANSPOSE_2D,
@@ -1575,8 +1576,25 @@ extern "C" {
             float                 beta_slow);
 
     // clamp
-    // in-place, returns view(a)
     GGML_API struct ggml_tensor * ggml_clamp(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            float                 min,
+            float                 max);
+
+    GGML_API struct ggml_tensor * ggml_clamp_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            float                 min,
+            float                 max);
+
+    GGML_API struct ggml_tensor * ggml_clamp_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            float                 min,
+            float                 max);
+
+    GGML_API struct ggml_tensor * ggml_clamp_back_inplace(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             float                 min,

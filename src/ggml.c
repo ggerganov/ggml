@@ -2799,6 +2799,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "ROPE",
     "ROPE_BACK",
     "CLAMP",
+    "CLAMP_BACK",
     "CONV_TRANSPOSE_1D",
     "IM2COL",
     "CONV_TRANSPOSE_2D",
@@ -2837,7 +2838,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS_BACK",
 };
 
-static_assert(GGML_OP_COUNT == 76, "GGML_OP_COUNT != 76");
+static_assert(GGML_OP_COUNT == 77, "GGML_OP_COUNT != 77");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -2889,6 +2890,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "rope(x)",
     "rope_back(x)",
     "clamp(x)",
+    "clamp_back(x)",
     "conv_transpose_1d(x)",
     "im2col(x)",
     "conv_transpose_2d(x)",
@@ -2927,7 +2929,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "cross_entropy_loss_back(x,y)",
 };
 
-static_assert(GGML_OP_COUNT == 76, "GGML_OP_COUNT != 76");
+static_assert(GGML_OP_COUNT == 77, "GGML_OP_COUNT != 77");
 
 static_assert(GGML_OP_POOL_COUNT == 2, "GGML_OP_POOL_COUNT != 2");
 
@@ -6648,20 +6650,19 @@ struct ggml_tensor * ggml_rope_back(
 
 // ggml_clamp
 
-struct ggml_tensor * ggml_clamp(
+static struct ggml_tensor * ggml_clamp_impl(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         float                 min,
-        float                 max) {
+        float                 max,
+        bool                  inplace) {
     bool is_node = false;
 
-    if (a->grad) {
-        GGML_ABORT("fatal error"); // TODO: implement backward
+    if (!inplace && a->grad) {
         is_node = true;
     }
 
-    // TODO: when implement backward, fix this:
-    struct ggml_tensor * result = ggml_view_tensor(ctx, a);
+    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
 
     float params[] = { min, max };
     ggml_set_op_params(result, params, sizeof(params));
@@ -6671,6 +6672,64 @@ struct ggml_tensor * ggml_clamp(
     result->src[0] = a;
 
     return result;
+}
+
+struct ggml_tensor * ggml_clamp(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        float                 min,
+        float                 max) {
+    return ggml_clamp_impl(ctx, a, min, max, false);
+}
+
+struct ggml_tensor * ggml_clamp_inplace(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        float                 min,
+        float                 max) {
+    return ggml_clamp_impl(ctx, a, min, max, true);
+}
+
+// ggml_clamp_back
+
+static struct ggml_tensor * ggml_clamp_back_impl(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        float                 min,
+        float                 max,
+        bool                  inplace) {
+    bool is_node = false;
+
+    if (!inplace && a->grad) {
+        is_node = true;
+    }
+
+    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
+
+    float params[] = { min, max };
+    ggml_set_op_params(result, params, sizeof(params));
+
+    result->op   = GGML_OP_CLAMP_BACK;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->src[0] = a;
+
+    return result;
+}
+
+struct ggml_tensor * ggml_clamp_back(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        float                 min,
+        float                 max) {
+    return ggml_clamp_back_impl(ctx, a, min, max, false);
+}
+
+struct ggml_tensor * ggml_clamp_back_inplace(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        float                 min,
+        float                 max) {
+    return ggml_clamp_back_impl(ctx, a, min, max, true);
 }
 
 // ggml_conv_1d
@@ -14159,6 +14218,97 @@ static void ggml_compute_forward_clamp(
     }
 }
 
+// ggml_compute_forward_clamp_back
+
+static void ggml_compute_forward_clamp_back_f32(
+        const struct ggml_compute_params * params,
+        struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src0 = dst->src[0];
+
+    if (params->ith != 0) {
+        return;
+    }
+
+    float min;
+    float max;
+    memcpy(&min, (float *) dst->op_params + 0, sizeof(float));
+    memcpy(&max, (float *) dst->op_params + 1, sizeof(float));
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int n  = ggml_nrows(src0);
+    const int nc = src0->ne[0];
+
+    const size_t nb00 = src0->nb[0];
+    const size_t nb01 = src0->nb[1];
+
+    const size_t nb0 = dst->nb[0];
+    const size_t nb1 = dst->nb[1];
+
+    GGML_ASSERT( nb0 == sizeof(float));
+    GGML_ASSERT(nb00 == sizeof(float));
+
+    for (int j = ith; j < n; j += nth) {
+        float * dst_ptr  = (float *) ((char *)  dst->data + j*nb1);
+        float * src0_ptr = (float *) ((char *) src0->data + j*nb01);
+
+        for (int i = 0; i < nc; i++) {
+            dst_ptr[i] = src0_ptr[i] < min || src0_ptr[i] > max ? 0.0f : 1.0f;
+        }
+    }
+}
+
+static void ggml_compute_forward_clamp_back(
+        const struct ggml_compute_params * params,
+        struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src0 = dst->src[0];
+
+    switch (src0->type) {
+        case GGML_TYPE_F32:
+            {
+                ggml_compute_forward_clamp_back_f32(params, dst);
+            } break;
+        case GGML_TYPE_F16:
+        case GGML_TYPE_BF16:
+        case GGML_TYPE_Q4_0:
+        case GGML_TYPE_Q4_1:
+        case GGML_TYPE_Q5_0:
+        case GGML_TYPE_Q5_1:
+        case GGML_TYPE_Q8_0:
+        case GGML_TYPE_Q8_1:
+        case GGML_TYPE_Q2_K:
+        case GGML_TYPE_Q3_K:
+        case GGML_TYPE_Q4_K:
+        case GGML_TYPE_Q5_K:
+        case GGML_TYPE_Q6_K:
+        case GGML_TYPE_IQ2_XXS:
+        case GGML_TYPE_IQ2_XS:
+        case GGML_TYPE_IQ3_XXS:
+        case GGML_TYPE_IQ1_S:
+        case GGML_TYPE_IQ1_M:
+        case GGML_TYPE_IQ4_NL:
+        case GGML_TYPE_IQ4_XS:
+        case GGML_TYPE_IQ3_S:
+        case GGML_TYPE_IQ2_S:
+        case GGML_TYPE_Q8_K:
+        case GGML_TYPE_Q4_0_4_4:
+        case GGML_TYPE_Q4_0_4_8:
+        case GGML_TYPE_Q4_0_8_8:
+        case GGML_TYPE_I8:
+        case GGML_TYPE_I16:
+        case GGML_TYPE_I32:
+        case GGML_TYPE_I64:
+        case GGML_TYPE_F64:
+        case GGML_TYPE_COUNT:
+            {
+                GGML_ABORT("fatal error");
+            }
+    }
+}
+
 // ggml_compute_forward_rope
 
 static float rope_yarn_ramp(const float low, const float high, const int i0) {
@@ -17088,6 +17238,10 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_clamp(params, tensor);
             } break;
+        case GGML_OP_CLAMP_BACK:
+            {
+                ggml_compute_forward_clamp_back(params, tensor);
+            } break;
         case GGML_OP_CONV_TRANSPOSE_1D:
             {
                 ggml_compute_forward_conv_transpose_1d(params, tensor);
@@ -18077,8 +18231,24 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             } break;
         case GGML_OP_CLAMP:
             {
-                GGML_ABORT("fatal error"); // TODO: not implemented
-            }
+                if (src0->grad) {
+                    float min_max[2];
+                    memcpy(min_max, tensor->op_params, sizeof(min_max));
+
+                    src0->grad =
+                        ggml_add_or_set(ctx, src0->grad,
+                            ggml_mul(ctx,
+                                 tensor->grad,
+                                 ggml_clamp_back(ctx, src0, min_max[0], min_max[1])),
+                            zero_table);
+                }
+            } break;
+        case GGML_OP_CLAMP_BACK:
+            {
+                if (src0->grad) {
+                    // noop
+                }
+            } break;
         case GGML_OP_CONV_TRANSPOSE_1D:
             {
                 GGML_ABORT("fatal error"); // TODO: not implemented
