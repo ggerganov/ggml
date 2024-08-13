@@ -18386,8 +18386,20 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             }
         case GGML_OP_LEAKY_RELU:
             {
-                GGML_ABORT("fatal error"); // TODO: not implemented
-            }
+                if (src0->grad) {
+                    float negative_slope;
+                    memcpy(&negative_slope, tensor->op_params, sizeof(float));
+
+                    src0->grad = ggml_add_or_set(ctx,
+                            src0->grad,
+                            ggml_mul(ctx,
+                                ggml_add(ctx,
+                                    ggml_scale(ctx, ggml_step(ctx, ggml_neg(ctx, src0)), negative_slope),
+                                    ggml_step(ctx, src0)),
+                                tensor->grad),
+                            zero_table);
+                }
+            } break;
         case GGML_OP_FLASH_ATTN_EXT:
             {
                 struct ggml_tensor * flash_grad = NULL;
