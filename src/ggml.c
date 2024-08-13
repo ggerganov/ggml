@@ -17840,8 +17840,39 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             } break;
         case GGML_OP_CONCAT:
             {
-                GGML_ABORT("fatal error"); // TODO: implement
-            }
+                // TODO: test this
+                if (src0->grad) {
+                    struct ggml_tensor * grad_view = ggml_view_4d(ctx,
+                            tensor->grad,
+                            src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3],
+                            tensor->grad->nb[1], tensor->grad->nb[2], tensor->grad->nb[3],
+                            0);
+
+                    src0->grad = ggml_add_or_set(ctx,
+                            src0->grad,
+                            ggml_reshape(ctx, ggml_cont(ctx, grad_view), src0->grad),
+                            zero_table);
+                }
+
+                if (src1->grad) {
+                    int dim = ((int32_t *) tensor->op_params)[0];
+                    size_t offset = src0->ne[dim] * (dim == 0 ? tensor->nb[0] :
+                                                     dim == 1 ? tensor->nb[1] :
+                                                     dim == 2 ? tensor->nb[2] :
+                                                                tensor->nb[3]);
+
+                    struct ggml_tensor * grad_view = ggml_view_4d(ctx,
+                            tensor->grad,
+                            src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3],
+                            tensor->grad->nb[1], tensor->grad->nb[2], tensor->grad->nb[3],
+                            offset);
+
+                    src1->grad = ggml_add_or_set(ctx,
+                            src1->grad,
+                            ggml_reshape(ctx, ggml_cont(ctx, grad_view), src1->grad),
+                            zero_table);
+                }
+            } break;
         case GGML_OP_SILU_BACK:
             {
                 GGML_ABORT("fatal error"); // TODO: not implemented
