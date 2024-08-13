@@ -17863,7 +17863,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
 
                     struct ggml_tensor * grad_view = ggml_view_4d(ctx,
                             tensor->grad,
-                            src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3],
+                            src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3],
                             tensor->grad->nb[1], tensor->grad->nb[2], tensor->grad->nb[3],
                             offset);
 
