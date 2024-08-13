@@ -2318,6 +2318,7 @@ inline static void ggml_vec_sgn_f32  (const int n, float * y, const float * x) {
 inline static void ggml_vec_step_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? 1.f : 0.f; }
 inline static void ggml_vec_tanh_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = tanhf(x[i]);  }
 inline static void ggml_vec_elu_f32  (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? x[i] : expm1f(x[i]); }
+inline static void ggml_vec_elu_back_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? x[i] : expf(x[i]); }
 inline static void ggml_vec_relu_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = (x[i] > 0.f) ? x[i] : 0.f; }
 inline static void ggml_vec_leaky_relu_f32 (const int n, float * y, const float * x, const float ns) { for (int i = 0; i < n; ++i) y[i] = ((x[i] > 0.f) ? x[i] : 0.f) + ns * ((x[i] < 0.0f) ? x[i] : 0.f); }
 inline static void ggml_vec_sigmoid_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = 1.f / (1.f + expf(-x[i])); }
@@ -2941,6 +2942,7 @@ static const char * GGML_UNARY_OP_NAME[GGML_UNARY_OP_COUNT] = {
     "STEP",
     "TANH",
     "ELU",
+    "ELU_BACK",
     "RELU",
     "SIGMOID",
     "GELU",
@@ -2950,7 +2952,7 @@ static const char * GGML_UNARY_OP_NAME[GGML_UNARY_OP_COUNT] = {
     "HARDSIGMOID",
 };
 
-static_assert(GGML_UNARY_OP_COUNT == 13, "GGML_UNARY_OP_COUNT != 13");
+static_assert(GGML_UNARY_OP_COUNT == 14, "GGML_UNARY_OP_COUNT != 14");
 
 
 static_assert(sizeof(struct ggml_object)%GGML_MEM_ALIGN == 0, "ggml_object size must be a multiple of GGML_MEM_ALIGN");
@@ -5213,6 +5215,20 @@ struct ggml_tensor * ggml_elu_inplace(
     struct ggml_context * ctx,
     struct ggml_tensor  * a) {
     return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_ELU);
+}
+
+// ggml_elu_back
+
+struct ggml_tensor * ggml_elu_back(
+    struct ggml_context * ctx,
+    struct ggml_tensor  * a) {
+    return ggml_unary(ctx, a, GGML_UNARY_OP_ELU_BACK);
+}
+
+struct ggml_tensor * ggml_elu_back_inplace(
+    struct ggml_context * ctx,
+    struct ggml_tensor  * a) {
+    return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_ELU_BACK);
 }
 
 // ggml_relu
@@ -11548,6 +11564,50 @@ static void ggml_compute_forward_elu(
     }
 }
 
+// ggml_compute_forward_elu_back
+
+static void ggml_compute_forward_elu_back_f32(
+        const struct ggml_compute_params * params,
+        struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src0 = dst->src[0];
+
+    if (params->ith != 0) {
+        return;
+    }
+
+    assert(ggml_is_contiguous_1(src0));
+    assert(ggml_is_contiguous_1(dst));
+    assert(ggml_are_same_shape(src0, dst));
+
+    const int n  = ggml_nrows(src0);
+    const int nc = src0->ne[0];
+
+    for (int i = 0; i < n; i++) {
+        ggml_vec_elu_back_f32(nc,
+                (float *) ((char *) dst->data  + i*( dst->nb[1])),
+                (float *) ((char *) src0->data + i*(src0->nb[1])));
+    }
+}
+
+static void ggml_compute_forward_elu_back(
+        const struct ggml_compute_params * params,
+        struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src0 = dst->src[0];
+
+    switch (src0->type) {
+        case GGML_TYPE_F32:
+            {
+                ggml_compute_forward_elu_back_f32(params, dst);
+            } break;
+        default:
+            {
+                GGML_ABORT("fatal error");
+            }
+    }
+}
+
 // ggml_compute_forward_relu
 
 static void ggml_compute_forward_relu_f32(
@@ -16504,6 +16564,10 @@ static void ggml_compute_forward_unary(
             {
                 ggml_compute_forward_elu(params, dst);
             } break;
+        case GGML_UNARY_OP_ELU_BACK:
+            {
+                ggml_compute_forward_elu_back(params, dst);
+            } break;
         case GGML_UNARY_OP_RELU:
             {
                 ggml_compute_forward_relu(params, dst);
@@ -18434,6 +18498,17 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                         } break;
                     case GGML_UNARY_OP_ELU:
                         {
+                            if (src0->grad) {
+                                src0->grad = ggml_add_or_set(ctx,
+                                        src0->grad,
+                                        ggml_mul(ctx,
+                                            ggml_elu_back(ctx, src0),
+                                            tensor->grad),
+                                        zero_table);
+                            }
+                        } break;
+                    case GGML_UNARY_OP_ELU_BACK:
+                        {
                             GGML_ABORT("fatal error"); // TODO: not implemented
                         }
                     case GGML_UNARY_OP_RELU:
@@ -18959,6 +19034,7 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
                 case GGML_UNARY_OP_STEP:
                 case GGML_UNARY_OP_TANH:
                 case GGML_UNARY_OP_ELU:
+                case GGML_UNARY_OP_ELU_BACK:
                 case GGML_UNARY_OP_RELU:
                 case GGML_UNARY_OP_SIGMOID:
                 case GGML_UNARY_OP_HARDSWISH:
@@ -19019,6 +19095,7 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
                 n_tasks = n_threads;
             } break;
         case GGML_OP_CLAMP:
+        case GGML_OP_CLAMP_BACK:
             {
                 n_tasks = 1; //TODO
             } break;

@@ -536,6 +536,7 @@ extern "C" {
         GGML_UNARY_OP_STEP,
         GGML_UNARY_OP_TANH,
         GGML_UNARY_OP_ELU,
+        GGML_UNARY_OP_ELU_BACK,
         GGML_UNARY_OP_RELU,
         GGML_UNARY_OP_SIGMOID,
         GGML_UNARY_OP_GELU,
@@ -1072,6 +1073,14 @@ extern "C" {
             struct ggml_tensor  * a);
 
     GGML_API struct ggml_tensor * ggml_elu_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+    GGML_API struct ggml_tensor * ggml_elu_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+    GGML_API struct ggml_tensor * ggml_elu_back_inplace(
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
 
