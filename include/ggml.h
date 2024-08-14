@@ -540,7 +540,9 @@ extern "C" {
         GGML_UNARY_OP_RELU,
         GGML_UNARY_OP_SIGMOID,
         GGML_UNARY_OP_GELU,
+        GGML_UNARY_OP_GELU_BACK,
         GGML_UNARY_OP_GELU_QUICK,
+        GGML_UNARY_OP_GELU_QUICK_BACK,
         GGML_UNARY_OP_SILU,
         GGML_UNARY_OP_HARDSWISH,
         GGML_UNARY_OP_HARDSIGMOID,
@@ -1112,11 +1114,27 @@ extern "C" {
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
 
+    GGML_API struct ggml_tensor * ggml_gelu_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+    GGML_API struct ggml_tensor * ggml_gelu_back_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
     GGML_API struct ggml_tensor * ggml_gelu_quick(
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
 
     GGML_API struct ggml_tensor * ggml_gelu_quick_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+    GGML_API struct ggml_tensor * ggml_gelu_quick_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+    GGML_API struct ggml_tensor * ggml_gelu_quick_back_inplace(
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
 

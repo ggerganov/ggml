@@ -2364,6 +2364,18 @@ inline static void ggml_vec_gelu_f32(const int n, float * y, const float * x) {
 }
 #endif
 
+inline static float ggml_gelu_back_f32(float x) {
+    float v = SQRT_2_OVER_PI * x * (1.0f + GELU_COEF_A*x*x);
+    float cosh_v = coshf(v);
+    return 0.5f*(1 + tanhf(v)) + 0.5f*x*(1.0f/(cosh_v*cosh_v))*SQRT_2_OVER_PI*(1 + 3*GELU_COEF_A*x*x);
+}
+
+inline static void ggml_vec_gelu_back_f32(const int n, float * y, const float * x) {
+    for (int i = 0; i < n; ++i) {
+        y[i] = ggml_gelu_back_f32(x[i]);
+    }
+}
+
 inline static float ggml_gelu_quick_f32(float x) {
     return x*(1.0f/(1.0f+expf(GELU_QUICK_COEF*x)));
 }
@@ -2391,6 +2403,17 @@ inline static void ggml_vec_gelu_quick_f32(const int n, float * y, const float *
     }
 }
 #endif
+
+inline static float ggml_gelu_quick_back_f32(float x) {
+    float ecx = expf(GELU_QUICK_COEF*x);
+    return -(GELU_QUICK_COEF*x*ecx - 1 - ecx)/((1 + ecx)*(1 + ecx));
+}
+
+inline static void ggml_vec_gelu_quick_back_f32(const int n, float * y, const float * x) {
+    for (int i = 0; i < n; ++i) {
+        y[i] = ggml_gelu_quick_back_f32(x[i]);
+    }
+}
 
 // Sigmoid Linear Unit (SiLU) function
 inline static float ggml_silu_f32(float x) {
@@ -2946,13 +2969,15 @@ static const char * GGML_UNARY_OP_NAME[GGML_UNARY_OP_COUNT] = {
     "RELU",
     "SIGMOID",
     "GELU",
+    "GELU_BACK",
     "GELU_QUICK",
+    "GELU_QUICK_BACK",
     "SILU",
     "HARDSWISH",
     "HARDSIGMOID",
 };
 
-static_assert(GGML_UNARY_OP_COUNT == 14, "GGML_UNARY_OP_COUNT != 14");
+static_assert(GGML_UNARY_OP_COUNT == 16, "GGML_UNARY_OP_COUNT != 16");
 
 
 static_assert(sizeof(struct ggml_object)%GGML_MEM_ALIGN == 0, "ggml_object size must be a multiple of GGML_MEM_ALIGN");
@@ -5295,6 +5320,20 @@ struct ggml_tensor * ggml_gelu_inplace(
     return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_GELU);
 }
 
+// ggml_gelu_back
+
+struct ggml_tensor * ggml_gelu_back(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a) {
+    return ggml_unary(ctx, a, GGML_UNARY_OP_GELU_BACK);
+}
+
+struct ggml_tensor * ggml_gelu_back_inplace(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a) {
+    return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_GELU_BACK);
+}
+
 // ggml_gelu_quick
 
 struct ggml_tensor * ggml_gelu_quick(
@@ -5307,6 +5346,20 @@ struct ggml_tensor * ggml_gelu_quick_inplace(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
     return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_GELU_QUICK);
+}
+
+// ggml_gelu_quick
+
+struct ggml_tensor * ggml_gelu_quick_back(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a) {
+    return ggml_unary(ctx, a, GGML_UNARY_OP_GELU_QUICK_BACK);
+}
+
+struct ggml_tensor * ggml_gelu_quick_back_inplace(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a) {
+    return ggml_unary_inplace(ctx, a, GGML_UNARY_OP_GELU_QUICK_BACK);
 }
 
 // ggml_silu
@@ -11755,6 +11808,65 @@ static void ggml_compute_forward_gelu(
     }
 }
 
+// ggml_compute_forward_gelu_back
+
+static void ggml_compute_forward_gelu_back_f32(
+        const struct ggml_compute_params * params,
+        struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src0 = dst->src[0];
+
+    assert(ggml_is_contiguous_1(src0));
+    assert(ggml_is_contiguous_1(dst));
+    assert(ggml_are_same_shape(src0, dst));
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int nc = src0->ne[0];
+    const int nr = ggml_nrows(src0);
+
+    // rows per thread
+    const int dr = (nr + nth - 1)/nth;
+
+    // row range for this thread
+    const int ir0 = dr*ith;
+    const int ir1 = MIN(ir0 + dr, nr);
+
+    for (int i1 = ir0; i1 < ir1; i1++) {
+        ggml_vec_gelu_back_f32(nc,
+                (float *) ((char *) dst->data  + i1*( dst->nb[1])),
+                (float *) ((char *) src0->data + i1*(src0->nb[1])));
+
+#ifndef NDEBUG
+        for (int k = 0; k < nc; k++) {
+            const float x = ((float *) ((char *) dst->data + i1*( dst->nb[1])))[k];
+            UNUSED(x);
+            assert(!isnan(x));
+            assert(!isinf(x));
+        }
+#endif
+    }
+}
+
+static void ggml_compute_forward_gelu_back(
+        const struct ggml_compute_params * params,
+        struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src0 = dst->src[0];
+
+    switch (src0->type) {
+        case GGML_TYPE_F32:
+            {
+                ggml_compute_forward_gelu_back_f32(params, dst);
+            } break;
+        default:
+            {
+                GGML_ABORT("fatal error");
+            }
+    }
+}
+
 // ggml_compute_forward_gelu_quick
 
 static void ggml_compute_forward_gelu_quick_f32(
@@ -11806,6 +11918,65 @@ static void ggml_compute_forward_gelu_quick(
         case GGML_TYPE_F32:
             {
                 ggml_compute_forward_gelu_quick_f32(params, dst);
+            } break;
+        default:
+            {
+                GGML_ABORT("fatal error");
+            }
+    }
+}
+
+// ggml_compute_forward_gelu_quick_back
+
+static void ggml_compute_forward_gelu_quick_back_f32(
+        const struct ggml_compute_params * params,
+        struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src0 = dst->src[0];
+
+    assert(ggml_is_contiguous_1(src0));
+    assert(ggml_is_contiguous_1(dst));
+    assert(ggml_are_same_shape(src0, dst));
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int nc = src0->ne[0];
+    const int nr = ggml_nrows(src0);
+
+    // rows per thread
+    const int dr = (nr + nth - 1)/nth;
+
+    // row range for this thread
+    const int ir0 = dr*ith;
+    const int ir1 = MIN(ir0 + dr, nr);
+
+    for (int i1 = ir0; i1 < ir1; i1++) {
+        ggml_vec_gelu_quick_back_f32(nc,
+                (float *) ((char *) dst->data  + i1*( dst->nb[1])),
+                (float *) ((char *) src0->data + i1*(src0->nb[1])));
+
+#ifndef NDEBUG
+        for (int k = 0; k < nc; k++) {
+            const float x = ((float *) ((char *) dst->data + i1*( dst->nb[1])))[k];
+            UNUSED(x);
+            assert(!isnan(x));
+            assert(!isinf(x));
+        }
+#endif
+    }
+}
+
+static void ggml_compute_forward_gelu_quick_back(
+        const struct ggml_compute_params * params,
+        struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src0 = dst->src[0];
+
+    switch (src0->type) {
+        case GGML_TYPE_F32:
+            {
+                ggml_compute_forward_gelu_quick_back_f32(params, dst);
             } break;
         default:
             {
@@ -16580,9 +16751,17 @@ static void ggml_compute_forward_unary(
             {
                 ggml_compute_forward_gelu(params, dst);
             } break;
+        case GGML_UNARY_OP_GELU_BACK:
+            {
+                ggml_compute_forward_gelu_back(params, dst);
+            } break;
         case GGML_UNARY_OP_GELU_QUICK:
             {
                 ggml_compute_forward_gelu_quick(params, dst);
+            } break;
+        case GGML_UNARY_OP_GELU_QUICK_BACK:
+            {
+                ggml_compute_forward_gelu_quick_back(params, dst);
             } break;
         case GGML_UNARY_OP_SILU:
             {
@@ -18547,9 +18726,31 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                         } break;
                     case GGML_UNARY_OP_GELU:
                         {
+                            if (src0->grad) {
+                                src0->grad = ggml_add_or_set(ctx,
+                                        src0->grad,
+                                        ggml_mul(ctx,
+                                            ggml_gelu_back(ctx, src0),
+                                            tensor->grad),
+                                        zero_table);
+                            }
+                        } break;
+                    case GGML_UNARY_OP_GELU_BACK:
+                        {
                             GGML_ABORT("fatal error"); // TODO: not implemented
                         }
                     case GGML_UNARY_OP_GELU_QUICK:
+                        {
+                            if (src0->grad) {
+                                src0->grad = ggml_add_or_set(ctx,
+                                        src0->grad,
+                                        ggml_mul(ctx,
+                                            ggml_gelu_quick_back(ctx, src0),
+                                            tensor->grad),
+                                        zero_table);
+                            }
+                        } break;
+                    case GGML_UNARY_OP_GELU_QUICK_BACK:
                         {
                             GGML_ABORT("fatal error"); // TODO: not implemented
                         }
@@ -19056,7 +19257,9 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
                     } break;
 
                 case GGML_UNARY_OP_GELU:
+                case GGML_UNARY_OP_GELU_BACK:
                 case GGML_UNARY_OP_GELU_QUICK:
+                case GGML_UNARY_OP_GELU_QUICK_BACK:
                 case GGML_UNARY_OP_SILU:
                     {
                         n_tasks = n_threads;
