@@ -277,6 +277,15 @@ function gg_run_yolo {
     grep -q "truck: 56%" $OUT/${ci}-main.log
     grep -q "bicycle: 59%" $OUT/${ci}-main.log
 
+    python3 ../examples/yolo/gguf_add_file.py yolov3-tiny.gguf yolov3-tiny-data.gguf data/coco.names data/labels/*.png
+
+    (time ./bin/yolov3-tiny -m yolov3-tiny-data.gguf -i ${path_models}/dog.jpg ) 2>&1 | tee -a $OUT/${ci}-main2.log
+
+    grep -q "dog: 57%" $OUT/${ci}-main2.log
+    grep -q "car: 52%" $OUT/${ci}-main2.log
+    grep -q "truck: 56%" $OUT/${ci}-main2.log
+    grep -q "bicycle: 59%" $OUT/${ci}-main2.log
+
     set +e
 }
 
