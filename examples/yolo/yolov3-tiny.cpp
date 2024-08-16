@@ -91,7 +91,6 @@ static bool load_model(const std::string & fname, yolo_model & model) {
 
 #ifdef GGML_USE_METAL
     fprintf(stderr, "%s: using Metal backend\n", __func__);
-    ggml_backend_metal_log_set_callback(ggml_log_callback_default, nullptr);
     model.backend = ggml_backend_metal_init();
     if (!model.backend) {
         fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
