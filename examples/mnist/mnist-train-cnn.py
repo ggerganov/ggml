@@ -17,8 +17,8 @@ def train(model_path):
     (x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
 
     # Scale images to the [0, 1] range
-    x_train = x_train.astype("float32")
-    x_test = x_test.astype("float32")
+    x_train = x_train.astype("float32") / 255
+    x_test = x_test.astype("float32") / 255
     x_train = np.expand_dims(x_train, -1)
     x_test = np.expand_dims(x_test, -1)
     print("x_train shape:", x_train.shape)
@@ -56,28 +56,28 @@ def train(model_path):
 
     gguf_writer = gguf.GGUFWriter(model_path, "mnist-cnn")
 
-    kernel1 = model.layers[0].weights[0].numpy()
-    kernel1 = np.moveaxis(kernel1, [2,3], [0,1])
-    gguf_writer.add_tensor("kernel1", kernel1, raw_shape=(8, 1, 3, 3))
+    conv1_kernel = model.layers[0].weights[0].numpy()
+    conv1_kernel = np.moveaxis(conv1_kernel, [2, 3], [0, 1])
+    gguf_writer.add_tensor("conv1.kernel", conv1_kernel, raw_shape=(8, 1, 3, 3))
 
-    bias1 = model.layers[0].weights[1].numpy()
-    bias1 = np.repeat(bias1, 28*28)
-    gguf_writer.add_tensor("bias1", bias1, raw_shape=(1, 8, 28, 28))
+    conv1_bias = model.layers[0].weights[1].numpy()
+    conv1_bias = np.repeat(conv1_bias, 28*28)
+    gguf_writer.add_tensor("conv1.bias", conv1_bias, raw_shape=(1, 8, 28, 28))
 
-    kernel2 = model.layers[2].weights[0].numpy()
-    kernel2 = np.moveaxis(kernel2, [0,1,2,3], [2,3,1,0])
-    gguf_writer.add_tensor("kernel2", kernel2, raw_shape=(16, 8, 3, 3))
+    conv2_kernel = model.layers[2].weights[0].numpy()
+    conv2_kernel = np.moveaxis(conv2_kernel, [0, 1, 2, 3], [2, 3, 1, 0])
+    gguf_writer.add_tensor("conv2.kernel", conv2_kernel, raw_shape=(16, 8, 3, 3))
 
-    bias2 = model.layers[2].weights[1].numpy()
-    bias2 = np.repeat(bias2, 14*14)
-    gguf_writer.add_tensor("bias2", bias2, raw_shape=(1, 16, 14, 14))
+    conv2_bias = model.layers[2].weights[1].numpy()
+    conv2_bias = np.repeat(conv2_bias, 14*14)
+    gguf_writer.add_tensor("conv2.bias", conv2_bias, raw_shape=(1, 16, 14, 14))
 
-    dense_w = model.layers[-1].weights[0].numpy()
-    dense_w = dense_w.transpose()
-    gguf_writer.add_tensor("dense_w", dense_w, raw_shape=(10, 7*7*16))
+    dense_weight = model.layers[-1].weights[0].numpy()
+    dense_weight = dense_weight.transpose()
+    gguf_writer.add_tensor("dense.weight", dense_weight, raw_shape=(10, 7*7*16))
 
-    dense_b = model.layers[-1].weights[1].numpy()
-    gguf_writer.add_tensor("dense_b", dense_b)
+    dense_bias = model.layers[-1].weights[1].numpy()
+    gguf_writer.add_tensor("dense.bias", dense_bias)
 
     gguf_writer.write_header_to_file()
     gguf_writer.write_kv_data_to_file()

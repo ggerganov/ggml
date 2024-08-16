@@ -10,7 +10,6 @@
 #include <fstream>
 #include <string>
 #include <vector>
-#include <algorithm>
 
 #if defined(_MSC_VER)
 #pragma warning(disable: 4244 4267) // possible loss of data
@@ -21,22 +20,18 @@ extern "C" {
 #endif
 
 int wasm_eval(uint8_t * digitPtr) {
-    mnist_model model;
-    // FIXME
-    // if (!mnist_model_load("models/mnist/ggml-model-f32.bin", model)) {
-    //     fprintf(stderr, "error loading model\n");
-    //     return -1;
-    // }
-    std::vector<float> digit(digitPtr, digitPtr + 784);
-    // int result = mnist_eval(model, 1, digit, nullptr); // FIXME
-    int result = -1;
-    ggml_free(model.ctx_weight); // FIXME
+    std::vector<float> digit(digitPtr, digitPtr + MNIST_NINPUT);
+    std::vector<float> labels(MNIST_NCLASSES);
 
-    return result;
+    mnist_model model = mnist_model_init_from_file("models/MNIST/mnist-fc-f32.gguf");
+    mnist_model_build(model);
+    mnist_eval_result result = mnist_model_eval(model, digit.data(), labels.data(), 1);
+
+    return result.pred[0];
 }
 
 int wasm_random_digit(char * digitPtr) {
-    auto fin = std::ifstream("models/mnist/t10k-images.idx3-ubyte", std::ios::binary);
+    auto fin = std::ifstream("data/MNIST/raw/t10k-images-idx3-ubyte", std::ios::binary);
     if (!fin) {
         fprintf(stderr, "failed to open digits file\n");
         return 0;
@@ -44,8 +39,8 @@ int wasm_random_digit(char * digitPtr) {
     srand(time(NULL));
 
     // Seek to a random digit: 16-byte header + 28*28 * (random 0 - 10000)
-    fin.seekg(16 + 784 * (rand() % 10000));
-    fin.read(digitPtr, 784);
+    fin.seekg(16 + MNIST_NINPUT * (rand() % MNIST_NTEST));
+    fin.read(digitPtr, MNIST_NINPUT);
 
     return 1;
 }

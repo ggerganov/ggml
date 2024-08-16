@@ -10,6 +10,7 @@
 #include <fstream>
 #include <random>
 #include <string>
+#include <thread>
 #include <utility>
 
 bool mnist_image_load(const std::string & fname, float * buf, const int nex) {
@@ -26,7 +27,7 @@ bool mnist_image_load(const std::string & fname, float * buf, const int nex) {
         fin.read((char *) image, sizeof(image));
 
         for (int i = 0; i < MNIST_NINPUT; ++i) {
-            buf[iex*MNIST_NINPUT + i] = image[i];
+            buf[iex*MNIST_NINPUT + i] = image[i] / 255.0f; // Normalize to [0, 1]
         }
     }
 
@@ -38,8 +39,12 @@ void mnist_image_print(FILE * stream, const float * image) {
 
     for (int row = 0; row < 28; row++) {
         for (int col = 0; col < 28; col++) {
-            const int rgb = roundf(image[row*28 + col]);
-            fprintf(stream, "\033[48;2;%d;%d;%dm  \033[0m", rgb, rgb, rgb);
+            const int rgb = roundf(255.0f * image[row*28 + col]);
+#ifdef _WIN32
+            fprintf(stream, "%s", rgb >= 220 ? "##" : "__");                // Represented via text.
+#else
+            fprintf(stream, "\033[48;2;%d;%d;%dm  \033[0m", rgb, rgb, rgb); // Represented via colored blocks.
+#endif // _WIN32
         }
         fprintf(stream, "\n");
     }
@@ -124,7 +129,7 @@ mnist_eval_result mnist_graph_eval(const std::string & fname, const float * imag
 
         for (int iex0; iex0 < nex; iex0 += nbatch) {
             memcpy(images_batch->data, images + iex0*MNIST_NINPUT, ggml_nbytes(images_batch));
-            ggml_graph_compute_with_ctx(ctx_compute, gf, 16);
+            ggml_graph_compute_with_ctx(ctx_compute, gf, std::thread::hardware_concurrency());
 
             for (int iexb = 0; iexb < nbatch; ++iexb) {
                 const float * probs_data = ggml_get_data_f32(logits_batch) + iexb*MNIST_NCLASSES;
@@ -191,42 +196,42 @@ mnist_model mnist_model_init_from_file(const std::string & fname) {
         GGML_ASSERT(model.fc2_bias->ne[2] == 1);
         GGML_ASSERT(model.fc2_bias->ne[3] == 1);
     } else if (model.arch == "mnist-cnn") {
-        model.conv2d_1_kernel = ggml_get_tensor(model.ctx_weight, "kernel1");
-        GGML_ASSERT(model.conv2d_1_kernel->type == GGML_TYPE_F32);
-        GGML_ASSERT(model.conv2d_1_kernel->ne[0] == 3);
-        GGML_ASSERT(model.conv2d_1_kernel->ne[1] == 3);
-        GGML_ASSERT(model.conv2d_1_kernel->ne[2] == 1);
-        GGML_ASSERT(model.conv2d_1_kernel->ne[3] == MNIST_CNN_NCB);
+        model.conv1_kernel = ggml_get_tensor(model.ctx_weight, "conv1.kernel");
+        GGML_ASSERT(model.conv1_kernel->type == GGML_TYPE_F32);
+        GGML_ASSERT(model.conv1_kernel->ne[0] == 3);
+        GGML_ASSERT(model.conv1_kernel->ne[1] == 3);
+        GGML_ASSERT(model.conv1_kernel->ne[2] == 1);
+        GGML_ASSERT(model.conv1_kernel->ne[3] == MNIST_CNN_NCB);
 
-        model.conv2d_1_bias = ggml_get_tensor(model.ctx_weight, "bias1");
-        GGML_ASSERT(model.conv2d_1_bias->type == GGML_TYPE_F32);
-        GGML_ASSERT(model.conv2d_1_bias->ne[0] == MNIST_HW);
-        GGML_ASSERT(model.conv2d_1_bias->ne[1] == MNIST_HW);
-        GGML_ASSERT(model.conv2d_1_bias->ne[2] == MNIST_CNN_NCB);
-        GGML_ASSERT(model.conv2d_1_bias->ne[3] == 1);
+        model.conv1_bias = ggml_get_tensor(model.ctx_weight, "conv1.bias");
+        GGML_ASSERT(model.conv1_bias->type == GGML_TYPE_F32);
+        GGML_ASSERT(model.conv1_bias->ne[0] == MNIST_HW);
+        GGML_ASSERT(model.conv1_bias->ne[1] == MNIST_HW);
+        GGML_ASSERT(model.conv1_bias->ne[2] == MNIST_CNN_NCB);
+        GGML_ASSERT(model.conv1_bias->ne[3] == 1);
 
-        model.conv2d_2_kernel = ggml_get_tensor(model.ctx_weight, "kernel2");
-        GGML_ASSERT(model.conv2d_2_kernel->type == GGML_TYPE_F32);
-        GGML_ASSERT(model.conv2d_2_kernel->ne[0] == 3);
-        GGML_ASSERT(model.conv2d_2_kernel->ne[1] == 3);
-        GGML_ASSERT(model.conv2d_2_kernel->ne[2] == MNIST_CNN_NCB);
-        GGML_ASSERT(model.conv2d_2_kernel->ne[3] == MNIST_CNN_NCB*2);
+        model.conv2_kernel = ggml_get_tensor(model.ctx_weight, "conv2.kernel");
+        GGML_ASSERT(model.conv2_kernel->type == GGML_TYPE_F32);
+        GGML_ASSERT(model.conv2_kernel->ne[0] == 3);
+        GGML_ASSERT(model.conv2_kernel->ne[1] == 3);
+        GGML_ASSERT(model.conv2_kernel->ne[2] == MNIST_CNN_NCB);
+        GGML_ASSERT(model.conv2_kernel->ne[3] == MNIST_CNN_NCB*2);
 
-        model.conv2d_2_bias = ggml_get_tensor(model.ctx_weight, "bias2");
-        GGML_ASSERT(model.conv2d_2_bias->type == GGML_TYPE_F32);
-        GGML_ASSERT(model.conv2d_2_bias->ne[0] == MNIST_HW/2);
-        GGML_ASSERT(model.conv2d_2_bias->ne[1] == MNIST_HW/2);
-        GGML_ASSERT(model.conv2d_2_bias->ne[2] == MNIST_CNN_NCB*2);
-        GGML_ASSERT(model.conv2d_2_bias->ne[3] == 1);
+        model.conv2_bias = ggml_get_tensor(model.ctx_weight, "conv2.bias");
+        GGML_ASSERT(model.conv2_bias->type == GGML_TYPE_F32);
+        GGML_ASSERT(model.conv2_bias->ne[0] == MNIST_HW/2);
+        GGML_ASSERT(model.conv2_bias->ne[1] == MNIST_HW/2);
+        GGML_ASSERT(model.conv2_bias->ne[2] == MNIST_CNN_NCB*2);
+        GGML_ASSERT(model.conv2_bias->ne[3] == 1);
 
-        model.dense_weight = ggml_get_tensor(model.ctx_weight, "dense_w");
+        model.dense_weight = ggml_get_tensor(model.ctx_weight, "dense.weight");
         GGML_ASSERT(model.dense_weight->type == GGML_TYPE_F32);
         GGML_ASSERT(model.dense_weight->ne[0] == (MNIST_HW/4)*(MNIST_HW/4)*(MNIST_CNN_NCB*2));
         GGML_ASSERT(model.dense_weight->ne[1] == MNIST_NCLASSES);
         GGML_ASSERT(model.dense_weight->ne[2] == 1);
         GGML_ASSERT(model.dense_weight->ne[3] == 1);
 
-        model.dense_bias = ggml_get_tensor(model.ctx_weight, "dense_b");
+        model.dense_bias = ggml_get_tensor(model.ctx_weight, "dense.bias");
         GGML_ASSERT(model.dense_bias->type == GGML_TYPE_F32);
         GGML_ASSERT(model.dense_bias->ne[0] == MNIST_NCLASSES);
         GGML_ASSERT(model.dense_bias->ne[1] == 1);
@@ -235,12 +240,18 @@ mnist_model mnist_model_init_from_file(const std::string & fname) {
     } else {
         fprintf(stderr, "%s: unknown model arch: %s\n", __func__, model.arch.c_str());
     }
+    fprintf(stderr, "%s: successfully loaded weights from %s\n", __func__, fname.c_str());
     return model;
 }
 
 mnist_model mnist_model_init_random(const std::string & arch) {
     mnist_model model;
     model.arch = arch;
+
+    std::random_device rd{};
+    std::mt19937 gen{rd()};
+    std::normal_distribution<float> nd{0.0f, 1e-2f};
+    std::vector<ggml_tensor *> init_tensors;
 
     if (model.arch == "mnist-fc") {
         fprintf(stderr, "%s: initializing random weights for a fully connected model\n", __func__);
@@ -249,17 +260,51 @@ mnist_model mnist_model_init_random(const std::string & arch) {
         model.fc1_bias   = ggml_new_tensor_1d(model.ctx_weight, GGML_TYPE_F32,                MNIST_NHIDDEN);
         model.fc2_weight = ggml_new_tensor_2d(model.ctx_weight, GGML_TYPE_F32, MNIST_NHIDDEN, MNIST_NCLASSES);
         model.fc2_bias   = ggml_new_tensor_1d(model.ctx_weight, GGML_TYPE_F32,                MNIST_NCLASSES);
-    } else if (model.arch == "mnist-cnn") {
-        model.conv2d_1_kernel = ggml_new_tensor_4d(model.ctx_weight, GGML_TYPE_F32, 3, 3, 1, MNIST_CNN_NCB);
-        model.conv2d_1_bias   = ggml_new_tensor_3d(model.ctx_weight, GGML_TYPE_F32, MNIST_HW, MNIST_HW, MNIST_CNN_NCB);
-        model.conv2d_2_kernel = ggml_new_tensor_4d(model.ctx_weight, GGML_TYPE_F32, 3, 3, MNIST_CNN_NCB, MNIST_CNN_NCB*2);
-        model.conv2d_2_bias   = ggml_new_tensor_3d(model.ctx_weight, GGML_TYPE_F32, MNIST_HW/2, MNIST_HW/2, MNIST_CNN_NCB*2);
 
-        model.dense_weight    = ggml_new_tensor_2d(model.ctx_weight, GGML_TYPE_F32, (MNIST_HW/4)*(MNIST_HW/4)*(MNIST_CNN_NCB*2), MNIST_NCLASSES);
-        model.dense_bias      = ggml_new_tensor_1d(model.ctx_weight, GGML_TYPE_F32, MNIST_NCLASSES);
+        ggml_set_name(model.fc1_weight, "fc1.weight");
+        ggml_set_name(model.fc1_bias,   "fc1.bias");
+        ggml_set_name(model.fc2_weight, "fc2.weight");
+        ggml_set_name(model.fc2_bias,   "fc2.bias");
+
+        init_tensors.push_back(model.fc1_weight);
+        init_tensors.push_back(model.fc1_bias);
+        init_tensors.push_back(model.fc2_weight);
+        init_tensors.push_back(model.fc2_bias);
+    } else if (model.arch == "mnist-cnn") {
+        model.conv1_kernel = ggml_new_tensor_4d(model.ctx_weight, GGML_TYPE_F32, 3, 3, 1, MNIST_CNN_NCB);
+        model.conv1_bias   = ggml_new_tensor_3d(model.ctx_weight, GGML_TYPE_F32, MNIST_HW, MNIST_HW, MNIST_CNN_NCB);
+        model.conv2_kernel = ggml_new_tensor_4d(model.ctx_weight, GGML_TYPE_F32, 3, 3, MNIST_CNN_NCB, MNIST_CNN_NCB*2);
+        model.conv2_bias   = ggml_new_tensor_3d(model.ctx_weight, GGML_TYPE_F32, MNIST_HW/2, MNIST_HW/2, MNIST_CNN_NCB*2);
+        model.dense_weight = ggml_new_tensor_2d(model.ctx_weight, GGML_TYPE_F32, (MNIST_HW/4)*(MNIST_HW/4)*(MNIST_CNN_NCB*2), MNIST_NCLASSES);
+        model.dense_bias   = ggml_new_tensor_1d(model.ctx_weight, GGML_TYPE_F32, MNIST_NCLASSES);
+
+        ggml_set_name(model.conv1_kernel, "conv1.kernel");
+        ggml_set_name(model.conv1_bias,   "conv1.bias");
+        ggml_set_name(model.conv2_kernel, "conv2.kernel");
+        ggml_set_name(model.conv2_bias,   "conv2.bias");
+        ggml_set_name(model.dense_weight, "dense.weight");
+        ggml_set_name(model.dense_bias,   "dense.bias");
+
+        init_tensors.push_back(model.conv1_kernel);
+        init_tensors.push_back(model.conv1_bias);
+        init_tensors.push_back(model.conv2_kernel);
+        init_tensors.push_back(model.conv2_bias);
+        init_tensors.push_back(model.dense_weight);
+        init_tensors.push_back(model.dense_bias);
     } else {
         fprintf(stderr, "%s: unknown model arch: %s\n", __func__, model.arch.c_str());
     }
+
+    for (ggml_tensor * t : init_tensors) {
+        GGML_ASSERT(t->type == GGML_TYPE_F32);
+        float * data = ggml_get_data_f32(t);
+        const int64_t ne = ggml_nelements(t);
+
+        for (int64_t i = 0; i < ne; ++i) {
+            data[i] = nd(gen);
+        }
+    }
+
     return model;
 }
 
@@ -269,11 +314,6 @@ void mnist_model_build(mnist_model & model) {
         ggml_set_param(model.ctx_compute, model.fc1_bias);
         ggml_set_param(model.ctx_compute, model.fc2_weight);
         ggml_set_param(model.ctx_compute, model.fc2_bias);
-
-        ggml_set_name(model.fc1_weight, "fc1.weight");
-        ggml_set_name(model.fc1_bias,   "fc1.bias");
-        ggml_set_name(model.fc2_weight, "fc2.weight");
-        ggml_set_name(model.fc2_bias,   "fc2.bias");
 
         model.images = ggml_new_tensor_2d(model.ctx_compute, GGML_TYPE_F32, MNIST_NINPUT, MNIST_NBATCH);
         ggml_set_input(model.images);
@@ -299,25 +339,18 @@ void mnist_model_build(mnist_model & model) {
             ggml_mul_mat(model.ctx_compute, model.fc2_weight, fc1),
             fc2_bias);
     } else if (model.arch == "mnist-cnn") {
-        ggml_set_param(model.ctx_compute, model.conv2d_1_kernel);
-        ggml_set_param(model.ctx_compute, model.conv2d_1_bias);
-        ggml_set_param(model.ctx_compute, model.conv2d_2_kernel);
-        ggml_set_param(model.ctx_compute, model.conv2d_2_bias);
+        ggml_set_param(model.ctx_compute, model.conv1_kernel);
+        ggml_set_param(model.ctx_compute, model.conv1_bias);
+        ggml_set_param(model.ctx_compute, model.conv2_kernel);
+        ggml_set_param(model.ctx_compute, model.conv2_bias);
         ggml_set_param(model.ctx_compute, model.dense_weight);
         ggml_set_param(model.ctx_compute, model.dense_bias);
-
-        ggml_set_name(model.conv2d_1_kernel, "kernel1");
-        ggml_set_name(model.conv2d_1_bias,   "bias1");
-        ggml_set_name(model.conv2d_2_kernel, "kernel2");
-        ggml_set_name(model.conv2d_2_bias,   "bias2");
-        ggml_set_name(model.dense_weight,    "dense_w");
-        ggml_set_name(model.dense_bias,      "dense_b");
 
         model.images = ggml_new_tensor_4d(model.ctx_compute, GGML_TYPE_F32, 28, 28, 1, MNIST_NBATCH);
         ggml_set_input(model.images);
         ggml_set_name(model.images, "images");
 
-        struct ggml_tensor * conv2d_1_bias = model.conv2d_1_bias;
+        struct ggml_tensor * conv2d_1_bias = model.conv1_bias;
         if (MNIST_NBATCH > 1) {
             int64_t ne[4];
             memcpy(ne, conv2d_1_bias->ne, sizeof(ne));
@@ -326,7 +359,7 @@ void mnist_model_build(mnist_model & model) {
         }
 
         struct ggml_tensor * conv1_out = ggml_relu(model.ctx_compute, ggml_add(model.ctx_compute,
-            ggml_conv_2d(model.ctx_compute, model.conv2d_1_kernel, model.images, 1, 1, 1, 1, 1, 1),
+            ggml_conv_2d(model.ctx_compute, model.conv1_kernel, model.images, 1, 1, 1, 1, 1, 1),
             conv2d_1_bias));
         GGML_ASSERT(conv1_out->ne[0] == MNIST_HW);
         GGML_ASSERT(conv1_out->ne[1] == MNIST_HW);
@@ -339,7 +372,7 @@ void mnist_model_build(mnist_model & model) {
         GGML_ASSERT(conv2_in->ne[2] == MNIST_CNN_NCB);
         GGML_ASSERT(conv2_in->ne[3] == MNIST_NBATCH);
 
-        struct ggml_tensor * conv2d_2_bias = model.conv2d_2_bias;
+        struct ggml_tensor * conv2d_2_bias = model.conv2_bias;
         if (MNIST_NBATCH > 1) {
             int64_t ne[4];
             memcpy(ne, conv2d_2_bias->ne, sizeof(ne));
@@ -348,7 +381,7 @@ void mnist_model_build(mnist_model & model) {
         }
 
         struct ggml_tensor * conv2_out = ggml_relu(model.ctx_compute, ggml_add(model.ctx_compute,
-            ggml_conv_2d(model.ctx_compute, model.conv2d_2_kernel, conv2_in, 1, 1, 1, 1, 1, 1),
+            ggml_conv_2d(model.ctx_compute, model.conv2_kernel, conv2_in, 1, 1, 1, 1, 1, 1),
             conv2d_2_bias));
         GGML_ASSERT(conv2_out->ne[0] == MNIST_HW/2);
         GGML_ASSERT(conv2_out->ne[1] == MNIST_HW/2);
@@ -400,7 +433,6 @@ void mnist_model_build(mnist_model & model) {
 mnist_eval_result mnist_model_eval(const mnist_model & model, const float * images, const float * labels, const int nex) {
     mnist_eval_result result;
 
-
     struct ggml_cgraph * gf = ggml_new_graph(model.ctx_compute);
     ggml_build_forward_expand(gf, model.loss);
 
@@ -434,48 +466,6 @@ mnist_eval_result mnist_model_eval(const mnist_model & model, const float * imag
 void mnist_model_train(const float * images, const float * labels, const int nex, mnist_model & model) {
     const int64_t t_start_us = ggml_time_us();
 
-    std::random_device rd{};
-    std::mt19937 gen{rd()};
-    std::normal_distribution<float> nd1{0.0f, 1.0f/sqrtf(MNIST_NINPUT*MNIST_NHIDDEN)};
-    std::normal_distribution<float> nd2{0.0f, 1.0f/sqrtf(MNIST_NHIDDEN*MNIST_NCLASSES)};
-
-    if (model.arch == "mnist-fc") {
-        for (ggml_tensor * t : {model.fc1_weight, model.fc1_bias}) {
-            float * data = (float *) t->data;
-            const int64_t ne = ggml_nelements(t);
-
-            for (int64_t i = 0; i < ne; ++i) {
-                data[i] = nd1(gen);
-            }
-        }
-        for (ggml_tensor * t : {model.fc2_weight, model.fc2_bias}) {
-            float * data = (float *) t->data;
-            const int64_t ne = ggml_nelements(t);
-
-            for (int64_t i = 0; i < ne; ++i) {
-                data[i] = nd2(gen);
-            }
-        }
-    } else if (model.arch == "mnist-cnn") {
-        for (ggml_tensor * t : {model.conv2d_1_kernel, model.conv2d_1_bias, model.conv2d_2_kernel, model.conv2d_2_bias, model.dense_weight, model.dense_bias}) {
-            const int64_t ne = ggml_nelements(t);
-
-            if (t->type == GGML_TYPE_F32) {
-                float * data = (float *) t->data;
-                for (int64_t i = 0; i < ne; ++i) {
-                    data[i] = nd1(gen);
-                }
-            } else if (t->type == GGML_TYPE_F16) {
-                ggml_fp16_t * data = (ggml_fp16_t *) t->data;
-                for (int64_t i = 0; i < ne; ++i) {
-                    data[i] = ggml_fp32_to_fp16(nd1(gen));
-                }
-            } else {
-                GGML_ASSERT(false);
-            }
-        }
-    }
-
     struct ggml_cgraph * gf = ggml_new_graph_custom(model.ctx_compute, 16384, true);
     ggml_build_forward_expand(gf, model.loss);
 
@@ -486,8 +476,8 @@ void mnist_model_train(const float * images, const float * labels, const int nex
     struct ggml_opt_params  opt_pars = ggml_opt_default_params(GGML_OPT_TYPE_ADAM);
     opt_pars.print_forward_graph = false;
     opt_pars.print_backward_graph = false;
-    opt_pars.n_threads = 16;
-    opt_pars.adam.n_iter = 1;
+    opt_pars.n_threads = std::thread::hardware_concurrency();
+    opt_pars.adam.n_iter = 1; // per call of ggml_opt_resume_g
     ggml_opt_init(model.ctx_compute, &opt_ctx, opt_pars, 0);
 
     for (int epoch = 0; epoch < 20; ++epoch) {
@@ -495,7 +485,7 @@ void mnist_model_train(const float * images, const float * labels, const int nex
         const int64_t t_start_us = ggml_time_us();
         mnist_eval_result result;
         for (int iex0 = 0; iex0 < nex; iex0 += MNIST_NBATCH) {
-            memcpy(model.images->data,  images + iex0*MNIST_NINPUT,   ggml_nbytes(model.images));
+            memcpy(model.images->data, images + iex0*MNIST_NINPUT,   ggml_nbytes(model.images));
             memcpy(model.labels->data, labels + iex0*MNIST_NCLASSES, ggml_nbytes(model.labels));
 
             enum ggml_opt_result opt_result = ggml_opt_resume_g(model.ctx_compute, &opt_ctx, model.loss, gf, gb, NULL, NULL);
@@ -521,10 +511,7 @@ void mnist_model_train(const float * images, const float * labels, const int nex
     const double t_total_s = 1e-6*t_total_us;
     fprintf(stderr, "%s: training took %.2lfs\n", __func__, t_total_s);
 
-    std::string fname("models/MNIST/");
-    fname += model.arch;
-    fname += "-f32.ggml";
-
+    std::string fname = model.arch + "-f32.ggml";
     fprintf(stderr, "%s: saving the ggml graph for the forward pass to %s\n", __func__, fname.c_str());
     ggml_graph_export(gf, fname.c_str());
 }
@@ -541,10 +528,10 @@ void mnist_model_save(const std::string & fname, mnist_model & model) {
         gguf_add_tensor(gguf_ctx, model.fc2_weight);
         gguf_add_tensor(gguf_ctx, model.fc2_bias);
     } else if (model.arch == "mnist-cnn") {
-        gguf_add_tensor(gguf_ctx, model.conv2d_1_kernel);
-        gguf_add_tensor(gguf_ctx, model.conv2d_1_bias);
-        gguf_add_tensor(gguf_ctx, model.conv2d_2_kernel);
-        gguf_add_tensor(gguf_ctx, model.conv2d_2_bias);
+        gguf_add_tensor(gguf_ctx, model.conv1_kernel);
+        gguf_add_tensor(gguf_ctx, model.conv1_bias);
+        gguf_add_tensor(gguf_ctx, model.conv2_kernel);
+        gguf_add_tensor(gguf_ctx, model.conv2_bias);
         gguf_add_tensor(gguf_ctx, model.dense_weight);
         gguf_add_tensor(gguf_ctx, model.dense_bias);
     } else {
@@ -554,6 +541,9 @@ void mnist_model_save(const std::string & fname, mnist_model & model) {
 }
 
 std::pair<double, double> mnist_loss(const mnist_eval_result & result) {
+    const size_t nbatches = result.loss.size();
+    GGML_ASSERT(nbatches >= 1);
+
     double sum         = 0.0;
     double sum_squared = 0.0;
 
@@ -562,8 +552,8 @@ std::pair<double, double> mnist_loss(const mnist_eval_result & result) {
         sum_squared += loss*loss;
     }
 
-    const double mean        = sum/result.loss.size();
-    const double uncertainty = sqrt((sum_squared/result.loss.size() - mean*mean) / (result.loss.size() - 1));
+    const double mean        = sum/nbatches;
+    const double uncertainty = sqrt((sum_squared/nbatches - mean*mean) / (nbatches - 1));
 
     return std::make_pair(mean, uncertainty);
 }
@@ -581,7 +571,7 @@ std::pair<double, double> mnist_accuracy(const mnist_eval_result & result, const
     }
 
     const double fraction_correct = ((double) ncorrect) / ((double) nex);
-    const double uncertainty = sqrt(fraction_correct * (1.0 - fraction_correct) / (nex - 1));
+    const double uncertainty      = sqrt(fraction_correct * (1.0 - fraction_correct) / (nex - 1));
 
     return std::make_pair(fraction_correct, uncertainty);
 }

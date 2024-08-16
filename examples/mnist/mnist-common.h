@@ -33,10 +33,10 @@ struct mnist_model {
     struct ggml_tensor * fc2_weight = nullptr;
     struct ggml_tensor * fc2_bias   = nullptr;
 
-    struct ggml_tensor * conv2d_1_kernel = nullptr;
-    struct ggml_tensor * conv2d_1_bias   = nullptr;
-    struct ggml_tensor * conv2d_2_kernel = nullptr;
-    struct ggml_tensor * conv2d_2_bias   = nullptr;
+    struct ggml_tensor * conv1_kernel = nullptr;
+    struct ggml_tensor * conv1_bias   = nullptr;
+    struct ggml_tensor * conv2_kernel = nullptr;
+    struct ggml_tensor * conv2_bias   = nullptr;
     struct ggml_tensor * dense_weight    = nullptr;
     struct ggml_tensor * dense_bias      = nullptr;
 
