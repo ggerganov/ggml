@@ -38,8 +38,8 @@ struct mnist_model {
     struct ggml_tensor * conv1_bias   = nullptr;
     struct ggml_tensor * conv2_kernel = nullptr;
     struct ggml_tensor * conv2_bias   = nullptr;
-    struct ggml_tensor * dense_weight    = nullptr;
-    struct ggml_tensor * dense_bias      = nullptr;
+    struct ggml_tensor * dense_weight = nullptr;
+    struct ggml_tensor * dense_bias   = nullptr;
 
     static const size_t size_weight  = 100 *      1024*1024;
     static const size_t size_compute =   1 * 1024*1024*1024;

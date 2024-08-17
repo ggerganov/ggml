@@ -4498,8 +4498,6 @@ static struct ggml_tensor * ggml_add_impl(
     bool is_node = false;
 
     if (!inplace && (a->grad || b->grad)) {
-        // TODO: support backward pass for broadcasting
-        GGML_ASSERT(ggml_are_same_shape(a, b));
         is_node = true;
     }
 
@@ -17771,7 +17769,11 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                     src0->grad = ggml_add_or_set(ctx, src0->grad, tensor->grad, zero_table);
                 }
                 if (src1->grad) {
-                    src1->grad = ggml_add_or_set(ctx, src1->grad, tensor->grad, zero_table);
+                    if (ggml_are_same_shape(src0, src1)) {
+                        src1->grad = ggml_add_or_set(ctx, src1->grad,                       tensor->grad,        zero_table);
+                    } else {
+                        src1->grad = ggml_add_or_set(ctx, src1->grad, ggml_repeat_back(ctx, tensor->grad, src1), zero_table);
+                    }
                 }
             } break;
         case GGML_OP_ADD1:
