@@ -1,6 +1,7 @@
 # MNIST Examples for GGML
 
 This directory contains simple examples of how to use GGML for training and inference using the [MNIST dataset](https://yann.lecun.com/exdb/mnist/).
+All commands listed in this README assume the working directory to be `examples/mnist`.
 Please note that training in GGML is a work-in-progress and not production ready.
 
 ## Obtaining the data
@@ -13,7 +14,7 @@ For our first example we will train a fully connected network.
 To train a fully connected model in PyTorch and save it as a GGUF file, run:
 
 ```bash
-$ python3 ../examples/mnist/mnist-train-fc.py mnist-fc-f32.gguf
+$ python3 mnist-train-fc.py mnist-fc-f32.gguf
 
 ...
 
@@ -30,7 +31,7 @@ The training script includes an evaluation of the model on the test set.
 To evaluate the model using GGML, run:
 
 ```bash
-$ bin/mnist-eval mnist-fc-f32.gguf data/MNIST/raw/t10k-images-idx3-ubyte data/MNIST/raw/t10k-labels-idx1-ubyte
+$ ../../build/bin/mnist-eval mnist-fc-f32.gguf data/MNIST/raw/t10k-images-idx3-ubyte data/MNIST/raw/t10k-labels-idx1-ubyte
 
 ________________________________________________________
 ________________________________________________________
@@ -77,7 +78,7 @@ In addition to the evaluation on the test set the GGML evaluation also prints a 
 To train a fully connected model using GGML run:
 
 ``` bash
-$ bin/mnist-train mnist-fc mnist-fc-f32.gguf data/MNIST/raw/train-images-idx3-ubyte data/MNIST/raw/train-labels-idx1-ubyte
+$ ../../build/bin/mnist-train mnist-fc mnist-fc-f32.gguf data/MNIST/raw/train-images-idx3-ubyte data/MNIST/raw/train-labels-idx1-ubyte
 ```
 
 It can then be evaluated with the same binary as above.
@@ -91,7 +92,7 @@ It can be evaluated using the `mnist-eval` binary by substituting the argument f
 To train a convolutional network using TensorFlow run:
 
 ```bash
-$ python3 ../examples/mnist/mnist-train-cnn.py mnist-cnn-f32.gguf
+$ python3 mnist-train-cnn.py mnist-cnn-f32.gguf
 
 ...
 
@@ -103,7 +104,7 @@ GGUF model saved to 'mnist-cnn-f32.gguf'
 The saved model can be evaluated using the `mnist-eval` binary:
 
 ```bash
-$ bin/mnist-eval mnist-fc-f32.gguf data/MNIST/raw/t10k-images-idx3-ubyte data/MNIST/raw/t10k-labels-idx1-ubyte
+$ ../../build/bin/mnist-eval mnist-fc-f32.gguf data/MNIST/raw/t10k-images-idx3-ubyte data/MNIST/raw/t10k-labels-idx1-ubyte
 
 ________________________________________________________
 ________________________________________________________
@@ -149,18 +150,38 @@ main: test_acc=98.40+-0.13%
 Like with the fully connected network the convolutional network can also be trained using GGML:
 
 ``` bash
-bin/mnist-train mnist-cnn mnist-cnn-f32.gguf data/MNIST/raw/train-images-idx3-ubyte data/MNIST/raw/train-labels-idx1-ubyte
+$ ../../build/bin/mnist-train mnist-cnn mnist-cnn-f32.gguf data/MNIST/raw/train-images-idx3-ubyte data/MNIST/raw/train-labels-idx1-ubyte
 ```
 
 As always, the evaluation is done using `mnist-eval` and like with the fully connected network the GGML graph is exported to `mnist-cnn-f32.ggml`.
 
 ## Web demo
 
-The example can be compiled with Emscripten like this:
+The evaluation code can be compiled to WebAssembly using [Emscripten](https://emscripten.org/) (may need to re-login to update `$PATH` after installation).
+First, copy the GGUF file of either of the trained models to `examples/mnist` and name it `mnist-f32.gguf`.
+Copy the test set to `examples/mnist` and name it `t10k-images-idx3-ubyte`.
+Symlinking these files will *not* work!
+Compile the code like so:
 
 ```bash
-cd examples/mnist
-emcc -I../../include -I../../include/ggml -I../../examples ../../src/ggml.c ../../src/ggml-quants.c main.cpp -o web/mnist.js -s EXPORTED_FUNCTIONS='["_wasm_eval","_wasm_random_digit","_malloc","_free"]' -s EXPORTED_RUNTIME_METHODS='["ccall"]' -s ALLOW_MEMORY_GROWTH=1 --preload-file models/mnist
+$ emcc -I../../include -I../../include/ggml -I../../examples ../../src/ggml.c ../../src/ggml-quants.c ../../src/ggml-aarch64.c mnist-common.cpp -o web/mnist.js -s EXPORTED_FUNCTIONS='["_wasm_eval","_wasm_random_digit","_malloc","_free"]' -s EXPORTED_RUNTIME_METHODS='["ccall"]' -s ALLOW_MEMORY_GROWTH=1 --preload-file mnist-f32.gguf --preload-file t10k-images-idx3-ubyte
 ```
 
-Online demo: https://mnist.ggerganov.com
+The compilation output is in `examples/mnist/web`.
+To run it, you need an HTTP server.
+For example:
+
+``` bash
+$ cd web
+$ python3 -m http.server
+
+Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...
+```
+
+The web demo can then be accessed via the link printed on the console.
+Simply draw a digit on the canvas and the model will try to predict what it's supposed to be.
+Alternatively, click the "Random" button to retrieve a random digit from the test set.
+Be aware that like all neural networks the one we trained is susceptible to distributional shift:
+if the numbers you draw look different than the ones in the training set
+(e.g. because they're not centered) the model will perform comparatively worse.
+An online demo can be accessed [here](https://mnist.ggerganov.com).

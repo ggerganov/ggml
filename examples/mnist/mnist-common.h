@@ -21,6 +21,7 @@ static_assert(MNIST_NTEST  % MNIST_NBATCH == 0, "MNIST_NTRAIN % MNIST_BATCH != 0
 
 struct mnist_model {
     std::string arch;
+    int nbatch;
 
     struct ggml_tensor  * images = nullptr;
     struct ggml_tensor  * labels = nullptr;
@@ -90,14 +91,14 @@ bool mnist_image_load(const std::string & fname, float * buf, const int nex);
 void mnist_image_print(FILE * f, const float * image);
 bool mnist_label_load(const std::string & fname, float * buf, const int nex);
 
-mnist_eval_result mnist_graph_eval(const std::string & fname, const float * images, const float * labels, const int nex);
+mnist_eval_result mnist_graph_eval(const std::string & fname, const float * images, const float * labels, const int nex, const int nthreads);
 
 mnist_model       mnist_model_init_from_file(const std::string & fname);
 mnist_model       mnist_model_init_random(const std::string & arch);
-void              mnist_model_build(mnist_model & model);
-mnist_eval_result mnist_model_eval(const mnist_model & model, const float * images, const float * labels, const int nex);
-void              mnist_model_train(const float * images, const float * labels, const int nex, mnist_model & model);
-void              mnist_model_save(const std::string & fname, mnist_model & model);
+void              mnist_model_build(mnist_model & model, const int nbatch);
+mnist_eval_result mnist_model_eval(const mnist_model & model, const float * images, const float * labels, const int nex, const int nthreads);
+void              mnist_model_train(mnist_model & model, const float * images, const float * labels, const int nex, const int nthreads);
+void              mnist_model_save(mnist_model & model, const std::string & fname);
 
 std::pair<double, double> mnist_loss(const mnist_eval_result & result);
 std::pair<double, double> mnist_accuracy(const mnist_eval_result & result, const float * labels);

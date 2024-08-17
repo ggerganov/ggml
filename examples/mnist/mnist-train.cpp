@@ -5,6 +5,7 @@
 #include <cstring>
 #include <ctime>
 #include <string>
+#include <thread>
 
 #if defined(_MSC_VER)
 #pragma warning(disable: 4244 4267) // possible loss of data
@@ -12,7 +13,7 @@
 
 int main(int argc, char ** argv) {
     if (argc != 5) {
-        fprintf(stderr, "Usage: %s mnist-fc models/MNIST/mnist-fc-f32.gguf data/MNIST/raw/train-images-idx3-ubyte data/MNIST/raw/train-labels-idx1-ubyte\n", argv[0]);
+        fprintf(stderr, "Usage: %s mnist-fc mnist-fc-f32.gguf data/MNIST/raw/train-images-idx3-ubyte data/MNIST/raw/train-labels-idx1-ubyte\n", argv[0]);
         exit(0);
     }
 
@@ -28,12 +29,11 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
-    const int nex = MNIST_NTRAIN;
     mnist_model model = mnist_model_init_random(argv[1]);
 
-    mnist_model_build(model);
+    mnist_model_build(model, MNIST_NBATCH);
 
-    mnist_model_train(images.data(), labels.data(), nex, model);
+    mnist_model_train(model, images.data(), labels.data(), MNIST_NTRAIN, std::thread::hardware_concurrency());
 
-    mnist_model_save(argv[2], model);
+    mnist_model_save(model, argv[2]);
 }
