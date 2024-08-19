@@ -488,6 +488,7 @@ extern "C" {
         GGML_OP_ROPE,
         GGML_OP_ROPE_BACK,
         GGML_OP_CLAMP,
+        GGML_OP_CLAMP_BACK,
         GGML_OP_CONV_TRANSPOSE_1D,
         GGML_OP_IM2COL,
         GGML_OP_CONV_TRANSPOSE_2D,
@@ -535,10 +536,13 @@ extern "C" {
         GGML_UNARY_OP_STEP,
         GGML_UNARY_OP_TANH,
         GGML_UNARY_OP_ELU,
+        GGML_UNARY_OP_ELU_BACK,
         GGML_UNARY_OP_RELU,
         GGML_UNARY_OP_SIGMOID,
         GGML_UNARY_OP_GELU,
+        GGML_UNARY_OP_GELU_BACK,
         GGML_UNARY_OP_GELU_QUICK,
+        GGML_UNARY_OP_GELU_QUICK_BACK,
         GGML_UNARY_OP_SILU,
         GGML_UNARY_OP_HARDSWISH,
         GGML_UNARY_OP_HARDSIGMOID,
@@ -1074,6 +1078,14 @@ extern "C" {
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
 
+    GGML_API struct ggml_tensor * ggml_elu_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+    GGML_API struct ggml_tensor * ggml_elu_back_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
     GGML_API struct ggml_tensor * ggml_relu(
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
@@ -1102,11 +1114,27 @@ extern "C" {
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
 
+    GGML_API struct ggml_tensor * ggml_gelu_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+    GGML_API struct ggml_tensor * ggml_gelu_back_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
     GGML_API struct ggml_tensor * ggml_gelu_quick(
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
 
     GGML_API struct ggml_tensor * ggml_gelu_quick_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+    GGML_API struct ggml_tensor * ggml_gelu_quick_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+    GGML_API struct ggml_tensor * ggml_gelu_quick_back_inplace(
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
 
@@ -1575,8 +1603,25 @@ extern "C" {
             float                 beta_slow);
 
     // clamp
-    // in-place, returns view(a)
     GGML_API struct ggml_tensor * ggml_clamp(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            float                 min,
+            float                 max);
+
+    GGML_API struct ggml_tensor * ggml_clamp_inplace(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            float                 min,
+            float                 max);
+
+    GGML_API struct ggml_tensor * ggml_clamp_back(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            float                 min,
+            float                 max);
+
+    GGML_API struct ggml_tensor * ggml_clamp_back_inplace(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             float                 min,
