@@ -74,8 +74,8 @@ mnist_eval_result mnist_graph_eval(const std::string & fname, const float * imag
     fprintf(stderr, "%s: trying to load a ggml graph from %s\n", __func__, fname.c_str());
     mnist_eval_result result;
 
-    struct ggml_context * ctx_data;
-    struct ggml_context * ctx_eval;
+    struct ggml_context * ctx_data = NULL;
+    struct ggml_context * ctx_eval = NULL;
 
     struct ggml_cgraph * gf;
     {
