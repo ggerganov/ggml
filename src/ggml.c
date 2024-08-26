@@ -9085,12 +9085,13 @@ static void ggml_compute_forward_dup_bytes(
     GGML_ASSERT(ggml_nelements(dst) == ggml_nelements(src0));
     GGML_ASSERT(src0->type == dst->type);
 
-    if (ggml_is_contiguous(src0) && ggml_is_contiguous(dst)) {
+    GGML_TENSOR_UNARY_OP_LOCALS;
+
+    if (ggml_is_contiguous(src0) && ggml_is_contiguous(dst) &&
+        nb00 == nb0 && nb01 == nb1 && nb02 == nb2 && nb03 == nb3) {
         ggml_compute_forward_dup_same_cont(params, dst);
         return;
     }
-
-    GGML_TENSOR_UNARY_OP_LOCALS;
 
     const size_t type_size = ggml_type_size(src0->type);
     const int ith = params->ith; // thread index
