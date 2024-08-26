@@ -232,8 +232,8 @@ static void gemm_f16_out_f32(int m, int n, int k,
 void perform_gemm_test(float* a, float* b, float* expected, int M, int N, int K) {
     printf("\nPerforming gemm_f16_out_f32 test:\n");
 
-    float* gemm_out = new float[M * N];
-    gemm_f16_out_f32(M, N, K, a, b, gemm_out, 0, 1);
+    std::vector<float> gemm_out(M * N);
+    gemm_f16_out_f32(M, N, K, a, b, gemm_out.data(), 0, 1);
 
     for (int i = 0; i < M; i++) {
         for (int j = 0; j < N; j++) {
@@ -318,9 +318,9 @@ int main(void)
 
     struct ggml_tensor * result = compute(model, allocr);
 
-    float* out_data = new float[ggml_nelements(result)];
+    std::vector<float> out_data(ggml_nelements(result));
 
-    ggml_backend_tensor_get(result, out_data, 0, ggml_nbytes(result));
+    ggml_backend_tensor_get(result, out_data.data(), 0, ggml_nbytes(result));
 
     printf("\nPerforming ggml_mul_mat test:\n");
 
