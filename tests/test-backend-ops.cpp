@@ -1730,6 +1730,27 @@ struct test_flash_attn_ext : public test_case {
     }
 };
 
+// GGML_OP_CROSS_ENTROPY_LOSS
+struct test_cross_entropy_loss : public test_case {
+    const ggml_type type;
+    const std::array<int64_t, 4> ne;
+
+    std::string vars() override {
+        return VARS_TO_STR2(type, ne);
+    }
+
+    test_cross_entropy_loss(ggml_type type = GGML_TYPE_F32,
+            std::array<int64_t, 4> ne = {10, 10, 10, 10})
+        : type(type), ne(ne) {}
+
+    ggml_tensor * build_graph(ggml_context * ctx) override {
+        ggml_tensor * logits = ggml_new_tensor(ctx, type, 4, ne.data());
+        ggml_tensor * labels = ggml_new_tensor(ctx, type, 4, ne.data());
+        ggml_tensor * out = ggml_cross_entropy_loss(ctx, logits, labels);
+        return out;
+    }
+};
+
 enum llm_norm_type {
     LLM_NORM,
     LLM_NORM_RMS,
@@ -2490,6 +2511,8 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
             }
         }
     }
+
+    test_cases.emplace_back(new test_cross_entropy_loss());
 
     // these tests are disabled to save execution time, but they can be handy for debugging
 #if 0
