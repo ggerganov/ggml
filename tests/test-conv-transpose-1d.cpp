@@ -421,9 +421,9 @@ int main(void)
         }
     }
 
-    float* conv1d_transpose_data_0 = new float[ggml_nelements(conv1d_transpose_res_0)];
+    std::vector<float> conv1d_transpose_data_0(ggml_nelements(conv1d_transpose_res_0));
 
-    ggml_backend_tensor_get(conv1d_transpose_res_0, conv1d_transpose_data_0, 0, ggml_nbytes(conv1d_transpose_res_0));
+    ggml_backend_tensor_get(conv1d_transpose_res_0, conv1d_transpose_data_0.data(), 0, ggml_nbytes(conv1d_transpose_res_0));
 
     const int n_conv_transpose_1d_test_0 = 4;
 
@@ -440,9 +440,9 @@ int main(void)
         }
     }
 
-    float* conv1d_transpose_data_1 = new float[ggml_nelements(conv1d_transpose_res_1)];
+    std::vector<float> conv1d_transpose_data_1(ggml_nelements(conv1d_transpose_res_1));
 
-    ggml_backend_tensor_get(conv1d_transpose_res_1, conv1d_transpose_data_1, 0, ggml_nbytes(conv1d_transpose_res_1));
+    ggml_backend_tensor_get(conv1d_transpose_res_1, conv1d_transpose_data_1.data(), 0, ggml_nbytes(conv1d_transpose_res_1));
 
 
 
@@ -462,9 +462,9 @@ int main(void)
         }
     }
 
-    float* conv1d_transpose_data_2 = new float[ggml_nelements(conv1d_transpose_res_2)];
+    std::vector<float> conv1d_transpose_data_2(ggml_nelements(conv1d_transpose_res_2));
 
-    ggml_backend_tensor_get(conv1d_transpose_res_2, conv1d_transpose_data_2, 0, ggml_nbytes(conv1d_transpose_res_2));
+    ggml_backend_tensor_get(conv1d_transpose_res_2, conv1d_transpose_data_2.data(), 0, ggml_nbytes(conv1d_transpose_res_2));
 
 
     const int n_conv_transpose_1d_test_2 = 10;
@@ -481,9 +481,9 @@ int main(void)
         }
     }
 
-    float* conv1d_transpose_data_3 = new float[ggml_nelements(conv1d_transpose_res_3)];
+    std::vector<float> conv1d_transpose_data_3(ggml_nelements(conv1d_transpose_res_3));
 
-    ggml_backend_tensor_get(conv1d_transpose_res_3, conv1d_transpose_data_3, 0, ggml_nbytes(conv1d_transpose_res_3));
+    ggml_backend_tensor_get(conv1d_transpose_res_3, conv1d_transpose_data_3.data(), 0, ggml_nbytes(conv1d_transpose_res_3));
 
 
     const int n_conv_transpose_1d_test_3 = 14;
@@ -501,9 +501,9 @@ int main(void)
         }
     }
 
-    float* conv1d_transpose_data_4 = new float[ggml_nelements(conv1d_transpose_res_4)];
+    std::vector<float> conv1d_transpose_data_4(ggml_nelements(conv1d_transpose_res_4));
 
-    ggml_backend_tensor_get(conv1d_transpose_res_4, conv1d_transpose_data_4, 0, ggml_nbytes(conv1d_transpose_res_4));
+    ggml_backend_tensor_get(conv1d_transpose_res_4, conv1d_transpose_data_4.data(), 0, ggml_nbytes(conv1d_transpose_res_4));
 
 
     const int n_conv_transpose_1d_test_4 = 12;
@@ -522,9 +522,9 @@ int main(void)
         }
     }
 
-    float* conv1d_transpose_data_5 = new float[ggml_nelements(conv1d_transpose_res_5)];
+    std::vector<float> conv1d_transpose_data_5(ggml_nelements(conv1d_transpose_res_5));
 
-    ggml_backend_tensor_get(conv1d_transpose_res_5, conv1d_transpose_data_5, 0, ggml_nbytes(conv1d_transpose_res_5));
+    ggml_backend_tensor_get(conv1d_transpose_res_5, conv1d_transpose_data_5.data(), 0, ggml_nbytes(conv1d_transpose_res_5));
 
 
     const int n_conv_transpose_1d_test_5 = 18;
@@ -543,9 +543,9 @@ int main(void)
         }
     }
 
-    float* conv1d_transpose_data_6 = new float[ggml_nelements(conv1d_transpose_res_6)];
+    std::vector<float> conv1d_transpose_data_6(ggml_nelements(conv1d_transpose_res_6));
 
-    ggml_backend_tensor_get(conv1d_transpose_res_6, conv1d_transpose_data_6, 0, ggml_nbytes(conv1d_transpose_res_6));
+    ggml_backend_tensor_get(conv1d_transpose_res_6, conv1d_transpose_data_6.data(), 0, ggml_nbytes(conv1d_transpose_res_6));
 
 
     const int n_conv_transpose_1d_test_6 = 24;
@@ -565,9 +565,9 @@ int main(void)
         }
     }
 
-    float* conv1d_transpose_data_7 = new float[ggml_nelements(conv1d_transpose_res_7)];
+    std::vector<float> conv1d_transpose_data_7(ggml_nelements(conv1d_transpose_res_7));
 
-    ggml_backend_tensor_get(conv1d_transpose_res_7, conv1d_transpose_data_7, 0, ggml_nbytes(conv1d_transpose_res_7));
+    ggml_backend_tensor_get(conv1d_transpose_res_7, conv1d_transpose_data_7.data(), 0, ggml_nbytes(conv1d_transpose_res_7));
 
 
     const int n_conv_transpose_1d_test_7 = 32*1584;

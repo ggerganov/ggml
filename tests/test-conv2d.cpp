@@ -40,17 +40,17 @@ void load_model(test_model & model, bool use_gpu = false) {
     int IW = 8, IH = 6, N = 1;
 
     // Initialize adata
-    float * adata = new float[KW * KH * IC * OC];
+    std::vector<float> adata(KW * KH * IC * OC);
     for (int i = 0; i < KW * KH * IC * OC; i++) {
         adata[i] = 2.5f;
     }
 
     // Convert adata to fp16 format
     std::vector<ggml_fp16_t> hadata(KW * KH * IC * OC);
-    ggml_fp32_to_fp16_row(adata, hadata.data(), KW * KH * IC * OC);
+    ggml_fp32_to_fp16_row(adata.data(), hadata.data(), KW * KH * IC * OC);
 
     // Initialize bdata
-    float * bdata =  new float[IW * IH * IC * N];
+    std::vector<float> bdata(IW * IH * IC * N);
     for (int i = 0; i < IW * IH * IC * N; i++) {
         bdata[i] = 1.5f;
     }
@@ -129,9 +129,9 @@ void load_model(test_model & model, bool use_gpu = false) {
                 || ggml_backend_is_metal(model.backend)
 #endif
     ) {
-        memcpy(model.b->data, bdata, ggml_nbytes(model.b));
+        memcpy(model.b->data, bdata.data(), ggml_nbytes(model.b));
     } else {
-        ggml_backend_tensor_set(model.b, bdata, 0, ggml_nbytes(model.b));
+        ggml_backend_tensor_set(model.b, bdata.data(), 0, ggml_nbytes(model.b));
     }
 }
 
@@ -229,11 +229,11 @@ int main(void)
         }
     }
 
-    uint16_t* im2col_data = new uint16_t[ggml_nelements(im2col_res)];
-    float* conv2d_data = new float[ggml_nelements(conv2d_res)];
+    std::vector<uint16_t> im2col_data(ggml_nelements(im2col_res));
+    std::vector<float> conv2d_data(ggml_nelements(conv2d_res));
 
-    ggml_backend_tensor_get(im2col_res, im2col_data, 0, ggml_nbytes(im2col_res));
-    ggml_backend_tensor_get(conv2d_res, conv2d_data, 0, ggml_nbytes(conv2d_res));
+    ggml_backend_tensor_get(im2col_res, im2col_data.data(), 0, ggml_nbytes(im2col_res));
+    ggml_backend_tensor_get(conv2d_res, conv2d_data.data(), 0, ggml_nbytes(conv2d_res));
 
     const int n_conv2d_test = 480;
     const int n_im2col_test = 4320;
