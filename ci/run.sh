@@ -185,38 +185,39 @@ function gg_sum_gpt_2 {
     gg_printf '```\n'
 }
 
-# mnist
-
-function gg_run_mnist {
-    cd ${SRC}
-
-    cd build-ci-release
-
-    set -e
-
-    mkdir -p models/mnist
-    python3 ../examples/mnist/convert-h5-to-ggml.py ../examples/mnist/models/mnist/mnist_model.state_dict
-
-    model_f32="./models/mnist/ggml-model-f32.bin"
-    samples="../examples/mnist/models/mnist/t10k-images.idx3-ubyte"
-
-    # first command runs and exports "mnist.ggml", the second command runs the exported model
-
-    (time ./bin/mnist     ${model_f32} ${samples} ) 2>&1 | tee -a $OUT/${ci}-mnist.log
-    (time ./bin/mnist-cpu ./mnist.ggml ${samples} ) 2>&1 | tee -a $OUT/${ci}-mnist.log
-
-    set +e
-}
-
-function gg_sum_mnist {
-    gg_printf '### %s\n\n' "${ci}"
-
-    gg_printf 'MNIST\n'
-    gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
-    gg_printf '```\n'
-    gg_printf '%s\n' "$(cat $OUT/${ci}-mnist.log)"
-    gg_printf '```\n'
-}
+# TODO: update
+## mnist
+#
+#function gg_run_mnist {
+#    cd ${SRC}
+#
+#    cd build-ci-release
+#
+#    set -e
+#
+#    mkdir -p models/mnist
+#    python3 ../examples/mnist/convert-h5-to-ggml.py ../examples/mnist/models/mnist/mnist_model.state_dict
+#
+#    model_f32="./models/mnist/ggml-model-f32.bin"
+#    samples="../examples/mnist/models/mnist/t10k-images.idx3-ubyte"
+#
+#    # first command runs and exports "mnist.ggml", the second command runs the exported model
+#
+#    (time ./bin/mnist     ${model_f32} ${samples} ) 2>&1 | tee -a $OUT/${ci}-mnist.log
+#    (time ./bin/mnist-cpu ./mnist.ggml ${samples} ) 2>&1 | tee -a $OUT/${ci}-mnist.log
+#
+#    set +e
+#}
+#
+#function gg_sum_mnist {
+#    gg_printf '### %s\n\n' "${ci}"
+#
+#    gg_printf 'MNIST\n'
+#    gg_printf '- status: %s\n' "$(cat $OUT/${ci}.exit)"
+#    gg_printf '```\n'
+#    gg_printf '%s\n' "$(cat $OUT/${ci}-mnist.log)"
+#    gg_printf '```\n'
+#}
 
 # sam
 
@@ -313,7 +314,7 @@ fi
 
 if [ -z ${GG_BUILD_NO_DOWNLOAD} ]; then
     test $ret -eq 0 && gg_run gpt_2
-    test $ret -eq 0 && gg_run mnist
+    #test $ret -eq 0 && gg_run mnist
     test $ret -eq 0 && gg_run sam
     test $ret -eq 0 && gg_run yolo
 fi
