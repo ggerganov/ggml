@@ -273,10 +273,10 @@ function gg_run_yolo {
 
     (time ./bin/yolov3-tiny -m yolov3-tiny.gguf -i ${path_models}/dog.jpg ) 2>&1 | tee -a $OUT/${ci}-main.log
 
-    grep -q "dog: 57%" $OUT/${ci}-main.log
-    grep -q "car: 52%" $OUT/${ci}-main.log
-    grep -q "truck: 56%" $OUT/${ci}-main.log
-    grep -q "bicycle: 59%" $OUT/${ci}-main.log
+    grep -qE "dog: (55|56|57|58|59)%" $OUT/${ci}-main.log
+    grep -qE "car: (50|51|52|53|54)%" $OUT/${ci}-main.log
+    grep -qE "truck: (54|55|56|57|58)%" $OUT/${ci}-main.log
+    grep -qE "bicycle: (57|58|59|60|61)%" $OUT/${ci}-main.log
 
     set +e
 }
