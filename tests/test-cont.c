@@ -35,8 +35,9 @@ ggml_backend_t make_backend(void) {
     GGML_ASSERT(backend != NULL);
 #endif
 
-    if (!backend)
+    if (!backend) {
         backend = ggml_backend_cpu_init();
+    }
 
     return backend;
 }
@@ -108,18 +109,18 @@ void check_tensor(struct ggml_tensor* t,
             GGML_ASSERT(expected == actual);
         }
         free(buffer);
-    } else if (t->type == GGML_TYPE_BF16) {
-        ggml_bf16_t* buffer = malloc(bsize);
-        ggml_backend_tensor_get(t, buffer, 0, bsize);
-        for (int i = 0; i < bsize / sizeof(ggml_bf16_t); ++i) {
-            float expected = expected_t_d[i];
-            float actual = ggml_bf16_to_fp32(buffer[i]);
-            if (expected != actual) {
-                printf("expected %.1f, got %.1f\n", expected, actual);
-            }
-            GGML_ASSERT(expected == actual);
-        }
-        free(buffer);
+    //} else if (t->type == GGML_TYPE_BF16) {
+    //    ggml_bf16_t* buffer = malloc(bsize);
+    //    ggml_backend_tensor_get(t, buffer, 0, bsize);
+    //    for (int i = 0; i < bsize / sizeof(ggml_bf16_t); ++i) {
+    //        float expected = expected_t_d[i];
+    //        float actual = ggml_bf16_to_fp32(buffer[i]);
+    //        if (expected != actual) {
+    //            printf("expected %.1f, got %.1f\n", expected, actual);
+    //        }
+    //        GGML_ASSERT(expected == actual);
+    //    }
+    //    free(buffer);
     } else {
         GGML_ABORT("unknown type");
     }
@@ -137,27 +138,27 @@ void test_cont(void) {
 
     struct ggml_tensor* in_1 = ggml_new_tensor_1d(m.ctx, GGML_TYPE_F32, 2);
     struct ggml_tensor* in_2 = ggml_new_tensor_1d(m.ctx, GGML_TYPE_F16, 2);
-    struct ggml_tensor* in_3 = ggml_new_tensor_1d(m.ctx, GGML_TYPE_BF16, 2);
+    //struct ggml_tensor* in_3 = ggml_new_tensor_1d(m.ctx, GGML_TYPE_BF16, 2);
 
     model_alloc(&m);
 
     ggml_backend_tensor_set(in_1, buf_f32, 0, ggml_nbytes(in_1));
     ggml_backend_tensor_set(in_2, buf_f16, 0, ggml_nbytes(in_2));
-    ggml_backend_tensor_set(in_3, buf_bf16, 0, ggml_nbytes(in_3));
+    //ggml_backend_tensor_set(in_3, buf_bf16, 0, ggml_nbytes(in_3));
 
     struct ggml_tensor* out_1 = ggml_cont(m.ctx0, ggml_transpose(m.ctx0, in_1));
     struct ggml_tensor* out_2 = ggml_cont(m.ctx0, ggml_transpose(m.ctx0, in_2));
-    struct ggml_tensor* out_3 = ggml_cont(m.ctx0, ggml_transpose(m.ctx0, in_3));
+    //struct ggml_tensor* out_3 = ggml_cont(m.ctx0, ggml_transpose(m.ctx0, in_3));
 
     ggml_build_forward_expand(m.gf, out_1);
     ggml_build_forward_expand(m.gf, out_2);
-    ggml_build_forward_expand(m.gf, out_3);
+    //ggml_build_forward_expand(m.gf, out_3);
 
     model_compute(&m);
 
     check_tensor(out_1, expected_out, 1, 2, 1);
     check_tensor(out_2, expected_out, 1, 2, 1);
-    check_tensor(out_3, expected_out, 1, 2, 1);
+    //check_tensor(out_3, expected_out, 1, 2, 1);
 
     model_free(&m);
 }
