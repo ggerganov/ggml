@@ -65,6 +65,7 @@ while read c; do
         ggml/src/ggml-cann/* \
         ggml/src/ggml-cuda/* \
         ggml/src/ggml-sycl/* \
+        ggml/src/vulkan-shaders/* \
         ggml/include/ggml*.h \
         tests/test-opt.cpp \
         tests/test-grad0.cpp \
