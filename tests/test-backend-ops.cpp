@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <ggml.h>
 #include <ggml-alloc.h>
 #include <ggml-backend.h>
@@ -6,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <cfloat>
+#include <cstdint>
 #include <cstring>
 #include <functional>
 #include <memory>
