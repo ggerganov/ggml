@@ -2815,6 +2815,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CONV_TRANSPOSE_1D",
     "IM2COL",
     "IM2COL_BACK",
+    "COL2IM",
     "CONV_TRANSPOSE_2D",
     "POOL_1D",
     "POOL_2D",
@@ -2852,7 +2853,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS_BACK",
 };
 
-static_assert(GGML_OP_COUNT == 78, "GGML_OP_COUNT != 78");
+static_assert(GGML_OP_COUNT == 79, "GGML_OP_COUNT != 79");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -2907,6 +2908,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "conv_transpose_1d(x)",
     "im2col(x)",
     "im2col_back(x)",
+    "col2im(x)",
     "conv_transpose_2d(x)",
     "pool_1d(x)",
     "pool_2d(x)",
@@ -2944,7 +2946,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "cross_entropy_loss_back(x,y)",
 };
 
-static_assert(GGML_OP_COUNT == 78, "GGML_OP_COUNT != 78");
+static_assert(GGML_OP_COUNT == 79, "GGML_OP_COUNT != 79");
 
 static_assert(GGML_OP_POOL_COUNT == 2, "GGML_OP_POOL_COUNT != 2");
 
@@ -6730,7 +6732,7 @@ struct ggml_tensor* ggml_conv_1d_ph(
 
 // ggml_conv_transpose_1d
 
-static int64_t ggml_calc_conv_transpose_1d_output_size(int64_t ins, int64_t ks, int s, int p, int d) {
+static int64_t ggml_calc_conv_transpose_output_size(int64_t ins, int64_t ks, int s, int p, int d) {
     return (ins - 1) * s - 2 * p + d * (ks - 1) + 1;
 }
 
@@ -6756,7 +6758,7 @@ GGML_API struct ggml_tensor * ggml_conv_transpose_1d(
     }
 
     const int64_t ne[4] = {
-        ggml_calc_conv_transpose_1d_output_size(b->ne[0], a->ne[0], s0, 0 /*p0*/, 1 /*d0*/),
+        ggml_calc_conv_transpose_output_size(b->ne[0], a->ne[0], s0, 0 /*p0*/, 1 /*d0*/),
         a->ne[1], b->ne[2], 1,
     };
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
@@ -6883,6 +6885,57 @@ struct ggml_tensor * ggml_im2col_back(
     return result;
 }
 
+// a:      [N, OC, KW, IW]
+// result: [N, OC, OW]
+struct ggml_tensor * ggml_col2im(
+    struct ggml_context * ctx,
+    struct ggml_tensor  * a,
+    int                  s0,
+    int                  s1,
+    int                  p0,
+    int                  p1,
+    int                  d0,
+    int                  d1,
+    int64_t              KH,
+    int64_t              IH) {
+
+    GGML_ASSERT(s1 == 1);
+    GGML_ASSERT(p1 == 0);
+    GGML_ASSERT(d1 == 1);
+    GGML_ASSERT(KH == 1);
+    GGML_ASSERT(IH == 1);
+
+    GGML_ASSERT(s0 >= 1);
+    GGML_ASSERT(p0 >= 0);
+    GGML_ASSERT(d0 >= 1);
+    bool is_node = false;
+
+    if (a->grad) {
+        GGML_ABORT("fatal error"); // TODO: implement backward
+        is_node = true;
+    }
+
+    const int64_t OW = ggml_calc_conv_transpose_output_size(a->ne[0], a->ne[1], s0, p0, d0);
+
+    GGML_ASSERT(OW > 0);
+
+    const int64_t ne[3] = {
+        OW,
+        a->ne[2],
+        a->ne[3],
+    };
+
+    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 3, ne);
+    int32_t params[] = { s0, s1, p0, p1, d0, d1, KH, IH };
+    ggml_set_op_params(result, params, sizeof(params));
+
+    result->op = GGML_OP_COL2IM;
+    result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
+    result->src[0] = a;
+
+    return result;
+}
+
 // a: [OC，IC, KH, KW]
 // b: [N, IC, IH, IW]
 // result: [N, OC, OH, OW]
@@ -6929,10 +6982,6 @@ struct ggml_tensor * ggml_conv_2d_s1_ph(
 
 // ggml_conv_transpose_2d_p0
 
-static int64_t ggml_calc_conv_transpose_output_size(int64_t ins, int64_t ks, int s, int p) {
-    return (ins - 1) * s - 2 * p + ks;
-}
-
 struct ggml_tensor * ggml_conv_transpose_2d_p0(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
@@ -6948,8 +6997,8 @@ struct ggml_tensor * ggml_conv_transpose_2d_p0(
     }
 
     const int64_t ne[4] = {
-        ggml_calc_conv_transpose_output_size(b->ne[0], a->ne[0], stride, 0 /*p0*/),
-        ggml_calc_conv_transpose_output_size(b->ne[1], a->ne[1], stride, 0 /*p1*/),
+        ggml_calc_conv_transpose_output_size(b->ne[0], a->ne[0], stride, 0 /*p0*/, 1 /*d0*/),
+        ggml_calc_conv_transpose_output_size(b->ne[1], a->ne[1], stride, 0 /*p1*/, 1 /*d0*/),
         a->ne[2], b->ne[3],
     };
 
@@ -15038,6 +15087,102 @@ static void ggml_compute_forward_im2col_back_f32(
     }
 }
 
+// src0: kernel [N, OC, KW, IW]
+// dst:  result [N, OC, OW]
+static void ggml_compute_forward_col2im(
+        const struct ggml_compute_params * params,
+              struct ggml_tensor * dst) {
+    const struct ggml_tensor * src0 = dst->src[0];
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    assert(ggml_is_contiguous(dst));
+    assert(dst->type == GGML_TYPE_F32);
+
+    GGML_TENSOR_UNARY_OP_LOCALS;
+
+    const int32_t s0 = dst->op_params[0];
+    const int32_t p0 = dst->op_params[2];
+    const int32_t d0 = dst->op_params[4];
+
+    assert(s0 >= 1);
+    assert(p0 >= 0);
+    assert(d0 >= 1);
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int64_t IW = ne00;
+    const int64_t KW = ne01;
+    const int64_t OC = ne02;
+    const int64_t N  = ne03;
+    const int64_t OW = ne0;
+
+    const int64_t ioc_offs = nb02 / nb00;
+    const int64_t ikw_offs = nb01 / nb00;
+    const int64_t in_offs  = nb03 / nb00;
+
+    const float * const input = (float *) src0->data;
+    float * const out = (float *) dst->data;
+
+    int64_t ns = 0;
+    int64_t ne = N;
+    int64_t ocs = 0;
+    int64_t oce = OC;
+    bool t_split_on_n = true;
+    // prefer to split work between threads over N
+    // but do it over OC if this let us use more threads
+    if (N < nth && OC >= nth) {
+        const int64_t dr = (OC + nth - 1) / nth;
+        ocs = dr * ith;
+        oce = MIN(ocs + dr, OC);
+        t_split_on_n = false;
+    } else {
+        const int64_t dr = (N + nth - 1) / nth;
+        ns = dr * ith;
+        ne = MIN(ns + dr, N);
+    }
+    if (ne > ns && oce > ocs) {
+        if (t_split_on_n)
+            memset((char *) out + ns * nb2, 0, (ne-ns) * nb2);
+        else {
+            for (int64_t in = ns; in < ne; ++in)
+                memset((char *) out + in*nb2 + ocs * nb1, 0, (oce-ocs) * nb1);
+        }
+        for (int64_t in = ns; in < ne; ++in) {
+            const int64_t in_off_1= in*in_offs;
+            const int64_t out_off_1 = in*OC*OW;
+            for (int64_t ioc = ocs; ioc < oce; ++ioc) {
+                const int64_t in_off_2 = in_off_1 + ioc*ioc_offs;
+                const int64_t out_off_2 = out_off_1 + ioc*OW;
+                for (int64_t ikw = 0; ikw < KW; ++ikw) {
+                    // exclude any values of iiw
+                    // that does not satisfy:
+                    // 0 < ikw*d0 - p0 + iiw*s0 < OW
+                    const int64_t iiw_tmp = p0-ikw*d0+s0-1;
+                    const int64_t iiws = MAX(0, iiw_tmp/s0);
+                    const int64_t iiwe = MIN(IW, (OW+iiw_tmp)/s0) - iiws;
+                    if (iiwe > 0) {
+                        const int64_t in_off_3 = in_off_2 + ikw*ikw_offs + iiws;
+                        const int64_t out_off_3 = out_off_2 + ikw*d0 - p0 + iiws*s0;
+#ifdef GGML_USE_ACCELERATE
+                        vDSP_vadd(out + out_off_3, s0,
+                                  input + in_off_3, 1,
+                                  out + out_off_3, s0,
+                                  iiwe);
+#else
+                        const float* restrict const src = input + in_off_3;
+                        float* restrict const dest = out + out_off_3;
+                        for (int64_t iiw = 0; iiw < iiwe; ++iiw)
+                            dest[iiw*s0] += src[iiw];
+#endif
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 // ggml_compute_forward_conv_transpose_2d
 
 static void ggml_compute_forward_conv_transpose_2d(
@@ -17294,6 +17439,10 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_im2col_back_f32(params, tensor);
             } break;
+        case GGML_OP_COL2IM:
+            {
+                ggml_compute_forward_col2im(params, tensor);
+            } break;
         case GGML_OP_CONV_TRANSPOSE_2D:
             {
                 ggml_compute_forward_conv_transpose_2d(params, tensor);
@@ -18295,6 +18444,10 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             {
                 GGML_ABORT("fatal error"); // TODO: not implemented
             }
+        case GGML_OP_COL2IM:
+            {
+                GGML_ABORT("fatal error"); // TODO: not implemented
+            }
         case GGML_OP_CONV_TRANSPOSE_2D:
             {
                 GGML_ABORT("fatal error"); // TODO: not implemented
@@ -19040,6 +19193,7 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
             } break;
         case GGML_OP_IM2COL:
         case GGML_OP_IM2COL_BACK:
+        case GGML_OP_COL2IM:
         case GGML_OP_CONV_TRANSPOSE_1D:
         case GGML_OP_CONV_TRANSPOSE_2D:
             {
