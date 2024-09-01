@@ -777,7 +777,7 @@ struct test_case {
 
         ggml_build_forward_expand(gf, out);
         ggml_graph_cpy(gf, gb);
-        ggml_build_backward_expand(ctx, gf, gb, true); // TODO why can the results sometimes be wrong with keep == false?
+        ggml_build_backward_expand(ctx, gf, gb, false);
         if (expect.size() != 1 || expect[0] != 0.0f) {
             GGML_ASSERT(gb->n_nodes > gf->n_nodes);
             for (ggml_tensor * t = ggml_get_first_tensor(ctx); t != NULL; t = ggml_get_next_tensor(ctx, t)) {
