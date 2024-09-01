@@ -2182,6 +2182,42 @@ struct test_im2col : public test_case {
     }
 };
 
+// GGML_OP_COL2IM
+struct test_col2im : public test_case {
+    const ggml_type type_input;
+    const std::array<int64_t, 4> ne_input;
+    // stride
+    const int s0;
+    // padding
+    const int p0;
+    // dilation
+    const int d0;
+
+    std::string vars() override {
+        return VARS_TO_STR5(type_input, ne_input, s0, p0, d0);
+    }
+
+    test_col2im(ggml_type type_input = GGML_TYPE_F32,
+                std::array<int64_t, 4> ne_input = {7, 5, 3, 2}, // IW, KW, OC, N
+                int s0 = 1,
+                int p0 = 0,
+                int d0 = 1)
+        : type_input(type_input)
+        , ne_input(ne_input)
+        , s0(s0), p0(p0), d0(d0) {}
+
+    ggml_tensor * build_graph(ggml_context * ctx) override {
+        ggml_tensor * input = ggml_new_tensor(ctx, type_input, 4, ne_input.data());
+        ggml_tensor * out = ggml_col2im(ctx,
+                                        input,
+                                        s0, 1 /* s1 */,
+                                        p0, 0 /* p1 */,
+                                        d0, 1 /* d1 */,
+                                        1 /* KH */, 1 /* IH */);
+        return out;
+    }
+};
+
 // GGML_OP_CONCAT
 struct test_concat : public test_case {
     const ggml_type type;
@@ -3147,6 +3183,13 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
     // these cases are verified (pass) in Intel(R) Data Center GPU Max 1100 (sycl backend) and NV A30 (cuda backend)
     // test_cases.emplace_back(new test_im2col(GGML_TYPE_F32, GGML_TYPE_F16, GGML_TYPE_F16, {1024, 1024, 256, 1}, {3, 3, 256, 1}, 1, 1, 1, 1, 1, 1, true));
     // test_cases.emplace_back(new test_im2col(GGML_TYPE_F32, GGML_TYPE_F16, GGML_TYPE_F32, {1024, 1024, 256, 1}, {3, 3, 256, 1}, 1, 1, 1, 1, 1, 1, true));
+
+    test_cases.emplace_back(new test_col2im());
+    test_cases.emplace_back(new test_col2im(GGML_TYPE_F32, {3000, 128, 7, 5}, 1, 0, 1));
+    test_cases.emplace_back(new test_col2im(GGML_TYPE_F32, {3000, 128, 7, 5}, 10, 0, 1));
+    test_cases.emplace_back(new test_col2im(GGML_TYPE_F32, {3000, 128, 7, 5}, 1, 0, 10));
+    test_cases.emplace_back(new test_col2im(GGML_TYPE_F32, {3000, 128, 7, 5}, 1, 10, 1));
+    test_cases.emplace_back(new test_col2im(GGML_TYPE_F32, {3000, 128, 7, 5}, 10, 10, 10));
 
     test_cases.emplace_back(new test_conv_transpose_1d());
     test_cases.emplace_back(new test_conv_transpose_1d({3,2,1,1}, {2,3,2,1}, 3, 0, 1));
