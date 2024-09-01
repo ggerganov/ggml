@@ -121,6 +121,246 @@ void test_conv_transpose_1d(void) {
     }
 }
 
+void test_conv_transpose_1d_gemm(void) {
+
+    float buf_f32[1024];
+    for (int i = 0; i < 1024; ++i) {
+        buf_f32[i] = (float)i;
+    }
+
+    ggml_fp16_t buf_f16[1024];
+    for (int i = 0; i < 1024; ++i) {
+        buf_f16[i] = ggml_fp32_to_fp16((float)i);
+    }
+
+    float expected_out_1[3][4] = {
+        {18.0, 45.0, 59.0, 37.0},
+        {24.0, 61.0, 83.0, 51.0},
+        {30.0, 77.0, 107.0, 65.0},
+    };
+    float expected_out_2[3][6] = {
+        {18.0, 21.0, 24.0, 29.0, 30.0, 37.0},
+        {24.0, 27.0, 34.0, 39.0, 44.0, 51.0},
+        {30.0, 33.0, 44.0, 49.0, 58.0, 65.0},
+    };
+    float expected_out_3[3][8] = {
+        {18.0, 21.0, 0.0, 24.0, 29.0, 0.0, 30.0, 37.0},
+        {24.0, 27.0, 0.0, 34.0, 39.0, 0.0, 44.0, 51.0},
+        {30.0, 33.0, 0.0, 44.0, 49.0, 0.0, 58.0, 65.0},
+    };
+    float expected_out_4[] = { 18., 24., 51., 29., 37., 24., 34., 71.,
+                               39., 51., 30., 44., 91., 49., 65. };
+    float expected_out_5[] = { 18., 24., 30., 21., 29., 37., 24., 34., 44.,
+                               27., 39., 51., 30., 44., 58., 33., 49., 65. };
+    float expected_out_6[] = { 45., 59., 61., 83., 77., 107. };
+    float expected_out_7[] = { 0., 0., 0. };
+
+    // conv transpose 1d
+    {
+        struct ggml_context * ctx = make_ctx();
+
+        struct ggml_tensor * t = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 3, 2); // l x cin
+        memcpy(t->data, buf_f32, ggml_nbytes(t));
+
+        struct ggml_tensor * k = ggml_new_tensor_3d(ctx, GGML_TYPE_F16, 2, 3, 2); // k x cout x cin
+        memcpy(k->data, buf_f16, ggml_nbytes(k));
+
+        struct ggml_tensor * out_1 = ggml_conv_transpose_1d_gemm(ctx, k, t, 1 /* s0 */, 0 /* p0 */, 1 /* d0 */);
+        struct ggml_tensor * out_2 = ggml_conv_transpose_1d_gemm(ctx, k, t, 2 /* s0 */, 0 /* p0 */, 1 /* d0 */);
+        struct ggml_tensor * out_3 = ggml_conv_transpose_1d_gemm(ctx, k, t, 3 /* s0 */, 0 /* p0 */, 1 /* d0 */);
+
+        struct ggml_tensor * out_4 = ggml_conv_transpose_1d_gemm(ctx, k, t, 1 /* s0 */, 0 /* p0 */, 2 /* d0 */);
+        struct ggml_tensor * out_5 = ggml_conv_transpose_1d_gemm(ctx, k, t, 1 /* s0 */, 0 /* p0 */, 3 /* d0 */);
+
+        struct ggml_tensor * out_6 = ggml_conv_transpose_1d_gemm(ctx, k, t, 1 /* s0 */, 1 /* p0 */, 1 /* d0 */);
+
+        struct ggml_tensor * out_7 = ggml_conv_transpose_1d_gemm(ctx, k, t, 2 /* s0 */, 3 /* p0 */, 2 /* d0 */);
+
+        struct ggml_cgraph * gf_1 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_2 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_3 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_4 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_5 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_6 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_7 = ggml_new_graph(ctx);
+
+        ggml_build_forward_expand(gf_1, out_1);
+        ggml_build_forward_expand(gf_2, out_2);
+        ggml_build_forward_expand(gf_3, out_3);
+        ggml_build_forward_expand(gf_4, out_4);
+        ggml_build_forward_expand(gf_5, out_5);
+        ggml_build_forward_expand(gf_6, out_6);
+        ggml_build_forward_expand(gf_7, out_7);
+
+        ggml_graph_compute_with_ctx(ctx, gf_1, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_2, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_3, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_4, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_5, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_6, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_7, 1);
+
+        check_tensor(out_1, (float*)expected_out_1, 4, 3, 1);
+        check_tensor(out_2, (float*)expected_out_2, 6, 3, 1);
+        check_tensor(out_3, (float*)expected_out_3, 8, 3, 1);
+        check_tensor(out_4, (float*)expected_out_4, 5, 3, 1);
+        check_tensor(out_5, (float*)expected_out_5, 6, 3, 1);
+        check_tensor(out_6, (float*)expected_out_6, 2, 3, 1);
+        check_tensor(out_7, (float*)expected_out_7, 1, 3, 1);
+    }
+}
+
+void test_conv_transpose_1d_gemm_batched(void) {
+
+    float buf_f32[1024];
+    for (int i = 0; i < 1024; ++i) {
+        buf_f32[i] = (float)i;
+    }
+
+    ggml_fp16_t buf_f16[1024];
+    for (int i = 0; i < 1024; ++i) {
+        buf_f16[i] = ggml_fp32_to_fp16((float)i);
+    }
+
+    float expected_out_1[] = {
+        2520.,  5350.,  8495.,  8600.,  6065.,  3200.,  2640.,  5610.,  8915.,  9020.,  6365.,
+        3360.,  2760.,  5870.,  9335.,  9440.,  6665.,  3520.,  2880.,  6130.,  9755.,  9860.,
+        6965.,  3680.,  3000.,  6390.,  10175., 10280., 7265.,  3840.,  3120.,  6650.,  10595.,
+        10700., 7565.,  4000.,  3240.,  6910.,  11015., 11120., 7865.,  4160.,  6720.,  13825.,
+        21320., 21650., 14840., 7625.,  7140.,  14685., 22640., 22970., 15740., 8085.,  7560.,
+        15545., 23960., 24290., 16640., 8545.,  7980.,  16405., 25280., 25610., 17540., 9005.,
+        8400.,  17265., 26600., 26930., 18440., 9465.,  8820.,  18125., 27920., 28250., 19340.,
+        9925.,  9240.,  18985., 29240., 29570., 20240., 10385.
+    };
+    float expected_out_2[] = {
+        2520.,  2550.,  5380.,  5445.,  5950.,  6025.,  3160.,  3200.,  2640.,  2670.,  5640.,
+        5705.,  6250.,  6325.,  3320.,  3360.,  2760.,  2790.,  5900.,  5965.,  6550.,  6625.,
+        3480.,  3520.,  2880.,  2910.,  6160.,  6225.,  6850.,  6925.,  3640.,  3680.,  3000.,
+        3030.,  6420.,  6485.,  7150.,  7225.,  3800.,  3840.,  3120.,  3150.,  6680.,  6745.,
+        7450.,  7525.,  3960.,  4000.,  3240.,  3270.,  6940.,  7005.,  7750.,  7825.,  4120.,
+        4160.,  6720.,  6825.,  13930., 14145., 14500., 14725., 7510.,  7625.,  7140.,  7245.,
+        14790., 15005., 15400., 15625., 7970.,  8085.,  7560.,  7665.,  15650., 15865., 16300.,
+        16525., 8430.,  8545.,  7980.,  8085.,  16510., 16725., 17200., 17425., 8890.,  9005.,
+        8400.,  8505.,  17370., 17585., 18100., 18325., 9350.,  9465.,  8820.,  8925.,  18230.,
+        18445., 19000., 19225., 9810.,  9925.,  9240.,  9345.,  19090., 19305., 19900., 20125.,
+        10270., 10385.
+    };
+    float expected_out_3[] = {
+        2520., 2550.,  2580.,  5410.,  2835.,  2870.,  5985.,  3120.,  3160.,  3200.,  2640.,
+        2670., 2700.,  5670.,  2975.,  3010.,  6285.,  3280.,  3320.,  3360.,  2760.,  2790.,
+        2820., 5930.,  3115.,  3150.,  6585.,  3440.,  3480.,  3520.,  2880.,  2910.,  2940.,
+        6190., 3255.,  3290.,  6885.,  3600.,  3640.,  3680.,  3000.,  3030.,  3060.,  6450.,
+        3395., 3430.,  7185.,  3760.,  3800.,  3840.,  3120.,  3150.,  3180.,  6710.,  3535.,
+        3570., 7485.,  3920.,  3960.,  4000.,  3240.,  3270.,  3300.,  6970.,  3675.,  3710.,
+        7785., 4080.,  4120.,  4160.,  6720.,  6825.,  6930.,  14035., 7110.,  7220.,  14610.,
+        7395., 7510.,  7625.,  7140.,  7245.,  7350.,  14895., 7550.,  7660.,  15510., 7855.,
+        7970., 8085.,  7560.,  7665.,  7770.,  15755., 7990.,  8100.,  16410., 8315.,  8430.,
+        8545., 7980.,  8085.,  8190.,  16615., 8430.,  8540.,  17310., 8775.,  8890.,  9005.,
+        8400., 8505.,  8610.,  17475., 8870.,  8980.,  18210., 9235.,  9350.,  9465.,  8820.,
+        8925., 9030.,  18335., 9310.,  9420.,  19110., 9695.,  9810.,  9925.,  9240.,  9345.,
+        9450., 19195., 9750.,  9860.,  20010., 10155., 10270., 10385.
+    };
+    float expected_out_4[] = {
+        2520.,  2800.,  5630.,  2835.,  5700.,  2870., 5770.,  2905., 3200.,  2640.,  2940.,
+        5910.,  2975.,  5980.,  3010.,  6050.,  3045., 3360.,  2760., 3080.,  6190.,  3115.,
+        6260.,  3150.,  6330.,  3185.,  3520.,  2880., 3220.,  6470., 3255.,  6540.,  3290.,
+        6610.,  3325.,  3680.,  3000.,  3360.,  6750., 3395.,  6820., 3430.,  6890.,  3465.,
+        3840.,  3120.,  3500.,  7030.,  3535.,  7100., 3570.,  7170., 3605.,  4000.,  3240.,
+        3640.,  7310.,  3675.,  7380.,  3710.,  7450., 3745.,  4160., 6720.,  7000.,  14105.,
+        7110.,  14325., 7220.,  14545., 7330.,  7625., 7140.,  7440., 14985., 7550.,  15205.,
+        7660.,  15425., 7770.,  8085.,  7560.,  7880., 15865., 7990., 16085., 8100.,  16305.,
+        8210.,  8545.,  7980.,  8320.,  16745., 8430., 16965., 8540., 17185., 8650.,  9005.,
+        8400.,  8760.,  17625., 8870.,  17845., 8980., 18065., 9090., 9465.,  8820.,  9200.,
+        18505., 9310.,  18725., 9420.,  18945., 9530., 9925.,  9240., 9640.,  19385., 9750.,
+        19605., 9860.,  19825., 9970.,  10385.
+    };
+    float expected_out_5[] = {
+        2520., 2800., 3080.,  2550., 2835., 3120.,  2580., 2870., 3160.,  2610., 2905., 3200.,
+        2640., 2940., 3240.,  2670., 2975., 3280.,  2700., 3010., 3320.,  2730., 3045., 3360.,
+        2760., 3080., 3400.,  2790., 3115., 3440.,  2820., 3150., 3480.,  2850., 3185., 3520.,
+        2880., 3220., 3560.,  2910., 3255., 3600.,  2940., 3290., 3640.,  2970., 3325., 3680.,
+        3000., 3360., 3720.,  3030., 3395., 3760.,  3060., 3430., 3800.,  3090., 3465., 3840.,
+        3120., 3500., 3880.,  3150., 3535., 3920.,  3180., 3570., 3960.,  3210., 3605., 4000.,
+        3240., 3640., 4040.,  3270., 3675., 4080.,  3300., 3710., 4120.,  3330., 3745., 4160.,
+        6720., 7000., 7280.,  6825., 7110., 7395.,  6930., 7220., 7510.,  7035., 7330., 7625.,
+        7140., 7440., 7740.,  7245., 7550., 7855.,  7350., 7660., 7970.,  7455., 7770., 8085.,
+        7560., 7880., 8200.,  7665., 7990., 8315.,  7770., 8100., 8430.,  7875., 8210., 8545.,
+        7980., 8320., 8660.,  8085., 8430., 8775.,  8190., 8540., 8890.,  8295., 8650., 9005.,
+        8400., 8760., 9120.,  8505., 8870., 9235.,  8610., 8980., 9350.,  8715., 9090., 9465.,
+        8820., 9200., 9580.,  8925., 9310., 9695.,  9030., 9420., 9810.,  9135., 9530., 9925.,
+        9240., 9640., 10040., 9345., 9750., 10155., 9450., 9860., 10270., 9555., 9970., 10385.
+    };
+    float expected_out_6[] = {
+        5350.,  8495.,  8600.,  6065.,  5610.,  8915.,  9020.,  6365.,  5870.,  9335.,
+        9440.,  6665.,  6130.,  9755.,  9860.,  6965.,  6390.,  10175., 10280., 7265.,
+        6650.,  10595., 10700., 7565.,  6910.,  11015., 11120., 7865.,  13825., 21320.,
+        21650., 14840., 14685., 22640., 22970., 15740., 15545., 23960., 24290., 16640.,
+        16405., 25280., 25610., 17540., 17265., 26600., 26930., 18440., 18125., 27920.,
+        28250., 19340., 18985., 29240., 29570., 20240.
+    };
+    float expected_out_7[] = { 0., 8495.,  0., 8600.,  0., 0., 8915.,  0., 9020.,  0.,
+                               0., 9335.,  0., 9440.,  0., 0., 9755.,  0., 9860.,  0.,
+                               0., 10175., 0., 10280., 0., 0., 10595., 0., 10700., 0.,
+                               0., 11015., 0., 11120., 0., 0., 21320., 0., 21650., 0.,
+                               0., 22640., 0., 22970., 0., 0., 23960., 0., 24290., 0.,
+                               0., 25280., 0., 25610., 0., 0., 26600., 0., 26930., 0.,
+                               0., 27920., 0., 28250., 0., 0., 29240., 0., 29570., 0. };
+
+    // conv transpose 1d
+    {
+        struct ggml_context * ctx = make_ctx();
+
+        struct ggml_tensor * t = ggml_new_tensor_3d(ctx, GGML_TYPE_F32, 3, 5, 2); // l x cin x n
+        memcpy(t->data, buf_f32, ggml_nbytes(t));
+
+        struct ggml_tensor * k = ggml_new_tensor_3d(ctx, GGML_TYPE_F16, 4, 7, 5); // k x cout x cin
+        memcpy(k->data, buf_f16, ggml_nbytes(k));
+
+        struct ggml_tensor * out_1 = ggml_conv_transpose_1d_gemm(ctx, k, t, 1 /* s0 */, 0 /* p0 */, 1 /* d0 */);
+        struct ggml_tensor * out_2 = ggml_conv_transpose_1d_gemm(ctx, k, t, 2 /* s0 */, 0 /* p0 */, 1 /* d0 */);
+        struct ggml_tensor * out_3 = ggml_conv_transpose_1d_gemm(ctx, k, t, 3 /* s0 */, 0 /* p0 */, 1 /* d0 */);
+
+        struct ggml_tensor * out_4 = ggml_conv_transpose_1d_gemm(ctx, k, t, 1 /* s0 */, 0 /* p0 */, 2 /* d0 */);
+        struct ggml_tensor * out_5 = ggml_conv_transpose_1d_gemm(ctx, k, t, 1 /* s0 */, 0 /* p0 */, 3 /* d0 */);
+
+        struct ggml_tensor * out_6 = ggml_conv_transpose_1d_gemm(ctx, k, t, 1 /* s0 */, 1 /* p0 */, 1 /* d0 */);
+
+        struct ggml_tensor * out_7 = ggml_conv_transpose_1d_gemm(ctx, k, t, 2 /* s0 */, 3 /* p0 */, 2 /* d0 */);
+
+        struct ggml_cgraph * gf_1 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_2 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_3 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_4 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_5 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_6 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_7 = ggml_new_graph(ctx);
+
+        ggml_build_forward_expand(gf_1, out_1);
+        ggml_build_forward_expand(gf_2, out_2);
+        ggml_build_forward_expand(gf_3, out_3);
+        ggml_build_forward_expand(gf_4, out_4);
+        ggml_build_forward_expand(gf_5, out_5);
+        ggml_build_forward_expand(gf_6, out_6);
+        ggml_build_forward_expand(gf_7, out_7);
+
+        ggml_graph_compute_with_ctx(ctx, gf_1, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_2, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_3, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_4, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_5, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_6, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_7, 1);
+
+        check_tensor(out_1, (float*)expected_out_1, 6, 7, 2);
+        check_tensor(out_2, (float*)expected_out_2, 8, 7, 2);
+        check_tensor(out_3, (float*)expected_out_3, 10, 7, 2);
+        check_tensor(out_4, (float*)expected_out_4, 9, 7, 2);
+        check_tensor(out_5, (float*)expected_out_5, 12, 7, 2);
+        check_tensor(out_6, (float*)expected_out_6, 4, 7, 2);
+        check_tensor(out_7, (float*)expected_out_7, 5, 7, 2);
+    }
+}
+
 void test_conv_transpose_2d(void) {
 
     float buf_f32[1024];
@@ -471,6 +711,8 @@ void test_col2im(void) {
 
 int main(int argc, const char * argv[]) {
     test_conv_transpose_1d();
+    test_conv_transpose_1d_gemm();
+    test_conv_transpose_1d_gemm_batched();
     test_conv_transpose_2d();
     test_col2im();
     return 0;
