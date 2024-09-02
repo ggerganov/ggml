@@ -1753,6 +1753,7 @@ extern "C" {
             int                   ne3);
 
     // pad each dimension with zeros: [x, ..., x] -> [x, ..., x, 0, ..., 0]
+    // only supports postfix padding
     GGML_API struct ggml_tensor * ggml_pad(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
@@ -1760,6 +1761,21 @@ extern "C" {
             int                  p1,
             int                  p2,
             int                  p3);
+
+
+    // pad each dimension with zeros: [x, ..., x] -> [0, ..., 0, x, ..., x, 0, ..., 0]
+    // supports prefix and postfix padding
+    GGML_API struct ggml_tensor * ggml_pad_ext(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            int                  p00,
+            int                  p01,
+            int                  p10,
+            int                  p11,
+            int                  p20,
+            int                  p21,
+            int                  p30,
+            int                  p31);
 
     // Ref: https://github.com/CompVis/stable-diffusion/blob/main/ldm/modules/diffusionmodules/util.py#L151
     // timesteps: [N,]

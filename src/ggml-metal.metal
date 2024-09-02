@@ -1997,6 +1997,10 @@ kernel void kernel_pad_f32(
     constant  uint64_t & nb1,
     constant  uint64_t & nb2,
     constant  uint64_t & nb3,
+    constant   int64_t & p00,
+    constant   int64_t & p10,
+    constant   int64_t & p20,
+    constant   int64_t & p30,
     uint3 tgpig[[threadgroup_position_in_grid]],
     uint3 tpitg[[thread_position_in_threadgroup]],
     uint3   ntg[[threads_per_threadgroup]]) {
@@ -2009,23 +2013,18 @@ kernel void kernel_pad_f32(
     const int64_t i02 = i2;
     const int64_t i01 = i1;
 
-    device const float * src0_ptr = (device const float *) (src0 + i03*nb03 + i02*nb02 + i01*nb01);
-    device       float * dst_ptr  = (device       float *) (dst  +  i3*nb3  +  i2*nb2  +  i1*nb1);
-
-    if (i1 < ne01 && i2 < ne02 && i3 < ne03) {
-        for (int i0 = tpitg.x; i0 < ne0; i0 += ntg.x) {
-            if (i0 < ne00) {
-                dst_ptr[i0] = src0_ptr[i0];
-            } else {
-                dst_ptr[i0] = 0.0f;
-            }
-        }
-
-        return;
-    }
-
     for (int i0 = tpitg.x; i0 < ne0; i0 += ntg.x) {
-        dst_ptr[i0] = 0.0f;
+        device       float * dst_ptr  = (device       float *) (dst  + i3*nb3 + i2*nb2 + i1*nb1 + i0*nb0);
+
+        if (i0 <  ne00 + p00 && i1 <  ne01 + p10 && i2 <  ne02 + p20 && i3 <  ne03 + p30 &&
+            i0 >=        p00 && i1 >=        p10 && i2 >=        p20 && i3 >=        p30) {
+
+            device const float * src0_ptr = (device const float *) (src0 + (i03 - p30)*nb03 + (i02 - p20)*nb02 + (i01 - p10)*nb01 + (i0 - p00)*nb00);
+
+            dst_ptr[0] = src0_ptr[0];
+        } else {
+            dst_ptr[0] = 0.0f;
+        }
     }
 }
 
