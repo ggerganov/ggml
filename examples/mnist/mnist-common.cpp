@@ -1,3 +1,5 @@
+#include "ggml-alloc.h"
+#include "ggml-backend.h"
 #include "ggml.h"
 
 #include "mnist-common.h"
@@ -158,16 +160,20 @@ mnist_model mnist_model_init_from_file(const std::string & fname) {
     mnist_model model;
     fprintf(stderr, "%s: loading model weights from '%s'\n", __func__, fname.c_str());
 
-    struct gguf_init_params params = {
-        /*.no_alloc   =*/ false,
-        /*.ctx        =*/ &model.ctx_weight,
-    };
-    gguf_context * ctx = gguf_init_from_file(fname.c_str(), params);
-    if (!ctx) {
-        fprintf(stderr, "%s: gguf_init_from_file() failed\n", __func__);
-        exit(1);
+    struct gguf_context * ctx_be; // be == backend
+
+    {
+        struct gguf_init_params params = {
+            /*.no_alloc   =*/ true,
+            /*.ctx        =*/ &model.ctx_weight,
+        };
+        ctx_be = gguf_init_from_file(fname.c_str(), params);
+        if (!ctx_be) {
+            fprintf(stderr, "%s: gguf_init_from_file() failed\n", __func__);
+            exit(1);
+        }
     }
-    model.arch = gguf_get_val_str(ctx, gguf_find_key(ctx, "general.architecture"));
+    model.arch = gguf_get_val_str(ctx_be, gguf_find_key(ctx_be, "general.architecture"));
     fprintf(stderr, "%s: model arch is %s\n", __func__, model.arch.c_str());
 
     if (model.arch == "mnist-fc") {
@@ -239,6 +245,43 @@ mnist_model mnist_model_init_from_file(const std::string & fname) {
     } else {
         fprintf(stderr, "%s: unknown model arch: %s\n", __func__, model.arch.c_str());
     }
+    model.buf_weightt = ggml_backend_alloc_ctx_tensors(model.ctx_weight, model.backend);
+
+    void * buf_tmp = malloc(model.size_weight);
+    struct ggml_context * ctx_ggml_tmp;
+    {
+        struct ggml_init_params params = {
+            /*.mem_size   =*/ model.size_weight,
+            /*.mem_buffer =*/ buf_tmp,
+            /*.no_alloc   =*/ false,
+        };
+        ctx_ggml_tmp = ggml_init(params);
+    }
+    struct gguf_context * ctx_gguf_tmp;
+    {
+        struct gguf_init_params params = {
+            /*.no_alloc   =*/ false,
+            /*.ctx        =*/ &ctx_ggml_tmp,
+        };
+        ctx_gguf_tmp = gguf_init_from_file(fname.c_str(), params);
+        if (!ctx_gguf_tmp) {
+            fprintf(stderr, "%s: gguf_init_from_file() failed\n", __func__);
+            exit(1);
+        }
+    }
+    for (const std::string & s : {"fc1.weight", "fc1.bias", "fc2.weight", "fc2.bias"}) {
+        const struct ggml_tensor * src = ggml_get_tensor(ctx_ggml_tmp,     s.c_str());
+        struct       ggml_tensor * dst = ggml_get_tensor(model.ctx_weight, s.c_str());
+        GGML_ASSERT(ggml_nbytes(src) == ggml_nbytes(dst));
+        ggml_backend_tensor_set(dst, src->data, 0, ggml_nbytes(dst));
+    }
+
+    gguf_free(ctx_gguf_tmp);
+    ggml_free(ctx_ggml_tmp);
+    free(buf_tmp);
+
+    gguf_free(ctx_be);
+
     fprintf(stderr, "%s: successfully loaded weights from %s\n", __func__, fname.c_str());
     return model;
 }
@@ -408,6 +451,8 @@ void mnist_model_build(mnist_model & model, const int nbatch) {
     GGML_ASSERT(model.loss->ne[1] == 1);
     GGML_ASSERT(model.loss->ne[2] == 1);
     GGML_ASSERT(model.loss->ne[3] == 1);
+
+    model.buf_compute = ggml_backend_alloc_ctx_tensors(model.ctx_compute, model.backend);
 }
 
 mnist_eval_result mnist_model_eval(const mnist_model & model, const float * images, const float * labels, const int nex, const int nthreads) {
@@ -419,17 +464,27 @@ mnist_eval_result mnist_model_eval(const mnist_model & model, const float * imag
     {
         const int64_t t_start_us = ggml_time_us();
 
+        float loss;
+        std::vector<float> logits(model.nbatch*MNIST_NCLASSES);
+
+        GGML_ASSERT(sizeof(loss)  == ggml_nbytes(model.loss));
+        GGML_ASSERT(logits.size() == ggml_nelements(model.logits));
+
         GGML_ASSERT(nex % model.nbatch == 0);
         for (int iex0 = 0; iex0 < nex; iex0 += model.nbatch) {
-            memcpy(model.images->data, images + iex0*MNIST_NINPUT,   ggml_nbytes(model.images));
-            memcpy(model.labels->data, labels + iex0*MNIST_NCLASSES, ggml_nbytes(model.labels));
-            ggml_graph_compute_with_ctx(model.ctx_compute, gf, nthreads);
+            ggml_backend_tensor_set(model.images, images + iex0*MNIST_NINPUT,   0, ggml_nbytes(model.images));
+            ggml_backend_tensor_set(model.labels, labels + iex0*MNIST_NCLASSES, 0, ggml_nbytes(model.labels));
 
-            result.loss.push_back(*ggml_get_data_f32(model.loss));
+            ggml_backend_graph_compute(model.backend, gf);
+
+            ggml_backend_tensor_get(model.loss,   &loss,         0, ggml_nbytes(model.loss));
+            ggml_backend_tensor_get(model.logits, logits.data(), 0, ggml_nbytes(model.logits));
+
+            result.loss.push_back(loss);
 
             for (int iexb = 0; iexb < model.nbatch; ++iexb) {
-                const float * logits_data = ggml_get_data_f32(model.logits) + iexb*MNIST_NCLASSES;
-                result.pred.push_back(std::max_element(logits_data, logits_data + MNIST_NCLASSES) - logits_data);
+                const float * logits_iexb = logits.data() + iexb*MNIST_NCLASSES;
+                result.pred.push_back(std::max_element(logits_iexb, logits_iexb + MNIST_NCLASSES) - logits_iexb);
             }
         }
 

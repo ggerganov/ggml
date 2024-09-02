@@ -1,6 +1,10 @@
 #include <string>
+#include <thread>
 #include <vector>
 
+#include "ggml-alloc.h"
+#include "ggml-backend.h"
+#include "ggml-cuda.h"
 #include "ggml.h"
 
 #define MNIST_NTRAIN 60000
@@ -21,6 +25,7 @@ static_assert(MNIST_NTEST  % MNIST_NBATCH == 0, "MNIST_NTRAIN % MNIST_BATCH != 0
 
 struct mnist_model {
     std::string arch;
+    ggml_backend_t backend;
     int nbatch;
 
     struct ggml_tensor  * images = nullptr;
@@ -48,14 +53,20 @@ struct mnist_model {
     struct ggml_context * ctx_weight  = nullptr;
     void                * buf_compute = nullptr;
     struct ggml_context * ctx_compute = nullptr;
+    ggml_backend_buffer_t buf_backend = nullptr;
+    ggml_backend_buffer_t buf_weightt = nullptr;
 
     mnist_model() {
+        backend = ggml_backend_cuda_init(0);
+        // backend = ggml_backend_cpu_init();
+        // ggml_backend_cpu_set_n_threads(backend, std::thread::hardware_concurrency());
+
         buf_weight = malloc(size_weight);
         {
             struct ggml_init_params params = {
                 /*.mem_size   =*/ size_weight,
-                /*.mem_buffer =*/ buf_weight,
-                /*.no_alloc   =*/ false,
+                /*.mem_buffer =*/ nullptr,
+                /*.no_alloc   =*/ true,
             };
             ctx_weight = ggml_init(params);
         }
@@ -64,8 +75,8 @@ struct mnist_model {
         {
             struct ggml_init_params params = {
                 /*.mem_size   =*/ size_compute,
-                /*.mem_buffer =*/ buf_compute,
-                /*.no_alloc   =*/ false,
+                /*.mem_buffer =*/ nullptr,
+                /*.no_alloc   =*/ true,
             };
             ctx_compute = ggml_init(params);
         }
@@ -77,6 +88,10 @@ struct mnist_model {
 
         free(buf_weight);
         free(buf_compute);
+
+        ggml_backend_buffer_free(buf_weightt);
+        ggml_backend_buffer_free(buf_backend);
+        ggml_backend_free(backend);
     }
 };
 

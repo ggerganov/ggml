@@ -43,18 +43,18 @@ int main(int argc, char ** argv) {
 
     mnist_image_print(stdout, images.data() + iex*MNIST_NINPUT);
 
-    mnist_eval_result result_eval = mnist_graph_eval(argv[1], images.data(), labels.data(), MNIST_NTEST, nthreads);
-    if (result_eval.success) {
-        fprintf(stdout, "%s: predicted digit is %d\n", __func__, result_eval.pred[iex]);
+    // mnist_eval_result result_eval = mnist_graph_eval(argv[1], images.data(), labels.data(), MNIST_NTEST, nthreads);
+    // if (result_eval.success) {
+    //     fprintf(stdout, "%s: predicted digit is %d\n", __func__, result_eval.pred[iex]);
 
-        std::pair<double, double> result_loss = mnist_loss(result_eval);
-        fprintf(stdout, "%s: test_loss=%.6lf+-%.6lf\n", __func__, result_loss.first, result_loss.second);
+    //     std::pair<double, double> result_loss = mnist_loss(result_eval);
+    //     fprintf(stdout, "%s: test_loss=%.6lf+-%.6lf\n", __func__, result_loss.first, result_loss.second);
 
-        std::pair<double, double> result_acc = mnist_accuracy(result_eval, labels.data());
-        fprintf(stdout, "%s: test_acc=%.2lf+-%.2lf%%\n", __func__, 100.0*result_acc.first, 100.0*result_acc.second);
+    //     std::pair<double, double> result_acc = mnist_accuracy(result_eval, labels.data());
+    //     fprintf(stdout, "%s: test_acc=%.2lf+-%.2lf%%\n", __func__, 100.0*result_acc.first, 100.0*result_acc.second);
 
-        return 0;
-    }
+    //     return 0;
+    // }
 
     const int64_t t_start_us = ggml_time_us();
 
@@ -65,7 +65,7 @@ int main(int argc, char ** argv) {
     const int64_t t_load_us = ggml_time_us() - t_start_us;
 
     fprintf(stdout, "%s: loaded model in %.2lf ms\n", __func__, t_load_us / 1000.0);
-    result_eval = mnist_model_eval(model, images.data(), labels.data(), MNIST_NTEST, nthreads);
+    mnist_eval_result result_eval = mnist_model_eval(model, images.data(), labels.data(), MNIST_NTEST, nthreads);
     fprintf(stdout, "%s: predicted digit is %d\n", __func__, result_eval.pred[iex]);
 
     std::pair<double, double> result_loss = mnist_loss(result_eval);
