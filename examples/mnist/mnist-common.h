@@ -57,9 +57,9 @@ struct mnist_model {
     ggml_backend_buffer_t buf_weightt = nullptr;
 
     mnist_model() {
-        backend = ggml_backend_cuda_init(0);
-        // backend = ggml_backend_cpu_init();
-        // ggml_backend_cpu_set_n_threads(backend, std::thread::hardware_concurrency());
+        // backend = ggml_backend_cuda_init(0);
+        backend = ggml_backend_cpu_init();
+        ggml_backend_cpu_set_n_threads(backend, std::thread::hardware_concurrency()/2);
 
         buf_weight = malloc(size_weight);
         {
