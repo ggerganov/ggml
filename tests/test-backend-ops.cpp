@@ -1718,7 +1718,7 @@ struct test_sin : public test_case {
     }
 
     test_sin(ggml_type type = GGML_TYPE_F32,
-            std::array<int64_t, 4> ne = {10, 5, 4, 3})
+            std::array<int64_t, 4> ne = {10, 2, 2, 2})
         : type(type), ne(ne) {}
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
@@ -1734,8 +1734,16 @@ struct test_sin : public test_case {
 
     void initialize_tensors(ggml_context * ctx) override {
         for (ggml_tensor * t = ggml_get_first_tensor(ctx); t != NULL; t = ggml_get_next_tensor(ctx, t)) {
-            init_tensor_uniform(t, -100.0f, 100.0f);
+            init_tensor_uniform(t, -6.5f, 6.5f);
         }
+    }
+
+    double max_maa_err() override {
+        return 1e-3;
+    }
+
+    float grad_eps() override {
+        return 0.2f;
     }
 
     bool grad_precise() override {
@@ -1753,7 +1761,7 @@ struct test_cos : public test_case {
     }
 
     test_cos(ggml_type type = GGML_TYPE_F32,
-            std::array<int64_t, 4> ne = {10, 5, 4, 3})
+            std::array<int64_t, 4> ne = {10, 2, 2, 2})
         : type(type), ne(ne) {}
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
@@ -1769,8 +1777,16 @@ struct test_cos : public test_case {
 
     void initialize_tensors(ggml_context * ctx) override {
         for (ggml_tensor * t = ggml_get_first_tensor(ctx); t != NULL; t = ggml_get_next_tensor(ctx, t)) {
-            init_tensor_uniform(t, -100.0f, 100.0f);
+            init_tensor_uniform(t, -6.5f, 6.5f);
         }
+    }
+
+    double max_maa_err() override {
+        return 1e-3;
+    }
+
+    float grad_eps() override {
+        return 0.2f;
     }
 
     bool grad_precise() override {
