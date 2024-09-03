@@ -6637,14 +6637,12 @@ struct ggml_tensor * ggml_rope_back(
     GGML_ASSERT(ggml_is_vector(b));
     GGML_ASSERT(b->type == GGML_TYPE_I32);
     GGML_ASSERT(a->ne[2] == b->ne[0]);
-    GGML_ASSERT(c == NULL && "freq factors not implemented yet");
-
-    GGML_ASSERT((mode & 4) == 0 && "ggml_rope_back() for ChatGLM not implemented yet");
 
     bool is_node = false;
 
     if (a->grad) {
-        is_node = false; // TODO: implement backward
+        GGML_ASSERT(false && "backwards pass not implemented");
+        is_node = false;
     }
 
     struct ggml_tensor * result = ggml_dup_tensor(ctx, a);
@@ -6662,6 +6660,7 @@ struct ggml_tensor * ggml_rope_back(
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
     result->src[1] = b;
+    result->src[2] = c;
 
     return result;
 }
