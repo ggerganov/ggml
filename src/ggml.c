@@ -8312,7 +8312,11 @@ struct ggml_tensor * ggml_cross_entropy_loss_back(
 struct ggml_tensor * ggml_opt_step_adam(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
-        float                 alpha) {
+        float                 sched,
+        float                 alpha,
+        float                 beta1,
+        float                 beta2,
+        float                 eps) {
     GGML_ASSERT(a->grad);
 
     struct ggml_tensor * result = ggml_view_tensor(ctx, a);
@@ -8321,8 +8325,15 @@ struct ggml_tensor * ggml_opt_step_adam(
     result->grad = NULL;
     result->src[0] = a;
     result->src[1] = a->grad;
+    result->src[2] = ggml_dup_tensor(ctx, a->grad);
+    result->src[3] = ggml_dup_tensor(ctx, a->grad);
 
-    ggml_set_op_params(result, &alpha, sizeof(alpha));
+    ggml_set_op_params_i32(result, 0, 1);     // iteration
+    ggml_set_op_params_f32(result, 1, sched);
+    ggml_set_op_params_f32(result, 2, alpha);
+    ggml_set_op_params_f32(result, 3, beta1);
+    ggml_set_op_params_f32(result, 4, beta2);
+    ggml_set_op_params_f32(result, 5, eps);
 
     return result;
 }
@@ -17470,8 +17481,10 @@ static void ggml_compute_forward_opt_step_adam_f32(
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
 
-    const struct ggml_tensor * src0      = dst->src[0];
-    const struct ggml_tensor * src0_grad = dst->src[1];
+    const struct ggml_tensor * src0        = dst->src[0];
+    const struct ggml_tensor * src0_grad   = dst->src[1];
+    const struct ggml_tensor * src0_grad_m = dst->src[2];
+    const struct ggml_tensor * src0_grad_v = dst->src[3];
     GGML_ASSERT(ggml_are_same_shape(src0, src0_grad));
 
     const int ith = params->ith;
@@ -17489,7 +17502,17 @@ static void ggml_compute_forward_opt_step_adam_f32(
     const int ir0 = dr*ith;
     const int ir1 = MIN(ir0 + dr, nr);
 
-    const float alpha = ggml_get_op_params_f32(dst, 0);
+    /* const float   gnorm = 1.0f; */
+    const int32_t iter  = ggml_get_op_params_i32(dst, 0);
+    const float   sched = ggml_get_op_params_f32(dst, 1);
+    const float   alpha = ggml_get_op_params_f32(dst, 2);
+    const float   beta1 = ggml_get_op_params_f32(dst, 3);
+    const float   beta2 = ggml_get_op_params_f32(dst, 4);
+    const float   eps   = ggml_get_op_params_f32(dst, 5);
+
+    const float beta1h  = alpha*sched/(1.0f - powf(beta1, iter));
+    const float beta2h  =        1.0f/(1.0f - powf(beta2, iter));
+    const float p_decay = 0.0f;
 
     for (int ir = ir0; ir < ir1; ++ir) {
         const int64_t i03 = ir/(ne02*ne01);
@@ -17498,10 +17521,20 @@ static void ggml_compute_forward_opt_step_adam_f32(
 
         const size_t offset = i03*nb03 + i02*nb02 + i01*nb01;
 
-        float       * weight_ptr = (float       *) ((char       *) src0->data      + offset);
-        const float * grad_ptr   = (const float *) ((const char *) src0_grad->data + offset);
+        float       * w = (float       *) ((char       *) src0->data        + offset); // weight
+        const float * g = (const float *) ((const char *) src0_grad->data   + offset); // grad
+        float       * m = (float       *) ((char       *) src0_grad_m->data + offset);
+        float       * v = (float       *) ((char       *) src0_grad_v->data + offset);
 
-        ggml_vec_mad_f32(ne00, weight_ptr, grad_ptr, -alpha);
+        for (int i00 = 0; i00 < ne00; ++i00) {
+            m[i00] = m[i00]*beta1 +        g[i00]*(1.0f - beta1);
+            v[i00] = v[i00]*beta2 + g[i00]*g[i00]*(1.0f - beta2);
+
+            const float mh =       m[i00]*beta1h;
+            const float vh = sqrtf(v[i00]*beta2h) + eps;
+
+            w[i00] = w[i00]*(1.0f - p_decay) - mh/vh;
+        }
     }
 }
 
@@ -19109,7 +19142,7 @@ void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * 
 
         if (node->flags & GGML_TENSOR_FLAG_PARAM) {
             GGML_PRINT_DEBUG("%s: found root node %p\n", __func__, (void *) node);
-            struct ggml_tensor * opt_step = ggml_opt_step_adam(ctx, node, 0.001f);
+            struct ggml_tensor * opt_step = ggml_opt_step_adam(ctx, node, 1.0f, 0.001f, 0.9f, 0.999f, 1e-8f);
             ggml_build_forward_expand(gb, opt_step);
         }
     }

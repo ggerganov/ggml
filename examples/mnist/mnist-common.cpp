@@ -518,6 +518,17 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
 
     model.buf_compute = ggml_backend_alloc_ctx_tensors(model.ctx_compute, model.backend);
 
+    for (int j = 0; j < gb->n_nodes; ++j) {
+        struct ggml_tensor * node = gb->nodes[j];
+
+        if (node->op != GGML_OP_OPT_STEP_ADAM) {
+            continue;
+        }
+
+        ggml_backend_tensor_memset(node->src[2], 0, 0, ggml_nbytes(node->src[2]));
+        ggml_backend_tensor_memset(node->src[3], 0, 0, ggml_nbytes(node->src[3]));
+    }
+
     for (int epoch = 0; epoch < 20; ++epoch) {
         fprintf(stderr, "%s: epoch %d start...", __func__, epoch);
         const int64_t t_start_us = ggml_time_us();
@@ -534,6 +545,15 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
             ggml_backend_graph_compute(model.backend, gf);
             ggml_backend_tensor_set(model.loss->grad, &onef, 0, sizeof(float));
             ggml_backend_graph_compute(model.backend, gb);
+            for (int j = 0; j < gb->n_nodes; ++j) {
+                struct ggml_tensor * node = gb->nodes[j];
+
+                if (node->op != GGML_OP_OPT_STEP_ADAM) {
+                    continue;
+                }
+
+                node->op_params[0]++;
+            }
 
             ggml_backend_tensor_get(model.loss,   &loss,         0, ggml_nbytes(model.loss));
             ggml_backend_tensor_get(model.logits, logits.data(), 0, ggml_nbytes(model.logits));
