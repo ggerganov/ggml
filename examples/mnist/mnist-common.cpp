@@ -456,11 +456,13 @@ void mnist_model_build(mnist_model & model, const int nbatch) {
     GGML_ASSERT(model.loss->ne[3] == 1);
 }
 
-mnist_eval_result mnist_model_eval(const mnist_model & model, const float * images, const float * labels, const int nex, const int nthreads) {
+mnist_eval_result mnist_model_eval(mnist_model & model, const float * images, const float * labels, const int nex, const int nthreads) {
     mnist_eval_result result;
 
     struct ggml_cgraph * gf = ggml_new_graph(model.ctx_compute);
     ggml_build_forward_expand(gf, model.loss);
+
+    model.buf_compute = ggml_backend_alloc_ctx_tensors(model.ctx_compute, model.backend);
 
     {
         const int64_t t_start_us = ggml_time_us();
@@ -578,33 +580,45 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
     const double t_total_s = 1e-6*t_total_us;
     fprintf(stderr, "%s: training took %.2lfs\n", __func__, t_total_s);
 
-    std::string fname = model.arch + "-f32.ggml";
-    fprintf(stderr, "%s: saving the ggml graph for the forward pass to %s\n", __func__, fname.c_str());
-    ggml_graph_export(gf, fname.c_str());
+    // std::string fname = model.arch + "-f32.ggml";
+    // fprintf(stderr, "%s: saving the ggml graph for the forward pass to %s\n", __func__, fname.c_str());
+    // ggml_graph_export(gf, fname.c_str());
 }
 
 void mnist_model_save(mnist_model & model, const std::string & fname) {
     printf("%s: saving model to '%s'\n", __func__, fname.c_str());
 
+    struct ggml_context * ggml_ctx;
+    {
+        struct ggml_init_params params = {
+            /*.mem_size   =*/ model.size_weight,
+            /*.mem_buffer =*/ NULL,
+            /*.no_alloc   =*/ false,
+        };
+        ggml_ctx = ggml_init(params);
+    }
+
     gguf_context * gguf_ctx = gguf_init_empty();
     gguf_set_val_str(gguf_ctx, "general.architecture", model.arch.c_str());
 
+    std::vector<struct ggml_tensor *> weights;
     if (model.arch == "mnist-fc") {
-        gguf_add_tensor(gguf_ctx, model.fc1_weight);
-        gguf_add_tensor(gguf_ctx, model.fc1_bias);
-        gguf_add_tensor(gguf_ctx, model.fc2_weight);
-        gguf_add_tensor(gguf_ctx, model.fc2_bias);
+        weights = {model.fc1_weight, model.fc1_bias, model.fc2_weight, model.fc2_bias};
     } else if (model.arch == "mnist-cnn") {
-        gguf_add_tensor(gguf_ctx, model.conv1_kernel);
-        gguf_add_tensor(gguf_ctx, model.conv1_bias);
-        gguf_add_tensor(gguf_ctx, model.conv2_kernel);
-        gguf_add_tensor(gguf_ctx, model.conv2_bias);
-        gguf_add_tensor(gguf_ctx, model.dense_weight);
-        gguf_add_tensor(gguf_ctx, model.dense_bias);
+        weights = {model.conv1_kernel, model.conv1_bias, model.conv2_kernel, model.conv2_bias, model.dense_weight, model.dense_bias};
     } else {
         GGML_ASSERT(false);
     }
+    for (struct ggml_tensor * t : weights) {
+        struct ggml_tensor * copy = ggml_dup_tensor(ggml_ctx, t);
+        ggml_set_name(copy, t->name);
+        ggml_backend_tensor_get(t, copy->data, 0, ggml_nbytes(t));
+        gguf_add_tensor(gguf_ctx, copy);
+    }
     gguf_write_to_file(gguf_ctx, fname.c_str(), false);
+
+    ggml_free(ggml_ctx);
+    gguf_free(gguf_ctx);
 }
 
 std::pair<double, double> mnist_loss(const mnist_eval_result & result) {

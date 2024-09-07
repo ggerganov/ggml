@@ -57,9 +57,12 @@ struct mnist_model {
     ggml_backend_buffer_t buf_weightt = nullptr;
 
     mnist_model() {
-        // backend = ggml_backend_cuda_init(0);
-        backend = ggml_backend_cpu_init();
-        ggml_backend_cpu_set_n_threads(backend, std::thread::hardware_concurrency()/2);
+        backend = ggml_backend_cuda_init(0);
+        if (!backend) {
+            fprintf(stderr, "%s: CUDA backend could not be initialized, using CPU backend as a fallback\n", __func__);
+            backend = ggml_backend_cpu_init();
+            ggml_backend_cpu_set_n_threads(backend, std::thread::hardware_concurrency()/2);
+        }
 
         buf_weight = malloc(size_weight);
         {
@@ -111,7 +114,7 @@ mnist_eval_result mnist_graph_eval(const std::string & fname, const float * imag
 mnist_model       mnist_model_init_from_file(const std::string & fname);
 mnist_model       mnist_model_init_random(const std::string & arch);
 void              mnist_model_build(mnist_model & model, const int nbatch);
-mnist_eval_result mnist_model_eval(const mnist_model & model, const float * images, const float * labels, const int nex, const int nthreads);
+mnist_eval_result mnist_model_eval(mnist_model & model, const float * images, const float * labels, const int nex, const int nthreads);
 void              mnist_model_train(mnist_model & model, const float * images, const float * labels, const int nex, const int nthreads);
 void              mnist_model_save(mnist_model & model, const std::string & fname);
 
