@@ -698,7 +698,7 @@ bool gpt2_eval(
     }
 
     // run the computation
-    struct ggml_cplan plan = ggml_graph_plan(gf, n_threads);
+    struct ggml_cplan plan = ggml_graph_plan(gf, n_threads, nullptr);
     static std::vector<uint8_t> work_buffer;
     work_buffer.resize(plan.work_size);
     plan.work_data = work_buffer.data();
