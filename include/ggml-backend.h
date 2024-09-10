@@ -123,7 +123,7 @@ extern "C" {
     // The backend registry is a registry of all the available backends, and allows initializing backends in a generic way
 
     GGML_API size_t                     ggml_backend_reg_get_count(void);
-    GGML_API size_t                     ggml_backend_reg_find_by_name(const char * name);
+    GGML_API size_t                     ggml_backend_reg_find_by_name(const char * name); // returns index of backend with name, or SIZE_MAX if not found
     GGML_API ggml_backend_t             ggml_backend_reg_init_backend_from_str(const char * backend_str); // str is backend_name:params (params is optional)
     GGML_API const char *               ggml_backend_reg_get_name(size_t i);
     GGML_API ggml_backend_t             ggml_backend_reg_init_backend(size_t i, const char * params); // params is backend-specific

@@ -19,8 +19,8 @@ int main(int argc, char ** argv) {
     srand(time(NULL));
     ggml_time_init();
 
-    if (argc != 4) {
-        fprintf(stderr, "Usage: %s mnist-fc-f32.gguf data/MNIST/raw/t10k-images-idx3-ubyte data/MNIST/raw/t10k-labels-idx1-ubyte\n", argv[0]);
+    if (argc != 4 && argc != 5) {
+        fprintf(stderr, "Usage: %s mnist-fc-f32.gguf data/MNIST/raw/t10k-images-idx3-ubyte data/MNIST/raw/t10k-labels-idx1-ubyte [CPU/CUDA0]\n", argv[0]);
         exit(1);
     }
 
@@ -58,7 +58,7 @@ int main(int argc, char ** argv) {
 
     const int64_t t_start_us = ggml_time_us();
 
-    mnist_model model = mnist_model_init_from_file(argv[1]);
+    mnist_model model = mnist_model_init_from_file(argv[1], argc >= 5 ? argv[4] : "CPU");
 
     mnist_model_build(model, MNIST_NBATCH);
 

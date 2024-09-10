@@ -1,10 +1,10 @@
+#include <cstdint>
 #include <string>
 #include <thread>
 #include <vector>
 
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
-#include "ggml-cuda.h"
 #include "ggml.h"
 
 #define MNIST_NTRAIN 60000
@@ -56,13 +56,18 @@ struct mnist_model {
     ggml_backend_buffer_t buf_backend = nullptr;
     ggml_backend_buffer_t buf_weightt = nullptr;
 
-    mnist_model() {
-        backend = ggml_backend_cuda_init(0);
-        if (!backend) {
-            fprintf(stderr, "%s: CUDA backend could not be initialized, using CPU backend as a fallback\n", __func__);
-            backend = ggml_backend_cpu_init();
-            ggml_backend_cpu_set_n_threads(backend, std::thread::hardware_concurrency()/2);
+    mnist_model(const std::string & backend_name) {
+        const size_t backend_index = ggml_backend_reg_find_by_name(backend_name.c_str());
+        if (backend_index == SIZE_MAX) {
+            fprintf(stderr, "%s: ERROR: backend %s not found, available:\n", __func__, backend_name.c_str());
+            for (size_t i = 0; i < ggml_backend_reg_get_count(); ++i) {
+                fprintf(stderr, "  - %s\n", ggml_backend_reg_get_name(i));
+            }
+            exit(1);
         }
+
+        fprintf(stderr, "%s: using %s backend\n", __func__, backend_name.c_str());
+        backend = ggml_backend_reg_init_backend(backend_index, nullptr);
 
         buf_weight = malloc(size_weight);
         {
@@ -111,8 +116,8 @@ bool mnist_label_load(const std::string & fname, float * buf, const int nex);
 
 mnist_eval_result mnist_graph_eval(const std::string & fname, const float * images, const float * labels, const int nex, const int nthreads);
 
-mnist_model       mnist_model_init_from_file(const std::string & fname);
-mnist_model       mnist_model_init_random(const std::string & arch);
+mnist_model       mnist_model_init_from_file(const std::string & fname, const std::string & backend);
+mnist_model       mnist_model_init_random(const std::string & arch, const std::string & backend);
 void              mnist_model_build(mnist_model & model, const int nbatch);
 mnist_eval_result mnist_model_eval(mnist_model & model, const float * images, const float * labels, const int nex, const int nthreads);
 void              mnist_model_train(mnist_model & model, const float * images, const float * labels, const int nex, const int nthreads);

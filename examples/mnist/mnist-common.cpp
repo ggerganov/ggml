@@ -156,8 +156,8 @@ mnist_eval_result mnist_graph_eval(const std::string & fname, const float * imag
     return result;
 }
 
-mnist_model mnist_model_init_from_file(const std::string & fname) {
-    mnist_model model;
+mnist_model mnist_model_init_from_file(const std::string & fname, const std::string & backend) {
+    mnist_model model(backend);
     fprintf(stderr, "%s: loading model weights from '%s'\n", __func__, fname.c_str());
 
     struct gguf_context * ctx_be; // be == backend
@@ -286,8 +286,8 @@ mnist_model mnist_model_init_from_file(const std::string & fname) {
     return model;
 }
 
-mnist_model mnist_model_init_random(const std::string & arch) {
-    mnist_model model;
+mnist_model mnist_model_init_random(const std::string & arch, const std::string & backend) {
+    mnist_model model(backend);
     model.arch = arch;
 
     std::random_device rd{};
@@ -665,7 +665,7 @@ int wasm_eval(uint8_t * digitPtr) {
     std::vector<float> digit(digitPtr, digitPtr + MNIST_NINPUT);
     std::vector<float> labels(MNIST_NCLASSES);
 
-    mnist_model model = mnist_model_init_from_file("mnist-f32.gguf");
+    mnist_model model = mnist_model_init_from_file("mnist-f32.gguf", "CPU");
     mnist_model_build(model, 1);
     mnist_eval_result result = mnist_model_eval(model, digit.data(), labels.data(), 1, 1);
 

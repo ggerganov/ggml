@@ -12,8 +12,8 @@
 #endif
 
 int main(int argc, char ** argv) {
-    if (argc != 5) {
-        fprintf(stderr, "Usage: %s mnist-fc mnist-fc-f32.gguf data/MNIST/raw/train-images-idx3-ubyte data/MNIST/raw/train-labels-idx1-ubyte\n", argv[0]);
+    if (argc != 5 && argc != 6) {
+        fprintf(stderr, "Usage: %s mnist-fc mnist-fc-f32.gguf data/MNIST/raw/train-images-idx3-ubyte data/MNIST/raw/train-labels-idx1-ubyte [CPU/CUDA0]\n", argv[0]);
         exit(0);
     }
 
@@ -29,7 +29,7 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
-    mnist_model model = mnist_model_init_random(argv[1]);
+    mnist_model model = mnist_model_init_random(argv[1], argc >= 6 ? argv[5] : "CPU");
 
     mnist_model_build(model, MNIST_NBATCH);
 
