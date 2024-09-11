@@ -8315,8 +8315,14 @@ struct ggml_tensor * ggml_opt_step_adam(
         float                 alpha,
         float                 beta1,
         float                 beta2,
-        float                 eps) {
+        float                 eps,
+        float                 l1) {
     GGML_ASSERT(a->grad);
+    GGML_ASSERT(alpha >  0.0f);
+    GGML_ASSERT(beta1 >= 0.0f && beta1 <= 1.0f);
+    GGML_ASSERT(beta2 >= 0.0f && beta2 <= 1.0f);
+    GGML_ASSERT(eps   >= 0.0f);
+    GGML_ASSERT(l1    >= 0.0f);
 
     struct ggml_tensor * result = ggml_view_tensor(ctx, a);
 
@@ -8332,6 +8338,7 @@ struct ggml_tensor * ggml_opt_step_adam(
     ggml_set_op_params_f32(result, 2, beta1);
     ggml_set_op_params_f32(result, 3, beta2);
     ggml_set_op_params_f32(result, 4, eps);
+    ggml_set_op_params_f32(result, 5, l1);
 
     return result;
 }
@@ -17506,10 +17513,10 @@ static void ggml_compute_forward_opt_step_adam_f32(
     const float   beta1 = ggml_get_op_params_f32(dst, 2);
     const float   beta2 = ggml_get_op_params_f32(dst, 3);
     const float   eps   = ggml_get_op_params_f32(dst, 4);
+    const float   l1    = ggml_get_op_params_f32(dst, 5);
 
     const float beta1h  = alpha/(1.0f - powf(beta1, iter));
     const float beta2h  =  1.0f/(1.0f - powf(beta2, iter));
-    const float p_decay = 0.0f;
 
     for (int ir = ir0; ir < ir1; ++ir) {
         const int64_t i03 = ir/(ne02*ne01);
@@ -17530,7 +17537,7 @@ static void ggml_compute_forward_opt_step_adam_f32(
             const float mh =       m[i00]*beta1h;
             const float vh = sqrtf(v[i00]*beta2h) + eps;
 
-            w[i00] = w[i00]*(1.0f - p_decay) - mh/vh;
+            w[i00] = w[i00]*(1.0f - alpha*l1) - mh/vh;
         }
     }
 }
@@ -19139,7 +19146,7 @@ void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * 
 
         if (node->flags & GGML_TENSOR_FLAG_PARAM) {
             GGML_PRINT_DEBUG("%s: found root node %p\n", __func__, (void *) node);
-            struct ggml_tensor * opt_step = ggml_opt_step_adam(ctx, node, 1.0e-3f, 0.9f, 0.999f, 1e-8f);
+            struct ggml_tensor * opt_step = ggml_opt_step_adam(ctx, node, 1e-3f, 0.9f, 0.999f, 1e-8f, 1e-3f);
             ggml_build_forward_expand(gb, opt_step);
         }
     }

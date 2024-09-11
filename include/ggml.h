@@ -2087,7 +2087,8 @@ extern "C" {
             float                 alpha,
             float                 beta1,
             float                 beta2,
-            float                 eps);
+            float                 eps,
+            float                 l1);
 
     //
     // automatic differentiation
