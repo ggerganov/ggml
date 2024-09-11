@@ -8312,7 +8312,6 @@ struct ggml_tensor * ggml_cross_entropy_loss_back(
 struct ggml_tensor * ggml_opt_step_adam(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
-        float                 sched,
         float                 alpha,
         float                 beta1,
         float                 beta2,
@@ -8329,11 +8328,10 @@ struct ggml_tensor * ggml_opt_step_adam(
     result->src[3] = ggml_dup_tensor(ctx, a->grad);
 
     ggml_set_op_params_i32(result, 0, 1);     // iteration
-    ggml_set_op_params_f32(result, 1, sched);
-    ggml_set_op_params_f32(result, 2, alpha);
-    ggml_set_op_params_f32(result, 3, beta1);
-    ggml_set_op_params_f32(result, 4, beta2);
-    ggml_set_op_params_f32(result, 5, eps);
+    ggml_set_op_params_f32(result, 1, alpha);
+    ggml_set_op_params_f32(result, 2, beta1);
+    ggml_set_op_params_f32(result, 3, beta2);
+    ggml_set_op_params_f32(result, 4, eps);
 
     return result;
 }
@@ -17504,14 +17502,13 @@ static void ggml_compute_forward_opt_step_adam_f32(
 
     /* const float   gnorm = 1.0f; */
     const int32_t iter  = ggml_get_op_params_i32(dst, 0);
-    const float   sched = ggml_get_op_params_f32(dst, 1);
-    const float   alpha = ggml_get_op_params_f32(dst, 2);
-    const float   beta1 = ggml_get_op_params_f32(dst, 3);
-    const float   beta2 = ggml_get_op_params_f32(dst, 4);
-    const float   eps   = ggml_get_op_params_f32(dst, 5);
+    const float   alpha = ggml_get_op_params_f32(dst, 1);
+    const float   beta1 = ggml_get_op_params_f32(dst, 2);
+    const float   beta2 = ggml_get_op_params_f32(dst, 3);
+    const float   eps   = ggml_get_op_params_f32(dst, 4);
 
-    const float beta1h  = alpha*sched/(1.0f - powf(beta1, iter));
-    const float beta2h  =        1.0f/(1.0f - powf(beta2, iter));
+    const float beta1h  = alpha/(1.0f - powf(beta1, iter));
+    const float beta2h  =  1.0f/(1.0f - powf(beta2, iter));
     const float p_decay = 0.0f;
 
     for (int ir = ir0; ir < ir1; ++ir) {
@@ -19142,7 +19139,7 @@ void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * 
 
         if (node->flags & GGML_TENSOR_FLAG_PARAM) {
             GGML_PRINT_DEBUG("%s: found root node %p\n", __func__, (void *) node);
-            struct ggml_tensor * opt_step = ggml_opt_step_adam(ctx, node, 1.0f, 0.001f, 0.9f, 0.999f, 1e-8f);
+            struct ggml_tensor * opt_step = ggml_opt_step_adam(ctx, node, 1.0e-3f, 0.9f, 0.999f, 1e-8f);
             ggml_build_forward_expand(gb, opt_step);
         }
     }

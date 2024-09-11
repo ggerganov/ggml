@@ -4,7 +4,7 @@
 
 static __global__ void opt_step_adam_f32(
     float * __restrict__ x, const float * __restrict__ g, float * __restrict__ g_m, float * __restrict__ g_v, const int64_t k,
-    const float sched, const float alpha, const float beta1, const float beta2, const float eps,
+    const float alpha, const float beta1, const float beta2, const float eps,
     const float beta1h, const float beta2h, const float p_decay) {
 
     const int64_t i = (int64_t) blockIdx.x*blockDim.x + threadIdx.x;
@@ -28,12 +28,12 @@ static __global__ void opt_step_adam_f32(
 
 static void opt_step_adam_f32_cuda(
     float * x, const float * g, float * g_m, float * g_v, const int64_t k,
-    const float sched, const float alpha, const float beta1, const float beta2, const float eps,
+    const float alpha, const float beta1, const float beta2, const float eps,
     const float beta1h, const float beta2h, const float p_decay, cudaStream_t stream) {
 
     const dim3 block_dims(CUDA_OPT_STEP_ADAM_BLOCK_SIZE, 1, 1);
     const dim3 block_nums((k + CUDA_OPT_STEP_ADAM_BLOCK_SIZE - 1) / CUDA_OPT_STEP_ADAM_BLOCK_SIZE, 1, 1);
-    opt_step_adam_f32<<<block_nums, block_dims, 0, stream>>>(x, g, g_m, g_v, k, sched, alpha, beta1, beta2, eps, beta1h, beta2h, p_decay);
+    opt_step_adam_f32<<<block_nums, block_dims, 0, stream>>>(x, g, g_m, g_v, k, alpha, beta1, beta2, eps, beta1h, beta2h, p_decay);
 }
 
 void ggml_cuda_opt_step_adam(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
@@ -64,15 +64,14 @@ void ggml_cuda_opt_step_adam(ggml_backend_cuda_context & ctx, ggml_tensor * dst)
     const int64_t ne = ggml_nelements(src0);
 
     int32_t iter;  memcpy(&iter,  &dst->op_params[0], sizeof(float));
-    float   sched; memcpy(&sched, &dst->op_params[1], sizeof(float));
-    float   alpha; memcpy(&alpha, &dst->op_params[2], sizeof(float));
-    float   beta1; memcpy(&beta1, &dst->op_params[3], sizeof(float));
-    float   beta2; memcpy(&beta2, &dst->op_params[4], sizeof(float));
-    float   eps;   memcpy(&eps,   &dst->op_params[5], sizeof(float));
+    float   alpha; memcpy(&alpha, &dst->op_params[1], sizeof(float));
+    float   beta1; memcpy(&beta1, &dst->op_params[2], sizeof(float));
+    float   beta2; memcpy(&beta2, &dst->op_params[3], sizeof(float));
+    float   eps;   memcpy(&eps,   &dst->op_params[4], sizeof(float));
 
-    const float beta1h  = alpha*sched/(1.0f - powf(beta1, iter));
-    const float beta2h  =        1.0f/(1.0f - powf(beta2, iter));
+    const float beta1h  = alpha/(1.0f - powf(beta1, iter));
+    const float beta2h  =  1.0f/(1.0f - powf(beta2, iter));
     const float p_decay = 0.0f;
 
-    opt_step_adam_f32_cuda(src0_d, src0_grad_d, src0_grad_m_d, src0_grad_v_d, ne, sched, alpha, beta1, beta2, eps, beta1h, beta2h, p_decay, stream);
+    opt_step_adam_f32_cuda(src0_d, src0_grad_d, src0_grad_m_d, src0_grad_v_d, ne, alpha, beta1, beta2, eps, beta1h, beta2h, p_decay, stream);
 }
