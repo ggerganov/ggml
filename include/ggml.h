@@ -574,6 +574,7 @@ extern "C" {
         GGML_TENSOR_FLAG_INPUT  = 1,
         GGML_TENSOR_FLAG_OUTPUT = 2,
         GGML_TENSOR_FLAG_PARAM  = 4,
+        GGML_TENSOR_FLAG_LOSS   = 8,
     };
 
     // ggml object
@@ -2094,9 +2095,8 @@ extern "C" {
     // automatic differentiation
     //
 
-    GGML_API void ggml_set_param(
-            struct ggml_context * ctx,
-            struct ggml_tensor  * tensor);
+    GGML_API void ggml_set_param(struct ggml_context * ctx, struct ggml_tensor * tensor);
+    GGML_API void ggml_set_loss(struct ggml_tensor * tensor);
 
 
     GGML_API void ggml_build_forward_expand (struct ggml_cgraph * cgraph, struct ggml_tensor * tensor);

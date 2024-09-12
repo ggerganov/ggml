@@ -378,8 +378,8 @@ void mnist_model_build(mnist_model & model, const int nbatch) {
         ggml_set_param(model.ctx_compute, model.fc2_bias);
 
         model.images = ggml_new_tensor_2d(model.ctx_compute, GGML_TYPE_F32, MNIST_NINPUT, model.nbatch);
-        ggml_set_input(model.images);
         ggml_set_name(model.images, "images");
+        ggml_set_input(model.images);
 
         ggml_tensor * fc1 = ggml_relu(model.ctx_compute, ggml_add(model.ctx_compute,
             ggml_mul_mat(model.ctx_compute, model.fc1_weight, model.images),
@@ -396,8 +396,8 @@ void mnist_model_build(mnist_model & model, const int nbatch) {
         ggml_set_param(model.ctx_compute, model.dense_bias);
 
         model.images = ggml_new_tensor_4d(model.ctx_compute, GGML_TYPE_F32, 28, 28, 1, model.nbatch);
-        ggml_set_input(model.images);
         ggml_set_name(model.images, "images");
+        ggml_set_input(model.images);
 
         struct ggml_tensor * conv1_out = ggml_relu(model.ctx_compute, ggml_add(model.ctx_compute,
             ggml_conv_2d(model.ctx_compute, model.conv1_kernel, model.images, 1, 1, 1, 1, 1, 1),
@@ -440,8 +440,8 @@ void mnist_model_build(mnist_model & model, const int nbatch) {
         GGML_ASSERT(false);
     }
 
-    ggml_set_output(model.logits);
     ggml_set_name(model.logits, "logits");
+    ggml_set_output(model.logits);
     GGML_ASSERT(model.logits->type == GGML_TYPE_F32);
     GGML_ASSERT(model.logits->ne[0] == MNIST_NCLASSES);
     GGML_ASSERT(model.logits->ne[1] == model.nbatch);
@@ -449,8 +449,8 @@ void mnist_model_build(mnist_model & model, const int nbatch) {
     GGML_ASSERT(model.logits->ne[3] == 1);
 
     model.probs = ggml_soft_max(model.ctx_compute, model.logits);
-    ggml_set_output(model.probs);
     ggml_set_name(model.probs, "probs");
+    ggml_set_output(model.probs);
     GGML_ASSERT(model.probs->type == GGML_TYPE_F32);
     GGML_ASSERT(model.probs->ne[0] == MNIST_NCLASSES);
     GGML_ASSERT(model.probs->ne[1] == model.nbatch);
@@ -458,12 +458,13 @@ void mnist_model_build(mnist_model & model, const int nbatch) {
     GGML_ASSERT(model.probs->ne[3] == 1);
 
     model.labels = ggml_new_tensor_2d(model.ctx_compute, GGML_TYPE_F32, MNIST_NCLASSES, model.nbatch);
-    ggml_set_input(model.labels);
     ggml_set_name(model.labels, "labels");
+    ggml_set_input(model.labels);
 
     model.loss = ggml_cross_entropy_loss(model.ctx_compute, model.logits, model.labels);
-    ggml_set_output(model.loss);
     ggml_set_name(model.loss, "loss");
+    ggml_set_output(model.loss);
+    ggml_set_loss(model.loss);
     GGML_ASSERT(model.loss->type == GGML_TYPE_F32);
     GGML_ASSERT(model.loss->ne[0] == 1);
     GGML_ASSERT(model.loss->ne[1] == 1);
@@ -526,26 +527,8 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
     ggml_build_backward_expand(model.ctx_compute, gf, gb, false);
     ggml_build_opt_adam(       model.ctx_compute, gf, gb, 1e-3f, 0.9f, 0.999f, 1e-8f, 0.0f);
 
-    struct ggml_opt_context opt_ctx;
-    struct ggml_opt_params  opt_pars = ggml_opt_default_params(GGML_OPT_TYPE_ADAM);
-    opt_pars.print_forward_graph = false;
-    opt_pars.print_backward_graph = false;
-    opt_pars.n_threads = std::thread::hardware_concurrency();
-    opt_pars.adam.n_iter = 1; // per call of ggml_opt_resume_g
-    ggml_opt_init(model.ctx_compute, &opt_ctx, opt_pars, 0);
-
     model.buf_compute = ggml_backend_alloc_ctx_tensors(model.ctx_compute, model.backend);
-
-    for (int j = 0; j < gb->n_nodes; ++j) {
-        struct ggml_tensor * node = gb->nodes[j];
-
-        if (node->op != GGML_OP_OPT_STEP_ADAM) {
-            continue;
-        }
-
-        ggml_backend_tensor_memset(node->src[2], 0, 0, ggml_nbytes(node->src[2]));
-        ggml_backend_tensor_memset(node->src[3], 0, 0, ggml_nbytes(node->src[3]));
-    }
+    ggml_graph_reset(gb);
 
     for (int epoch = 0; epoch < 20; ++epoch) {
         fprintf(stderr, "%s: epoch %d start...", __func__, epoch);
@@ -559,9 +542,7 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
             ggml_backend_tensor_set(model.images, images + iex0*MNIST_NINPUT,   0, ggml_nbytes(model.images));
             ggml_backend_tensor_set(model.labels, labels + iex0*MNIST_NCLASSES, 0, ggml_nbytes(model.labels));
 
-            const float onef = 1.0f;
             ggml_backend_graph_compute(model.backend, gf);
-            ggml_backend_tensor_set(model.loss->grad, &onef, 0, sizeof(float));
             ggml_backend_graph_compute(model.backend, gb);
             for (int j = 0; j < gb->n_nodes; ++j) {
                 struct ggml_tensor * node = gb->nodes[j];

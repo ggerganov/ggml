@@ -1,6 +1,7 @@
 #define _CRT_SECURE_NO_DEPRECATE // Disables ridiculous "unsafe" warnings on Windows
 #define _USE_MATH_DEFINES // For M_PI on MSVC
 
+#include "ggml-backend.h"
 #include "ggml-impl.h"
 #include "ggml-quants.h"
 #include "ggml.h"
@@ -8345,14 +8346,19 @@ struct ggml_tensor * ggml_opt_step_adam(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void ggml_set_param(
-        struct ggml_context * ctx,
-        struct ggml_tensor * tensor) {
+void ggml_set_param(struct ggml_context * ctx, struct ggml_tensor * tensor) {
     tensor->flags |= GGML_TENSOR_FLAG_PARAM;
 
     GGML_ASSERT(tensor->grad == NULL);
     tensor->grad = ggml_dup_tensor(ctx, tensor);
     ggml_format_name(tensor->grad, "%s (grad)", tensor->name);
+}
+
+void ggml_set_loss(struct ggml_tensor * tensor) {
+    GGML_ASSERT(ggml_is_scalar(tensor));
+    GGML_ASSERT(tensor->type == GGML_TYPE_F32);
+    GGML_ASSERT(tensor->grad);
+    tensor->flags |= GGML_TENSOR_FLAG_LOSS;
 }
 
 // ggml_compute_forward_dup
@@ -19292,10 +19298,28 @@ void ggml_graph_reset(struct ggml_cgraph * cgraph) {
     GGML_ASSERT(cgraph->grads != NULL);
 
     for (int i = 0; i < cgraph->n_nodes; i++) {
+        struct ggml_tensor * node = cgraph->nodes[i];
         struct ggml_tensor * grad = cgraph->grads[i];
 
+        // initial gradients of loss should be 1, 0 otherwise
         if (grad) {
-            ggml_set_zero(grad);
+            if (node->flags & GGML_TENSOR_FLAG_LOSS) {
+                GGML_ASSERT(node->type == GGML_TYPE_F32);
+                GGML_ASSERT(ggml_is_scalar(node));
+
+                const float onef = 1.0f;
+                ggml_backend_tensor_set(grad, &onef, 0, ggml_nbytes(grad));
+            } else {
+                ggml_backend_tensor_memset(grad, 0, 0, ggml_nbytes(grad));
+            }
+        }
+
+        GGML_ASSERT(node);
+        if (node->op == GGML_OP_OPT_STEP_ADAM) {
+            // set iteration to 1 and clear momenta
+            ggml_set_op_params_i32(node, 0, 1);
+            ggml_backend_tensor_memset(node->src[2], 0, 0, ggml_nbytes(node->src[2]));
+            ggml_backend_tensor_memset(node->src[3], 0, 0, ggml_nbytes(node->src[3]));
         }
     }
 }

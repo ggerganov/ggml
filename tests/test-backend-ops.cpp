@@ -799,6 +799,7 @@ struct test_case {
             out = ggml_sum(ctx, out);
             ggml_set_name(out, "sum_of_out");
         }
+        ggml_set_loss(out);
 
         ggml_build_forward_expand(gf, out);
         ggml_graph_cpy(gf, gb);
@@ -837,22 +838,11 @@ struct test_case {
             return false;
         }
 
-        // randomize tensors
-        initialize_tensors(ctx);
 
-        for (struct ggml_tensor * t = ggml_get_first_tensor(ctx); t != nullptr; t = ggml_get_next_tensor(ctx, t)) {
-            if (!t->grad) {
-                continue;
-            }
+        initialize_tensors(ctx); // Randomizes all tensors (including gradients).
+        ggml_graph_reset(gb);    // Sets gradients to 1 if loss, 0 otherwise.
 
-            std::vector<float> tmp(ggml_nelements(t->grad));
-            ggml_backend_tensor_set(t->grad, tmp.data(), 0, ggml_nbytes(t->grad));
-        }
-
-        // build graphs
-        const float onef = 1.0f;
         ggml_backend_graph_compute(backend, gf);
-        ggml_backend_tensor_set(out->grad, &onef, 0, ggml_nbytes(out->grad));
         ggml_backend_graph_compute(backend, gb);
 
         bool ok = true;
