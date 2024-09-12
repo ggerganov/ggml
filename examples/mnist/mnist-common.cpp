@@ -524,6 +524,7 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
 
     struct ggml_cgraph * gb = ggml_graph_dup(model.ctx_compute, gf);
     ggml_build_backward_expand(model.ctx_compute, gf, gb, false);
+    ggml_build_opt_adam(       model.ctx_compute, gf, gb, 1e-3f, 0.9f, 0.999f, 1e-8f, 0.0f);
 
     struct ggml_opt_context opt_ctx;
     struct ggml_opt_params  opt_pars = ggml_opt_default_params(GGML_OPT_TYPE_ADAM);

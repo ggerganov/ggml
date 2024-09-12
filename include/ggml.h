@@ -2102,6 +2102,16 @@ extern "C" {
     GGML_API void ggml_build_forward_expand (struct ggml_cgraph * cgraph, struct ggml_tensor * tensor);
     GGML_API void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * gf, struct ggml_cgraph * gb, bool keep);
 
+    GGML_API void ggml_build_opt_adam(
+            struct ggml_context * ctx,
+            struct ggml_cgraph  * gf,
+            struct ggml_cgraph  * gb,
+            float                 alpha,
+            float                 beta1,
+            float                 beta2,
+            float                 eps,
+            float                 l1);
+
     // graph allocation in a context
     GGML_API struct ggml_cgraph * ggml_new_graph         (struct ggml_context * ctx); // size = GGML_DEFAULT_GRAPH_SIZE, grads = false
     GGML_API struct ggml_cgraph * ggml_new_graph_custom  (struct ggml_context * ctx, size_t size, bool grads);
