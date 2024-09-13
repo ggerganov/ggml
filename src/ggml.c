@@ -4082,7 +4082,11 @@ static void ggml_set_op_params_f32(struct ggml_tensor * tensor, uint32_t i, floa
 }
 
 struct ggml_tensor * ggml_set_zero(struct ggml_tensor * tensor) {
-    memset(tensor->data, 0, ggml_nbytes(tensor));
+    if (tensor->buffer) {
+        ggml_backend_tensor_memset(tensor, 0, 0, ggml_nbytes(tensor));
+    } else {
+        memset(tensor->data, 0, ggml_nbytes(tensor));
+    }
     return tensor;
 }
 
@@ -19317,13 +19321,14 @@ void ggml_graph_reset(struct ggml_cgraph * cgraph) {
         // initial gradients of loss should be 1, 0 otherwise
         if (grad) {
             if (node->flags & GGML_TENSOR_FLAG_LOSS) {
+                GGML_ASSERT(grad->buffer);
                 GGML_ASSERT(node->type == GGML_TYPE_F32);
                 GGML_ASSERT(ggml_is_scalar(node));
 
                 const float onef = 1.0f;
                 ggml_backend_tensor_set(grad, &onef, 0, ggml_nbytes(grad));
             } else {
-                ggml_backend_tensor_memset(grad, 0, 0, ggml_nbytes(grad));
+                ggml_set_zero(grad);
             }
         }
 
@@ -19331,8 +19336,8 @@ void ggml_graph_reset(struct ggml_cgraph * cgraph) {
         if (node->op == GGML_OP_OPT_STEP_ADAM) {
             // set iteration to 1 and clear momenta
             ggml_set_op_params_i32(node, 0, 1);
-            ggml_backend_tensor_memset(node->src[2], 0, 0, ggml_nbytes(node->src[2]));
-            ggml_backend_tensor_memset(node->src[3], 0, 0, ggml_nbytes(node->src[3]));
+            ggml_set_zero(node->src[2]);
+            ggml_set_zero(node->src[3]);
         }
     }
 }
@@ -21182,7 +21187,6 @@ static enum ggml_opt_result ggml_opt_adam(
     }
 
     if ((opt->params.type != params.type) || (opt->nx != nx) || (opt->params.past != params.past)) {
-        GGML_ASSERT(false);
         int iter = opt->iter;
         ggml_opt_init(opt->ctx, opt, params, nx);
         opt->iter = iter;
