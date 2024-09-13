@@ -63,15 +63,18 @@ void ggml_cuda_opt_step_adam(ggml_backend_cuda_context & ctx, ggml_tensor * dst)
 
     const int64_t ne = ggml_nelements(src0);
 
-    int32_t iter;  memcpy(&iter,  &dst->op_params[0], sizeof(float));
-    float   alpha; memcpy(&alpha, &dst->op_params[1], sizeof(float));
-    float   beta1; memcpy(&beta1, &dst->op_params[2], sizeof(float));
-    float   beta2; memcpy(&beta2, &dst->op_params[3], sizeof(float));
-    float   eps;   memcpy(&eps,   &dst->op_params[4], sizeof(float));
-    float   l1;    memcpy(&l1,    &dst->op_params[5], sizeof(float));
+    int64_t iter;  memcpy(&iter,  &dst->op_params[0], sizeof(int64_t));
+    float   alpha; memcpy(&alpha, &dst->op_params[2], sizeof(float));
+    float   beta1; memcpy(&beta1, &dst->op_params[3], sizeof(float));
+    float   beta2; memcpy(&beta2, &dst->op_params[4], sizeof(float));
+    float   eps;   memcpy(&eps,   &dst->op_params[5], sizeof(float));
+    float   l1;    memcpy(&l1,    &dst->op_params[6], sizeof(float));
 
     const float beta1h  = alpha/(1.0f - powf(beta1, iter));
     const float beta2h  =  1.0f/(1.0f - powf(beta2, iter));
 
     opt_step_adam_f32_cuda(src0_d, src0_grad_d, src0_grad_m_d, src0_grad_v_d, ne, alpha, beta1, beta2, eps, l1, beta1h, beta2h, stream);
+
+    iter++;
+    memcpy(&dst->op_params[0], &iter, sizeof(int64_t));
 }

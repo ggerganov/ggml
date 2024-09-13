@@ -556,15 +556,6 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
                 ggml_backend_graph_compute(model.backend, gb_opt);
                 ggml_graph_reset(gb_grad); // Set gradients to zero, do not reset optimizer.
             }
-            for (int j = 0; j < gb_grad->n_nodes; ++j) {
-                struct ggml_tensor * node = gb_grad->nodes[j];
-
-                if (node->op != GGML_OP_OPT_STEP_ADAM) {
-                    continue;
-                }
-
-                node->op_params[0]++;
-            }
 
             ggml_backend_tensor_get(model.loss,   &loss,         0, ggml_nbytes(model.loss));
             ggml_backend_tensor_get(model.logits, logits.data(), 0, ggml_nbytes(model.logits));

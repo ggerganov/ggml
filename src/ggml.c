@@ -8334,12 +8334,13 @@ struct ggml_tensor * ggml_opt_step_adam(
     result->src[2] = ggml_dup_tensor(ctx, a->grad);
     result->src[3] = ggml_dup_tensor(ctx, a->grad);
 
-    ggml_set_op_params_i32(result, 0, 1);     // iteration
-    ggml_set_op_params_f32(result, 1, alpha);
-    ggml_set_op_params_f32(result, 2, beta1);
-    ggml_set_op_params_f32(result, 3, beta2);
-    ggml_set_op_params_f32(result, 4, eps);
-    ggml_set_op_params_f32(result, 5, l1);
+    const int64_t iter = 1;
+    memcpy(&result->op_params[0], &iter, sizeof(int64_t));
+    ggml_set_op_params_f32(result, 2, alpha);
+    ggml_set_op_params_f32(result, 3, beta1);
+    ggml_set_op_params_f32(result, 4, beta2);
+    ggml_set_op_params_f32(result, 5, eps);
+    ggml_set_op_params_f32(result, 6, l1);
 
     return result;
 }
@@ -17514,12 +17515,12 @@ static void ggml_compute_forward_opt_step_adam_f32(
     const int ir1 = MIN(ir0 + dr, nr);
 
     /* const float   gnorm = 1.0f; */
-    const int32_t iter  = ggml_get_op_params_i32(dst, 0);
-    const float   alpha = ggml_get_op_params_f32(dst, 1);
-    const float   beta1 = ggml_get_op_params_f32(dst, 2);
-    const float   beta2 = ggml_get_op_params_f32(dst, 3);
-    const float   eps   = ggml_get_op_params_f32(dst, 4);
-    const float   l1    = ggml_get_op_params_f32(dst, 5);
+    int64_t       iter;   memcpy(&iter, &dst->op_params[0], sizeof(int64_t));
+    const float   alpha = ggml_get_op_params_f32(dst, 2);
+    const float   beta1 = ggml_get_op_params_f32(dst, 3);
+    const float   beta2 = ggml_get_op_params_f32(dst, 4);
+    const float   eps   = ggml_get_op_params_f32(dst, 5);
+    const float   l1    = ggml_get_op_params_f32(dst, 6);
 
     const float beta1h  = alpha/(1.0f - powf(beta1, iter));
     const float beta2h  =  1.0f/(1.0f - powf(beta2, iter));
@@ -17546,6 +17547,14 @@ static void ggml_compute_forward_opt_step_adam_f32(
             w[i00] = w[i00]*(1.0f - alpha*l1) - mh/vh;
         }
     }
+
+    ggml_barrier(params->threadpool);
+    if (ith != 0) {
+        return;
+    }
+
+    iter++;
+    memcpy(&dst->op_params[0], &iter, sizeof(int64_t));
 }
 
 static void ggml_compute_forward_opt_step_adam(
