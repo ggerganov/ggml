@@ -7,12 +7,14 @@
 #include "ggml-backend.h"
 #include "ggml.h"
 
-#define MNIST_NTRAIN 60000
-#define MNIST_NTEST  10000
-#define MNIST_NBATCH 500
+#define MNIST_NTRAIN          60000
+#define MNIST_NTEST           10000
+#define MNIST_NBATCH_LOGICAL   1000
+#define MNIST_NBATCH_PHYSICAL   500
 
-static_assert(MNIST_NTRAIN % MNIST_NBATCH == 0, "MNIST_NTRAIN % MNIST_BATCH != 0");
-static_assert(MNIST_NTEST  % MNIST_NBATCH == 0, "MNIST_NTRAIN % MNIST_BATCH != 0");
+static_assert(MNIST_NBATCH_LOGICAL % MNIST_NBATCH_PHYSICAL == 0, "MNIST_NBATCH_LOGICAL % MNIST_NBATCH_PHYSICAL != 0");
+static_assert(MNIST_NTRAIN % MNIST_NBATCH_LOGICAL == 0, "MNIST_NTRAIN % MNIST_NBATCH_LOGICAL != 0");
+static_assert(MNIST_NTEST  % MNIST_NBATCH_LOGICAL == 0, "MNIST_NTRAIN % MNIST_NBATCH_LOGICAL != 0");
 
 #define MNIST_HW       28
 #define MNIST_NINPUT   (MNIST_HW*MNIST_HW)
@@ -26,7 +28,8 @@ static_assert(MNIST_NTEST  % MNIST_NBATCH == 0, "MNIST_NTRAIN % MNIST_BATCH != 0
 struct mnist_model {
     std::string arch;
     ggml_backend_t backend;
-    int nbatch;
+    int nbatch_logical;
+    int nbatch_physical;
 
     struct ggml_tensor  * images = nullptr;
     struct ggml_tensor  * labels = nullptr;
@@ -118,7 +121,7 @@ mnist_eval_result mnist_graph_eval(const std::string & fname, const float * imag
 
 mnist_model       mnist_model_init_from_file(const std::string & fname, const std::string & backend);
 mnist_model       mnist_model_init_random(const std::string & arch, const std::string & backend);
-void              mnist_model_build(mnist_model & model, const int nbatch);
+void              mnist_model_build(mnist_model & model, const int nbatch_logical, const int nbatch_physical);
 mnist_eval_result mnist_model_eval(mnist_model & model, const float * images, const float * labels, const int nex, const int nthreads);
 void              mnist_model_train(mnist_model & model, const float * images, const float * labels, const int nex, const int nthreads);
 void              mnist_model_save(mnist_model & model, const std::string & fname);

@@ -31,7 +31,7 @@ int main(int argc, char ** argv) {
 
     mnist_model model = mnist_model_init_random(argv[1], argc >= 6 ? argv[5] : "CPU");
 
-    mnist_model_build(model, MNIST_NBATCH);
+    mnist_model_build(model, MNIST_NBATCH_LOGICAL, MNIST_NBATCH_PHYSICAL);
 
     mnist_model_train(model, images.data(), labels.data(), MNIST_NTRAIN, std::thread::hardware_concurrency());
 

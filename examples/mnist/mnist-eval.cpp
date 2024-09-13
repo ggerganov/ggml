@@ -60,7 +60,7 @@ int main(int argc, char ** argv) {
 
     mnist_model model = mnist_model_init_from_file(argv[1], argc >= 5 ? argv[4] : "CPU");
 
-    mnist_model_build(model, MNIST_NBATCH);
+    mnist_model_build(model, MNIST_NBATCH_LOGICAL, MNIST_NBATCH_PHYSICAL);
 
     const int64_t t_load_us = ggml_time_us() - t_start_us;
 
