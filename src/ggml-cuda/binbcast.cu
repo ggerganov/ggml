@@ -91,18 +91,28 @@ static __global__ void k_bin_bcast_unravel(const src0_t * src0, const src1_t * s
     dst_row[i0] = (dst_t)bin_op(src0 ? (float)src0_row[i0] : 0.0f, (float)src1_row[i10]);
 }
 
-static __global__ void k_repeat_back_f32(const float * __restrict__ src, float * __restrict__ dst, const int64_t ncols, const int64_t nrows) {
-    const int64_t col = (int64_t) blockIdx.x*blockDim.x + threadIdx.x;
+template <typename T>
+static __global__ void k_repeat_back(
+    const T * __restrict__ src, T * __restrict__ dst, const int64_t ne00, const int64_t ne01, const int64_t ne02,
+    const int64_t ne0, const int64_t ne1, const int64_t ne2) {
 
-    if (col >= ncols) {
+    const int64_t tid0 = (int64_t) blockIdx.x*blockDim.x + threadIdx.x;
+    const int64_t tid1 = (int64_t) blockIdx.y*blockDim.y + threadIdx.y;
+    const int64_t tid2 = (int64_t) blockIdx.z*blockDim.z + threadIdx.z;
+
+    if (tid0 >= ne0) {
         return;
     }
 
-    float sum = 0.0f;
-    for (int64_t row = 0; row < nrows; ++row) {
-        sum += src[row*ncols + col];
+    T sum = 0;
+    for (int64_t i2 = tid2; i2 < ne02; i2 += ne2) {
+        for (int64_t i1 = tid1; i1 < ne01; i1 += ne1) {
+            for (int64_t i0 = tid0; i0 < ne00; i0 += ne0) {
+                sum += src[i2*ne01*ne00 + i1*ne00 + i0];
+            }
+        }
     }
-    dst[col] = sum;
+    dst[tid2*ne1*ne0 + tid1*ne0 + tid0] = sum;
 }
 
 template<float (*bin_op)(const float, const float)>
@@ -262,10 +272,14 @@ struct bin_bcast_cuda {
     }
 };
 
-static void repeat_back_f32_cuda(const float * src, float * dst, const int64_t ncols, const int64_t nrows, cudaStream_t stream) {
+template <typename T>
+static void repeat_back_cuda(
+    const T * src, T * dst, const int64_t ne00, const int64_t ne01, const int64_t ne02,
+    const int64_t ne0, const int64_t ne1, const int64_t ne2, cudaStream_t stream) {
+
     const dim3 block_dims(WARP_SIZE, 1, 1);
-    const dim3 block_nums((ncols + WARP_SIZE - 1) / WARP_SIZE, 1, 1);
-    k_repeat_back_f32<<<block_nums, block_dims, 0, stream>>>(src, dst, ncols, nrows);
+    const dim3 block_nums((ne0 + WARP_SIZE - 1) / WARP_SIZE, ne1, ne2);
+    k_repeat_back<T><<<block_nums, block_dims, 0, stream>>>(src, dst, ne00, ne01, ne02, ne0, ne1, ne2);
 }
 
 template<class op>
@@ -311,23 +325,31 @@ void ggml_cuda_op_div(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
 void ggml_cuda_op_repeat_back(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     const ggml_tensor * src0 = dst->src[0];
 
-    GGML_ASSERT(src0->type == GGML_TYPE_F32);
-    GGML_ASSERT(dst->type  == GGML_TYPE_F32);
+    GGML_ASSERT(src0->type == dst->type);
     GGML_ASSERT(ggml_is_contiguous(src0));
     GGML_ASSERT(ggml_is_contiguous(dst));
     GGML_ASSERT(ggml_can_repeat(dst, src0));
 
-    const float * src0_d = (const float *) src0->data;
-    float       * dst_d  = (float       *) dst->data;
-
     cudaStream_t stream = ctx.stream();
 
-    const int64_t ne00  = src0->ne[0];
-    const int64_t nrows = ggml_nrows(src0);
-    GGML_ASSERT(src0->ne[2] == 1);
+    const int64_t ne00 = src0->ne[0];
+    const int64_t ne01 = src0->ne[1];
+    const int64_t ne02 = src0->ne[2];
     GGML_ASSERT(src0->ne[3] == 1);
 
-    GGML_ASSERT(dst->ne[1] == 1);
+    const int64_t ne0 = dst->ne[0];
+    const int64_t ne1 = dst->ne[1];
+    const int64_t ne2 = dst->ne[2];
+    GGML_ASSERT(dst->ne[3] == 1);
 
-    repeat_back_f32_cuda(src0_d, dst_d, ne00, nrows, stream);
+    switch (dst->type) {
+        case GGML_TYPE_F32: {
+            const float * src0_d = (const float *) src0->data;
+            float       * dst_d  = (float       *) dst->data;
+            repeat_back_cuda<float>(src0_d, dst_d, ne00, ne01, ne02, ne0, ne1, ne2, stream);
+        } break;
+        default: {
+            GGML_ASSERT(false);
+        } break;
+    }
 }
