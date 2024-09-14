@@ -21161,18 +21161,6 @@ static enum ggml_opt_result ggml_opt_adam(
     GGML_ASSERT(ggml_is_scalar(f));
     GGML_ASSERT(f->type == GGML_TYPE_F32);
 
-    // initialize
-    if (opt->just_initialized) {
-        ggml_set_zero(opt->adam.m);
-        ggml_set_zero(opt->adam.v);
-        if (opt->adam.pf) {
-            ggml_set_zero(opt->adam.pf);
-        }
-
-        opt->adam.n_no_improvement = 0;
-        opt->just_initialized = false;
-    }
-
     // these will store the parameters we want to optimize
     struct ggml_tensor * ps[GGML_MAX_PARAMS];
 
@@ -21245,6 +21233,12 @@ static enum ggml_opt_result ggml_opt_adam(
 
     opt->loss_before = opt->adam.fx_prev;
     opt->loss_after  = opt->adam.fx_prev;
+
+    // initialize
+    if (opt->just_initialized) {
+        opt->adam.n_no_improvement = 0;
+        opt->just_initialized = false;
+    }
 
     float * fx_best = &opt->adam.fx_best;
     float * fx_prev = &opt->adam.fx_prev;
@@ -21892,6 +21886,11 @@ GGML_API void ggml_opt_init(
                 opt->adam.pf = params.past > 0
                     ? ggml_new_tensor_1d(opt->ctx, GGML_TYPE_F32, params.past)
                     : NULL;
+                ggml_set_zero(opt->adam.m);
+                ggml_set_zero(opt->adam.v);
+                if (opt->adam.pf) {
+                    ggml_set_zero(opt->adam.pf);
+                }
             } break;
         case GGML_OPT_TYPE_LBFGS:
             {

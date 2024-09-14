@@ -1671,7 +1671,7 @@ struct test_mul_mat_id : public test_case {
     }
 };
 
-// GGML_OP_MUL_MAT
+// GGML_OP_OUT_PROD
 struct test_out_prod : public test_case {
     const ggml_type type_a;
     const ggml_type type_b;
