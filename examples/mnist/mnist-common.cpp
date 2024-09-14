@@ -299,7 +299,7 @@ mnist_model mnist_model_init_from_file(const std::string & fname, const std::str
     } else {
         fprintf(stderr, "%s: unknown model arch: %s\n", __func__, model.arch.c_str());
     }
-    model.buf_weightt = ggml_backend_alloc_ctx_tensors(model.ctx_weight, model.backend);
+    model.buf_weight = ggml_backend_alloc_ctx_tensors(model.ctx_weight, model.backend);
 
     if(!load_from_gguf(fname.c_str(), model.ctx_weight, ctx)) {
         fprintf(stderr, "%s: loading weights from %s failed\n", __func__, fname.c_str());
@@ -361,7 +361,7 @@ mnist_model mnist_model_init_random(const std::string & arch, const std::string 
         fprintf(stderr, "%s: unknown model arch: %s\n", __func__, model.arch.c_str());
     }
 
-    model.buf_weightt = ggml_backend_alloc_ctx_tensors(model.ctx_weight, model.backend);
+    model.buf_weight = ggml_backend_alloc_ctx_tensors(model.ctx_weight, model.backend);
 
     for (ggml_tensor * t : init_tensors) {
         GGML_ASSERT(t->type == GGML_TYPE_F32);

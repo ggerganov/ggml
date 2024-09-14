@@ -52,12 +52,10 @@ struct mnist_model {
     static const size_t size_weight  = 100 *      1024*1024;
     static const size_t size_compute =   1 * 1024*1024*1024;
 
-    void                * buf_weight  = nullptr;
     struct ggml_context * ctx_weight  = nullptr;
-    void                * buf_compute = nullptr;
     struct ggml_context * ctx_compute = nullptr;
-    ggml_backend_buffer_t buf_backend = nullptr;
-    ggml_backend_buffer_t buf_weightt = nullptr;
+    ggml_backend_buffer_t buf_weight  = nullptr;
+    ggml_backend_buffer_t buf_compute = nullptr;
 
     mnist_model(const std::string & backend_name) {
         const size_t backend_index = ggml_backend_reg_find_by_name(backend_name.c_str());
@@ -75,7 +73,6 @@ struct mnist_model {
             ggml_backend_cpu_set_n_threads(backend, std::thread::hardware_concurrency());
         }
 
-        buf_weight = malloc(size_weight);
         {
             struct ggml_init_params params = {
                 /*.mem_size   =*/ size_weight,
@@ -85,7 +82,6 @@ struct mnist_model {
             ctx_weight = ggml_init(params);
         }
 
-        buf_compute = malloc(size_compute);
         {
             struct ggml_init_params params = {
                 /*.mem_size   =*/ size_compute,
@@ -100,11 +96,8 @@ struct mnist_model {
         ggml_free(ctx_weight);
         ggml_free(ctx_compute);
 
-        free(buf_weight);
-        free(buf_compute);
-
-        ggml_backend_buffer_free(buf_weightt);
-        ggml_backend_buffer_free(buf_backend);
+        ggml_backend_buffer_free(buf_weight);
+        ggml_backend_buffer_free(buf_compute);
         ggml_backend_free(backend);
     }
 };

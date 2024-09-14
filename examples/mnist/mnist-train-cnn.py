@@ -42,8 +42,8 @@ def train(model_path):
     )
 
     model.summary()
-    batch_size = 500
-    epochs = 20
+    batch_size = 1000
+    epochs = 30
     model.compile(loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"])
 
     t_start = time()
