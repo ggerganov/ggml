@@ -33,7 +33,7 @@ int main(int argc, char ** argv) {
 
     mnist_model_build(model, MNIST_NBATCH_LOGICAL, MNIST_NBATCH_PHYSICAL);
 
-    mnist_model_train(model, images.data(), labels.data(), MNIST_NTRAIN, std::thread::hardware_concurrency());
+    mnist_model_train(model, images.data(), labels.data(), MNIST_NTRAIN);
 
     mnist_model_save(model, argv[2]);
 }

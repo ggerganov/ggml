@@ -113,15 +113,23 @@ mnist_eval_result mnist_graph_eval(const std::string & fname, const float * imag
     GGML_ASSERT(images_batch);
     GGML_ASSERT(images_batch->ne[0] == MNIST_NINPUT || (images_batch->ne[0] == MNIST_HW && images_batch->ne[1] == MNIST_HW));
 
+    struct ggml_tensor * labels_batch = ggml_graph_get_tensor(gf, "labels");
+    GGML_ASSERT(labels_batch);
+    GGML_ASSERT(labels_batch->ne[0] == MNIST_NCLASSES);
+    GGML_ASSERT(labels_batch->ne[2] == 1);
+    GGML_ASSERT(labels_batch->ne[3] == 1);
+
+    const int nbatch = labels_batch->ne[1];
+    GGML_ASSERT(nex % nbatch == 0);
+
     struct ggml_tensor * logits_batch = ggml_graph_get_tensor(gf, "logits");
     GGML_ASSERT(logits_batch);
     GGML_ASSERT(logits_batch->ne[0] == MNIST_NCLASSES);
+    GGML_ASSERT(logits_batch->ne[1] == nbatch);
     GGML_ASSERT(logits_batch->ne[2] == 1);
     GGML_ASSERT(logits_batch->ne[3] == 1);
 
     GGML_ASSERT(images_batch->ne[1] == logits_batch->ne[1] || images_batch->ne[3] == logits_batch->ne[1]);
-    const int nbatch = logits_batch->ne[1];
-    GGML_ASSERT(nex % nbatch == 0);
 
     struct ggml_tensor * loss = ggml_graph_get_tensor(gf, "loss");
 
@@ -129,7 +137,8 @@ mnist_eval_result mnist_graph_eval(const std::string & fname, const float * imag
         const int64_t t_start_us = ggml_time_us();
 
         for (int iex0; iex0 < nex; iex0 += nbatch) {
-            memcpy(images_batch->data, images + iex0*MNIST_NINPUT, ggml_nbytes(images_batch));
+            memcpy(images_batch->data, images + iex0*MNIST_NINPUT,   ggml_nbytes(images_batch));
+            memcpy(labels_batch->data, labels + iex0*MNIST_NCLASSES, ggml_nbytes(labels_batch));
             ggml_graph_compute_with_ctx(ctx_compute, gf, nthreads);
 
             for (int iexb = 0; iexb < nbatch; ++iexb) {
@@ -473,7 +482,7 @@ void mnist_model_build(mnist_model & model, const int nbatch_logical, const int 
     GGML_ASSERT(model.loss->ne[3] == 1);
 }
 
-mnist_eval_result mnist_model_eval(mnist_model & model, const float * images, const float * labels, const int nex, const int nthreads) {
+mnist_eval_result mnist_model_eval(mnist_model & model, const float * images, const float * labels, const int nex) {
     mnist_eval_result result;
 
     struct ggml_cgraph * gf = ggml_new_graph(model.ctx_compute);
@@ -518,7 +527,7 @@ mnist_eval_result mnist_model_eval(mnist_model & model, const float * images, co
     return result;
 }
 
-void mnist_model_train(mnist_model & model, const float * images, const float * labels, const int nex, const int nthreads) {
+void mnist_model_train(mnist_model & model, const float * images, const float * labels, const int nex) {
     const int64_t t_start_us = ggml_time_us();
 
     struct ggml_cgraph * gf = ggml_new_graph_custom(model.ctx_compute, 16384, true); // Forward pass.
@@ -534,7 +543,7 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
     ggml_graph_reset(gb_opt); // Set gradients to zero, reset optimizer.
 
     for (int epoch = 0; epoch < 30; ++epoch) {
-        fprintf(stderr, "%s: epoch %d start...", __func__, epoch);
+        fprintf(stderr, "%s: epoch %02d start...", __func__, epoch);
         const int64_t t_start_us = ggml_time_us();
 
         float loss;
@@ -580,9 +589,13 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
     const double t_total_s = 1e-6*t_total_us;
     fprintf(stderr, "%s: training took %.2lfs\n", __func__, t_total_s);
 
-    // std::string fname = model.arch + "-f32.ggml";
-    // fprintf(stderr, "%s: saving the ggml graph for the forward pass to %s\n", __func__, fname.c_str());
-    // ggml_graph_export(gf, fname.c_str());
+    if (ggml_backend_is_cpu(model.backend)) {
+        std::string fname = model.arch + "-f32.ggml";
+        fprintf(stderr, "%s: saving the GGML graph for the forward pass to %s\n", __func__, fname.c_str());
+        ggml_graph_export(gf, fname.c_str());
+    } else {
+        fprintf(stderr, "%s: not saving the GGML graph for the forward pass because this is only supported for the CPU backend\n", __func__);
+    }
 }
 
 void mnist_model_save(mnist_model & model, const std::string & fname) {
@@ -667,7 +680,7 @@ int wasm_eval(uint8_t * digitPtr) {
 
     mnist_model model = mnist_model_init_from_file("mnist-f32.gguf", "CPU");
     mnist_model_build(model, 1, 1);
-    mnist_eval_result result = mnist_model_eval(model, digit.data(), labels.data(), 1, 1);
+    mnist_eval_result result = mnist_model_eval(model, digit.data(), labels.data(), 1);
 
     return result.pred[0];
 }
