@@ -33,7 +33,7 @@ int main(int argc, char ** argv) {
 
     mnist_model_build(model, MNIST_NBATCH_LOGICAL, MNIST_NBATCH_PHYSICAL);
 
-    mnist_model_train(model, images.data(), labels.data(), MNIST_NTRAIN);
+    mnist_model_train(model, images.data(), labels.data(), MNIST_NTRAIN, /*nepoch =*/ 30, /*val_split =*/ 0.05f);
 
     mnist_model_save(model, argv[2]);
 }

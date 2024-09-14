@@ -527,7 +527,7 @@ mnist_eval_result mnist_model_eval(mnist_model & model, const float * images, co
     return result;
 }
 
-void mnist_model_train(mnist_model & model, const float * images, const float * labels, const int nex) {
+void mnist_model_train(mnist_model & model, const float * images, const float * labels, const int nex, const int nepoch, const float val_split) {
     const int64_t t_start_us = ggml_time_us();
 
     struct ggml_cgraph * gf = ggml_new_graph_custom(model.ctx_compute, 16384, true); // Forward pass.
@@ -542,15 +542,18 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
     model.buf_compute = ggml_backend_alloc_ctx_tensors(model.ctx_compute, model.backend);
     ggml_graph_reset(gb_opt); // Set gradients to zero, reset optimizer.
 
-    for (int epoch = 0; epoch < 30; ++epoch) {
+    const int iex_split = ((int)((1.0f - val_split)*nex) / model.nbatch_logical) * model.nbatch_logical;
+
+    for (int epoch = 0; epoch < nepoch; ++epoch) {
         fprintf(stderr, "%s: epoch %02d start...", __func__, epoch);
         const int64_t t_start_us = ggml_time_us();
 
         float loss;
         std::vector<float> logits(model.nbatch_physical*MNIST_NCLASSES);
+        int iex0 = 0;
 
-        mnist_eval_result result;
-        for (int iex0 = 0; iex0 < nex; iex0 += model.nbatch_physical) {
+        mnist_eval_result result_train;
+        for (; iex0 < iex_split; iex0 += model.nbatch_physical) {
             ggml_backend_tensor_set(model.images, images + iex0*MNIST_NINPUT,   0, ggml_nbytes(model.images));
             ggml_backend_tensor_set(model.labels, labels + iex0*MNIST_NCLASSES, 0, ggml_nbytes(model.labels));
 
@@ -569,20 +572,47 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
             ggml_backend_tensor_get(model.loss,   &loss,         0, ggml_nbytes(model.loss));
             ggml_backend_tensor_get(model.logits, logits.data(), 0, ggml_nbytes(model.logits));
 
-            result.loss.push_back(loss);
+            result_train.loss.push_back(loss);
 
             for (int iexb = 0; iexb < model.nbatch_physical; ++iexb) {
                 const float * logits_iexb = logits.data() + iexb*MNIST_NCLASSES;
-                result.pred.push_back(std::max_element(logits_iexb, logits_iexb + MNIST_NCLASSES) - logits_iexb);
+                result_train.pred.push_back(std::max_element(logits_iexb, logits_iexb + MNIST_NCLASSES) - logits_iexb);
             }
         }
 
-        const double loss_mean = mnist_loss(result).first;
-        const double percent_correct = 100.0 * mnist_accuracy(result, labels).first;
+        mnist_eval_result result_val;
+        for (; iex0 < nex; iex0 += model.nbatch_physical) {
+            ggml_backend_tensor_set(model.images, images + iex0*MNIST_NINPUT,   0, ggml_nbytes(model.images));
+            ggml_backend_tensor_set(model.labels, labels + iex0*MNIST_NCLASSES, 0, ggml_nbytes(model.labels));
 
-        const int64_t t_epoch_us = ggml_time_us() - t_start_us;
-        const double t_epoch_s = 1e-6*t_epoch_us;
-        fprintf(stderr, "done, took %.2lfs, train_loss=%.6lf, train_acc=%.2f%%\n", t_epoch_s, loss_mean, percent_correct);
+            ggml_backend_graph_compute(model.backend, gf); // For the validation set, only the forward pass is needed.
+
+            ggml_backend_tensor_get(model.loss,   &loss,         0, ggml_nbytes(model.loss));
+            ggml_backend_tensor_get(model.logits, logits.data(), 0, ggml_nbytes(model.logits));
+
+            result_val.loss.push_back(loss);
+
+            for (int iexb = 0; iexb < model.nbatch_physical; ++iexb) {
+                const float * logits_iexb = logits.data() + iexb*MNIST_NCLASSES;
+                result_val.pred.push_back(std::max_element(logits_iexb, logits_iexb + MNIST_NCLASSES) - logits_iexb);
+            }
+        }
+
+        {
+            const double loss_mean = mnist_loss(result_train).first;
+            const double percent_correct = 100.0 * mnist_accuracy(result_train, labels + 0*MNIST_NCLASSES).first;
+
+            const int64_t t_epoch_us = ggml_time_us() - t_start_us;
+            const double t_epoch_s = 1e-6*t_epoch_us;
+            fprintf(stderr, "done, took %.2lfs, train_loss=%.6lf, train_acc=%.2f%%, ", t_epoch_s, loss_mean, percent_correct);
+        }
+
+        {
+            const std::pair<double, double> loss = mnist_loss(result_val);
+            const std::pair<double, double> acc  = mnist_accuracy(result_val, labels + iex_split*MNIST_NCLASSES);
+
+            fprintf(stderr, "val_loss=%.6lf+-%.6lf, train_acc=%.2f+-%.2f%%\n", loss.first, loss.second, 100.0*acc.first, 100.0*acc.second);
+        }
     }
 
     const int64_t t_total_us = ggml_time_us() - t_start_us;
