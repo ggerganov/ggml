@@ -264,8 +264,8 @@ mnist_model mnist_model_init_from_file(const std::string & fname, const std::str
 
         model.conv1_bias = ggml_get_tensor(model.ctx_weight, "conv1.bias");
         GGML_ASSERT(model.conv1_bias->type == GGML_TYPE_F32);
-        GGML_ASSERT(model.conv1_bias->ne[0] == MNIST_HW);
-        GGML_ASSERT(model.conv1_bias->ne[1] == MNIST_HW);
+        GGML_ASSERT(model.conv1_bias->ne[0] == 1);
+        GGML_ASSERT(model.conv1_bias->ne[1] == 1);
         GGML_ASSERT(model.conv1_bias->ne[2] == MNIST_CNN_NCB);
         GGML_ASSERT(model.conv1_bias->ne[3] == 1);
 
@@ -278,8 +278,8 @@ mnist_model mnist_model_init_from_file(const std::string & fname, const std::str
 
         model.conv2_bias = ggml_get_tensor(model.ctx_weight, "conv2.bias");
         GGML_ASSERT(model.conv2_bias->type == GGML_TYPE_F32);
-        GGML_ASSERT(model.conv2_bias->ne[0] == MNIST_HW/2);
-        GGML_ASSERT(model.conv2_bias->ne[1] == MNIST_HW/2);
+        GGML_ASSERT(model.conv2_bias->ne[0] == 1);
+        GGML_ASSERT(model.conv2_bias->ne[1] == 1);
         GGML_ASSERT(model.conv2_bias->ne[2] == MNIST_CNN_NCB*2);
         GGML_ASSERT(model.conv2_bias->ne[3] == 1);
 

@@ -18,7 +18,7 @@ $ python3 mnist-train-fc.py mnist-fc-f32.gguf
 
 ...
 
-Test loss: 0.069983+-0.009196, Test accuracy: 97.94+-0.14%
+Test loss: 0.066051+-0.011630, Test accuracy: 98.07+-0.14%
 
 Model tensors saved to mnist-fc-f32.gguf:
 fc1.weight       (500, 784)
@@ -28,7 +28,7 @@ fc2.bias         (10,)
 ```
 
 The training script includes an evaluation of the model on the test set.
-To evaluate the model using GGML, run:
+To evaluate the model on the CPU using GGML, run:
 
 ```bash
 $ ../../build/bin/mnist-eval mnist-fc-f32.gguf data/MNIST/raw/t10k-images-idx3-ubyte data/MNIST/raw/t10k-labels-idx1-ubyte
@@ -37,26 +37,26 @@ ________________________________________________________
 ________________________________________________________
 ________________________________________________________
 ________________________________________________________
-________________________________######__________________
-____________________________########____________________
-________________________########________________________
-____________________########________________##__________
-__________________######____________________##__________
-________________######______________________####________
-______________######________________________####________
-____________######__________________________####________
-____________####____________________________####________
-__________####______________________________####________
-__________####______________________________####________
-__________##________________________________####________
-__________##______________________________####__________
-__________##____________________________######__________
-__________##__________________________######____________
-____________##____________________########______________
-____________##########################__________________
-______________##################________________________
-________________________________________________________
-________________________________________________________
+__________________________________####__________________
+______________________________########__________________
+__________________________##########____________________
+______________________##############____________________
+____________________######________####__________________
+__________________________________####__________________
+__________________________________####__________________
+________________________________####____________________
+______________________________####______________________
+________________________##########______________________
+______________________########__####____________________
+________________________##__________##__________________
+____________________________________##__________________
+__________________________________##____________________
+__________________________________##____________________
+________________________________##______________________
+____________________________####________________________
+__________##____________######__________________________
+__________##############________________________________
+________________####____________________________________
 ________________________________________________________
 ________________________________________________________
 ________________________________________________________
@@ -64,18 +64,23 @@ ________________________________________________________
 mnist_graph_eval: trying to load a ggml graph from mnist-fc-f32.gguf
 ggml_graph_import: invalid magic number, got 46554747
 mnist_graph_eval: could not load a ggml graph from mnist-fc-f32.gguf
+ggml_cuda_init: GGML_CUDA_FORCE_MMQ:    no
+ggml_cuda_init: GGML_CUDA_FORCE_CUBLAS: no
+ggml_cuda_init: found 1 CUDA devices:
+  Device 0: NVIDIA GeForce RTX 3090, compute capability 8.6, VMM: yes
+mnist_model: using CPU backend
 mnist_model_init_from_file: loading model weights from 'mnist-fc-f32.gguf'
 mnist_model_init_from_file: model arch is mnist-fc
 mnist_model_init_from_file: successfully loaded weights from mnist-fc-f32.gguf
-main: loaded model in 1.52 ms
-mnist_model_eval: model evaluation on 10000 images took 26.65 ms, 2.66 us/image
-main: predicted digit is 0
-main: test_loss=0.069983+-0.009196
-main: test_acc=97.94+-0.14%
+main: loaded model in 13.03 ms
+mnist_model_eval: model evaluation on 10000 images took 95.02 ms, 9.50 us/image
+main: predicted digit is 3
+main: test_loss=0.066051+-0.009343
+main: test_acc=98.07+-0.14%
 ```
 
 In addition to the evaluation on the test set the GGML evaluation also prints a random image from the test set as well as the model prediction for said image.
-To train a fully connected model using GGML run:
+To train a fully connected model on the CPU using GGML run:
 
 ``` bash
 $ ../../build/bin/mnist-train mnist-fc mnist-fc-f32.gguf data/MNIST/raw/train-images-idx3-ubyte data/MNIST/raw/train-labels-idx1-ubyte
@@ -96,12 +101,12 @@ $ python3 mnist-train-cnn.py mnist-cnn-f32.gguf
 
 ...
 
-Test loss: 0.046456
-Test accuracy: 98.40%
+Test loss: 0.045483
+Test accuracy: 98.56%
 GGUF model saved to 'mnist-cnn-f32.gguf'
 ```
 
-The saved model can be evaluated using the `mnist-eval` binary:
+The saved model can be evaluated on the CPU using the `mnist-eval` binary:
 
 ```bash
 $ ../../build/bin/mnist-eval mnist-fc-f32.gguf data/MNIST/raw/t10k-images-idx3-ubyte data/MNIST/raw/t10k-labels-idx1-ubyte
@@ -111,25 +116,25 @@ ________________________________________________________
 ________________________________________________________
 ________________________________________________________
 ________________________________________________________
-________________________________________________________
-________________________________________________________
-________________________####____________________________
-__________________________##____________________________
-__________________________##____________________________
-__________________________##____________________________
-__________________________##____________________________
-__________________________##____________________________
-____________________________##__________________________
-____________________________##__________________________
-____________________________##__________________________
-______________________________##________________________
-______________________________##________________________
-______________________________####______________________
-________________________________##______________________
-________________________________##______________________
-________________________________####____________________
+______________________________________##________________
+______________________________________##________________
+______________________________________##________________
+____________________________________##__________________
+__________________________________####__________________
 __________________________________##____________________
 ________________________________##______________________
+______________________________##________________________
+____________________________####________________________
+____________________________##__________________________
+__________________________##____________________________
+________________________##______________________________
+______________________##________________________________
+____________________####________________________________
+____________________##__________________________________
+__________________##____________________________________
+________________##______________________________________
+________________________________________________________
+________________________________________________________
 ________________________________________________________
 ________________________________________________________
 ________________________________________________________
@@ -137,23 +142,34 @@ ________________________________________________________
 mnist_graph_eval: trying to load a ggml graph from mnist-cnn-f32.gguf
 ggml_graph_import: invalid magic number, got 46554747
 mnist_graph_eval: could not load a ggml graph from mnist-cnn-f32.gguf
+ggml_cuda_init: GGML_CUDA_FORCE_MMQ:    no
+ggml_cuda_init: GGML_CUDA_FORCE_CUBLAS: no
+ggml_cuda_init: found 1 CUDA devices:
+  Device 0: NVIDIA GeForce RTX 3090, compute capability 8.6, VMM: yes
+mnist_model: using CPU backend
 mnist_model_init_from_file: loading model weights from 'mnist-cnn-f32.gguf'
 mnist_model_init_from_file: model arch is mnist-cnn
 mnist_model_init_from_file: successfully loaded weights from mnist-cnn-f32.gguf
-main: loaded model in 5.45 ms
-mnist_model_eval: model evaluation on 10000 images took 605.60 ms, 60.56 us/image
+main: loaded model in 11.88 ms
+mnist_model_eval: model evaluation on 10000 images took 1074.09 ms, 107.41 us/image
 main: predicted digit is 1
-main: test_loss=0.046456+-0.007354
-main: test_acc=98.40+-0.13%
+main: test_loss=0.045483+-0.006884
+main: test_acc=98.56+-0.12%
 ```
 
-Like with the fully connected network the convolutional network can also be trained using GGML:
+Like with the fully connected network the convolutional network can also be trained on the CPU using GGML:
 
 ``` bash
 $ ../../build/bin/mnist-train mnist-cnn mnist-cnn-f32.gguf data/MNIST/raw/train-images-idx3-ubyte data/MNIST/raw/train-labels-idx1-ubyte
 ```
 
 As always, the evaluation is done using `mnist-eval` and like with the fully connected network the GGML graph is exported to `mnist-cnn-f32.ggml`.
+
+## CUDA
+
+The fully connected model can be trained and evaluated using CUDA.
+`mnist-train` and `mnist-eval` accept an additional, optional argument behind those listed so far to specify the backend.
+The default is `CPU`, by specifying `CUDA0` the first available CUDA device can be used instead (make sure to compile GGML with CUDA cupport).
 
 ## Web demo
 

@@ -61,16 +61,14 @@ def train(model_path):
     gguf_writer.add_tensor("conv1.kernel", conv1_kernel, raw_shape=(8, 1, 3, 3))
 
     conv1_bias = model.layers[0].weights[1].numpy()
-    conv1_bias = np.repeat(conv1_bias, 28*28)
-    gguf_writer.add_tensor("conv1.bias", conv1_bias, raw_shape=(1, 8, 28, 28))
+    gguf_writer.add_tensor("conv1.bias", conv1_bias, raw_shape=(1, 8, 1, 1))
 
     conv2_kernel = model.layers[2].weights[0].numpy()
     conv2_kernel = np.moveaxis(conv2_kernel, [0, 1, 2, 3], [2, 3, 1, 0])
     gguf_writer.add_tensor("conv2.kernel", conv2_kernel, raw_shape=(16, 8, 3, 3))
 
     conv2_bias = model.layers[2].weights[1].numpy()
-    conv2_bias = np.repeat(conv2_bias, 14*14)
-    gguf_writer.add_tensor("conv2.bias", conv2_bias, raw_shape=(1, 16, 14, 14))
+    gguf_writer.add_tensor("conv2.bias", conv2_bias, raw_shape=(1, 16, 1, 1))
 
     dense_weight = model.layers[-1].weights[0].numpy()
     dense_weight = dense_weight.transpose()
