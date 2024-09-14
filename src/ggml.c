@@ -2978,7 +2978,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
 
     "CROSS_ENTROPY_LOSS",
     "CROSS_ENTROPY_LOSS_BACK",
-    "OPT_STEP_ADAM",
+    "OPT_STEP_ADAMW",
 };
 
 static_assert(GGML_OP_COUNT == 80, "GGML_OP_COUNT != 80");
@@ -3072,7 +3072,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
 
     "cross_entropy_loss(x,y)",
     "cross_entropy_loss_back(x,y)",
-    "adam(x)",
+    "adamw(x)",
 };
 
 static_assert(GGML_OP_COUNT == 80, "GGML_OP_COUNT != 80");
@@ -8312,26 +8312,26 @@ struct ggml_tensor * ggml_cross_entropy_loss_back(
     return result;
 }
 
-// opt_step_adam
+// opt_step_adamw
 
-struct ggml_tensor * ggml_opt_step_adam(
+struct ggml_tensor * ggml_opt_step_adamw(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         float                 alpha,
         float                 beta1,
         float                 beta2,
         float                 eps,
-        float                 l1) {
+        float                 wd) {
     GGML_ASSERT(a->grad);
     GGML_ASSERT(alpha >  0.0f);
     GGML_ASSERT(beta1 >= 0.0f && beta1 <= 1.0f);
     GGML_ASSERT(beta2 >= 0.0f && beta2 <= 1.0f);
     GGML_ASSERT(eps   >= 0.0f);
-    GGML_ASSERT(l1    >= 0.0f);
+    GGML_ASSERT(wd    >= 0.0f && wd    <= 1.0f);
 
     struct ggml_tensor * result = ggml_view_tensor(ctx, a);
 
-    result->op   = GGML_OP_OPT_STEP_ADAM;
+    result->op   = GGML_OP_OPT_STEP_ADAMW;
     result->grad = NULL;
     result->src[0] = a;
     result->src[1] = a->grad;
@@ -8344,7 +8344,7 @@ struct ggml_tensor * ggml_opt_step_adam(
     ggml_set_op_params_f32(result, 3, beta1);
     ggml_set_op_params_f32(result, 4, beta2);
     ggml_set_op_params_f32(result, 5, eps);
-    ggml_set_op_params_f32(result, 6, l1);
+    ggml_set_op_params_f32(result, 6, wd);
 
     return result;
 }
@@ -17493,7 +17493,7 @@ static void ggml_compute_forward_cross_entropy_loss_back(
     }
 }
 
-static void ggml_compute_forward_opt_step_adam_f32(
+static void ggml_compute_forward_opt_step_adamw_f32(
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
 
@@ -17524,7 +17524,7 @@ static void ggml_compute_forward_opt_step_adam_f32(
     const float   beta1 = ggml_get_op_params_f32(dst, 3);
     const float   beta2 = ggml_get_op_params_f32(dst, 4);
     const float   eps   = ggml_get_op_params_f32(dst, 5);
-    const float   l1    = ggml_get_op_params_f32(dst, 6);
+    const float   wd    = ggml_get_op_params_f32(dst, 6);
 
     const float beta1h  = alpha/(1.0f - powf(beta1, iter));
     const float beta2h  =  1.0f/(1.0f - powf(beta2, iter));
@@ -17548,7 +17548,10 @@ static void ggml_compute_forward_opt_step_adam_f32(
             const float mh =       m[i00]*beta1h;
             const float vh = sqrtf(v[i00]*beta2h) + eps;
 
-            w[i00] = w[i00]*(1.0f - alpha*l1) - mh/vh;
+            // The weight decay is applied independently of the Adam momenta m and v.
+            // This is NOT equivalent to l2 regularization that adds w[i00]*w[i00] to the loss.
+            // See: https://arxiv.org/pdf/1711.05101v3.pdf
+            w[i00] = w[i00]*(1.0f - alpha*wd) - mh/vh;
         }
     }
 
@@ -17561,7 +17564,7 @@ static void ggml_compute_forward_opt_step_adam_f32(
     memcpy(&dst->op_params[0], &iter, sizeof(int64_t));
 }
 
-static void ggml_compute_forward_opt_step_adam(
+static void ggml_compute_forward_opt_step_adamw(
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
 
@@ -17570,7 +17573,7 @@ static void ggml_compute_forward_opt_step_adam(
     switch (src0->type) {
         case GGML_TYPE_F32:
             {
-                ggml_compute_forward_opt_step_adam_f32(params, dst);
+                ggml_compute_forward_opt_step_adamw_f32(params, dst);
             } break;
         default:
             {
@@ -17923,9 +17926,9 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
                 ggml_compute_forward_cross_entropy_loss_back(params, tensor);
             }
             break;
-        case GGML_OP_OPT_STEP_ADAM:
+        case GGML_OP_OPT_STEP_ADAMW:
             {
-                ggml_compute_forward_opt_step_adam(params, tensor);
+                ggml_compute_forward_opt_step_adamw(params, tensor);
             }
             break;
         case GGML_OP_NONE:
@@ -19024,7 +19027,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             {
                 GGML_ABORT("fatal error"); // not supported
             }
-        case GGML_OP_OPT_STEP_ADAM:
+        case GGML_OP_OPT_STEP_ADAMW:
             {
                 GGML_ABORT("fatal error"); // not supported
             }
@@ -19167,7 +19170,7 @@ void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * 
     ggml_hash_set_free(&zero_table);
 }
 
-void ggml_build_opt_adam(
+void ggml_build_opt_adamw(
         struct ggml_context * ctx,
         struct ggml_cgraph  * gf,
         struct ggml_cgraph  * gb,
@@ -19175,13 +19178,13 @@ void ggml_build_opt_adam(
         float                 beta1,
         float                 beta2,
         float                 eps,
-        float                 l1) {
+        float                 wd) {
     for (int i = 0; i < gf->n_nodes; i++) {
         struct ggml_tensor * node = gf->nodes[i];
 
         if (node->flags & GGML_TENSOR_FLAG_PARAM) {
             GGML_PRINT_DEBUG("%s: found root node %p\n", __func__, (void *) node);
-            struct ggml_tensor * opt_step = ggml_opt_step_adam(ctx, node, alpha, beta1, beta2, eps, l1);
+            struct ggml_tensor * opt_step = ggml_opt_step_adamw(ctx, node, alpha, beta1, beta2, eps, wd);
             ggml_build_forward_expand(gb, opt_step);
         }
     }
@@ -19333,7 +19336,7 @@ void ggml_graph_reset(struct ggml_cgraph * cgraph) {
         }
 
         GGML_ASSERT(node);
-        if (node->op == GGML_OP_OPT_STEP_ADAM) {
+        if (node->op == GGML_OP_OPT_STEP_ADAMW) {
             // set iteration to 1 and clear momenta
             ggml_set_op_params_i32(node, 0, 1);
             ggml_set_zero(node->src[2]);
@@ -19602,7 +19605,7 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
             } break;
         case GGML_OP_CROSS_ENTROPY_LOSS:
         case GGML_OP_CROSS_ENTROPY_LOSS_BACK:
-        case GGML_OP_OPT_STEP_ADAM:
+        case GGML_OP_OPT_STEP_ADAMW:
             {
                 n_tasks = n_threads;
             } break;

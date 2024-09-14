@@ -533,7 +533,7 @@ extern "C" {
 
         GGML_OP_CROSS_ENTROPY_LOSS,
         GGML_OP_CROSS_ENTROPY_LOSS_BACK,
-        GGML_OP_OPT_STEP_ADAM,
+        GGML_OP_OPT_STEP_ADAMW,
 
         GGML_OP_COUNT,
     };
@@ -2082,14 +2082,17 @@ extern "C" {
             struct ggml_tensor          * b,
             struct ggml_tensor          * c);
 
-    GGML_API struct ggml_tensor * ggml_opt_step_adam(
+    // AdamW optimizer step
+    // Paper: https://arxiv.org/pdf/1711.05101v3.pdf
+    // PyTorch: https://pytorch.org/docs/stable/generated/torch.optim.AdamW.html
+    GGML_API struct ggml_tensor * ggml_opt_step_adamw(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             float                 alpha,
             float                 beta1,
             float                 beta2,
             float                 eps,
-            float                 l1);
+            float                 wd); // weight decay
 
     //
     // automatic differentiation
@@ -2102,7 +2105,7 @@ extern "C" {
     GGML_API void ggml_build_forward_expand (struct ggml_cgraph * cgraph, struct ggml_tensor * tensor);
     GGML_API void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * gf, struct ggml_cgraph * gb, bool accumulate, bool keep);
 
-    GGML_API void ggml_build_opt_adam(
+    GGML_API void ggml_build_opt_adamw(
             struct ggml_context * ctx,
             struct ggml_cgraph  * gf,
             struct ggml_cgraph  * gb,
@@ -2110,7 +2113,7 @@ extern "C" {
             float                 beta1,
             float                 beta2,
             float                 eps,
-            float                 l1);
+            float                 wd); // weight decay
 
     // graph allocation in a context
     GGML_API struct ggml_cgraph * ggml_new_graph         (struct ggml_context * ctx); // size = GGML_DEFAULT_GRAPH_SIZE, grads = false

@@ -2691,35 +2691,35 @@ struct test_cross_entropy_loss : public test_case {
     }
 };
 
-// GGML_OP_OPT_STEP_ADAM
-struct test_opt_step_adam : public test_case {
+// GGML_OP_OPT_STEP_ADAMW
+struct test_opt_step_adamw : public test_case {
     const ggml_type type;
     const std::array<int64_t, 4> ne;
     const float alpha;
     const float beta1;
     const float beta2;
     const float eps;
-    const float l1;
+    const float wd;
 
     std::string vars() override {
         return VARS_TO_STR2(type, ne);
     }
 
-    test_opt_step_adam(ggml_type type = GGML_TYPE_F32,
+    test_opt_step_adamw(ggml_type type = GGML_TYPE_F32,
             std::array<int64_t, 4> ne = {10, 5, 4, 3},
             float alpha = 1e-3f,
             float beta1 = 0.9f,
             float beta2 = 0.999f,
             float eps = 1e-8f,
-            float l1 = 0.0f)
-        : type(type), ne(ne), alpha(alpha), beta1(beta1), beta2(beta2), eps(eps), l1(l1) {}
+            float wd = 0.0f)
+        : type(type), ne(ne), alpha(alpha), beta1(beta1), beta2(beta2), eps(eps), wd(wd) {}
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
         ggml_tensor * a = ggml_new_tensor_4d(ctx, type, ne[0], ne[1], ne[2], ne[3]);
         ggml_set_param(ctx, a); // Despite tensor a having gradients the output tensor will not.
         ggml_set_name(a, "a");
 
-        ggml_tensor * out = ggml_opt_step_adam(ctx, a, alpha, beta1, beta2, eps, l1);
+        ggml_tensor * out = ggml_opt_step_adamw(ctx, a, alpha, beta1, beta2, eps, wd);
         ggml_set_name(out, "out");
 
         return out;
@@ -3566,8 +3566,8 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
     }
 
     test_cases.emplace_back(new test_cross_entropy_loss());
-    for (const float & l1 : {0.0f, 1e-3f}) {
-        test_cases.emplace_back(new test_opt_step_adam(GGML_TYPE_F32, {10, 5, 4, 3}, 1.0f, 1e-3f, 0.9f, 0.999f, l1));
+    for (const float & wd : {0.0f, 1e-2f}) {
+        test_cases.emplace_back(new test_opt_step_adamw(GGML_TYPE_F32, {10, 5, 4, 3}, 1.0f, 1e-3f, 0.9f, 0.999f, wd));
     }
 
     // these tests are disabled to save execution time, but they can be handy for debugging
