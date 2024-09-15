@@ -46,7 +46,9 @@ int main(int argc, char ** argv) {
     mnist_eval_result result_eval;
 
     if (backend == "CPU") {
-        result_eval = mnist_graph_eval(argv[1], images.data(), labels.data(), MNIST_NTEST, std::thread::hardware_concurrency());
+        const int ncores_logical = std::thread::hardware_concurrency();
+        result_eval = mnist_graph_eval(
+            argv[1], images.data(), labels.data(), MNIST_NTEST, std::min(ncores_logical, (ncores_logical + 4)/2));
         if (result_eval.success) {
             fprintf(stdout, "%s: predicted digit is %d\n", __func__, result_eval.pred[iex]);
 

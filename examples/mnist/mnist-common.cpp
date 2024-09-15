@@ -530,7 +530,7 @@ mnist_eval_result mnist_model_eval(mnist_model & model, const float * images, co
 void mnist_model_train(mnist_model & model, const float * images, const float * labels, const int nex, const int nepoch, const float val_split) {
     const int64_t t_start_us = ggml_time_us();
 
-    struct ggml_cgraph * gf = ggml_new_graph_custom(model.ctx_compute, 16384, true); // Forward pass.
+    struct ggml_cgraph * gf = ggml_new_graph_custom(model.ctx_compute, GGML_DEFAULT_GRAPH_SIZE, /*grads =*/ true); // Forward pass.
     ggml_build_forward_expand(gf, model.loss);
 
     struct ggml_cgraph * gb_grad = ggml_graph_dup(model.ctx_compute, gf); // Backward pass, gradients.
@@ -634,7 +634,7 @@ void mnist_model_save(mnist_model & model, const std::string & fname) {
     struct ggml_context * ggml_ctx;
     {
         struct ggml_init_params params = {
-            /*.mem_size   =*/ model.size_weight,
+            /*.mem_size   =*/ 100 * 1024*1024,
             /*.mem_buffer =*/ NULL,
             /*.no_alloc   =*/ false,
         };

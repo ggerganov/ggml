@@ -49,9 +49,6 @@ struct mnist_model {
     struct ggml_tensor * dense_weight = nullptr;
     struct ggml_tensor * dense_bias   = nullptr;
 
-    static const size_t size_weight  = 100 *      1024*1024;
-    static const size_t size_compute =   1 * 1024*1024*1024;
-
     struct ggml_context * ctx_weight  = nullptr;
     struct ggml_context * ctx_compute = nullptr;
     ggml_backend_buffer_t buf_weight  = nullptr;
@@ -70,12 +67,14 @@ struct mnist_model {
         fprintf(stderr, "%s: using %s backend\n", __func__, backend_name.c_str());
         backend = ggml_backend_reg_init_backend(backend_index, nullptr);
         if (ggml_backend_is_cpu(backend)) {
-            ggml_backend_cpu_set_n_threads(backend, std::thread::hardware_concurrency());
+            const int ncores_logical = std::thread::hardware_concurrency();
+            ggml_backend_cpu_set_n_threads(backend, std::min(ncores_logical, (ncores_logical + 4)/2));
         }
 
         {
+            const size_t size_meta = 1024*ggml_tensor_overhead();
             struct ggml_init_params params = {
-                /*.mem_size   =*/ size_weight,
+                /*.mem_size   =*/ size_meta,
                 /*.mem_buffer =*/ nullptr,
                 /*.no_alloc   =*/ true,
             };
@@ -83,8 +82,10 @@ struct mnist_model {
         }
 
         {
+            // The compute context needs a total of 3 compute graphs: forward pass + backwards pass (with/without optimizer step).
+            const size_t size_meta = GGML_DEFAULT_GRAPH_SIZE*ggml_tensor_overhead() + 3*ggml_graph_overhead();
             struct ggml_init_params params = {
-                /*.mem_size   =*/ size_compute,
+                /*.mem_size   =*/ size_meta,
                 /*.mem_buffer =*/ nullptr,
                 /*.no_alloc   =*/ true,
             };
