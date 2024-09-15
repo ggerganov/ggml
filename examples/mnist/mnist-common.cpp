@@ -565,7 +565,7 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
                 ggml_backend_graph_compute(model.backend, gb_grad);
             } else {
                 // For the last iteration, calculate gradients and also apply the optimizer:
-                ggml_backend_graph_compute(model.backend, gb_opt);
+                ggml_backend_graph_compute(model.backend, gb_opt); // gb_opt contains all nodes of gb_grad so no extra call for gb_grad is needed.
                 ggml_graph_reset(gb_grad); // Set gradients to zero, do not reset optimizer.
             }
 
