@@ -530,13 +530,16 @@ mnist_eval_result mnist_model_eval(mnist_model & model, const float * images, co
 void mnist_model_train(mnist_model & model, const float * images, const float * labels, const int nex, const int nepoch, const float val_split) {
     const int64_t t_start_us = ggml_time_us();
 
+    // gf == graph forward, forward pass only.
     struct ggml_cgraph * gf = ggml_new_graph_custom(model.ctx_compute, GGML_DEFAULT_GRAPH_SIZE, /*grads =*/ true); // Forward pass.
     ggml_build_forward_expand(gf, model.loss);
 
-    struct ggml_cgraph * gb_grad = ggml_graph_dup(model.ctx_compute, gf); // Backward pass, gradients.
+    // gb_grad == graph backward gradients, forward pass, then backward pass to calculate gradients.
+    struct ggml_cgraph * gb_grad = ggml_graph_dup(model.ctx_compute, gf);
     ggml_build_backward_expand(model.ctx_compute, gf, gb_grad, /*accumulate =*/ true, false);
 
-    struct ggml_cgraph * gb_opt = ggml_graph_dup(model.ctx_compute, gf); // Backward pass, gradients + optimizer.
+    // gb_opt == graph backward optimize, forward pass, then backward pass to calculate gradients, then optimizer step.
+    struct ggml_cgraph * gb_opt = ggml_graph_dup(model.ctx_compute, gb_grad);
     ggml_build_opt_adamw(model.ctx_compute, gf, gb_opt, 1e-3f, 0.9f, 0.999f, 1e-8f, 0.0f);
 
     model.buf_compute = ggml_backend_alloc_ctx_tensors(model.ctx_compute, model.backend);
@@ -556,8 +559,6 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
         for (; iex0 < iex_split; iex0 += model.nbatch_physical) {
             ggml_backend_tensor_set(model.images, images + iex0*MNIST_NINPUT,   0, ggml_nbytes(model.images));
             ggml_backend_tensor_set(model.labels, labels + iex0*MNIST_NCLASSES, 0, ggml_nbytes(model.labels));
-
-            ggml_backend_graph_compute(model.backend, gf); // Always compute forward pass.
 
             // With a period of nbatch_logical/nbatch_physical iterations:
             if ((iex0 + model.nbatch_physical) % model.nbatch_logical != 0) {

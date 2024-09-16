@@ -18123,11 +18123,23 @@ void ggml_build_backward_gradient_checkpointing(
     ggml_hash_map_free(replacements);
 }
 
-// functions to change gradients considering the case that input a might be initial gradient with zero value
+// utility functions to change gradients
+// by default, just add/subtract/etc. the gradients
+// if a is in zero_table and not a gradient accumulator, replace a
+// if a is in zero_table and a gradient accumulator, modify gradients in-place and mark result as gradient accumulator
 
 static struct ggml_tensor * ggml_add_or_set(struct ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * b, struct ggml_hash_set * zero_table) {
     if (ggml_hash_contains(zero_table, a)) {
-        return b;
+        if (a->flags & GGML_TENSOR_FLAG_GRAD_ACC) {
+            struct ggml_tensor * ret = ggml_add_impl(ctx, a, b, true);
+            ret->flags |= GGML_TENSOR_FLAG_GRAD_ACC;
+            const size_t insert_result = ggml_hash_insert(zero_table, ret);
+            GGML_ASSERT(insert_result != GGML_HASHSET_FULL);
+            GGML_ASSERT(insert_result != GGML_HASHSET_ALREADY_EXISTS);
+            return ret;
+        } else {
+            return b;
+        }
     } else {
         return ggml_add_impl(ctx, a, b, false);
     }
@@ -18135,8 +18147,17 @@ static struct ggml_tensor * ggml_add_or_set(struct ggml_context * ctx, struct gg
 
 static struct ggml_tensor * ggml_acc_or_set(struct ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * b, size_t nb1, size_t nb2, size_t nb3, size_t offset, struct ggml_hash_set * zero_table) {
     if (ggml_hash_contains(zero_table, a)) {
-        struct ggml_tensor * a_zero = ggml_scale(ctx, a, 0.0f);
-        return ggml_acc_impl(ctx, a_zero, b, nb1, nb2, nb3, offset, false);
+        if (a->flags & GGML_TENSOR_FLAG_GRAD_ACC) {
+            struct ggml_tensor * ret = ggml_acc_impl(ctx, a, b, nb1, nb2, nb3, offset, true);
+            ret->flags |= GGML_TENSOR_FLAG_GRAD_ACC;
+            const size_t insert_result = ggml_hash_insert(zero_table, ret);
+            GGML_ASSERT(insert_result != GGML_HASHSET_FULL);
+            GGML_ASSERT(insert_result != GGML_HASHSET_ALREADY_EXISTS);
+            return ret;
+        } else {
+            struct ggml_tensor * a_zero = ggml_scale(ctx, a, 0.0f); // FIXME this is going to produce NaN if a contains inf/NaN
+            return ggml_acc_impl(ctx, a_zero, b, nb1, nb2, nb3, offset, false);
+        }
     } else {
         return ggml_acc_impl(ctx, a, b, nb1, nb2, nb3, offset, false);
     }
@@ -18144,7 +18165,16 @@ static struct ggml_tensor * ggml_acc_or_set(struct ggml_context * ctx, struct gg
 
 static struct ggml_tensor * ggml_add1_or_set(struct ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * b, struct ggml_hash_set * zero_table) {
     if (ggml_hash_contains(zero_table, a)) {
-        return ggml_repeat(ctx, b, a);
+        if (a->flags & GGML_TENSOR_FLAG_GRAD_ACC) {
+            struct ggml_tensor * ret = ggml_add1_impl(ctx, a, b, true);
+            ret->flags |= GGML_TENSOR_FLAG_GRAD_ACC;
+            const size_t insert_result = ggml_hash_insert(zero_table, ret);
+            GGML_ASSERT(insert_result != GGML_HASHSET_FULL);
+            GGML_ASSERT(insert_result != GGML_HASHSET_ALREADY_EXISTS);
+            return ret;
+        } else {
+            return ggml_repeat(ctx, b, a);
+        }
     } else {
         return ggml_add1_impl(ctx, a, b, false);
     }
@@ -18152,7 +18182,16 @@ static struct ggml_tensor * ggml_add1_or_set(struct ggml_context * ctx, struct g
 
 static struct ggml_tensor * ggml_sub_or_set(struct ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * b, struct ggml_hash_set * zero_table) {
     if (ggml_hash_contains(zero_table, a)) {
-        return ggml_neg(ctx, b);
+        if (a->flags & GGML_TENSOR_FLAG_GRAD_ACC) {
+            struct ggml_tensor * ret = ggml_sub_impl(ctx, a, b, true);
+            ret->flags |= GGML_TENSOR_FLAG_GRAD_ACC;
+            const size_t insert_result = ggml_hash_insert(zero_table, ret);
+            GGML_ASSERT(insert_result != GGML_HASHSET_FULL);
+            GGML_ASSERT(insert_result != GGML_HASHSET_ALREADY_EXISTS);
+            return ret;
+        } else {
+            return ggml_neg(ctx, b);
+        }
     } else {
         return ggml_sub_impl(ctx, a, b, false);
     }
@@ -19136,22 +19175,25 @@ void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * 
         }
     }
 
-    // hash table of original gradients that should be overwritten instead of incremented
+    // keep table of original gradients for replacement/accumulation logic
     struct ggml_hash_set zero_table = ggml_hash_set_new(gf->size);
+    for (int i = 0; i < gf->n_nodes; i++) {
+        struct ggml_tensor * node = gf->nodes[i];
 
-    // when accumulating gradients the table is empty -> gradients always incremented
-    if (!accumulate) {
-        for (int i = 0; i < gf->n_nodes; i++) {
-            if (gf->grads[i]) {
-                ggml_hash_insert(&zero_table, gf->grads[i]);
+        if (node->grad) {
+            // only gradients of trainable parameters should be accumulated
+            if (accumulate && (node->flags & GGML_TENSOR_FLAG_PARAM)) {
+                node->grad->flags |= GGML_TENSOR_FLAG_GRAD_ACC;
             }
+
+            ggml_hash_insert(&zero_table, node->grad);
         }
     }
 
     for (int i = gf->n_nodes - 1; i >= 0; i--) {
         struct ggml_tensor * node = gf->nodes[i];
 
-        // inplace operations to add gradients are not created by ggml_compute_backward
+        // inplace operations to add gradients are not created by ggml_compute_backward except for gradient accumulation
         // use allocator to automatically make inplace operations
         if (node->grad) {
             ggml_compute_backward(ctx, node, &zero_table);
@@ -19319,19 +19361,18 @@ void ggml_graph_reset(struct ggml_cgraph * cgraph) {
 
     for (int i = 0; i < cgraph->n_nodes; i++) {
         struct ggml_tensor * node = cgraph->nodes[i];
-        struct ggml_tensor * grad = cgraph->grads[i];
 
         // initial gradients of loss should be 1, 0 otherwise
-        if (grad) {
+        if (node->grad) {
             if (node->flags & GGML_TENSOR_FLAG_LOSS) {
-                GGML_ASSERT(grad->buffer);
+                GGML_ASSERT(node->grad->buffer);
                 GGML_ASSERT(node->type == GGML_TYPE_F32);
                 GGML_ASSERT(ggml_is_scalar(node));
 
                 const float onef = 1.0f;
-                ggml_backend_tensor_set(grad, &onef, 0, ggml_nbytes(grad));
+                ggml_backend_tensor_set(node->grad, &onef, 0, ggml_nbytes(node->grad));
             } else {
-                ggml_set_zero(grad);
+                ggml_set_zero(node->grad);
             }
         }
 
