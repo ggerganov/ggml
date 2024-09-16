@@ -611,7 +611,7 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
             const std::pair<double, double> loss = mnist_loss(result_val);
             const std::pair<double, double> acc  = mnist_accuracy(result_val, labels + iex_split*MNIST_NCLASSES);
 
-            fprintf(stderr, ", val_loss=%.6lf+-%.6lf, train_acc=%.2f+-%.2f%%", loss.first, loss.second, 100.0*acc.first, 100.0*acc.second);
+            fprintf(stderr, ", val_loss=%.6lf+-%.6lf, val_acc=%.2f+-%.2f%%", loss.first, loss.second, 100.0*acc.first, 100.0*acc.second);
         }
         fprintf(stderr, "\n");
     }
