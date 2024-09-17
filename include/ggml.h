@@ -572,11 +572,10 @@ extern "C" {
 
     // this tensor...
     enum ggml_tensor_flag {
-        GGML_TENSOR_FLAG_INPUT    =  1, // ...is an input for the GGML comptue graph
-        GGML_TENSOR_FLAG_OUTPUT   =  2, // ...is an output for the GGML comptue graph
-        GGML_TENSOR_FLAG_PARAM    =  4, // ...contains trainable parameters
-        GGML_TENSOR_FLAG_GRAD_ACC =  8, // ...is an accumulator for gradients
-        GGML_TENSOR_FLAG_LOSS     = 16, // ...defines loss for numerical optimization (multiple loss tensors add up)
+        GGML_TENSOR_FLAG_INPUT    = 1, // ...is an input for the GGML comptue graph
+        GGML_TENSOR_FLAG_OUTPUT   = 2, // ...is an output for the GGML comptue graph
+        GGML_TENSOR_FLAG_PARAM    = 4, // ...contains trainable parameters
+        GGML_TENSOR_FLAG_LOSS     = 8, // ...defines loss for numerical optimization (multiple loss tensors add up)
     };
 
     // ggml object
