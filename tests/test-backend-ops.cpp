@@ -3567,7 +3567,7 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
     }
 
     test_cases.emplace_back(new test_cross_entropy_loss());
-    for (const float & wd : {0.0f, 1e-2f}) {
+    for (float wd : {0.0f, 1e-2f}) {
         test_cases.emplace_back(new test_opt_step_adamw(GGML_TYPE_F32, {10, 5, 4, 3}, 1.0f, 1e-3f, 0.9f, 0.999f, wd));
     }
 
