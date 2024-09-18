@@ -256,6 +256,8 @@ GGML_API GGML_CALL void ggml_backend_tensor_memset(struct ggml_tensor * tensor, 
     if (!size) {
         return;
     }
+    
+    GGML_ASSERT(buf->iface.memset_tensor != NULL && "memset not supported by backend buffer");
 
     buf->iface.memset_tensor(buf, tensor, value, offset, size);
 }
