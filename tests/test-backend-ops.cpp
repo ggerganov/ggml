@@ -2702,7 +2702,7 @@ struct test_opt_step_adamw : public test_case {
     const float wd;
 
     std::string vars() override {
-        return VARS_TO_STR2(type, ne);
+        return VARS_TO_STR7(type, ne, alpha, beta1, beta2, eps, wd);
     }
 
     test_opt_step_adamw(ggml_type type = GGML_TYPE_F32,
