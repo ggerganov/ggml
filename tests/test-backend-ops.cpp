@@ -1679,9 +1679,10 @@ struct test_out_prod : public test_case {
     const int64_t n;
     const int64_t k;
     const std::array<int64_t, 2> bs; // dims 3 and 4
+    const bool trans_b;
 
     std::string vars() override {
-        return VARS_TO_STR6(type_a, type_b, m, n, k, bs);
+        return VARS_TO_STR7(type_a, type_b, m, n, k, bs, trans_b);
     }
 
     double max_nmse_err() override {
@@ -1690,13 +1691,21 @@ struct test_out_prod : public test_case {
 
     test_out_prod(ggml_type type_a = GGML_TYPE_F32, ggml_type type_b = GGML_TYPE_F32,
             int64_t m = 32, int64_t n = 32, int64_t k = 32,
-            std::array<int64_t, 2> bs = {10, 10})
-        : type_a(type_a), type_b(type_b), m(m), n(n), k(k), bs(bs) {}
+            std::array<int64_t, 2> bs = {10, 10},
+            bool trans_b = false)
+        : type_a(type_a), type_b(type_b), m(m), n(n), k(k), bs(bs), trans_b(trans_b) {}
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
         ggml_tensor * a = ggml_new_tensor_4d(ctx, type_a, m, k, bs[0], bs[1]);
-        ggml_tensor * b = ggml_new_tensor_4d(ctx, type_b, n, k, bs[0], bs[1]);
         ggml_set_name(a, "a");
+
+        ggml_tensor * b;
+        if (trans_b) {
+            b = ggml_new_tensor_4d(ctx, type_b, k, n, bs[0], bs[1]);
+            b = ggml_transpose(ctx, b);
+        } else {
+            b = ggml_new_tensor_4d(ctx, type_b, n, k, bs[0], bs[1]);
+        }
         ggml_set_name(b, "b");
 
         ggml_tensor * out = ggml_out_prod(ctx, a, b);
@@ -3432,6 +3441,7 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
             test_cases.emplace_back(new test_out_prod(type_a, type_b, 256, 1, 16, {10, 10}));
 
             test_cases.emplace_back(new test_out_prod(type_a, type_b, 256, 16, 16, { 1,  1}));
+            test_cases.emplace_back(new test_out_prod(type_a, type_b, 256, 16, 16, { 1,  1}, true));
             test_cases.emplace_back(new test_out_prod(type_a, type_b, 256, 16, 16, {10,  1}));
             test_cases.emplace_back(new test_out_prod(type_a, type_b, 256, 16, 16, {10,  1}));
             test_cases.emplace_back(new test_out_prod(type_a, type_b, 256, 16, 16, {10, 10}));

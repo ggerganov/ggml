@@ -7,25 +7,15 @@ void ggml_cuda_out_prod(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     const ggml_tensor * src0 = dst->src[0];
     const ggml_tensor * src1 = dst->src[1];
 
+    GGML_TENSOR_BINARY_OP_LOCALS
+
     GGML_ASSERT(src0->type == GGML_TYPE_F32);
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
     GGML_ASSERT(dst->type  == GGML_TYPE_F32);
     GGML_ASSERT(ggml_is_contiguous(src0));
     GGML_ASSERT(ggml_is_contiguous(dst));
 
-    const int64_t ne00 = src0->ne[0];
-    const int64_t ne01 = src0->ne[1];
-
-    const int64_t ne10 = src1->ne[0];
-    const int64_t ne11 = src1->ne[1];
-
     GGML_ASSERT(ne01 == ne11);
-
-    const int64_t ne0 = dst->ne[0];
-    const int64_t ne1 = dst->ne[1];
-    const int64_t ne2 = dst->ne[2];
-    const int64_t ne3 = dst->ne[3];
-
     GGML_ASSERT(ne0 == ne00);
     GGML_ASSERT(ne1 == ne10);
 
@@ -48,8 +38,11 @@ void ggml_cuda_out_prod(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     GGML_ASSERT(ne3 == 1);
     CUBLAS_CHECK(cublasSetStream(handle, stream));
 
-    const cublasOperation_t src1_cublas_op = ggml_is_transposed(src1) ? CUBLAS_OP_N : CUBLAS_OP_T;
-    const int64_t           ldb            = ggml_is_transposed(src1) ? ne11        : ne10;
+    const bool src1_T = ggml_is_transposed(src1);
+    const cublasOperation_t src1_cublas_op =  src1_T ? CUBLAS_OP_N : CUBLAS_OP_T;
+    const int64_t           ldb            = (src1_T ?        nb10 :        nb11) /  sizeof(float);
+    GGML_ASSERT(                             (src1_T ?        nb11 :        nb10) == sizeof(float));
+
     CUBLAS_CHECK(
         cublasSgemm(handle, CUBLAS_OP_N, src1_cublas_op,
                 ne0, ne1, ne01,
