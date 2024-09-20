@@ -100,7 +100,7 @@ bool check_gradient(
     struct ggml_cgraph * gf = ggml_new_graph_custom(ctx0, GGML_DEFAULT_GRAPH_SIZE, true);
     ggml_build_forward_expand(gf, f);
     struct ggml_cgraph * gb = ggml_graph_dup(ctx0, gf);
-    ggml_build_backward_expand(ctx0, gf, gb, false);
+    ggml_build_backward_expand(ctx0, gf, gb, false, false);
 
     ggml_graph_compute_with_ctx(ctx0, gf, n_threads);
     ggml_graph_reset  (gf);

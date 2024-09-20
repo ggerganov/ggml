@@ -12,8 +12,8 @@ from time import time
 input_size  = 784  # img_size = (28,28) ---> 28*28=784 in total
 hidden_size = 500  # number of nodes at hidden layer
 num_classes = 10   # number of output classes discrete range [0,9]
-num_epochs  = 20   # number of times which the entire dataset is passed throughout the model
-batch_size  = 500  # the size of input data took for one iteration
+num_epochs  = 30   # number of times which the entire dataset is passed throughout the model
+batch_size  = 1000 # the size of input data used for one iteration
 lr          = 1e-3 # size of step
 
 
@@ -38,8 +38,9 @@ def train(model_path):
     assert len(train_data) == 60000
     assert len(test_data)  == 10000
 
-    train_gen = torch.utils.data.DataLoader(dataset=train_data, batch_size=batch_size, shuffle=True)
-    test_gen  = torch.utils.data.DataLoader(dataset=test_data,  batch_size=batch_size, shuffle=False)
+    kwargs_train_test = dict(batch_size=batch_size, num_workers=4, pin_memory=True)
+    train_gen = torch.utils.data.DataLoader(dataset=train_data, shuffle=True,  **kwargs_train_test)
+    test_gen  = torch.utils.data.DataLoader(dataset=test_data,  shuffle=False, **kwargs_train_test)
 
     net = Net(input_size, hidden_size, num_classes)
 
