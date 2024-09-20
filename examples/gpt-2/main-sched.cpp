@@ -888,7 +888,7 @@ bool gpt2_eval(
     //}
 
     // in this case, the output tensor is the last one in the graph
-    struct ggml_tensor * inpL = gf->nodes[gf->n_nodes - 1];
+    struct ggml_tensor * inpL = ggml_graph_node(gf, -1);
 
     //embd_w.resize(n_vocab*N);
     //ggml_backend_tensor_get(inpL, embd_w.data(), 0, sizeof(float)*n_vocab*N);

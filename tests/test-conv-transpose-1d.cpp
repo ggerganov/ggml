@@ -415,9 +415,9 @@ int main(void)
 
     struct ggml_tensor * conv1d_transpose_res_0 = NULL;
 
-    for(int i = 0; i < gf_res->n_nodes; i++) {
-       if(strcmp(ggml_get_name(gf_res->nodes[i]), "conv1d_transpose_res_0") == 0) {
-            conv1d_transpose_res_0 = gf_res->nodes[i];
+    for(int i = 0; i < ggml_graph_n_nodes(gf_res); i++) {
+       if(strcmp(ggml_get_name(ggml_graph_node(gf_res, i)), "conv1d_transpose_res_0") == 0) {
+            conv1d_transpose_res_0 = ggml_graph_node(gf_res, i);
         }
     }
 
@@ -434,9 +434,9 @@ int main(void)
 
     struct ggml_tensor * conv1d_transpose_res_1 = NULL;
 
-    for(int i = 0; i < gf_res->n_nodes; i++) {
-       if(strcmp(ggml_get_name(gf_res->nodes[i]), "conv1d_transpose_res_1") == 0) {
-            conv1d_transpose_res_1 = gf_res->nodes[i];
+    for(int i = 0; i < ggml_graph_n_nodes(gf_res); i++) {
+       if(strcmp(ggml_get_name(ggml_graph_node(gf_res, i)), "conv1d_transpose_res_1") == 0) {
+            conv1d_transpose_res_1 = ggml_graph_node(gf_res, i);
         }
     }
 
@@ -456,9 +456,9 @@ int main(void)
 
     struct ggml_tensor * conv1d_transpose_res_2 = NULL;
 
-    for(int i = 0; i < gf_res->n_nodes; i++) {
-       if(strcmp(ggml_get_name(gf_res->nodes[i]), "conv1d_transpose_res_2") == 0) {
-            conv1d_transpose_res_2 = gf_res->nodes[i];
+    for(int i = 0; i < ggml_graph_n_nodes(gf_res); i++) {
+       if(strcmp(ggml_get_name(ggml_graph_node(gf_res, i)), "conv1d_transpose_res_2") == 0) {
+            conv1d_transpose_res_2 = ggml_graph_node(gf_res, i);
         }
     }
 
@@ -475,9 +475,9 @@ int main(void)
 
     struct ggml_tensor * conv1d_transpose_res_3 = NULL;
 
-    for(int i = 0; i < gf_res->n_nodes; i++) {
-       if(strcmp(ggml_get_name(gf_res->nodes[i]), "conv1d_transpose_res_3") == 0) {
-            conv1d_transpose_res_3 = gf_res->nodes[i];
+    for(int i = 0; i < ggml_graph_n_nodes(gf_res); i++) {
+       if(strcmp(ggml_get_name(ggml_graph_node(gf_res, i)), "conv1d_transpose_res_3") == 0) {
+            conv1d_transpose_res_3 = ggml_graph_node(gf_res, i);
         }
     }
 
@@ -495,9 +495,9 @@ int main(void)
 
     struct ggml_tensor * conv1d_transpose_res_4 = NULL;
 
-    for(int i = 0; i < gf_res->n_nodes; i++) {
-       if(strcmp(ggml_get_name(gf_res->nodes[i]), "conv1d_transpose_res_4") == 0) {
-            conv1d_transpose_res_4 = gf_res->nodes[i];
+    for(int i = 0; i < ggml_graph_n_nodes(gf_res); i++) {
+       if(strcmp(ggml_get_name(ggml_graph_node(gf_res, i)), "conv1d_transpose_res_4") == 0) {
+            conv1d_transpose_res_4 = ggml_graph_node(gf_res, i);
         }
     }
 
@@ -516,9 +516,9 @@ int main(void)
 
     struct ggml_tensor * conv1d_transpose_res_5 = NULL;
 
-    for(int i = 0; i < gf_res->n_nodes; i++) {
-       if(strcmp(ggml_get_name(gf_res->nodes[i]), "conv1d_transpose_res_5") == 0) {
-            conv1d_transpose_res_5 = gf_res->nodes[i];
+    for(int i = 0; i < ggml_graph_n_nodes(gf_res); i++) {
+       if(strcmp(ggml_get_name(ggml_graph_node(gf_res, i)), "conv1d_transpose_res_5") == 0) {
+            conv1d_transpose_res_5 = ggml_graph_node(gf_res, i);
         }
     }
 
@@ -537,9 +537,9 @@ int main(void)
 
     struct ggml_tensor * conv1d_transpose_res_6 = NULL;
 
-    for(int i = 0; i < gf_res->n_nodes; i++) {
-       if(strcmp(ggml_get_name(gf_res->nodes[i]), "conv1d_transpose_res_6") == 0) {
-            conv1d_transpose_res_6 = gf_res->nodes[i];
+    for(int i = 0; i < ggml_graph_n_nodes(gf_res); i++) {
+       if(strcmp(ggml_get_name(ggml_graph_node(gf_res, i)), "conv1d_transpose_res_6") == 0) {
+            conv1d_transpose_res_6 = ggml_graph_node(gf_res, i);
         }
     }
 
@@ -559,9 +559,9 @@ int main(void)
 
     struct ggml_tensor * conv1d_transpose_res_7 = NULL;
 
-    for(int i = 0; i < gf_res->n_nodes; i++) {
-       if(strcmp(ggml_get_name(gf_res->nodes[i]), "conv1d_transpose_res_7") == 0) {
-            conv1d_transpose_res_7 = gf_res->nodes[i];
+    for(int i = 0; i < ggml_graph_n_nodes(gf_res); i++) {
+       if(strcmp(ggml_get_name(ggml_graph_node(gf_res, i)), "conv1d_transpose_res_7") == 0) {
+            conv1d_transpose_res_7 = ggml_graph_node(gf_res, i);
         }
     }
 
