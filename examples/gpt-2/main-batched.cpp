@@ -955,7 +955,7 @@ int gpt2_decode(
     //}
 
     // in this case, the output tensor is the last one in the graph
-    struct ggml_tensor * inpL = gf->nodes[gf->n_nodes - 1];
+    struct ggml_tensor * inpL = ggml_graph_node(gf, -1);
 
     if (batch.logits) {
         // return logits for all tokens

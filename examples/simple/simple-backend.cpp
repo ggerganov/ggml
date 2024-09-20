@@ -140,7 +140,7 @@ struct ggml_tensor * compute(const simple_model & model, ggml_gallocr_t allocr) 
     ggml_backend_graph_compute(model.backend, gf);
 
     // in this case, the output tensor is the last one in the graph
-    return gf->nodes[gf->n_nodes - 1];
+    return ggml_graph_node(gf, -1);
 }
 
 int main(void) {

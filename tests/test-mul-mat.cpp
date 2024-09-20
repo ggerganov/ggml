@@ -161,7 +161,7 @@ struct ggml_tensor* compute(const test_model & model, ggml_gallocr_t allocr) {
     //ggml_graph_print(gf);
 
     // in this case, the output tensor is the last one in the graph
-    return gf->nodes[gf->n_nodes - 1];
+    return ggml_graph_node(gf, -1);
 }
 
 

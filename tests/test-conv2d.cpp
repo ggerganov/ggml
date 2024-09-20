@@ -221,11 +221,11 @@ int main(void)
     struct ggml_tensor * im2col_res = NULL;
     struct ggml_tensor * conv2d_res = NULL;
 
-    for(int i = 0; i < gf_res->n_nodes; i++) {
-        if(strcmp(ggml_get_name(gf_res->nodes[i]), "im2col_res") == 0) {
-            im2col_res = gf_res->nodes[i];
-        } else if(strcmp(ggml_get_name(gf_res->nodes[i]), "conv2d_res") == 0) {
-            conv2d_res = gf_res->nodes[i];
+    for(int i = 0; i < ggml_graph_n_nodes(gf_res); ++i) {
+        if(strcmp(ggml_get_name(ggml_graph_node(gf_res, i)), "im2col_res") == 0) {
+            im2col_res = ggml_graph_node(gf_res, i);
+        } else if(strcmp(ggml_get_name(ggml_graph_node(gf_res, i)), "conv2d_res") == 0) {
+            conv2d_res = ggml_graph_node(gf_res, i);
         }
     }
 
