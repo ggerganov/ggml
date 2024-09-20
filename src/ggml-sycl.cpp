@@ -3845,6 +3845,13 @@ static void ggml_sycl_im2col(ggml_backend_sycl_context & ctx, const ggml_tensor 
     ggml_sycl_op_flatten(ctx, src0, src1, dst, ggml_sycl_op_im2col);
 }
 
+static void ggml_sycl_col2im(ggml_backend_sycl_context &ctx,
+                             const ggml_tensor *src0,
+                             const ggml_tensor *src1,
+                             ggml_tensor *dst) {
+    ggml_sycl_op_flatten(ctx, src0, src1, dst, ggml_sycl_op_col2im);
+}
+
 static void ggml_sycl_sum_rows(ggml_backend_sycl_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     GGML_ASSERT(ggml_is_contiguous(src0));
     ggml_sycl_op_flatten(ctx, src0, src1, dst, ggml_sycl_op_sum_rows);
@@ -4009,6 +4016,9 @@ bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tens
             break;
         case GGML_OP_IM2COL:
             func = ggml_sycl_im2col;
+            break;
+        case GGML_OP_COL2IM:
+            func = ggml_sycl_col2im;
             break;
         case GGML_OP_POOL_2D:
             func = ggml_sycl_pool2d;
@@ -5131,6 +5141,7 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
         case GGML_OP_ROPE:
             return ggml_is_contiguous(op->src[0]);
         case GGML_OP_IM2COL:
+        case GGML_OP_COL2IM:
         case GGML_OP_POOL_2D:
         case GGML_OP_SUM_ROWS:
         case GGML_OP_ARGSORT:

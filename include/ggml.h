@@ -497,6 +497,7 @@ extern "C" {
         GGML_OP_CONV_TRANSPOSE_1D,
         GGML_OP_IM2COL,
         GGML_OP_IM2COL_BACK,
+        GGML_OP_COL2IM,
         GGML_OP_CONV_TRANSPOSE_2D,
         GGML_OP_POOL_1D,
         GGML_OP_POOL_2D,
@@ -1652,6 +1653,18 @@ extern "C" {
         int                   d1, // dilation dimension 1
         bool                  is_2D);
 
+    GGML_API struct ggml_tensor * ggml_col2im(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            int                  s0,
+            int                  s1,
+            int                  p0,
+            int                  p1,
+            int                  d0,
+            int                  d1,
+            int64_t              KH,
+            int64_t              IH);
+
     GGML_API struct ggml_tensor * ggml_conv_depthwise_2d(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,  // convolution kernel
@@ -1681,6 +1694,14 @@ extern "C" {
             int                   d); // dilation
 
     GGML_API struct ggml_tensor * ggml_conv_transpose_1d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,   // convolution kernel
+            struct ggml_tensor  * b,   // data
+            int                   s0,  // stride
+            int                   p0,  // padding
+            int                   d0); // dilation
+
+    GGML_API struct ggml_tensor * ggml_conv_transpose_1d_gemm(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,   // convolution kernel
             struct ggml_tensor  * b,   // data
