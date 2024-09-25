@@ -18585,7 +18585,7 @@ void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * 
                 break;
             case GGML_OP_UNARY: {
                 const enum ggml_unary_op uop = ggml_get_unary_op(node);
-                // SGN and STEP unary ops are not differentiable
+                // SGN and STEP unary ops are piecewise constant
                 if (uop == GGML_UNARY_OP_SGN || uop == GGML_UNARY_OP_STEP) {
                     ignore_src0 = true;
                 }
