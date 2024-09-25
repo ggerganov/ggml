@@ -7723,7 +7723,7 @@ struct ggml_tensor * ggml_opt_step_adamw(
         float                 beta2,
         float                 eps,
         float                 wd) {
-    GGML_ASSERT(a->grad);
+    GGML_ASSERT(a->flags & GGML_TENSOR_FLAG_PARAM);
     GGML_ASSERT(alpha >  0.0f);
     GGML_ASSERT(beta1 >= 0.0f && beta1 <= 1.0f);
     GGML_ASSERT(beta2 >= 0.0f && beta2 <= 1.0f);
@@ -7743,8 +7743,8 @@ struct ggml_tensor * ggml_opt_step_adamw(
     result->op     = GGML_OP_OPT_STEP_ADAMW;
     result->src[0] = a;
     result->src[1] = a->grad;
-    result->src[2] = ggml_dup_tensor(ctx, a->grad);
-    result->src[3] = ggml_dup_tensor(ctx, a->grad);
+    result->src[2] = ggml_dup_tensor(ctx, a);
+    result->src[3] = ggml_dup_tensor(ctx, a);
 
     return result;
 }
