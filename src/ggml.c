@@ -4622,39 +4622,6 @@ struct ggml_tensor * ggml_get_tensor(struct ggml_context * ctx, const char * nam
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// utility function for determining whether a ggml_tensor built with a given op should receive gradients
-// considers all src tensors added to tensor, to ignore tensors for gradients add them after calling this function
-static void ggml_set_grad(struct ggml_context * ctx, struct ggml_tensor * tensor) {
-    bool any_src_grads = false;
-    for (int i = 0; i < GGML_MAX_SRC; ++i) {
-        // unused sources are not relevant in either way
-        if (!tensor->src[i]) {
-            continue;
-        }
-        // if any source is a gradient the newly created tensor must also be a gradient
-        // do not add gradients for the gradients but instead mark them
-        if (tensor->src[i]->flags & GGML_TENSOR_FLAG_GRAD) {
-            tensor->flags |= GGML_TENSOR_FLAG_GRAD;
-            return;
-        }
-        if (tensor->src[i]->grad) {
-            any_src_grads = true;
-        }
-    }
-    // if none of the sources have gradients then the newly created tensor does not need them either
-    if (!any_src_grads) {
-        return;
-    }
-
-    // inplace operations are currently not supported
-    GGML_ASSERT(!tensor->view_src || tensor->op == GGML_OP_CPY || tensor->op == GGML_OP_VIEW ||
-        tensor->op == GGML_OP_RESHAPE || tensor->op == GGML_OP_PERMUTE || tensor->op == GGML_OP_TRANSPOSE);
-
-    // create a new tensor with the same type and shape as the newly created tensor and mark it as gradients
-    tensor->grad = ggml_dup_tensor(ctx, tensor);
-    tensor->grad->flags |= GGML_TENSOR_FLAG_GRAD;
-}
-
 // ggml_dup
 
 static struct ggml_tensor * ggml_dup_impl(
@@ -4665,7 +4632,6 @@ static struct ggml_tensor * ggml_dup_impl(
 
     result->op     = GGML_OP_DUP;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -4696,7 +4662,6 @@ static struct ggml_tensor * ggml_add_impl(
     result->op     = GGML_OP_ADD;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -4736,8 +4701,6 @@ static struct ggml_tensor * ggml_add_cast_impl(
     result->op     = GGML_OP_ADD;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad || ggml_are_same_shape(a, b)); // TODO: support backward pass for broadcasting
 
     return result;
 }
@@ -4765,7 +4728,6 @@ static struct ggml_tensor * ggml_add1_impl(
     result->op     = GGML_OP_ADD1;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -4808,7 +4770,6 @@ static struct ggml_tensor * ggml_acc_impl(
     result->op     = GGML_OP_ACC;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -4849,8 +4810,6 @@ static struct ggml_tensor * ggml_sub_impl(
     result->op     = GGML_OP_SUB;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad || ggml_are_same_shape(a, b)); // TODO: support backward pass for broadcasting
 
     return result;
 }
@@ -4883,8 +4842,6 @@ static struct ggml_tensor * ggml_mul_impl(
     result->op     = GGML_OP_MUL;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad || ggml_are_same_shape(a, b)); // TODO: support backward pass for broadcasting
 
     return result;
 }
@@ -4917,8 +4874,6 @@ static struct ggml_tensor * ggml_div_impl(
     result->op     = GGML_OP_DIV;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad || ggml_are_same_shape(a, b)); // TODO: support backward pass for broadcasting
 
     return result;
 }
@@ -4947,7 +4902,6 @@ static struct ggml_tensor * ggml_sqr_impl(
 
     result->op     = GGML_OP_SQR;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -4974,7 +4928,6 @@ static struct ggml_tensor * ggml_sqrt_impl(
 
     result->op     = GGML_OP_SQRT;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5001,7 +4954,6 @@ static struct ggml_tensor * ggml_log_impl(
 
     result->op     = GGML_OP_LOG;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5028,7 +4980,6 @@ static struct ggml_tensor * ggml_sin_impl(
 
     result->op     = GGML_OP_SIN;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5055,7 +5006,6 @@ static struct ggml_tensor * ggml_cos_impl(
 
     result->op     = GGML_OP_COS;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5081,7 +5031,6 @@ struct ggml_tensor * ggml_sum(
 
     result->op     = GGML_OP_SUM;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5100,7 +5049,6 @@ struct ggml_tensor * ggml_sum_rows(
 
     result->op     = GGML_OP_SUM_ROWS;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5115,8 +5063,6 @@ struct ggml_tensor * ggml_mean(
 
     result->op     = GGML_OP_MEAN;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -5132,8 +5078,6 @@ struct ggml_tensor * ggml_argmax(
 
     result->op     = GGML_OP_ARGMAX;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -5150,7 +5094,6 @@ struct ggml_tensor * ggml_repeat(
 
     result->op     = GGML_OP_REPEAT;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5167,7 +5110,6 @@ struct ggml_tensor * ggml_repeat_back(
 
     result->op     = GGML_OP_REPEAT_BACK;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5198,8 +5140,6 @@ struct ggml_tensor * ggml_concat(
     result->op     = GGML_OP_CONCAT;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -5315,8 +5255,6 @@ struct ggml_tensor * ggml_leaky_relu(
 
     result->op     = GGML_OP_LEAKY_RELU;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -5388,8 +5326,6 @@ struct ggml_tensor * ggml_silu_back(
     result->op     = GGML_OP_SILU_BACK;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -5437,8 +5373,6 @@ static struct ggml_tensor * ggml_norm_impl(
 
     result->op     = GGML_OP_NORM;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -5470,7 +5404,6 @@ static struct ggml_tensor * ggml_rms_norm_impl(
 
     result->op     = GGML_OP_RMS_NORM;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5503,8 +5436,6 @@ struct ggml_tensor * ggml_rms_norm_back(
     result->op     = GGML_OP_RMS_NORM_BACK;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -5524,8 +5455,6 @@ static struct ggml_tensor * ggml_group_norm_impl(
 
     result->op     = GGML_OP_GROUP_NORM;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -5561,7 +5490,6 @@ struct ggml_tensor * ggml_mul_mat(
     result->op     = GGML_OP_MUL_MAT;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5612,8 +5540,6 @@ struct ggml_tensor * ggml_mul_mat_id(
     result->src[0] = as;
     result->src[1] = b;
     result->src[2] = ids;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -5634,7 +5560,6 @@ struct ggml_tensor * ggml_out_prod(
     result->op     = GGML_OP_OUT_PROD;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5654,7 +5579,6 @@ static struct ggml_tensor * ggml_scale_impl(
 
     result->op     = GGML_OP_SCALE;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5696,7 +5620,6 @@ static struct ggml_tensor * ggml_set_impl(
     result->op     = GGML_OP_SET;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5775,8 +5698,7 @@ static struct ggml_tensor * ggml_cpy_impl(
 
     result->op     = GGML_OP_CPY;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    result->src[1] = b; // destination not relevant for gradients
+    result->src[1] = b;
 
     return result;
 }
@@ -5797,8 +5719,6 @@ struct ggml_tensor * ggml_cast(
 
     result->op     = GGML_OP_CPY;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    result->src[1] = result; // destination not relevant for gradients
 
     return result;
 }
@@ -5813,7 +5733,6 @@ static struct ggml_tensor * ggml_cont_impl(
 
     result->op     = GGML_OP_CONT;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5863,7 +5782,6 @@ struct ggml_tensor * ggml_cont_4d(
 
     result->op     = GGML_OP_CONT;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5883,7 +5801,6 @@ struct ggml_tensor * ggml_reshape(
 
     result->op     = GGML_OP_RESHAPE;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5901,7 +5818,6 @@ struct ggml_tensor * ggml_reshape_1d(
 
     result->op     = GGML_OP_RESHAPE;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5920,7 +5836,6 @@ struct ggml_tensor * ggml_reshape_2d(
 
     result->op     = GGML_OP_RESHAPE;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5940,7 +5855,6 @@ struct ggml_tensor * ggml_reshape_3d(
 
     result->op     = GGML_OP_RESHAPE;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5961,7 +5875,6 @@ struct ggml_tensor * ggml_reshape_4d(
 
     result->op     = GGML_OP_RESHAPE;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -5979,7 +5892,6 @@ static struct ggml_tensor * ggml_view_impl(
 
     result->op     = GGML_OP_VIEW;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -6111,7 +6023,6 @@ struct ggml_tensor * ggml_permute(
 
     result->op     = GGML_OP_PERMUTE;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     int32_t params[] = { axis0, axis1, axis2, axis3 };
     ggml_set_op_params(result, params, sizeof(params));
@@ -6135,7 +6046,6 @@ struct ggml_tensor * ggml_transpose(
 
     result->op     = GGML_OP_TRANSPOSE;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -6159,8 +6069,7 @@ struct ggml_tensor * ggml_get_rows(
 
     result->op     = GGML_OP_GET_ROWS;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    result->src[1] = b; // the row indices are not differentiable, thus not relevant for the gradient
+    result->src[1] = b;
 
     return result;
 }
@@ -6181,8 +6090,7 @@ struct ggml_tensor * ggml_get_rows_back(
 
     result->op     = GGML_OP_GET_ROWS_BACK;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    result->src[1] = b; // the row indices are not differentiable, thus not relevant for the gradient
+    result->src[1] = b;
 
     return result;
 }
@@ -6199,7 +6107,6 @@ struct ggml_tensor * ggml_diag(
 
     result->op     = GGML_OP_DIAG;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -6218,7 +6125,6 @@ static struct ggml_tensor * ggml_diag_mask_inf_impl(
 
     result->op     = GGML_OP_DIAG_MASK_INF;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -6251,7 +6157,6 @@ static struct ggml_tensor * ggml_diag_mask_zero_impl(
 
     result->op     = GGML_OP_DIAG_MASK_ZERO;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -6301,8 +6206,6 @@ static struct ggml_tensor * ggml_soft_max_impl(
     result->op     = GGML_OP_SOFT_MAX;
     result->src[0] = a;
     result->src[1] = mask;
-    GGML_ASSERT((!mask || !mask->grad) && "backward pass for softmax mask not implemented");
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -6340,8 +6243,6 @@ static struct ggml_tensor * ggml_soft_max_back_impl(
     result->op     = GGML_OP_SOFT_MAX_BACK;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -6401,10 +6302,8 @@ static struct ggml_tensor * ggml_rope_impl(
 
     result->op     = GGML_OP_ROPE;
     result->src[0] = a;
+    result->src[1] = b;
     result->src[2] = c;
-    GGML_ASSERT((!c || !c->grad) && "gradients for freq factors not implemented");
-    ggml_set_grad(ctx, result);
-    result->src[1] = b; // the positions are not differentiable, thus not relevant for gradients
 
     return result;
 }
@@ -6544,8 +6443,6 @@ struct ggml_tensor * ggml_rope_back(
     result->src[0] = a;
     result->src[1] = b;
     result->src[2] = c;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -6565,8 +6462,6 @@ struct ggml_tensor * ggml_clamp(
 
     result->op     = GGML_OP_CLAMP;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -6639,8 +6534,6 @@ GGML_API struct ggml_tensor * ggml_conv_transpose_1d(
     result->op     = GGML_OP_CONV_TRANSPOSE_1D;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -6712,9 +6605,8 @@ struct ggml_tensor * ggml_im2col(
     ggml_set_op_params(result, params, sizeof(params));
 
     result->op     = GGML_OP_IM2COL;
+    result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
-    result->src[0] = a; // a is only used for its shape, not its data, therefore no influence on gradients
 
     return result;
 }
@@ -6736,10 +6628,8 @@ struct ggml_tensor * ggml_im2col_back(
     ggml_set_op_params(result, params, sizeof(params));
 
     result->op     = GGML_OP_IM2COL_BACK;
+    result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
-    result->src[0] = a; // a is only used for its shape, not its data, therefore no influence on gradients
 
     return result;
 }
@@ -6815,8 +6705,6 @@ struct ggml_tensor * ggml_conv_transpose_2d_p0(
     result->op     = GGML_OP_CONV_TRANSPOSE_2D;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -6849,8 +6737,6 @@ struct ggml_tensor * ggml_pool_1d(
 
     result->op     = GGML_OP_POOL_1D;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -6881,7 +6767,6 @@ struct ggml_tensor * ggml_pool_2d(
 
     result->op     = GGML_OP_POOL_2D;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -6906,8 +6791,6 @@ struct ggml_tensor * ggml_pool_2d_back(
     result->op     = GGML_OP_POOL_2D_BACK;
     result->src[0] = a;
     result->src[1] = af;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -6930,8 +6813,6 @@ static struct ggml_tensor * ggml_upscale_impl(
 
     result->op     = GGML_OP_UPSCALE;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -6970,8 +6851,6 @@ struct ggml_tensor * ggml_pad(
 
     result->op     = GGML_OP_PAD;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7017,8 +6896,6 @@ struct ggml_tensor * ggml_timestep_embedding(
 
     result->op     = GGML_OP_TIMESTEP_EMBEDDING;
     result->src[0] = timesteps;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7035,8 +6912,6 @@ struct ggml_tensor * ggml_argsort(
 
     result->op     = GGML_OP_ARGSORT;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7101,9 +6976,6 @@ struct ggml_tensor * ggml_flash_attn_ext(
     result->src[1] = k;
     result->src[2] = v;
     result->src[3] = mask;
-    GGML_ASSERT((!mask || !mask->grad) && "mask gradient support not implemented");
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not adapted since FA rework");
 
     return result;
 }
@@ -7222,8 +7094,6 @@ struct ggml_tensor * ggml_ssm_conv(
     result->op     = GGML_OP_SSM_CONV;
     result->src[0] = sx;
     result->src[1] = c;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7275,8 +7145,6 @@ struct ggml_tensor * ggml_ssm_scan(
     result->src[3] = A;
     result->src[4] = B;
     result->src[5] = C;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7306,8 +7174,6 @@ struct ggml_tensor * ggml_win_part(
 
     result->op     = GGML_OP_WIN_PART;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7330,8 +7196,6 @@ struct ggml_tensor * ggml_win_unpart(
 
     result->op     = GGML_OP_WIN_UNPART;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7351,8 +7215,6 @@ struct ggml_tensor * ggml_get_rel_pos(
 
     result->op     = GGML_OP_GET_REL_POS;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7382,8 +7244,6 @@ static struct ggml_tensor * ggml_add_rel_pos_impl(
     result->src[0] = a;
     result->src[1] = pw;
     result->src[2] = ph;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7445,8 +7305,6 @@ struct ggml_tensor * ggml_rwkv_wkv(
     result->src[3] = tf;
     result->src[4] = td;
     result->src[5] = state;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7466,9 +7324,6 @@ static struct ggml_tensor * ggml_unary_impl(
 
     result->op     = GGML_OP_UNARY;
     result->src[0] = a;
-    if (op != GGML_UNARY_OP_SGN && op != GGML_UNARY_OP_STEP) { // SGN and STEP are piecewise constant, therefore all gradients zero
-        ggml_set_grad(ctx, result);
-    }
 
     return result;
 }
@@ -7500,8 +7355,6 @@ static struct ggml_tensor * ggml_map_unary_impl_f32(
 
     result->op     = GGML_OP_MAP_UNARY;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7537,8 +7390,6 @@ static struct ggml_tensor * ggml_map_binary_impl_f32(
     result->op     = GGML_OP_MAP_BINARY;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7572,8 +7423,6 @@ static struct ggml_tensor * ggml_map_custom1_impl_f32(
 
     result->op     = GGML_OP_MAP_CUSTOM1_F32;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7607,8 +7456,6 @@ static struct ggml_tensor * ggml_map_custom2_impl_f32(
     result->op     = GGML_OP_MAP_CUSTOM2_F32;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7646,8 +7493,6 @@ static struct ggml_tensor * ggml_map_custom3_impl_f32(
     result->src[0] = a;
     result->src[1] = b;
     result->src[2] = c;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7697,8 +7542,6 @@ static struct ggml_tensor * ggml_map_custom1_impl(
 
     result->op     = GGML_OP_MAP_CUSTOM1;
     result->src[0] = a;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7751,8 +7594,6 @@ static struct ggml_tensor * ggml_map_custom2_impl(
     result->op     = GGML_OP_MAP_CUSTOM2;
     result->src[0] = a;
     result->src[1] = b;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7809,8 +7650,6 @@ static struct ggml_tensor * ggml_map_custom3_impl(
     result->src[0] = a;
     result->src[1] = b;
     result->src[2] = c;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7850,8 +7689,6 @@ struct ggml_tensor * ggml_cross_entropy_loss(
     result->op     = GGML_OP_CROSS_ENTROPY_LOSS;
     result->src[0] = a;
     result->src[1] = b;
-    GGML_ASSERT(!b->grad && "backward pass for labels not implemented");
-    ggml_set_grad(ctx, result);
 
     return result;
 }
@@ -7872,8 +7709,6 @@ struct ggml_tensor * ggml_cross_entropy_loss_back(
     result->src[0] = a;
     result->src[1] = b;
     result->src[2] = c;
-    ggml_set_grad(ctx, result);
-    GGML_ASSERT(!result->grad && "backward pass not implemented");
 
     return result;
 }
@@ -7910,7 +7745,6 @@ struct ggml_tensor * ggml_opt_step_adamw(
     result->src[1] = a->grad;
     result->src[2] = ggml_dup_tensor(ctx, a->grad);
     result->src[3] = ggml_dup_tensor(ctx, a->grad);
-    // for an optimizer step no meaningful gradient can be defined
 
     return result;
 }
@@ -7919,17 +7753,11 @@ struct ggml_tensor * ggml_opt_step_adamw(
 
 void ggml_set_param(struct ggml_context * ctx, struct ggml_tensor * tensor) {
     tensor->flags |= GGML_TENSOR_FLAG_PARAM;
-
-    GGML_ASSERT(tensor->grad == NULL);
-    tensor->grad = ggml_dup_tensor(ctx, tensor);
-    tensor->grad->flags |= GGML_TENSOR_FLAG_GRAD;
-    ggml_format_name(tensor->grad, "%s (grad)", tensor->name);
 }
 
 void ggml_set_loss(struct ggml_tensor * tensor) {
     GGML_ASSERT(ggml_is_scalar(tensor));
     GGML_ASSERT(tensor->type == GGML_TYPE_F32);
-    GGML_ASSERT(tensor->grad);
     tensor->flags |= GGML_TENSOR_FLAG_LOSS;
 }
 
@@ -18304,7 +18132,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                             ggml_soft_max_back(ctx, tensor->grad, tensor),
                         zero_table, acc_table);
                 }
-
+                GGML_ASSERT((!src1 || !src1->grad) && "backward pass for softmax mask not implemented");
             } break;
         case GGML_OP_SOFT_MAX_BACK:
             {
@@ -18345,6 +18173,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                                 beta_slow),
                             zero_table, acc_table);
                 }
+                GGML_ASSERT((!src2 || !src2->grad) && "gradients for freq factors not implemented");
             } break;
         case GGML_OP_ROPE_BACK:
             {
@@ -18466,6 +18295,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             }
         case GGML_OP_FLASH_ATTN_EXT:
             {
+                GGML_ABORT("FA backward pass not adapted after rework");
                 struct ggml_tensor * flash_grad = NULL;
                 if (src0->grad || src1->grad || tensor->src[2]->grad) {
                     int32_t t = ggml_get_op_params_i32(tensor, 0);
@@ -18640,6 +18470,7 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
                                     tensor->grad),
                                 zero_table, acc_table);
                 }
+                GGML_ASSERT(!src1->grad && "backward pass for labels not implemented");
             } break;
         case GGML_OP_CROSS_ENTROPY_LOSS_BACK:
             {
@@ -18690,7 +18521,7 @@ static void ggml_visit_parents(struct ggml_cgraph * cgraph, struct ggml_tensor *
         }
     }
 
-    if (node->op == GGML_OP_NONE && node->grad == NULL) {
+    if (node->op == GGML_OP_NONE && !(node->flags & GGML_TENSOR_FLAG_PARAM)) {
         // reached a leaf node, not part of the gradient graph (e.g. a constant)
         GGML_ASSERT(cgraph->n_leafs < cgraph->size);
 
@@ -18708,9 +18539,6 @@ static void ggml_visit_parents(struct ggml_cgraph * cgraph, struct ggml_tensor *
         }
 
         cgraph->nodes[cgraph->n_nodes] = node;
-        if (cgraph->grads) {
-            cgraph->grads[cgraph->n_nodes] = node->grad;
-        }
         cgraph->n_nodes++;
     }
 }
@@ -18741,17 +18569,63 @@ void ggml_build_forward_expand(struct ggml_cgraph * cgraph, struct ggml_tensor *
 void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * gf, struct ggml_cgraph * gb, bool accumulate, bool keep) {
     GGML_ASSERT(gf->n_nodes > 0);
     GGML_ASSERT(gf->grads);
+    GGML_ASSERT(!keep);
 
-    // if we are keeping the gradient graph, we have to detach the gradient nodes from the original graph
-    if (keep) {
-        for (int i = 0; i < gf->n_nodes; i++) {
-            struct ggml_tensor * node = gf->nodes[i];
+    for (int i = 0; i < gf->n_nodes; ++i) {
+        struct ggml_tensor * node = gf->nodes[i];
 
-            if (node->grad) {
-                node->grad = ggml_dup_tensor(ctx, node);
-                gf->grads[i] = node->grad;
-            }
+        bool needs_grad = node->flags & GGML_TENSOR_FLAG_PARAM;
+        bool ignore_src0 = false;
+        bool ignore_src1 = false;
+        switch (node->op) {
+            // gradients in node->src[0] for one reason or another have no effect on output gradients
+            case GGML_OP_IM2COL:      // only used for its shape
+            case GGML_OP_IM2COL_BACK: // same as IM2COL
+                ignore_src0 = true;
+                break;
+            case GGML_OP_UNARY: {
+                const enum ggml_unary_op uop = ggml_get_unary_op(node);
+                // SGN and STEP unary ops are not differentiable
+                if (uop == GGML_UNARY_OP_SGN || uop == GGML_UNARY_OP_STEP) {
+                    ignore_src0 = true;
+                }
+            } break;
+
+            // gradients in node->src[1] for one reason or another have no effect on output gradients
+            case GGML_OP_CPY:           // gradients in CPY target  are irrelevant
+            case GGML_OP_GET_ROWS:      // row indices not differentiable
+            case GGML_OP_GET_ROWS_BACK: // same as for GET_ROWS
+            case GGML_OP_ROPE:          // positions not differentiable
+                ignore_src1 = true;
+                break;
+
+            default:
+                break;
         }
+        for (int j = 0; j < GGML_MAX_SRC; ++j) {
+            if (j == 0 && ignore_src0) {
+                continue;
+            }
+            if (j == 1 && ignore_src1) {
+                continue;
+            }
+            if (!node->src[j] || !node->src[j]->grad) {
+                continue;
+            }
+            GGML_ASSERT(node->src[j]->type == GGML_TYPE_F32 || node->src[j]->type == GGML_TYPE_F16);
+            needs_grad = true;
+            break;
+        }
+        if (!needs_grad) {
+            continue;
+        }
+
+        // inplace operations are currently not supported
+        GGML_ASSERT(!node->view_src || node->op == GGML_OP_CPY || node->op == GGML_OP_VIEW ||
+            node->op == GGML_OP_RESHAPE || node->op == GGML_OP_PERMUTE || node->op == GGML_OP_TRANSPOSE);
+
+        // create a new tensor with the same type and shape as the node and set it as grad
+        node->grad = ggml_dup_tensor(ctx, node);
     }
 
     // keep tables of original gradients for replacement/accumulation logic
