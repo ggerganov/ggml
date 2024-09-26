@@ -103,7 +103,7 @@ int main(int argc, const char ** argv) {
 
         struct ggml_cgraph * gbb = ggml_graph_dup(ctx0, gb);
 
-        ggml_build_backward_expand(ctx0, gb, gbb, false, true);
+        ggml_build_backward_expand(ctx0, gb, gbb, false, false);
 
         ggml_graph_reset(gb);
         ggml_set_f32(g1->grad, 1.0f);
@@ -199,7 +199,7 @@ int main(int argc, const char ** argv) {
 
         struct ggml_cgraph * gbb = ggml_graph_dup(ctx0, gb);
 
-        ggml_build_backward_expand(ctx0, gb, gbb, false, true);
+        ggml_build_backward_expand(ctx0, gb, gbb, false, false);
 
         ggml_graph_reset(gb);
         ggml_set_f32(g1->grad, 1.0f);
