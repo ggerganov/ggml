@@ -7751,16 +7751,6 @@ struct ggml_tensor * ggml_opt_step_adamw(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void ggml_set_param(struct ggml_context * ctx, struct ggml_tensor * tensor) {
-    tensor->flags |= GGML_TENSOR_FLAG_PARAM;
-}
-
-void ggml_set_loss(struct ggml_tensor * tensor) {
-    GGML_ASSERT(ggml_is_scalar(tensor));
-    GGML_ASSERT(tensor->type == GGML_TYPE_F32);
-    tensor->flags |= GGML_TENSOR_FLAG_LOSS;
-}
-
 // ggml_compute_forward_dup
 
 static void ggml_compute_forward_dup_same_cont(
@@ -18575,19 +18565,18 @@ void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * 
         struct ggml_tensor * node = gf->nodes[i];
 
         bool needs_grad = node->flags & GGML_TENSOR_FLAG_PARAM;
-        bool ignore_src0 = false;
-        bool ignore_src1 = false;
+        bool ignore_src[GGML_MAX_SRC] = {false};
         switch (node->op) {
             // gradients in node->src[0] for one reason or another have no effect on output gradients
             case GGML_OP_IM2COL:      // only used for its shape
             case GGML_OP_IM2COL_BACK: // same as IM2COL
-                ignore_src0 = true;
+                ignore_src[0] = true;
                 break;
             case GGML_OP_UNARY: {
                 const enum ggml_unary_op uop = ggml_get_unary_op(node);
                 // SGN and STEP unary ops are piecewise constant
                 if (uop == GGML_UNARY_OP_SGN || uop == GGML_UNARY_OP_STEP) {
-                    ignore_src0 = true;
+                    ignore_src[0] = true;
                 }
             } break;
 
@@ -18596,20 +18585,14 @@ void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * 
             case GGML_OP_GET_ROWS:      // row indices not differentiable
             case GGML_OP_GET_ROWS_BACK: // same as for GET_ROWS
             case GGML_OP_ROPE:          // positions not differentiable
-                ignore_src1 = true;
+                ignore_src[1] = true;
                 break;
 
             default:
                 break;
         }
         for (int j = 0; j < GGML_MAX_SRC; ++j) {
-            if (j == 0 && ignore_src0) {
-                continue;
-            }
-            if (j == 1 && ignore_src1) {
-                continue;
-            }
-            if (!node->src[j] || !node->src[j]->grad) {
+            if (!node->src[j] || !node->src[j]->grad || ignore_src[j]) {
                 continue;
             }
             GGML_ASSERT(node->src[j]->type == GGML_TYPE_F32 || node->src[j]->type == GGML_TYPE_F16);
@@ -21580,6 +21563,17 @@ void ggml_set_input(struct ggml_tensor * tensor) {
 
 void ggml_set_output(struct ggml_tensor * tensor) {
     tensor->flags |= GGML_TENSOR_FLAG_OUTPUT;
+}
+
+void ggml_set_param(struct ggml_context * ctx, struct ggml_tensor * tensor) {
+    GGML_UNUSED(ctx); // TODO: remove this parameter
+    tensor->flags |= GGML_TENSOR_FLAG_PARAM;
+}
+
+void ggml_set_loss(struct ggml_tensor * tensor) {
+    GGML_ASSERT(ggml_is_scalar(tensor));
+    GGML_ASSERT(tensor->type == GGML_TYPE_F32);
+    tensor->flags |= GGML_TENSOR_FLAG_LOSS;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
