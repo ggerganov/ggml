@@ -536,7 +536,7 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
 
     // gb_grad == graph backward gradients, forward pass, then backward pass to calculate gradients.
     struct ggml_cgraph * gb_grad = ggml_graph_dup(model.ctx_compute, gf);
-    ggml_build_backward_expand(model.ctx_compute, gf, gb_grad, /*accumulate =*/ true, false);
+    ggml_build_backward_expand(model.ctx_compute, gf, gb_grad, /*accumulate =*/ true);
 
     // gb_opt == graph backward optimize, forward pass, then backward pass to calculate gradients, then optimizer step.
     struct ggml_cgraph * gb_opt = ggml_graph_dup(model.ctx_compute, gb_grad);

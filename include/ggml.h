@@ -2063,7 +2063,7 @@ extern "C" {
     GGML_API void ggml_set_loss(struct ggml_tensor * tensor);
 
     GGML_API void ggml_build_forward_expand (struct ggml_cgraph * cgraph, struct ggml_tensor * tensor);
-    GGML_API void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * gf, struct ggml_cgraph * gb, bool accumulate, bool keep);
+    GGML_API void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * gf, struct ggml_cgraph * gb, bool accumulate);
 
     GGML_API void ggml_build_opt_adamw(
             struct ggml_context * ctx,
