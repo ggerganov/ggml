@@ -3026,7 +3026,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "OPT_STEP_ADAMW",
 };
 
-static_assert(GGML_OP_COUNT == 80, "GGML_OP_COUNT != 80");
+static_assert(GGML_OP_COUNT == 82, "GGML_OP_COUNT != 82");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -7184,7 +7184,7 @@ struct ggml_tensor * ggml_winograd_stage0(
         is_node = true;
     }
 
-    struct ggml_tensor * result = ggml_new_tensor_4d(ctx, GGML_TYPE_F16, 16, a->ne[2], a->ne[3], 1);
+    struct ggml_tensor * result = ggml_new_tensor_4d(ctx, GGML_TYPE_F32, 4, 4, a->ne[2], a->ne[3]);
 
     result->op   = GGML_OP_WINOGRAD_STAGE0;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
@@ -15195,6 +15195,23 @@ static void ggml_compute_forward_conv_transpose_1d(
     }
 }
 
+
+static void ggml_compute_forward_winograd_stage0(
+        const struct ggml_compute_params * params,
+              struct ggml_tensor * dst) {
+
+    GGML_ASSERT(false && " CPU backend not implemented!");         
+    return;
+}
+
+static void ggml_compute_forward_winograd_stage1(
+        const struct ggml_compute_params * params,
+              struct ggml_tensor * dst) {
+
+    GGML_ASSERT(false && " CPU backend not implemented!");         
+    return;
+}
+
 // ggml_compute_forward_im2col_f32
 // src0: kernel [OC, IC, KH, KW]
 // src1: image [N, IC, IH, IW]
@@ -17891,6 +17908,14 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_conv_transpose_1d(params, tensor);
             } break;
+        case GGML_OP_WINOGRAD_STAGE0:
+            {
+                ggml_compute_forward_winograd_stage0(params, tensor);
+            } break;
+        case GGML_OP_WINOGRAD_STAGE1:
+            {
+                ggml_compute_forward_winograd_stage1(params, tensor);
+            } break;    
         case GGML_OP_IM2COL:
             {
                 ggml_compute_forward_im2col(params, tensor);
@@ -18964,6 +18989,14 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             {
                 GGML_ABORT("fatal error"); // TODO: not implemented
             }
+        case GGML_OP_WINOGRAD_STAGE0:
+            {
+                GGML_ABORT("fatal error"); // TODO: not implemented
+            }
+        case GGML_OP_WINOGRAD_STAGE1:
+            {
+                GGML_ABORT("fatal error"); // TODO: not implemented
+            }    
         case GGML_OP_POOL_1D:
             {
                 GGML_ABORT("fatal error"); // TODO: not implemented

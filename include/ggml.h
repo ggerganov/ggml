@@ -1698,6 +1698,21 @@ extern "C" {
             struct ggml_tensor  * a,
             struct ggml_tensor  * b,
             int                   stride);
+   
+   GGML_API struct ggml_tensor * ggml_winograd_stage0(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+   GGML_API struct ggml_tensor * ggml_winograd_stage1(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
+            
+   GGML_API struct ggml_tensor * ggml_conv_2d_3x3(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            struct ggml_tensor  * b);
+
 
     enum ggml_op_pool {
         GGML_OP_POOL_MAX,
