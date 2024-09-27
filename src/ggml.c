@@ -7223,8 +7223,11 @@ struct ggml_tensor * ggml_conv_2d_3x3(
         struct ggml_tensor  * a,
         struct ggml_tensor  * b){
 
-
     GGML_ASSERT(b->ne[3] == 1); // only works for 1 input image
+    GGML_ASSERT(b->ne[2] == a->ne[2]); // number of channels must match
+    if(a->ne[3] % 64 != 0 || a->ne[2] % 8 != 0)            // only works for the number of filters is a multiple of 64
+        return ggml_conv_2d(ctx, a, b, 1, 1, 1, 1, 1, 1);  // and the number of channels is a multiple of 8
+
 
     struct ggml_tensor* W = ggml_winograd_stage0(ctx, a);
     struct ggml_tensor * result = ggml_winograd_stage1(ctx, W, b);
