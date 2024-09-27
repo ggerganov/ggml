@@ -752,9 +752,9 @@ static void conv_winograd_stage1_f32_f32_cuda(int tiles_dim_w, int tiles_dim_h, 
     int64_t out_w  = in_w;
     int smem_size = (16*BN*BC + 16*BC*BK)*4;
 
-    printf("A %d, %d\n", filt_k, filt_c);
-    printf("B %d, %d, %d \n", in_c, in_h, in_w);
-    printf("C %d, %d, %d \n", out_c, out_h, out_w);
+    // printf("A %d, %d\n", filt_k, filt_c);
+    // printf("B %d, %d, %d \n", in_c, in_h, in_w);
+    // printf("C %d, %d, %d \n", out_c, out_h, out_w);
 
     Winograd_kernel<<<dim3((tiles_dim_w+X-1)/X, (tiles_dim_h+Y-1)/Y, filt_k/BK), dim3(BN, 8), smem_size>>>(src1, src0, dst,
      tiles_dim_w, tiles_dim_h, in_c, in_h, in_w, tile_size, X, Y, filt_k, filt_c, out_c, tile_2d_s, out_h, out_w);    
@@ -822,7 +822,7 @@ void ggml_cuda_op_winograd_stage1(ggml_backend_cuda_context & ctx, ggml_tensor *
     cudaMemcpyToSymbol(access_f_s, aux, 64*sizeof(int));
     cudaMemcpyToSymbol(access_s, aux2, 64*sizeof(int));  
     cudaMemcpyToSymbol(tileid, tid, 64*sizeof(int));
-    printf(" %d, %d, %d \n", tiles_dim_w, tiles_dim_h, tile_size);
+    // printf(" %d, %d, %d \n", tiles_dim_w, tiles_dim_h, tile_size);
     conv_winograd_stage1_f32_f32_cuda(tiles_dim_w, tiles_dim_h, 4, 8, 
         tile_size, tile_2d_s,
         src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3],
