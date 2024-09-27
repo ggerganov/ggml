@@ -7179,12 +7179,12 @@ struct ggml_tensor * ggml_winograd_stage0(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
     bool is_node = false;
-    GGML_ASSERT(a->ne[0] == 3 && a->ne[1] == 3); // kernel should be 3x3
+ 
     if (a->grad) {
         is_node = true;
     }
 
-    struct ggml_tensor * result = ggml_new_tensor_4d(ctx, GGML_TYPE_F32, 4, 4, a->ne[2], a->ne[3]);
+    struct ggml_tensor * result = ggml_new_tensor_4d(ctx, GGML_TYPE_F32, a->ne[0], 4, 4, a->ne[3]);
 
     result->op   = GGML_OP_WINOGRAD_STAGE0;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
@@ -7208,7 +7208,7 @@ struct ggml_tensor * ggml_winograd_stage1(
 
     int OW = b->ne[0];
     int OH = b->ne[1];
-    struct ggml_tensor * result = ggml_new_tensor_4d(ctx, GGML_TYPE_F32, OW, OH, a->ne[3] /* OC */, 1);
+    struct ggml_tensor * result = ggml_new_tensor_4d(ctx, GGML_TYPE_F32, OW, OH, a->ne[0] /* OC */, 1);
 
     result->op   = GGML_OP_WINOGRAD_STAGE1;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
@@ -7222,14 +7222,14 @@ struct ggml_tensor * ggml_conv_2d_3x3(
         struct ggml_context * ctx,
         struct ggml_tensor  * a,
         struct ggml_tensor  * b){
-
+    GGML_ASSERT(a->ne[0] == 3 && a->ne[1] == 3); // kernel should be 3x3
     GGML_ASSERT(b->ne[3] == 1); // only works for 1 input image
     GGML_ASSERT(b->ne[2] == a->ne[2]); // number of channels must match
     if(a->ne[3] % 64 != 0 || a->ne[2] % 8 != 0)            // only works for the number of filters is a multiple of 64
         return ggml_conv_2d(ctx, a, b, 1, 1, 1, 1, 1, 1);  // and the number of channels is a multiple of 8
 
-
-    struct ggml_tensor* W = ggml_winograd_stage0(ctx, a);
+    struct ggml_tensor* ra =  ggml_cont(ctx, ggml_permute(ctx, a, 1, 2, 3, 0)); // [N, OC, OH, OW]
+    struct ggml_tensor* W = ggml_winograd_stage0(ctx, ra);
     struct ggml_tensor * result = ggml_winograd_stage1(ctx, W, b);
 
     return result;

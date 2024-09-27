@@ -1,6 +1,6 @@
 #include "common.cuh"
 
-// #define CUDA_CONV_TRANPOSE_1D_BLOCK_SIZE 256
+
 #define BC 8
 #define BN 32
 #define BK 64

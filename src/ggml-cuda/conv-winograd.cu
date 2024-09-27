@@ -386,6 +386,8 @@ __device__ float f_row1(float *Gw, int j){
   
   __global__ void FX(const float *pInputs, float *pOutputs, int filt_k, 
                       int filt_c, int filt_h, int filt_w){
+
+    // assumes CHWK layout                    
     int Inx = threadIdx.x, Iny = threadIdx.y;
     int TileX = blockIdx.x, TileY = blockIdx.y;
   
@@ -725,14 +727,14 @@ static void conv_winograd_stage0_f32_f32_cuda(
         cudaStream_t stream) {
 
     
-    int64_t filt_k = src0_ne3;
-    int64_t filt_c = src0_ne2;
+    int64_t filt_k = src0_ne0;
+    int64_t filt_c = src0_ne3;
 
-    FX<<<dim3(filt_k/BK, filt_c/BC), dim3(32, BC)>>>(src0, dst, filt_k, filt_c, src0_ne1, src0_ne0);
+    FX<<<dim3(filt_k/BK, filt_c/BC), dim3(32, BC)>>>(src0, dst, filt_k, filt_c, src0_ne2, src0_ne1);
     
 }
 
-static void conv_winograd_stage1_f16_f32_cuda(int tiles_dim_w, int tiles_dim_h, int X, int Y,   
+static void conv_winograd_stage1_f32_f32_cuda(int tiles_dim_w, int tiles_dim_h, int X, int Y,   
         int tile_size, int tile_2d_s,    
         const int src0_ne0, const int src0_ne1, const int src0_ne2, const int src0_ne3,
         const int src1_ne0, const int src1_ne1, const int src1_ne2, const int src1_ne3,
@@ -740,15 +742,19 @@ static void conv_winograd_stage1_f16_f32_cuda(int tiles_dim_w, int tiles_dim_h, 
         const float * src0, const float * src1,  float * dst,
         cudaStream_t stream) {
 
-    int64_t filt_k = src0_ne3; 
+    int64_t filt_k = src0_ne0; 
     int64_t in_c   = src1_ne2;
     int64_t in_h   = src1_ne1;
     int64_t in_w   = src1_ne0;
-    int64_t filt_c = src1_ne0;
+    int64_t filt_c = src0_ne3;
     int64_t out_c  = filt_k;
     int64_t out_h  = in_h;
     int64_t out_w  = in_w;
     int smem_size = (16*BN*BC + 16*BC*BK)*4;
+
+    printf("A %d, %d\n", filt_k, filt_c);
+    printf("B %d, %d, %d \n", in_c, in_h, in_w);
+    printf("C %d, %d, %d \n", out_c, out_h, out_w);
 
     Winograd_kernel<<<dim3((tiles_dim_w+X-1)/X, (tiles_dim_h+Y-1)/Y, filt_k/BK), dim3(BN, 8), smem_size>>>(src1, src0, dst,
      tiles_dim_w, tiles_dim_h, in_c, in_h, in_w, tile_size, X, Y, filt_k, filt_c, out_c, tile_2d_s, out_h, out_w);    
@@ -816,8 +822,8 @@ void ggml_cuda_op_winograd_stage1(ggml_backend_cuda_context & ctx, ggml_tensor *
     cudaMemcpyToSymbol(access_f_s, aux, 64*sizeof(int));
     cudaMemcpyToSymbol(access_s, aux2, 64*sizeof(int));  
     cudaMemcpyToSymbol(tileid, tid, 64*sizeof(int));
-
-    conv_winograd_stage1_f16_f32_cuda(tiles_dim_w, tiles_dim_h, 4, 8, 
+    printf(" %d, %d, %d \n", tiles_dim_w, tiles_dim_h, tile_size);
+    conv_winograd_stage1_f32_f32_cuda(tiles_dim_w, tiles_dim_h, 4, 8, 
         tile_size, tile_2d_s,
         src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3],
         src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3],
