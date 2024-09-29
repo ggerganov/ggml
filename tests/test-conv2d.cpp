@@ -36,8 +36,8 @@ struct test_model {
 
 void load_model(test_model & model, bool use_gpu = false) {
     // create data
-    int KW = 3, KH = 3, IC = 32, OC = 32;
-    int IW = 28, IH = 40, N = 1;
+    int KW = 3, KH = 3, IC = 10, OC = 10;
+    int IW = 8, IH = 6, N = 1;
 
     // Initialize adata
     std::vector<float> adata(KW * KH * IC * OC);
@@ -365,28 +365,26 @@ int main(void)
 
     printf("\nPerforming test:\n");
 
-    // bool passed = true;
-    // for(int i = 0; i < n_conv2d_test; i++) {
-    //     if(
-    //         im2col_data[i] != expected_im2col[i]) {
-    //         passed = false;
-    //         break;
-    //     }
-    // }
-
-    // printf("ggml_im2col (%d): %s\n", (int) ggml_nelements(im2col_res), passed && (ggml_nelements(im2col_res) == n_im2col_test) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
-
-    // passed = true;
-    // printf("[");
-    for(int j = 0; j < 4; j++) {
-        printf("[");
-        for(int i = 0; i < 28; i++) {
-            printf("%.1f, ", conv2d_data[i]);
+    bool passed = true;
+    for(int i = 0; i < n_conv2d_test; i++) {
+        if(
+            im2col_data[i] != expected_im2col[i]) {
+            passed = false;
+            break;
         }
-        printf("]\n");
     }
-    
-    // printf("ggml_conv2d (%d): %s\n", (int) ggml_nelements(conv2d_res), passed && (ggml_nelements(conv2d_res) == n_conv2d_test) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
+
+    printf("ggml_im2col (%d): %s\n", (int) ggml_nelements(im2col_res), passed && (ggml_nelements(im2col_res) == n_im2col_test) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
+
+    passed = true;
+    for(int i = 0; i < n_conv2d_test; i++) {
+        if(conv2d_data[i] != expected_conv2d[i]) {
+            passed = false;
+            break;
+        }
+    }
+
+    printf("ggml_conv2d (%d): %s\n", (int) ggml_nelements(conv2d_res), passed && (ggml_nelements(conv2d_res) == n_conv2d_test) ? "\033[32mPASSED\033[0m" : "\033[31mFAILED\033[0m");
 
     ggml_free(model.ctx);
 
