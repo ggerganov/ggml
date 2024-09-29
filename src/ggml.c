@@ -7184,7 +7184,7 @@ struct ggml_tensor * ggml_winograd_stage0(
         is_node = true;
     }
 
-    struct ggml_tensor * result = ggml_new_tensor_4d(ctx, GGML_TYPE_F32, a->ne[0], 4, 4, a->ne[3]);
+    struct ggml_tensor * result = ggml_new_tensor_4d(ctx, GGML_TYPE_F32, a->ne[3], 4, 4, a->ne[2]);
 
     result->op   = GGML_OP_WINOGRAD_STAGE0;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
@@ -7228,8 +7228,8 @@ struct ggml_tensor * ggml_conv_2d_3x3(
     if(a->ne[3] % 64 != 0 || a->ne[2] % 8 != 0)            // only works for the number of filters is a multiple of 64
         return ggml_conv_2d(ctx, a, b, 1, 1, 1, 1, 1, 1);  // and the number of channels is a multiple of 8
 
-    struct ggml_tensor* ra =  ggml_cont(ctx, ggml_permute(ctx, a, 1, 2, 3, 0)); // [N, OC, OH, OW]
-    struct ggml_tensor* W = ggml_winograd_stage0(ctx, ra);
+    // struct ggml_tensor* ra =  ggml_cont(ctx, ggml_permute(ctx, a, 1, 2, 3, 0)); // [N, OC, OH, OW]
+    struct ggml_tensor* W = ggml_winograd_stage0(ctx, a);
     struct ggml_tensor * result = ggml_winograd_stage1(ctx, W, b);
 
     return result;
