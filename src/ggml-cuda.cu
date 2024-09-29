@@ -2332,7 +2332,7 @@ static bool ggml_cuda_compute_forward(ggml_backend_cuda_context & ctx, struct gg
         case GGML_OP_CONV_TRANSPOSE_1D:
             ggml_cuda_op_conv_transpose_1d(ctx,dst);
             break;
-         case GGML_OP_WINOGRAD_STAGE0:
+        case GGML_OP_WINOGRAD_STAGE0:
             ggml_cuda_op_winograd_stage0(ctx, dst);
             break;
         case GGML_OP_WINOGRAD_STAGE1:
