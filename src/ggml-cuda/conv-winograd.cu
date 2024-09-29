@@ -169,9 +169,9 @@ __device__ void __inline__ outer_product(float4* input_frag, float4* filter_frag
 // extern "C"
 // {
 
-__device__ __forceinline__ void  transform_output_tile(float *pOutputs, float2 *C_tile, float2 *At, 
+__device__ __forceinline__ void  transform_output_tile(float * __restrict__ pOutputs, float2 *C_tile, float2 *At, 
     int round, int c_tensor, int c_glb_offset, int i1, int i2,
-    unsigned short mask1, unsigned short mask2, int out_w)
+    unsigned int mask1, unsigned int mask2, int out_w)
 {                     
 
   c_tensor += (((round)/2)*32 + ((round)%2)*2)*c_glb_offset;
@@ -208,10 +208,10 @@ __device__ __forceinline__ void  transform_output_tile(float *pOutputs, float2 *
   } 
 }
 
-__device__ __forceinline__ unsigned short get_mask(int idd, int tiles_dim_w, int tiles_dim_h, 
+__device__ __forceinline__ unsigned int get_mask(int idd, int tiles_dim_w, int tiles_dim_h, 
          int tw, int th, int out_w, int out_h){
 
-  unsigned short mask = 0x000F;
+  unsigned int mask = 0x000F;
   // if((blockIdx.y/tiles_dim)==(tiles_dim-1) && out_w%2) mask&=0x0003; // pad bottom row
   // if(!((blockIdx.y+1)%tiles_dim) && out_w%2)           mask&=0X0005; // pad right col
   // if(blockIdx.y==gridDim.y-1 && (idd / tw) == th-1 && out_h%2)  mask&=0x0003; // pad bottom row
@@ -242,7 +242,7 @@ __device__ __forceinline__ unsigned short get_mask(int idd, int tiles_dim_w, int
   return mask;
 }
 
-__device__ __forceinline__ void store_output_tile(float4 acumm_smem[][16], float *shared_mem, float *C, 
+__device__ __forceinline__ void store_output_tile(float4 acumm_smem[][16], float *shared_mem, float * __restrict__ C, 
 int out_h, int out_w, int tiles_dim_w, int tiles_dim_h,  int tw, int th, 
 float4 *input_frag_mem, float4* filter_frag_mem){
   
@@ -271,8 +271,8 @@ float4 *input_frag_mem, float4* filter_frag_mem){
   int id2 = (idd2 % tw) * 2 + (idd2 / tw) * out_w * 2;
 
   // unsigned short mask1 = 0x000F;
-  unsigned short mask1 = get_mask(idd1, tiles_dim_w, tiles_dim_h, tw, th, out_w, out_h);
-  unsigned short mask2 = get_mask(idd2, tiles_dim_w, tiles_dim_h, tw, th, out_w, out_h);
+  unsigned int mask1 = get_mask(idd1, tiles_dim_w, tiles_dim_h, tw, th, out_w, out_h);
+  unsigned int mask2 = get_mask(idd2, tiles_dim_w, tiles_dim_h, tw, th, out_w, out_h);
   
   // output transpose step
   int t=0;
@@ -355,29 +355,29 @@ float4 *input_frag_mem, float4* filter_frag_mem){
 
 
 // Set of functions per row in Gw product
-__device__ float f_row1(float *G, int j){
+__device__ float f_row1(float * __restrict__ G, int j){
     return G[j];
   }
-  __device__ float f_row2(float *G, int j){
-    return 0.5*(G[j] + G[6+j] + G[3+j]);
+  __device__ float f_row2(float * __restrict__ G, int j){
+    return 0.5f*(G[j] + G[6+j] + G[3+j]);
   }
-  __device__ float f_row3(float *G, int j){
-    return 0.5*(G[j] + G[6+j] - G[3+j]);
+  __device__ float f_row3(float * __restrict__ G, int j){
+    return 0.5f*(G[j] + G[6+j] - G[3+j]);
   }
-  __device__ float f_row4(float *G, int j){
+  __device__ float f_row4(float * __restrict__ G, int j){
     return G[6+j];
   }
   // Set of functions per column in GwGt product
-  __device__ float f_col1(float *G, int j){
+  __device__ float f_col1(float * __restrict__ G, int j){
     return G[j];
   }
-  __device__ float f_col2(float *G, int j){
-    return 0.5*(G[j] + G[j+2] + G[j+1]);
+  __device__ float f_col2(float * __restrict__ G, int j){
+    return 0.5f*(G[j] + G[j+2] + G[j+1]);
   }
-  __device__ float f_col3(float *G, int j){
-    return 0.5*(G[j] + G[j+2] - G[j+1]);
+  __device__ float f_col3(float * __restrict__ G, int j){
+    return 0.5f*(G[j] + G[j+2] - G[j+1]);
   }
-  __device__ float f_col4(float *G, int j){
+  __device__ float f_col4(float * __restrict__ G, int j){
     return G[j+2];
   }
 
@@ -394,10 +394,10 @@ __device__ float f_row1(float *G, int j){
   typedef float(*pointFunction_t)(float *, int);
 
   template<typename T>
-  __global__ void FX(const T *pInputs, float *pOutputs, int filt_k, 
+  __global__ void FX(const T * __restrict__ pInputs, float * __restrict__ pOutputs, int filt_k, 
                       int filt_c, int filt_h, int filt_w){
 
-    // assumes KCHW layout                    
+    // assumes KCHW layout
     int Inx = threadIdx.x, Iny = threadIdx.y;
     int TileX = blockIdx.x, TileY = blockIdx.y;
   
@@ -418,7 +418,6 @@ __device__ float f_row1(float *G, int j){
     for(int bk=0; bk<BK; bk+=blockDim.x){      
       for(int i=0; i<9; i++){
         Gw[i] = t2f32(pInputs[c_kernel + i]);
-        
       }      
   
       int aux;
@@ -428,7 +427,7 @@ __device__ float f_row1(float *G, int j){
           Gw_buffer[j+aux] = (*func1[i])(Gw, j);
         }
       }
-        
+
       int aux2;
       for(int i=0; i<4; i++){
         aux = i*3; aux2 = i<<2;
@@ -444,7 +443,7 @@ __device__ float f_row1(float *G, int j){
 
 #define d(input, i, j) ( input[(i<<2) + (j)] )
 
-__device__ __forceinline__ void load_and_transform_input_tile(float *Btd, float *pOutputs){
+__device__ __forceinline__ void load_and_transform_input_tile(float *Btd, float * __restrict__ pOutputs){
 
   float workspace[3]; 
 
@@ -473,7 +472,7 @@ __device__ __forceinline__ void load_and_transform_input_tile(float *Btd, float 
 
 }
 
-__device__ __forceinline__ void load_filter_tile(float *tiles, float *pOutputs, 
+__device__ __forceinline__ void load_filter_tile(float *tiles, float * __restrict__ pOutputs, 
                                 int filt_c, int filt_k){
  
   int c_tensor_s = threadIdx.y*BK + threadIdx.x;
@@ -501,7 +500,7 @@ __device__ __forceinline__ void load_filter_tile(float *tiles, float *pOutputs,
   
 }
 
-__device__ __forceinline__ void prefetch_filter_tile(const float *pInputs, float *tiles, int filt_k){
+__device__ __forceinline__ void prefetch_filter_tile(const float * __restrict__ pInputs, float * __restrict__ tiles, int filt_k){
 
   int c_tensor = blockIdx.z*BK + (threadIdx.y*filt_k<<4) + threadIdx.x; // Iny*filt_k*4*4
   // each threadIdx.y corresponds to one channel; there are 8 different threadIdx.y so 8 channels 
@@ -521,7 +520,7 @@ __device__ __forceinline__ void prefetch_filter_tile(const float *pInputs, float
   }
 }
 
-__device__ __forceinline__ void prefetch_input_tile(const float *pInputs, float *tile, int in_h, 
+__device__ __forceinline__ void prefetch_input_tile(const float * __restrict__ pInputs, float *tile, int in_h, 
                        int in_w, int tw, int th, unsigned short mask){
   
   // load one input tile  
@@ -598,7 +597,7 @@ __global__ void Winograd_kernel(const float *A, const float *B, float *C,
   float *input_smem  = (float*)shared_mem;
   float *filter_smem = (float*)&shared_mem[16*BC*BN];
 
-  unsigned short m = 0xFFFF;  
+  unsigned int m = 0xFFFF;  
 
   if(blockIdx.y==0 && (threadIdx.x / X) == 0)   m &= 0xFFF0;  // pad top row
   if(tiles_dim_w % X == 0 && tiles_dim_h % Y == 0){
@@ -734,7 +733,7 @@ cudaError_t convolutionForward_32Tx64x8(float *k, int in_h, int in_w, float *w, 
 // }
 
 template<typename T>
-static void conv_winograd_stage0_f32_cuda(
+static void conv_winograd_stage0_f32_cuda(        
         const int src0_ne0, const int src0_ne1, const int src0_ne2, const int src0_ne3,        
         const int dst_ne0, const int dst_ne1, const int dst_ne2, const int dst_ne3,
         const T * src0, float * dst,
@@ -764,7 +763,7 @@ static void conv_winograd_stage1_f32_f32_cuda(int tiles_dim_w, int tiles_dim_h, 
 
     Winograd_kernel<<<dim3((tiles_dim_w+X-1)/X, (tiles_dim_h+Y-1)/Y, filt_k/BK), dim3(BN, 8), smem_size, stream>>>(src1, src0, dst,
                tiles_dim_w, tiles_dim_h, in_c, in_h, in_w, tile_size, X, Y, 
-               filt_k, filt_c, out_c, tile_2d_s, out_h, out_w);
+               filt_k, filt_c, out_c, tile_2d_s, out_h, out_w);    
 }
 
 
