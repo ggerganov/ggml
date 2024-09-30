@@ -31,11 +31,13 @@ struct mnist_model {
     int nbatch_logical;
     int nbatch_physical;
 
-    struct ggml_tensor  * images = nullptr;
-    struct ggml_tensor  * labels = nullptr;
-    struct ggml_tensor  * logits = nullptr;
-    struct ggml_tensor  * probs  = nullptr;
-    struct ggml_tensor  * loss   = nullptr;
+    struct ggml_tensor  * images    = nullptr;
+    struct ggml_tensor  * labels    = nullptr;
+    struct ggml_tensor  * logits    = nullptr;
+    struct ggml_tensor  * probs     = nullptr;
+    struct ggml_tensor  * loss      = nullptr;
+    struct ggml_tensor  * pred      = nullptr;
+    struct ggml_tensor  * acc_count = nullptr;
 
     struct ggml_tensor * fc1_weight = nullptr;
     struct ggml_tensor * fc1_bias   = nullptr;
@@ -108,6 +110,8 @@ struct mnist_eval_result {
 
     std::vector<float>   loss;
     std::vector<int32_t> pred;
+    int64_t              ncorrect = 0;
+    int64_t              ntotal   = 0;
 };
 
 bool mnist_image_load(const std::string & fname, float * buf, const int nex);
@@ -124,4 +128,4 @@ void              mnist_model_train(mnist_model & model, const float * images, c
 void              mnist_model_save(mnist_model & model, const std::string & fname);
 
 std::pair<double, double> mnist_loss(const mnist_eval_result & result);
-std::pair<double, double> mnist_accuracy(const mnist_eval_result & result, const float * labels);
+std::pair<double, double> mnist_accuracy(const mnist_eval_result & result);
