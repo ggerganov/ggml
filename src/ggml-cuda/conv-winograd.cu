@@ -770,7 +770,12 @@ static void conv_winograd_stage1_f32_f32_cuda(int tiles_dim_w, int tiles_dim_h, 
 void ggml_cuda_op_winograd_stage0(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     const ggml_tensor * src0 = dst->src[0];
     // const half * src0_d = (const half *)src0->data;
-    
+    // in case this tensor has already been computed in a preprocessing step,
+    // skip this time;
+    if(src0 == NULL){
+        return;
+    }
+
     float * dst_d = (float *)dst->data;
     cudaStream_t stream = ctx.stream();
     // int id = ggml_cuda_get_device();
