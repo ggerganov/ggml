@@ -2246,6 +2246,51 @@ struct test_im2col : public test_case {
     }
 };
 
+// GGML_Conv2D
+struct test_conv2d : public test_case {
+    const ggml_type type_input;
+    const ggml_type type_kernel;
+    const ggml_type dst_type;
+    const std::array<int64_t, 4> ne_input;
+    const std::array<int64_t, 4> ne_kernel;
+    // stride
+    const int s0;
+    const int s1;
+    // padding
+    const int p0;
+    const int p1;
+    // dilation
+    const int d0;
+    const int d1;
+    // mode
+
+    std::string vars() override {
+        return VARS_TO_STR11(type_input, type_kernel, dst_type, ne_input, ne_kernel, s0, s1, p0, p1, d0, d1);
+    }
+
+    test_conv2d(ggml_type type_input = GGML_TYPE_F32, ggml_type type_kernel = GGML_TYPE_F16, ggml_type dst_type = GGML_TYPE_F32,
+            std::array<int64_t, 4> ne_input = {10, 10, 3, 1}, // [input_width, input_height, input_channels, 1]
+            std::array<int64_t, 4> ne_kernel = {3, 3, 3, 1}, // [kernel_width, kernel_height, input_channels, 1]
+            int s0 = 1, int s1 = 1,
+            int p0 = 1, int p1 = 1,
+            int d0 = 1, int d1 = 1)
+        : type_input(type_input), type_kernel(type_kernel), dst_type(dst_type), ne_input(ne_input), ne_kernel(ne_kernel), s0(s0), s1(s1), p0(p0), p1(p1), d0(d0), d1(d1)
+          {}
+
+    ggml_tensor * build_graph(ggml_context * ctx) override {
+        ggml_tensor * input = ggml_new_tensor(ctx, type_input, 4, ne_input.data());        
+        ggml_set_name(input, "input");
+
+        ggml_tensor * kernel = ggml_new_tensor(ctx, type_kernel, 4, ne_kernel.data());
+        ggml_set_name(kernel, "kernel");
+
+        ggml_tensor * out = ggml_conv_2d_3x3(ctx, kernel, input);
+        ggml_set_name(out, "out");
+
+        return out;
+    }
+};
+
 // GGML_OP_CONCAT
 struct test_concat : public test_case {
     const ggml_type type;
@@ -3251,6 +3296,10 @@ static bool test_backend(ggml_backend_t backend, test_mode mode, const char * op
     test_cases.emplace_back(new test_im2col(GGML_TYPE_F32, GGML_TYPE_F32, GGML_TYPE_F32, {3000, 128, 1, 1}, {3, 128, 1280, 1}, 1, 0, 1, 0, 1, 0, false));
     test_cases.emplace_back(new test_im2col(GGML_TYPE_F32, GGML_TYPE_F16, GGML_TYPE_F32, {3000, 128, 1, 1}, {3, 128, 1280, 1}, 1, 0, 1, 0, 1, 0, false));
     test_cases.emplace_back(new test_im2col(GGML_TYPE_F32, GGML_TYPE_F16, GGML_TYPE_F16, {3000, 128, 1, 1}, {3, 128, 1280, 1}, 1, 0, 1, 0, 1, 0, false));
+
+    test_cases.emplace_back(new test_conv2d(GGML_TYPE_F32, GGML_TYPE_F16, GGML_TYPE_F32, {56, 80, 640, 1}, {3, 3, 640, 960}, 1, 1, 1, 1, 1, 1));
+    test_cases.emplace_back(new test_conv2d(GGML_TYPE_F32, GGML_TYPE_F16, GGML_TYPE_F32, {56, 80, 1280, 1}, {3, 3, 1280, 1280}, 1, 1, 1, 1, 1, 1));
+    test_cases.emplace_back(new test_conv2d(GGML_TYPE_F32, GGML_TYPE_F16, GGML_TYPE_F32, {56, 80, 1280, 1}, {3, 3, 1280, 2560}, 1, 1, 1, 1, 1, 1));
 
     // sycl backend will limit task global_range < MAX_INT
     // test cases for 2D im2col with large input W and H (occurs in stable-diffusion)
