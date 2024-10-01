@@ -758,12 +758,6 @@ bool gpt2_eval(
         ggml_backend_cpu_set_n_threads(model.backend, n_threads);
     }
 
-#ifdef GGML_USE_METAL
-    if (ggml_backend_is_metal(model.backend)) {
-        ggml_backend_metal_set_n_cb(model.backend, n_threads);
-    }
-#endif
-
     // run the computation
     ggml_backend_graph_compute(model.backend, gf);
 

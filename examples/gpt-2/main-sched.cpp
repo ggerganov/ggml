@@ -126,8 +126,6 @@ void init_backends(gpt2_model & model, const gpt_params & params) {
         gpu_backend = ggml_backend_metal_init();
         if (!gpu_backend) {
             fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
-        } else {
-            ggml_backend_metal_set_n_cb(gpu_backend, params.n_threads);
         }
     }
 #endif
