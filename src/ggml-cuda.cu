@@ -10,6 +10,7 @@
 #include "ggml-cuda/clamp.cuh"
 #include "ggml-cuda/concat.cuh"
 #include "ggml-cuda/conv-transpose-1d.cuh"
+#include "ggml-cuda/conv-winograd.cuh"
 #include "ggml-cuda/convert.cuh"
 #include "ggml-cuda/cpy.cuh"
 #include "ggml-cuda/cross-entropy-loss.cuh"
@@ -2331,6 +2332,12 @@ static bool ggml_cuda_compute_forward(ggml_backend_cuda_context & ctx, struct gg
         case GGML_OP_CONV_TRANSPOSE_1D:
             ggml_cuda_op_conv_transpose_1d(ctx,dst);
             break;
+        case GGML_OP_WINOGRAD_STAGE0:
+            ggml_cuda_op_winograd_stage0(ctx, dst);
+            break;
+        case GGML_OP_WINOGRAD_STAGE1:
+            ggml_cuda_op_winograd_stage1(ctx, dst);
+            break;
         case GGML_OP_POOL_2D:
             ggml_cuda_op_pool2d(ctx, dst);
             break;
@@ -2950,6 +2957,8 @@ GGML_CALL static bool ggml_backend_cuda_supports_op(ggml_backend_t backend, cons
                 }
                 return false;
             } break;
+        case GGML_OP_WINOGRAD_STAGE0:
+        case GGML_OP_WINOGRAD_STAGE1:    
         case GGML_OP_NONE:
         case GGML_OP_RESHAPE:
         case GGML_OP_VIEW:
