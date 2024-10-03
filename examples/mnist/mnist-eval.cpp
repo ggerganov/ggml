@@ -55,7 +55,7 @@ int main(int argc, char ** argv) {
             std::pair<double, double> result_loss = mnist_loss(result_eval);
             fprintf(stdout, "%s: test_loss=%.6lf+-%.6lf\n", __func__, result_loss.first, result_loss.second);
 
-            std::pair<double, double> result_acc = mnist_accuracy(result_eval, labels.data());
+            std::pair<double, double> result_acc = mnist_accuracy(result_eval);
             fprintf(stdout, "%s: test_acc=%.2lf+-%.2lf%%\n", __func__, 100.0*result_acc.first, 100.0*result_acc.second);
 
             return 0;
@@ -79,7 +79,7 @@ int main(int argc, char ** argv) {
     std::pair<double, double> result_loss = mnist_loss(result_eval);
     fprintf(stdout, "%s: test_loss=%.6lf+-%.6lf\n", __func__, result_loss.first, result_loss.second);
 
-    std::pair<double, double> result_acc = mnist_accuracy(result_eval, labels.data());
+    std::pair<double, double> result_acc = mnist_accuracy(result_eval);
     fprintf(stdout, "%s: test_acc=%.2lf+-%.2lf%%\n", __func__, 100.0*result_acc.first, 100.0*result_acc.second);
 
     return 0;
