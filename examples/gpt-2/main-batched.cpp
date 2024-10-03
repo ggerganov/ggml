@@ -268,6 +268,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         printf("%s: backend buffer size = %6.2f MB\n", __func__, buffer_size/(1024.0*1024.0));
     }
 
+    ggml_log_set(ggml_log_callback_default, nullptr);
+
     // create the ggml context
     {
         size_t n_tensors = 2 + 6 + 12*model.hparams.n_layer;
@@ -298,7 +300,6 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 #ifdef GGML_USE_METAL
     if (n_gpu_layers > 0) {
         fprintf(stderr, "%s: using Metal backend\n", __func__);
-        ggml_backend_metal_log_set_callback(ggml_log_callback_default, nullptr);
         model.backend = ggml_backend_metal_init();
         if (!model.backend) {
             fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);

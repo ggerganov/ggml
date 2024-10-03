@@ -72,6 +72,8 @@ void load_model(test_model & model, bool use_gpu = false) {
             /*.no_alloc   =*/ true,
     };
 
+    ggml_log_set(ggml_log_callback_default, nullptr);
+
     // initialize the backend
 #ifdef GGML_USE_CUDA
     if (use_gpu) {
@@ -86,7 +88,6 @@ void load_model(test_model & model, bool use_gpu = false) {
 #ifdef GGML_USE_METAL
     if (use_gpu) {
         fprintf(stderr, "%s: using Metal backend\n", __func__);
-        ggml_backend_metal_log_set_callback(ggml_log_callback_default, nullptr);
         model.backend = ggml_backend_metal_init();
         if (!model.backend) {
             fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);

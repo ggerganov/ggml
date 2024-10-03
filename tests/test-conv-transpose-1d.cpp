@@ -85,10 +85,6 @@ void load_model(test_model & model, bool use_gpu = false) {
         buffer_size += 16 * 32 * 32 * ggml_type_size(GGML_TYPE_F32); // tensor a_4
         buffer_size += 197 * 32* ggml_type_size(GGML_TYPE_F32); // tensor b_4
 
-
-
-
-
         buffer_size += 1024;
     }
 
@@ -101,6 +97,8 @@ void load_model(test_model & model, bool use_gpu = false) {
             /*.mem_buffer =*/ NULL,
             /*.no_alloc   =*/ true,
     };
+
+    ggml_log_set(ggml_log_callback_default, nullptr);
 
     // initialize the backend
 #ifdef GGML_USE_CUDA
@@ -116,7 +114,6 @@ void load_model(test_model & model, bool use_gpu = false) {
 #ifdef GGML_USE_METAL
     if (use_gpu) {
         fprintf(stderr, "%s: using Metal backend\n", __func__);
-        ggml_backend_metal_log_set_callback(ggml_log_callback_default, nullptr);
         model.backend = ggml_backend_metal_init();
         if (!model.backend) {
             fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
