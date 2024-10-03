@@ -43,6 +43,8 @@ struct simple_model {
 
 // initialize the tensors of the model in this case two matrices 2x2
 void load_model(simple_model & model, float * a, float * b, int rows_A, int cols_A, int rows_B, int cols_B) {
+    ggml_log_set(ggml_log_callback_default, nullptr);
+
     // initialize the backend
 #ifdef GGML_USE_CUDA
     fprintf(stderr, "%s: using CUDA backend\n", __func__);
@@ -54,7 +56,6 @@ void load_model(simple_model & model, float * a, float * b, int rows_A, int cols
 
 #ifdef GGML_USE_METAL
     fprintf(stderr, "%s: using Metal backend\n", __func__);
-    ggml_backend_metal_log_set_callback(ggml_log_callback_default, nullptr);
     model.backend = ggml_backend_metal_init();
     if (!model.backend) {
         fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);

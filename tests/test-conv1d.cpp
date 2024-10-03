@@ -65,6 +65,8 @@ void load_model(test_model & model, bool use_gpu = false) {
     printf("%s: ggml tensor size    = %d bytes\n", __func__, (int) sizeof(ggml_tensor));
     printf("%s: backend buffer size = %0.2f MB\n", __func__, (buffer_size/ 1024.f/ 1024.f));
 
+    ggml_log_set(ggml_log_callback_default, nullptr);
+
     int num_tensors = 2;
     struct ggml_init_params params {
             /*.mem_size   =*/ ggml_tensor_overhead() * num_tensors,
@@ -86,7 +88,6 @@ void load_model(test_model & model, bool use_gpu = false) {
 #ifdef GGML_USE_METAL
     if (use_gpu) {
         fprintf(stderr, "%s: using Metal backend\n", __func__);
-        ggml_backend_metal_log_set_callback(ggml_log_callback_default, nullptr);
         model.backend = ggml_backend_metal_init();
         if (!model.backend) {
             fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
