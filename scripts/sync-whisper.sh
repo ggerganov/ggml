@@ -9,7 +9,7 @@ cp -rpv ../whisper.cpp/ggml/src/ggml-aarch64.c      src/ggml-aarch64.c
 cp -rpv ../whisper.cpp/ggml/src/ggml-aarch64.h      src/ggml-aarch64.h
 cp -rpv ../whisper.cpp/ggml/src/ggml-alloc.c        src/ggml-alloc.c
 cp -rpv ../whisper.cpp/ggml/src/ggml-backend-impl.h src/ggml-backend-impl.h
-cp -rpv ../whisper.cpp/ggml/src/ggml-backend.c      src/ggml-backend.c
+cp -rpv ../whisper.cpp/ggml/src/ggml-backend.cpp    src/ggml-backend.cpp
 cp -rpv ../whisper.cpp/ggml/src/ggml-blas.cpp       src/ggml-blas.cpp
 cp -rpv ../whisper.cpp/ggml/src/ggml-cann/*         src/ggml-cann/
 cp -rpv ../whisper.cpp/ggml/src/ggml-cann.cpp       src/ggml-cann.cpp
