@@ -67,10 +67,12 @@ int main() {
     printf("Testing %zu backends\n\n", ggml_backend_reg_count());
 
     for (size_t i = 0; i < ggml_backend_reg_count(); i++) {
-        const char * name = ggml_backend_reg_name(ggml_backend_reg_get(i));
-        printf("Backend %zu/%zu (%s)\n", i + 1, ggml_backend_reg_count(), name);
+        ggml_backend_reg_t reg = ggml_backend_reg_get(i);
+        const char * reg_name = ggml_backend_reg_name(reg);
+        printf("Backend %zu/%zu (%s)\n", i + 1, ggml_backend_reg_count(), reg_name);
 
-        ggml_backend_t backend = ggml_backend_init_by_name(name, NULL);
+        const ggml_backend_dev_t dev = ggml_backend_reg_dev_get(reg, 0);
+        ggml_backend_t backend = ggml_backend_dev_init(dev, NULL);
         GGML_ASSERT(backend != NULL);
         printf("  Backend name: %s\n", ggml_backend_name(backend));
 

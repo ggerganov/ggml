@@ -57,8 +57,8 @@ struct mnist_model {
     ggml_backend_buffer_t buf_compute = nullptr;
 
     mnist_model(const std::string & backend_name) {
-        const ggml_backend_reg_t reg = ggml_backend_reg_by_name(backend_name.c_str());
-        if (reg == nullptr) {
+        const ggml_backend_dev_t dev = ggml_backend_dev_by_name(backend_name.c_str());
+        if (dev == nullptr) {
             fprintf(stderr, "%s: ERROR: backend %s not found, available:\n", __func__, backend_name.c_str());
             for (size_t i = 0; i < ggml_backend_reg_count(); ++i) {
                 fprintf(stderr, "  - %s\n", ggml_backend_reg_name(ggml_backend_reg_get(i)));
@@ -68,7 +68,7 @@ struct mnist_model {
 
         fprintf(stderr, "%s: using %s backend\n", __func__, backend_name.c_str());
 
-        ggml_backend_t backend = ggml_backend_init_by_name(backend_name.c_str(), NULL);
+        ggml_backend_t backend = ggml_backend_dev_init(dev, NULL);
         if (ggml_backend_is_cpu(backend)) {
             const int ncores_logical = std::thread::hardware_concurrency();
             ggml_backend_cpu_set_n_threads(backend, std::min(ncores_logical, (ncores_logical + 4)/2));
