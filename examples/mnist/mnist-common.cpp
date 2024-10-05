@@ -14,7 +14,7 @@
 #include <string>
 #include <utility>
 
-bool mnist_image_load(const std::string & fname, float * buf, const int nex) {
+bool mnist_image_load(const std::string & fname, mnist_dataset & dataset) {
     auto fin = std::ifstream(fname, std::ios::binary);
     if (!fin) {
         fprintf(stderr, "failed to open images file %s\n", fname.c_str());
@@ -23,8 +23,9 @@ bool mnist_image_load(const std::string & fname, float * buf, const int nex) {
     fin.seekg(16);
 
     uint8_t image[MNIST_NINPUT];
+    float * buf = ggml_get_data_f32(dataset.data);
 
-    for (int iex = 0; iex < nex; ++iex) {
+    for (int iex = 0; iex < dataset.nex; ++iex) {
         fin.read((char *) image, sizeof(image));
 
         for (int i = 0; i < MNIST_NINPUT; ++i) {
@@ -35,12 +36,12 @@ bool mnist_image_load(const std::string & fname, float * buf, const int nex) {
     return true;
 }
 
-void mnist_image_print(FILE * stream, const float * image) {
-    static_assert(MNIST_NINPUT == 28*28, "Unexpected MNIST_NINPUT");
+void mnist_image_print(FILE * stream, mnist_dataset & dataset, const int iex) {
+    const float * image = ggml_get_data_f32(dataset.data) + iex*MNIST_NINPUT;
 
-    for (int row = 0; row < 28; row++) {
-        for (int col = 0; col < 28; col++) {
-            const int rgb = roundf(255.0f * image[row*28 + col]);
+    for (int row = 0; row < MNIST_HW; row++) {
+        for (int col = 0; col < MNIST_HW; col++) {
+            const int rgb = roundf(255.0f * image[row*MNIST_HW + col]);
 #ifdef _WIN32
             fprintf(stream, "%s", rgb >= 220 ? "##" : "__");                // Represented via text.
 #else
@@ -51,7 +52,7 @@ void mnist_image_print(FILE * stream, const float * image) {
     }
 }
 
-bool mnist_label_load(const std::string & fname, float * buf, const int nex) {
+bool mnist_label_load(const std::string & fname, mnist_dataset & dataset) {
     auto fin = std::ifstream(fname, std::ios::binary);
     if (!fin) {
         fprintf(stderr, "failed to open labels file %s\n", fname.c_str());
@@ -60,8 +61,9 @@ bool mnist_label_load(const std::string & fname, float * buf, const int nex) {
     fin.seekg(8);
 
     uint8_t label;
+    float * buf = ggml_get_data_f32(dataset.labels);
 
-    for (int iex = 0; iex < nex; ++iex) {
+    for (int iex = 0; iex < dataset.nex; ++iex) {
         fin.read((char *) &label, sizeof(label));
 
         for (int i = 0; i < MNIST_NCLASSES; ++i) {
@@ -500,7 +502,7 @@ void mnist_model_build(mnist_model & model, const int nbatch_logical, const int 
     GGML_ASSERT(model.acc_count->ne[3] == 1);
 }
 
-mnist_eval_result mnist_model_eval(mnist_model & model, const float * images, const float * labels, const int nex) {
+mnist_eval_result mnist_model_eval(mnist_model & model, mnist_dataset & dataset) {
     mnist_eval_result result;
 
     struct ggml_cgraph * gf = ggml_new_graph(model.ctx_compute);
@@ -522,10 +524,10 @@ mnist_eval_result mnist_model_eval(mnist_model & model, const float * images, co
         GGML_ASSERT(sizeof(tmp_pred[0])*tmp_pred.size() == ggml_nbytes(model.pred));
         GGML_ASSERT(sizeof(tmp_acc_count)               == ggml_nbytes(model.acc_count));
 
-        GGML_ASSERT(nex % model.nbatch_physical == 0);
-        for (int iex0 = 0; iex0 < nex; iex0 += model.nbatch_physical) {
-            ggml_backend_tensor_set(model.images, images + iex0*MNIST_NINPUT,   0, ggml_nbytes(model.images));
-            ggml_backend_tensor_set(model.labels, labels + iex0*MNIST_NCLASSES, 0, ggml_nbytes(model.labels));
+        GGML_ASSERT(dataset.nex % model.nbatch_physical == 0);
+        const int nbatches = dataset.nex/model.nbatch_physical;
+        for (int ibatch = 0; ibatch < nbatches; ++ibatch) {
+            dataset.get_batch(model.images, model.labels, ibatch);
 
             ggml_backend_graph_compute(model.backend, gf);
 
@@ -542,17 +544,21 @@ mnist_eval_result mnist_model_eval(mnist_model & model, const float * images, co
         const int64_t t_total_us = ggml_time_us() - t_start_us;
         const double t_total_ms = 1e-3*t_total_us;
         fprintf(stderr, "%s: model evaluation on %d images took %.2lf ms, %.2lf us/image\n",
-                __func__, nex, t_total_ms, (double) t_total_us/nex);
+                __func__, (int)dataset.nex, t_total_ms, (double) t_total_us/dataset.nex);
     }
 
     result.success = true;
     return result;
 }
 
-void mnist_model_train(mnist_model & model, const float * images, const float * labels, const int nex, const int nepoch, const float val_split) {
+void mnist_model_train(mnist_model & model, mnist_dataset & dataset, const int nepoch, const float val_split) {
     const int64_t t_start_us = ggml_time_us();
 
-    const bool accumulate = model.nbatch_physical != model.nbatch_logical;
+    const int opt_period        = model.nbatch_logical / model.nbatch_physical;
+    const int nbatches_logical  = dataset.nex / model.nbatch_logical;
+    const int nbatches_physical = dataset.nex / model.nbatch_physical;
+    const int ibatch_split      = ((int)((1.0f - val_split)*nbatches_logical))*opt_period; // train <-> val split index (physical)
+    const int ishard_split      = ibatch_split * model.nbatch_physical/dataset.shard_size;
 
     // gf == graph forward, forward pass only.
     struct ggml_cgraph * gf = ggml_new_graph_custom(model.ctx_compute, GGML_DEFAULT_GRAPH_SIZE, /*grads =*/ true); // Forward pass.
@@ -563,7 +569,7 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
 
     // gb_grad == graph backward gradients, forward pass, then backward pass to calculate gradients.
     struct ggml_cgraph * gb_grad = ggml_graph_dup(model.ctx_compute, gf);
-    ggml_build_backward_expand(model.ctx_compute, gf, gb_grad, accumulate);
+    ggml_build_backward_expand(model.ctx_compute, gf, gb_grad, /*accumulate =*/ opt_period > 1);
 
     // gb_opt == graph backward optimize, forward pass, then backward pass to calculate gradients, then optimizer step.
     struct ggml_cgraph * gb_opt = ggml_graph_dup(model.ctx_compute, gb_grad);
@@ -572,13 +578,15 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
     model.buf_compute = ggml_backend_alloc_ctx_tensors(model.ctx_compute, model.backend);
     ggml_graph_reset(gb_opt); // Set gradients to zero, reset optimizer.
 
-    const int iex_split = ((int)((1.0f - val_split)*nex) / model.nbatch_logical) * model.nbatch_logical;
+    dataset.shuffle(-1); // Shuffle all data (train + validation).
 
     for (int epoch = 0; epoch < nepoch; ++epoch) {
         fprintf(stderr, "%s: epoch %02d start...", __func__, epoch);
         const int64_t t_start_us = ggml_time_us();
 
-        int iex0 = 0;
+        dataset.shuffle(ishard_split); // Shuffle only the training data, keeping training and validation set separate.
+
+        int ibatch_physical = 0;
 
         float                tmp_loss;
         std::vector<int32_t> tmp_pred(model.nbatch_physical);
@@ -589,13 +597,12 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
         GGML_ASSERT(sizeof(tmp_acc_count)               == ggml_nbytes(model.acc_count));
 
         mnist_eval_result result_train;
-        for (; iex0 < iex_split; iex0 += model.nbatch_physical) {
-            ggml_backend_tensor_set(model.images, images + iex0*MNIST_NINPUT,   0, ggml_nbytes(model.images));
-            ggml_backend_tensor_set(model.labels, labels + iex0*MNIST_NCLASSES, 0, ggml_nbytes(model.labels));
+        for (; ibatch_physical < ibatch_split; ++ibatch_physical) {
+            dataset.get_batch(model.images, model.labels, ibatch_physical);
 
-            // With a period of nbatch_logical/nbatch_physical iterations:
-            if ((iex0 + model.nbatch_physical) % model.nbatch_logical != 0) {
-                // For the first nbatch_logical/nbatch_physical - 1 iterations, only calculate gradients and accumulate them:
+            // With a period of opt_period == nbatch_logical/nbatch_physical iterations:
+            if ((ibatch_physical + 1) % opt_period != 0) {
+                // For the first opt_period - 1 iterations, only calculate gradients and accumulate them:
                 ggml_backend_graph_compute(model.backend, gb_grad);
             } else {
                 // For the last iteration, calculate gradients and also apply the optimizer:
@@ -614,9 +621,8 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
         }
 
         mnist_eval_result result_val;
-        for (; iex0 < nex; iex0 += model.nbatch_physical) {
-            ggml_backend_tensor_set(model.images, images + iex0*MNIST_NINPUT,   0, ggml_nbytes(model.images));
-            ggml_backend_tensor_set(model.labels, labels + iex0*MNIST_NCLASSES, 0, ggml_nbytes(model.labels));
+        for (; ibatch_physical < nbatches_physical; ++ibatch_physical) {
+            dataset.get_batch(model.images, model.labels, ibatch_physical);
 
             ggml_backend_graph_compute(model.backend, gf); // For the validation set, only the forward pass is needed.
 
@@ -639,7 +645,7 @@ void mnist_model_train(mnist_model & model, const float * images, const float * 
             fprintf(stderr, "done, took %.2lfs, train_loss=%.6lf, train_acc=%.2f%%", t_epoch_s, loss_mean, percent_correct);
         }
 
-        if (iex_split < nex) {
+        if (ibatch_split < nbatches_physical) {
             const std::pair<double, double> loss = mnist_loss(result_val);
             const std::pair<double, double> acc  = mnist_accuracy(result_val);
 
@@ -731,11 +737,14 @@ extern "C" {
 
 int wasm_eval(uint8_t * digitPtr) {
     std::vector<float> digit(digitPtr, digitPtr + MNIST_NINPUT);
-    std::vector<float> labels(MNIST_NCLASSES);
+
+    struct mnist_dataset dataset(1, 1);
+    memcpy(dataset.data->data, digitPtr, ggml_nbytes(dataset.data));
+    ggml_set_zero(dataset.labels); // The labels are not needed.
 
     mnist_model model = mnist_model_init_from_file("mnist-f32.gguf", "CPU");
     mnist_model_build(model, 1, 1);
-    mnist_eval_result result = mnist_model_eval(model, digit.data(), labels.data(), 1);
+    mnist_eval_result result = mnist_model_eval(model, dataset);
 
     return result.pred[0];
 }

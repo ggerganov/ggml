@@ -24,22 +24,17 @@ int main(int argc, char ** argv) {
         exit(1);
     }
 
-    std::vector<float> images;
-    images.resize(MNIST_NTEST*MNIST_NINPUT);
-    if (!mnist_image_load(argv[2], images.data(), MNIST_NTEST)) {
+    struct mnist_dataset dataset(/*nex =*/ MNIST_NTEST, /*shard_size =*/ MNIST_NBATCH_PHYSICAL);
+
+    if (!mnist_image_load(argv[2], dataset)) {
         return 1;
     }
-
-    std::vector<float> labels;
-    labels.resize(MNIST_NTEST*MNIST_NCLASSES);
-    if (!mnist_label_load(argv[3], labels.data(), MNIST_NTEST)) {
+    if (!mnist_label_load(argv[3], dataset)) {
         return 1;
     }
 
     const int iex = rand() % MNIST_NTEST;
-    const std::vector<float> digit(images.begin() + iex*MNIST_NINPUT, images.begin() + (iex+1)*MNIST_NINPUT);
-
-    mnist_image_print(stdout, images.data() + iex*MNIST_NINPUT);
+    mnist_image_print(stdout, dataset, iex);
 
     const std::string backend = argc >= 5 ? argv[4] : "CPU";
 
@@ -48,7 +43,7 @@ int main(int argc, char ** argv) {
     if (backend == "CPU") {
         const int ncores_logical = std::thread::hardware_concurrency();
         result_eval = mnist_graph_eval(
-            argv[1], images.data(), labels.data(), MNIST_NTEST, std::min(ncores_logical, (ncores_logical + 4)/2));
+            argv[1], ggml_get_data_f32(dataset.data), ggml_get_data_f32(dataset.labels), MNIST_NTEST, std::min(ncores_logical, (ncores_logical + 4)/2));
         if (result_eval.success) {
             fprintf(stdout, "%s: predicted digit is %d\n", __func__, result_eval.pred[iex]);
 
@@ -73,7 +68,7 @@ int main(int argc, char ** argv) {
     const int64_t t_load_us = ggml_time_us() - t_start_us;
 
     fprintf(stdout, "%s: loaded model in %.2lf ms\n", __func__, t_load_us / 1000.0);
-    result_eval = mnist_model_eval(model, images.data(), labels.data(), MNIST_NTEST);
+    result_eval = mnist_model_eval(model, dataset);
     fprintf(stdout, "%s: predicted digit is %d\n", __func__, result_eval.pred[iex]);
 
     std::pair<double, double> result_loss = mnist_loss(result_eval);
