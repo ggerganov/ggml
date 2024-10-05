@@ -18,7 +18,7 @@ $ python3 mnist-train-fc.py mnist-fc-f32.gguf
 
 ...
 
-Test loss: 0.066051+-0.011630, Test accuracy: 98.07+-0.14%
+Test loss: 0.066377+-0.010468, Test accuracy: 97.94+-0.14%
 
 Model tensors saved to mnist-fc-f32.gguf:
 fc1.weight       (500, 784)
@@ -61,22 +61,21 @@ ________________________________________________________
 ________________________________________________________
 ________________________________________________________
 ________________________________________________________
-mnist_graph_eval: trying to load a ggml graph from mnist-fc-f32.gguf
-ggml_graph_import: invalid magic number, got 46554747
-mnist_graph_eval: could not load a ggml graph from mnist-fc-f32.gguf
 ggml_cuda_init: GGML_CUDA_FORCE_MMQ:    no
 ggml_cuda_init: GGML_CUDA_FORCE_CUBLAS: no
 ggml_cuda_init: found 1 CUDA devices:
   Device 0: NVIDIA GeForce RTX 3090, compute capability 8.6, VMM: yes
-mnist_model: using CPU backend
+mnist_model: using CUDA0 (NVIDIA GeForce RTX 3090) as primary backend
+mnist_model: unsupported operations will be executed on the following fallback backends (in order of priority):
+mnist_model:  - CPU (AMD Ryzen 9 5950X 16-Core Processor)
 mnist_model_init_from_file: loading model weights from 'mnist-fc-f32.gguf'
 mnist_model_init_from_file: model arch is mnist-fc
 mnist_model_init_from_file: successfully loaded weights from mnist-fc-f32.gguf
-main: loaded model in 13.03 ms
-mnist_model_eval: model evaluation on 10000 images took 95.02 ms, 9.50 us/image
+main: loaded model in 109.44 ms
+mnist_model_eval: model evaluation on 10000 images took 76.92 ms, 7.69 us/image
 main: predicted digit is 3
-main: test_loss=0.066051+-0.009343
-main: test_acc=98.07+-0.14%
+main: test_loss=0.066379+-0.009101
+main: test_acc=97.94+-0.14%
 ```
 
 In addition to the evaluation on the test set the GGML evaluation also prints a random image from the test set as well as the model prediction for said image.
@@ -87,10 +86,6 @@ $ ../../build/bin/mnist-train mnist-fc mnist-fc-f32.gguf data/MNIST/raw/train-im
 ```
 
 It can then be evaluated with the same binary as above.
-When training a model with GGML the computation graph for the forward pass is also exported to `mnist-fc-f32.ggml`.
-Compared to the GGUF (which only contains the weights) this file also contains the model architecture.
-As long as the input and output tensors are well-defined an exported GGML graph is fully agnostic w.r.t. the model architecture.
-It can be evaluated using the `mnist-eval` binary by substituting the argument for the GGUF file.
 
 ## Convolutional network
 
@@ -101,8 +96,8 @@ $ python3 mnist-train-cnn.py mnist-cnn-f32.gguf
 
 ...
 
-Test loss: 0.045483
-Test accuracy: 98.56%
+Test loss: 0.047947
+Test accuracy: 98.46%
 GGUF model saved to 'mnist-cnn-f32.gguf'
 ```
 
@@ -139,25 +134,24 @@ ________________________________________________________
 ________________________________________________________
 ________________________________________________________
 ________________________________________________________
-mnist_graph_eval: trying to load a ggml graph from mnist-cnn-f32.gguf
-ggml_graph_import: invalid magic number, got 46554747
-mnist_graph_eval: could not load a ggml graph from mnist-cnn-f32.gguf
 ggml_cuda_init: GGML_CUDA_FORCE_MMQ:    no
 ggml_cuda_init: GGML_CUDA_FORCE_CUBLAS: no
 ggml_cuda_init: found 1 CUDA devices:
   Device 0: NVIDIA GeForce RTX 3090, compute capability 8.6, VMM: yes
-mnist_model: using CPU backend
+mnist_model: using CUDA0 (NVIDIA GeForce RTX 3090) as primary backend
+mnist_model: unsupported operations will be executed on the following fallback backends (in order of priority):
+mnist_model:  - CPU (AMD Ryzen 9 5950X 16-Core Processor)
 mnist_model_init_from_file: loading model weights from 'mnist-cnn-f32.gguf'
 mnist_model_init_from_file: model arch is mnist-cnn
 mnist_model_init_from_file: successfully loaded weights from mnist-cnn-f32.gguf
-main: loaded model in 11.88 ms
-mnist_model_eval: model evaluation on 10000 images took 1074.09 ms, 107.41 us/image
+main: loaded model in 91.99 ms
+mnist_model_eval: model evaluation on 10000 images took 267.61 ms, 26.76 us/image
 main: predicted digit is 1
-main: test_loss=0.045483+-0.006884
-main: test_acc=98.56+-0.12%
+main: test_loss=0.047955+-0.007029
+main: test_acc=98.46+-0.12%
 ```
 
-Like with the fully connected network the convolutional network can also be trained on the CPU using GGML:
+Like with the fully connected network the convolutional network can also be trained using GGML:
 
 ``` bash
 $ ../../build/bin/mnist-train mnist-cnn mnist-cnn-f32.gguf data/MNIST/raw/train-images-idx3-ubyte data/MNIST/raw/train-labels-idx1-ubyte
@@ -165,11 +159,12 @@ $ ../../build/bin/mnist-train mnist-cnn mnist-cnn-f32.gguf data/MNIST/raw/train-
 
 As always, the evaluation is done using `mnist-eval` and like with the fully connected network the GGML graph is exported to `mnist-cnn-f32.ggml`.
 
-## CUDA
+## Hardware Acceleration
 
-The fully connected model can be trained and evaluated using CUDA.
-`mnist-train` and `mnist-eval` accept an additional, optional argument behind those listed so far to specify the backend.
-The default is `CPU`, by specifying `CUDA0` the first available CUDA device can be used instead (make sure to compile GGML with CUDA cupport).
+Both the training and evaluation code is agnostic in terms of hardware as long as the corresponding GGML backend has implemented the necessary operations.
+A specific backend can be selected by appending the above commands with a backend name.
+The compute graphs then schedule the operations to preferentially use the specified backend.
+Note that if a backend does not implement some of the necessary operations a CPU fallback is used instead which may result in bad performance.
 
 ## Web demo
 
