@@ -1,4 +1,5 @@
-#include "ggml/ggml.h"
+#include "ggml.h"
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -150,9 +151,10 @@ int main(int argc, const char** argv) {
 
         struct ggml_tensor * m1 = ggml_map_custom1(ctx, t, custom1, 2, NULL);
 
-        struct ggml_cgraph graph = ggml_build_forward(m1);
+        struct ggml_cgraph * graph = ggml_new_graph(ctx);
+        ggml_build_forward_expand(graph, m1);
 
-        ggml_graph_compute_with_ctx(ctx, &graph, 4);
+        ggml_graph_compute_with_ctx(ctx, graph, 4);
 
         const float * output = ggml_get_data_f32(m1);
 
@@ -175,9 +177,10 @@ int main(int argc, const char** argv) {
 
         struct ggml_tensor * m2 = ggml_map_custom2(ctx, t1, t2, custom2, GGML_N_TASKS_MAX, g_userdata);
 
-        struct ggml_cgraph graph = ggml_build_forward(m2);
+        struct ggml_cgraph * graph = ggml_new_graph(ctx);
+        ggml_build_forward_expand(graph, m2);
 
-        ggml_graph_compute_with_ctx(ctx, &graph, 4);
+        ggml_graph_compute_with_ctx(ctx, graph, 4);
 
         const float * output = ggml_get_data_f32(m2);
 
@@ -203,9 +206,10 @@ int main(int argc, const char** argv) {
 
         struct ggml_tensor * m3 = ggml_map_custom3(ctx, t1, t2, t3, custom3, 1, g_userdata);
 
-        struct ggml_cgraph graph = ggml_build_forward(m3);
+        struct ggml_cgraph * graph = ggml_new_graph(ctx);
+        ggml_build_forward_expand(graph, m3);
 
-        ggml_graph_compute_with_ctx(ctx, &graph, 4);
+        ggml_graph_compute_with_ctx(ctx, graph, 4);
 
         const float * output = ggml_get_data_f32(m3);
 

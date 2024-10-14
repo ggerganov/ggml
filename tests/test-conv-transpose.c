@@ -1,4 +1,4 @@
-#include "ggml/ggml.h"
+#include "ggml.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -12,35 +12,35 @@ struct ggml_context* make_ctx(void) {
     return ggml_init(params);
 }
 
-// void printf_tensor(struct ggml_tensor * t) {
-//     if (t->type == GGML_TYPE_F32) {
-//         const float * t_d = ggml_get_data_f32(t);
-//         for (int i = 0; i < t->ne[2]; ++i) {
-//             for (int j = 0; j < t->ne[1]; ++j) {
-//                 for (int k = 0; k < t->ne[0]; ++k) {
-//                     printf("%.1f ", t_d[i * t->ne[1] * t->ne[0] + j * t->ne[0] + k]);
-//                 }
-//                 printf("\n");
-//             }
-//             printf("---\n");
-//         }
-//     }
-//     else if (t->type == GGML_TYPE_F16) {
-//         const ggml_fp16_t * t_d = ggml_get_data(t);
-//         for (int i = 0; i < t->ne[2]; ++i) {
-//             for (int j = 0; j < t->ne[1]; ++j) {
-//                 for (int k = 0; k < t->ne[0]; ++k) {
-//                     printf("%.1f ", ggml_fp16_to_fp32(t_d[i * t->ne[1] * t->ne[0] + j * t->ne[0] + k]));
-//                 }
-//                 printf("\n");
-//             }
-//             printf("---\n");
-//         }
-//     }
-//     else {
-//         printf("unknown type\n");
-//     }
-// }
+void printf_tensor(struct ggml_tensor * t) {
+    if (t->type == GGML_TYPE_F32) {
+        const float * t_d = ggml_get_data_f32(t);
+        for (int i = 0; i < t->ne[2]; ++i) {
+            for (int j = 0; j < t->ne[1]; ++j) {
+                for (int k = 0; k < t->ne[0]; ++k) {
+                    printf("%.1f ", t_d[i * t->ne[1] * t->ne[0] + j * t->ne[0] + k]);
+                }
+                printf("\n");
+            }
+            printf("---\n");
+        }
+    }
+    else if (t->type == GGML_TYPE_F16) {
+        const ggml_fp16_t * t_d = ggml_get_data(t);
+        for (int i = 0; i < t->ne[2]; ++i) {
+            for (int j = 0; j < t->ne[1]; ++j) {
+                for (int k = 0; k < t->ne[0]; ++k) {
+                    printf("%.1f ", ggml_fp16_to_fp32(t_d[i * t->ne[1] * t->ne[0] + j * t->ne[0] + k]));
+                }
+                printf("\n");
+            }
+            printf("---\n");
+        }
+    }
+    else {
+        printf("unknown type\n");
+    }
+}
 
 void check_tensor(struct ggml_tensor * t, float * expected_t_d, int ne0, int ne1, int ne2) {
     GGML_ASSERT(t->type == GGML_TYPE_F32);
@@ -52,13 +52,76 @@ void check_tensor(struct ggml_tensor * t, float * expected_t_d, int ne0, int ne1
             for (int i0 = 0; i0 < ne0; ++i0) {
                 float expected = *(expected_t_d + i2 * ne1 * ne0 + i1 * ne0 + i0);
                 float actual = ggml_get_data_f32(t)[i2 * ne1 * ne0 + i1 * ne0 + i0];
+                if (expected != actual) {
+                    printf("expected %.1f, got %.1f\n", expected, actual);
+                }
                 GGML_ASSERT(expected == actual);
             }
         }
     }
 }
 
-int main(int argc, const char** argv) {
+void test_conv_transpose_1d(void) {
+
+    float buf_f32[1024];
+    for (int i = 0; i < 1024; ++i) {
+        buf_f32[i] = (float)i;
+    }
+
+    ggml_fp16_t buf_f16[1024];
+    for (int i = 0; i < 1024; ++i) {
+        buf_f16[i] = ggml_fp32_to_fp16((float)i);
+    }
+
+    float expected_out_1[3][4] = {
+        {18.0, 45.0, 59.0, 37.0},
+        {24.0, 61.0, 83.0, 51.0},
+        {30.0, 77.0, 107.0, 65.0},
+    };
+    float expected_out_2[3][6] = {
+        {18.0, 21.0, 24.0, 29.0, 30.0, 37.0},
+        {24.0, 27.0, 34.0, 39.0, 44.0, 51.0},
+        {30.0, 33.0, 44.0, 49.0, 58.0, 65.0},
+    };
+    float expected_out_3[3][8] = {
+        {18.0, 21.0, 0.0, 24.0, 29.0, 0.0, 30.0, 37.0},
+        {24.0, 27.0, 0.0, 34.0, 39.0, 0.0, 44.0, 51.0},
+        {30.0, 33.0, 0.0, 44.0, 49.0, 0.0, 58.0, 65.0},
+    };
+
+    // conv transpose 1d with stride 1, 2 & 3
+    {
+        struct ggml_context * ctx = make_ctx();
+
+        struct ggml_tensor * t = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 3, 2); // l x cin
+        memcpy(t->data, buf_f32, ggml_nbytes(t));
+
+        struct ggml_tensor * k = ggml_new_tensor_3d(ctx, GGML_TYPE_F16, 2, 3, 2); // k x cout x cin
+        memcpy(k->data, buf_f16, ggml_nbytes(k));
+
+        struct ggml_tensor * out_1 = ggml_conv_transpose_1d(ctx, k, t, 1 /* s0 */, 0 /* p0 */, 1 /* d0 */);
+        struct ggml_tensor * out_2 = ggml_conv_transpose_1d(ctx, k, t, 2 /* s0 */, 0 /* p0 */, 1 /* d0 */);
+        struct ggml_tensor * out_3 = ggml_conv_transpose_1d(ctx, k, t, 3 /* s0 */, 0 /* p0 */, 1 /* d0 */);
+
+        struct ggml_cgraph * gf_1 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_2 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_3 = ggml_new_graph(ctx);
+
+        ggml_build_forward_expand(gf_1, out_1);
+        ggml_build_forward_expand(gf_2, out_2);
+        ggml_build_forward_expand(gf_3, out_3);
+
+        ggml_graph_compute_with_ctx(ctx, gf_1, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_2, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_3, 1);
+
+        check_tensor(out_1, (float*)expected_out_1, 4, 3, 1);
+        check_tensor(out_2, (float*)expected_out_2, 6, 3, 1);
+        check_tensor(out_3, (float*)expected_out_3, 8, 3, 1);
+    }
+}
+
+void test_conv_transpose_2d(void) {
 
     float buf_f32[1024];
     for (int i = 0; i < 1024; ++i) {
@@ -147,13 +210,17 @@ int main(int argc, const char** argv) {
         struct ggml_tensor * out_2 = ggml_conv_transpose_2d_p0(ctx, k, t, 2);
         struct ggml_tensor * out_3 = ggml_conv_transpose_2d_p0(ctx, k, t, 3);
 
-        struct ggml_cgraph gf_1 = ggml_build_forward(out_1);
-        struct ggml_cgraph gf_2 = ggml_build_forward(out_2);
-        struct ggml_cgraph gf_3 = ggml_build_forward(out_3);
+        struct ggml_cgraph * gf_1 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_2 = ggml_new_graph(ctx);
+        struct ggml_cgraph * gf_3 = ggml_new_graph(ctx);
 
-        ggml_graph_compute_with_ctx(ctx, &gf_1, 1);
-        ggml_graph_compute_with_ctx(ctx, &gf_2, 1);
-        ggml_graph_compute_with_ctx(ctx, &gf_3, 1);
+        ggml_build_forward_expand(gf_1, out_1);
+        ggml_build_forward_expand(gf_2, out_2);
+        ggml_build_forward_expand(gf_3, out_3);
+
+        ggml_graph_compute_with_ctx(ctx, gf_1, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_2, 1);
+        ggml_graph_compute_with_ctx(ctx, gf_3, 1);
 
         // printf("in\n");
         // printf_tensor(t);
@@ -171,5 +238,10 @@ int main(int argc, const char** argv) {
         check_tensor(out_3, (float*)expected_out_3, 8, 5, 3);
 
     }
+}
+
+int main(int argc, const char * argv[]) {
+    test_conv_transpose_1d();
+    test_conv_transpose_2d();
     return 0;
 }

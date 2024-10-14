@@ -1,4 +1,4 @@
-#include "ggml/ggml.h"
+#include "ggml.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -15,8 +15,8 @@ int main(int argc, const char ** argv) {
         .no_alloc   = false,
     };
 
-    //struct ggml_opt_params opt_params = ggml_opt_default_params(GGML_OPT_ADAM);
-    struct ggml_opt_params opt_params = ggml_opt_default_params(GGML_OPT_LBFGS);
+    //struct ggml_opt_params opt_params = ggml_opt_default_params(GGML_OPT_TYPE_ADAM);
+    struct ggml_opt_params opt_params = ggml_opt_default_params(GGML_OPT_TYPE_LBFGS);
 
     opt_params.n_threads = (argc > 1) ? atoi(argv[1]) : 8;
 
@@ -68,7 +68,7 @@ int main(int argc, const char ** argv) {
 
         enum ggml_opt_result res = ggml_opt(NULL, opt_params, f);
 
-        GGML_ASSERT(res == GGML_OPT_OK);
+        GGML_ASSERT(res == GGML_OPT_RESULT_OK);
 
         // print results
         for (int i = 0; i < 16; i++) {

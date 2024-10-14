@@ -3,6 +3,7 @@
 
 #include "ggml.h"
 #include "ggml-alloc.h"
+#include "ggml-backend.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -245,13 +246,11 @@ struct sam_state {
     // buffer for `ggml_graph_plan.work_data`
     std::vector<uint8_t> work_buffer;
     // buffers to evaluate the model
-    std::vector<uint8_t> buf_alloc_img_enc;
     std::vector<uint8_t> buf_compute_img_enc;
 
-    std::vector<uint8_t> buf_alloc_fast;
     std::vector<uint8_t> buf_compute_fast;
 
-    struct ggml_allocr  * allocr = {};
+    ggml_gallocr_t       allocr = {};
 };
 
 // void save_tensor(sam_state& state, struct ggml_tensor * t, struct ggml_cgraph * gf) {
@@ -296,6 +295,22 @@ struct sam_image_f32 {
     std::vector<float> data;
 };
 
+struct sam_params {
+    int32_t seed      = -1; // RNG seed
+    int32_t n_threads = std::min(4, (int32_t) std::thread::hardware_concurrency());
+
+    std::string model     = "models/sam-vit-b/ggml-model-f16.bin"; // model path
+    std::string fname_inp = "img.jpg";
+    std::string fname_out = "img.out";
+    float   mask_threshold            = 0.f;
+    float   iou_threshold             = 0.88f;
+    float   stability_score_threshold = 0.95f;
+    float   stability_score_offset    = 1.0f;
+    float   eps                       = 1e-6f;
+    float   eps_decoder_transformer   = 1e-5f;
+    sam_point pt = { 414.375f, 162.796875f, };
+};
+
 void print_t_f32(const char* title, struct ggml_tensor * t, int n = 10) {
     printf("%s\n", title);
     float * data = (float *)t->data;
@@ -330,7 +345,7 @@ static void ggml_disconnect_node_from_graph(ggml_tensor * t) {
 }
 
 static void ggml_graph_compute_helper(std::vector<uint8_t> & buf, ggml_cgraph * graph, int n_threads) {
-    struct ggml_cplan plan = ggml_graph_plan(graph, n_threads);
+    struct ggml_cplan plan = ggml_graph_plan(graph, n_threads, nullptr);
 
     if (plan.work_size > 0) {
         buf.resize(plan.work_size);
@@ -469,12 +484,12 @@ bool sam_image_preprocess(const sam_image_u8 & img, sam_image_f32 & res) {
 }
 
 // load the model's weights from a file
-bool sam_model_load(const std::string & fname, sam_model & model) {
-    fprintf(stderr, "%s: loading model from '%s' - please wait ...\n", __func__, fname.c_str());
+bool sam_model_load(const sam_params & params, sam_model & model) {
+    fprintf(stderr, "%s: loading model from '%s' - please wait ...\n", __func__, params.model.c_str());
 
-    auto fin = std::ifstream(fname, std::ios::binary);
+    auto fin = std::ifstream(params.model, std::ios::binary);
     if (!fin) {
-        fprintf(stderr, "%s: failed to open '%s'\n", __func__, fname.c_str());
+        fprintf(stderr, "%s: failed to open '%s'\n", __func__, params.model.c_str());
         return false;
     }
 
@@ -483,13 +498,21 @@ bool sam_model_load(const std::string & fname, sam_model & model) {
         uint32_t magic;
         fin.read((char *) &magic, sizeof(magic));
         if (magic != 0x67676d6c) {
-            fprintf(stderr, "%s: invalid model file '%s' (bad magic)\n", __func__, fname.c_str());
+            fprintf(stderr, "%s: invalid model file '%s' (bad magic)\n", __func__, params.model.c_str());
             return false;
         }
     }
 
     // load hparams
     {
+        // Override defaults with user choices
+        model.hparams.mask_threshold            = params.mask_threshold;
+        model.hparams.iou_threshold             = params.iou_threshold;
+        model.hparams.stability_score_threshold = params.stability_score_threshold;
+        model.hparams.stability_score_offset    = params.stability_score_offset;
+        model.hparams.eps                       = params.eps;
+        model.hparams.eps_decoder_transformer   = params.eps_decoder_transformer;
+
         auto & hparams = model.hparams;
 
         fin.read((char *) &hparams.n_enc_state,     sizeof(hparams.n_enc_state));
@@ -510,6 +533,7 @@ bool sam_model_load(const std::string & fname, sam_model & model) {
         printf("%s: qntvr            = %d\n", __func__, qntvr);
 
         hparams.ftype %= GGML_QNT_VERSION_FACTOR;
+
     }
 
     // for the big tensors, we have the option to store the data in 16-bit floats or quantized
@@ -517,7 +541,7 @@ bool sam_model_load(const std::string & fname, sam_model & model) {
     ggml_type wtype = ggml_ftype_to_ggml_type((ggml_ftype) (model.hparams.ftype));
     if (wtype == GGML_TYPE_COUNT) {
         fprintf(stderr, "%s: invalid model file '%s' (bad ftype value %d)\n",
-                __func__, fname.c_str(), model.hparams.ftype);
+                __func__, params.model.c_str(), model.hparams.ftype);
         return false;
     }
 
@@ -543,56 +567,56 @@ bool sam_model_load(const std::string & fname, sam_model & model) {
 
         // image encoder
         {
-            ctx_size += n_enc_state*n_img_embd*n_img_embd*ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_state*n_img_embd*n_img_embd*ggml_type_size(GGML_TYPE_F32);
 
-            ctx_size += n_enc_state*3*n_patch_size*n_patch_size*ggml_type_sizef(GGML_TYPE_F16);
-            ctx_size += n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_state*3*n_patch_size*n_patch_size*ggml_type_size(GGML_TYPE_F16);
+            ctx_size += n_enc_state*ggml_type_size(GGML_TYPE_F32);
 
-            ctx_size +=     n_enc_state*n_enc_out_chans*1*1*ggml_type_sizef(GGML_TYPE_F16);
-            ctx_size += n_enc_out_chans*n_enc_out_chans*3*3*ggml_type_sizef(GGML_TYPE_F16);
+            ctx_size +=     n_enc_state*n_enc_out_chans*1*1*ggml_type_size(GGML_TYPE_F16);
+            ctx_size += n_enc_out_chans*n_enc_out_chans*3*3*ggml_type_size(GGML_TYPE_F16);
 
-            ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
-            ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_out_chans*ggml_type_size(GGML_TYPE_F32);
+            ctx_size += n_enc_out_chans*ggml_type_size(GGML_TYPE_F32);
 
-            ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
-            ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_out_chans*ggml_type_size(GGML_TYPE_F32);
+            ctx_size += n_enc_out_chans*ggml_type_size(GGML_TYPE_F32);
         }
 
         // image encoder layers
         {
-            ctx_size += n_enc_layer*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
-            ctx_size += n_enc_layer*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_layer*n_enc_state*ggml_type_size(GGML_TYPE_F32);
+            ctx_size += n_enc_layer*n_enc_state*ggml_type_size(GGML_TYPE_F32);
 
-            ctx_size += n_enc_layer_global*n_enc_head_dim*(2*n_img_embd - 1)*ggml_type_sizef(GGML_TYPE_F16);
-            ctx_size += n_enc_layer_global*n_enc_head_dim*(2*n_img_embd - 1)*ggml_type_sizef(GGML_TYPE_F16);
+            ctx_size += n_enc_layer_global*n_enc_head_dim*(2*n_img_embd - 1)*ggml_type_size(GGML_TYPE_F16);
+            ctx_size += n_enc_layer_global*n_enc_head_dim*(2*n_img_embd - 1)*ggml_type_size(GGML_TYPE_F16);
 
-            ctx_size += n_enc_layer_local*n_enc_head_dim*(2*n_window_size - 1)*ggml_type_sizef(GGML_TYPE_F16);
-            ctx_size += n_enc_layer_local*n_enc_head_dim*(2*n_window_size - 1)*ggml_type_sizef(GGML_TYPE_F16);
+            ctx_size += n_enc_layer_local*n_enc_head_dim*(2*n_window_size - 1)*ggml_type_size(GGML_TYPE_F16);
+            ctx_size += n_enc_layer_local*n_enc_head_dim*(2*n_window_size - 1)*ggml_type_size(GGML_TYPE_F16);
 
-            ctx_size += n_enc_layer*3*n_enc_state*n_enc_state*ggml_type_sizef(GGML_TYPE_F16);
-            ctx_size += n_enc_layer*3*n_enc_state*            ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_layer*3*n_enc_state*n_enc_state*ggml_type_size(GGML_TYPE_F16);
+            ctx_size += n_enc_layer*3*n_enc_state*            ggml_type_size(GGML_TYPE_F32);
 
-            ctx_size += n_enc_layer*n_enc_state*n_enc_state*ggml_type_sizef(GGML_TYPE_F16);
-            ctx_size += n_enc_layer*n_enc_state*            ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_layer*n_enc_state*n_enc_state*ggml_type_size(GGML_TYPE_F16);
+            ctx_size += n_enc_layer*n_enc_state*            ggml_type_size(GGML_TYPE_F32);
 
-            ctx_size += n_enc_layer*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
-            ctx_size += n_enc_layer*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_layer*n_enc_state*ggml_type_size(GGML_TYPE_F32);
+            ctx_size += n_enc_layer*n_enc_state*ggml_type_size(GGML_TYPE_F32);
 
-            ctx_size += n_enc_layer*4*n_enc_state*n_enc_state*ggml_type_sizef(GGML_TYPE_F16);
-            ctx_size += n_enc_layer*4*n_enc_state*            ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_layer*4*n_enc_state*n_enc_state*ggml_type_size(GGML_TYPE_F16);
+            ctx_size += n_enc_layer*4*n_enc_state*            ggml_type_size(GGML_TYPE_F32);
 
-            ctx_size += n_enc_layer*4*n_enc_state*n_enc_state*ggml_type_sizef(GGML_TYPE_F16);
-            ctx_size += n_enc_layer*4*n_enc_state*            ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_layer*4*n_enc_state*n_enc_state*ggml_type_size(GGML_TYPE_F16);
+            ctx_size += n_enc_layer*4*n_enc_state*            ggml_type_size(GGML_TYPE_F32);
         }
 
         ctx_size += (8 + 14*n_enc_layer)*ggml_tensor_overhead();
 
         // prompt encoder
         {
-            ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16); // 2*(n_enc_out_chans/2)
+            ctx_size += n_enc_out_chans*ggml_type_size(GGML_TYPE_F16); // 2*(n_enc_out_chans/2)
 
-            ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
-            ctx_size += n_pt_embd*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
+            ctx_size += n_enc_out_chans*ggml_type_size(GGML_TYPE_F32);
+            ctx_size += n_pt_embd*n_enc_out_chans*ggml_type_size(GGML_TYPE_F32);
         }
 
         ctx_size += (2 + n_pt_embd)*ggml_tensor_overhead();
@@ -607,62 +631,62 @@ bool sam_model_load(const std::string & fname, sam_model & model) {
                 const int n_hypernet_mpls_count = 4;
 
                 // self_attn
-                ctx_size += tfm_layers_count*qkv_count*n_enc_state*n_enc_state*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += tfm_layers_count*qkv_count*n_enc_state*            ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += tfm_layers_count*n_enc_state*                      ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*qkv_count*n_enc_state*n_enc_state*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += tfm_layers_count*qkv_count*n_enc_state*            ggml_type_size(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*n_enc_state*                      ggml_type_size(GGML_TYPE_F32);
 
                 // all norms
-                ctx_size += tfm_layers_count*norm_count*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += tfm_layers_count*norm_count*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*norm_count*n_enc_state*ggml_type_size(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*norm_count*n_enc_state*ggml_type_size(GGML_TYPE_F32);
 
                 // cross_attn_token_to_img
-                ctx_size += tfm_layers_count*qkv_count*n_enc_state*(n_enc_state/2)*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += tfm_layers_count*qkv_count*(n_enc_state/2)*            ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += tfm_layers_count*n_enc_state*                          ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*qkv_count*n_enc_state*(n_enc_state/2)*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += tfm_layers_count*qkv_count*(n_enc_state/2)*            ggml_type_size(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*n_enc_state*                          ggml_type_size(GGML_TYPE_F32);
 
                 // mlp
-                ctx_size += tfm_layers_count*8*n_enc_out_chans*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += tfm_layers_count*8*n_enc_out_chans*                ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += tfm_layers_count*n_enc_out_chans*8*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += tfm_layers_count*n_enc_out_chans*                  ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*8*n_enc_out_chans*n_enc_out_chans*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += tfm_layers_count*8*n_enc_out_chans*                ggml_type_size(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*n_enc_out_chans*8*n_enc_out_chans*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += tfm_layers_count*n_enc_out_chans*                  ggml_type_size(GGML_TYPE_F32);
 
                 // cross_attn_img_to_token
-                ctx_size += tfm_layers_count*qkv_count*n_enc_state*(n_enc_state/2)*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += tfm_layers_count*qkv_count*(n_enc_state/2)*            ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += tfm_layers_count*n_enc_state*                          ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*qkv_count*n_enc_state*(n_enc_state/2)*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += tfm_layers_count*qkv_count*(n_enc_state/2)*            ggml_type_size(GGML_TYPE_F32);
+                ctx_size += tfm_layers_count*n_enc_state*                          ggml_type_size(GGML_TYPE_F32);
 
                 // transformer_final_attn_token_to_img
-                ctx_size += qkv_count*n_enc_state*(n_enc_state/2)*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += qkv_count*(n_enc_state/2)*            ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += n_enc_state*                          ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += qkv_count*n_enc_state*(n_enc_state/2)*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += qkv_count*(n_enc_state/2)*            ggml_type_size(GGML_TYPE_F32);
+                ctx_size += n_enc_state*                          ggml_type_size(GGML_TYPE_F32);
 
                 // transformer_norm_final
-                ctx_size += norm_count*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += norm_count*n_enc_state*ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += norm_count*n_enc_state*ggml_type_size(GGML_TYPE_F32);
+                ctx_size += norm_count*n_enc_state*ggml_type_size(GGML_TYPE_F32);
 
                 // output_upscaling
-                ctx_size += n_enc_out_chans*n_img_embd*2*2*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += 3*n_img_embd*                  ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += n_enc_out_chans*n_img_embd*(n_img_embd/2)*2*2*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += (n_img_embd/2)*                               ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += n_enc_out_chans*n_img_embd*2*2*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += 3*n_img_embd*                  ggml_type_size(GGML_TYPE_F32);
+                ctx_size += n_enc_out_chans*n_img_embd*(n_img_embd/2)*2*2*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += (n_img_embd/2)*                               ggml_type_size(GGML_TYPE_F32);
 
                 // output_hypernetworks_mlps
-                ctx_size += n_hypernet_mpls_count*2*n_enc_out_chans*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += n_hypernet_mpls_count*2*n_enc_out_chans*                ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += n_hypernet_mpls_count*n_enc_out_chans*(n_img_embd/2)*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += n_hypernet_mpls_count*(n_img_embd/2)*                ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += n_hypernet_mpls_count*2*n_enc_out_chans*n_enc_out_chans*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += n_hypernet_mpls_count*2*n_enc_out_chans*                ggml_type_size(GGML_TYPE_F32);
+                ctx_size += n_hypernet_mpls_count*n_enc_out_chans*(n_img_embd/2)*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += n_hypernet_mpls_count*(n_img_embd/2)*                ggml_type_size(GGML_TYPE_F32);
 
                 // iou_prediction_head
-                ctx_size += 2*n_enc_out_chans*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += 2*n_enc_out_chans*                ggml_type_sizef(GGML_TYPE_F32);
-                ctx_size += n_pt_embd*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F16);
-                ctx_size += n_pt_embd*                ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += 2*n_enc_out_chans*n_enc_out_chans*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += 2*n_enc_out_chans*                ggml_type_size(GGML_TYPE_F32);
+                ctx_size += n_pt_embd*n_enc_out_chans*ggml_type_size(GGML_TYPE_F16);
+                ctx_size += n_pt_embd*                ggml_type_size(GGML_TYPE_F32);
 
                 // iou_token_w
-                ctx_size += n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += n_enc_out_chans*ggml_type_size(GGML_TYPE_F32);
 
                 // mask_tokens_w
-                ctx_size += n_pt_embd*n_enc_out_chans*ggml_type_sizef(GGML_TYPE_F32);
+                ctx_size += n_pt_embd*n_enc_out_chans*ggml_type_size(GGML_TYPE_F32);
             }
         }
         fprintf(stderr, "%s: ggml ctx size = %6.2f MB\n", __func__, ctx_size/(1024.0*1024.0));
@@ -1091,28 +1115,15 @@ struct ggml_tensor * sam_fill_dense_pe(
     const auto & hparams = model.hparams;
     const auto & enc     = model.enc_prompt;
 
+
     const int32_t n_img_embd = hparams.n_img_embd();
-    const float n_img_embd_inv = 1.0f / n_img_embd;
-
     struct ggml_tensor * xy_embed_stacked = ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, 2, n_img_embd, n_img_embd);
-    ggml_allocr_alloc(state.allocr, xy_embed_stacked);
-
-    if (!ggml_allocr_is_measure(state.allocr)) {
-        float * data = (float *) ggml_get_data(xy_embed_stacked);
-        for (int i = 0; i < n_img_embd; ++i) {
-            const int row = 2*i*n_img_embd;
-            const float y_val = 2 * (i + 0.5f) * n_img_embd_inv - 1;
-            for (int j = 0; j < n_img_embd; ++j) {
-                const float x_val = 2 * (j + 0.5f) * n_img_embd_inv - 1;
-                data[row + 2*j + 0] = x_val;
-                data[row + 2*j + 1] = y_val;
-            }
-        }
-    }
+    ggml_set_name(xy_embed_stacked, "xy_embed_stacked");
+    ggml_set_input(xy_embed_stacked);
 
     struct ggml_tensor * cur = ggml_mul_mat(ctx0, ggml_cont(ctx0, ggml_transpose(ctx0, enc.pe)), xy_embed_stacked);
 
-    cur = ggml_scale(ctx0, cur, ggml_new_f32(ctx0, float(2.0*M_PI)));
+    cur = ggml_scale(ctx0, cur, float(2.0*M_PI));
 
     // concat
     // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/modeling/prompt_encoder.py#L192
@@ -1181,24 +1192,8 @@ struct ggml_cgraph  * sam_encode_image(
     struct ggml_cgraph  * gf     = ggml_new_graph(ctx0);
 
     struct ggml_tensor * inp = ggml_new_tensor_4d(ctx0, GGML_TYPE_F32, n_img_size, n_img_size, 3, 1);
-    ggml_allocr_alloc(state.allocr, inp);
-    if (!ggml_allocr_is_measure(state.allocr)) {
-        float * data = (float *) ggml_get_data(inp);
-
-        const int nx = img.nx;
-        const int ny = img.ny;
-        const int n  = nx*ny;
-
-        GGML_ASSERT(nx == n_img_size && ny == n_img_size);
-
-        for (int k = 0; k < 3; k++) {
-            for (int y = 0; y < ny; y++) {
-                for (int x = 0; x < nx; x++) {
-                    data[k*n + y*nx + x] = img.data[3*(y*nx + x) + k];
-                }
-            }
-        }
-    }
+    ggml_set_name(inp, "inp");
+    ggml_set_input(inp);
 
     // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/modeling/image_encoder.py#L392
     struct ggml_tensor * cur = ggml_conv_2d_sk_p0(ctx0, enc.proj_w, inp);
@@ -1282,8 +1277,7 @@ struct ggml_cgraph  * sam_encode_image(
             struct ggml_tensor * KQ_scaled =
                 ggml_scale_inplace(ctx0,
                         KQ,
-                        ggml_new_f32(ctx0, 1.0f/sqrtf(n_enc_head_dim))
-                        );
+                        1.0f/sqrtf(n_enc_head_dim));
 
             struct ggml_tensor * rw = ggml_get_rel_pos(ctx0, layer.rel_pos_w, W, W);
             struct ggml_tensor * rh = ggml_get_rel_pos(ctx0, layer.rel_pos_h, H, H);
@@ -1369,6 +1363,27 @@ struct ggml_cgraph  * sam_encode_image(
 
     ggml_free(ctx0);
 
+    ggml_gallocr_alloc_graph(state.allocr, gf);
+
+    {
+        struct ggml_tensor * inp = ggml_graph_get_tensor(gf, "inp");
+        float * data = (float *) ggml_get_data(inp);
+
+        const int nx = img.nx;
+        const int ny = img.ny;
+        const int n  = nx*ny;
+
+        GGML_ASSERT(nx == n_img_size && ny == n_img_size);
+
+        for (int k = 0; k < 3; k++) {
+            for (int y = 0; y < ny; y++) {
+                for (int x = 0; x < nx; x++) {
+                    data[k*n + y*nx + x] = img.data[3*(y*nx + x) + k];
+                }
+            }
+        }
+    }
+
     return gf;
 }
 
@@ -1390,47 +1405,19 @@ prompt_encoder_result sam_encode_prompt(
         const sam_model     & model,
         struct ggml_context * ctx0,
         struct ggml_cgraph  * gf,
-                  sam_state & state,
-                        int   nx,
-                        int   ny,
-                  sam_point   point) {
+                  sam_state & state) {
 
     const auto & hparams = model.hparams;
     const auto & enc = model.enc_prompt;
 
-    // transform points
-    // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/automatic_mask_generator.py#L276
-    {
-        const int nmax = std::max(nx, ny);
-
-        const float scale = hparams.n_img_size() / (float) nmax;
-
-        const int nx_new = int(nx*scale + 0.5f);
-        const int ny_new = int(ny*scale + 0.5f);
-
-        point.x = point.x*(float(nx_new)/nx) + 0.5f;
-        point.y = point.y*(float(ny_new)/ny) + 0.5f;
-    }
-
     struct ggml_tensor * inp = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, 2, 2);
+    ggml_set_name(inp, "prompt_input");
+    ggml_set_input(inp);
 
-    ggml_allocr_alloc(state.allocr, inp);
-    if (!ggml_allocr_is_measure(state.allocr)) {
-        // set the input by converting the [0, 1] coordinates to [-1, 1]
-        float * data = (float *) inp->data;
-
-        data[0] = 2.0f*(point.x / hparams.n_img_size()) - 1.0f;
-        data[1] = 2.0f*(point.y / hparams.n_img_size()) - 1.0f;
-
-        // padding
-        // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/modeling/prompt_encoder.py#L81-L85
-        data[2] = 2.0f*(0.0f) - 1.0f;
-        data[3] = 2.0f*(0.0f) - 1.0f;
-    }
 
     struct ggml_tensor * cur = ggml_mul_mat(ctx0, ggml_cont(ctx0, ggml_transpose(ctx0, enc.pe)), inp);
 
-    cur = ggml_scale(ctx0, cur, ggml_new_f32(ctx0, float(2.0*M_PI)));
+    cur = ggml_scale(ctx0, cur, float(2.0*M_PI));
 
     // concat
     // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/modeling/prompt_encoder.py#L192
@@ -1512,10 +1499,7 @@ struct ggml_tensor* sam_decode_mask_transformer_attn(
     // Q * K
     struct ggml_tensor * KQ = ggml_mul_mat(ctx0, K, Q);
 
-    struct ggml_tensor * KQ_scaled =
-        ggml_scale_inplace(ctx0,
-                KQ,
-                ggml_new_f32(ctx0, 1.0f/sqrt(float(Q->ne[0]))));
+    struct ggml_tensor * KQ_scaled = ggml_scale_inplace(ctx0, KQ, 1.0f/sqrt(float(Q->ne[0])));
 
     struct ggml_tensor * KQ_soft_max = ggml_soft_max_inplace(ctx0, KQ_scaled);
 
@@ -1736,7 +1720,6 @@ bool sam_decode_mask(
     {
         // ConvTranspose2d
         keys = ggml_conv_transpose_2d_p0(ctx0, dec.output_upscaling_0_w, keys, 2);
-        ggml_allocr_alloc(state.allocr, keys); // TODO: This alloc shouldn't be needed
         keys = ggml_add_inplace(ctx0, keys, ggml_repeat(ctx0,
                                      ggml_reshape_3d(ctx0, dec.output_upscaling_0_b, 1, 1, dec.output_upscaling_0_b->ne[0]),
                                      keys));
@@ -1748,7 +1731,6 @@ bool sam_decode_mask(
 
         // ConvTranspose2d
         keys = ggml_conv_transpose_2d_p0(ctx0, dec.output_upscaling_3_w, keys, 2);
-        ggml_allocr_alloc(state.allocr, keys); // TODO: This alloc shouldn't be needed
         keys = ggml_add_inplace(ctx0, ggml_repeat(ctx0,
                                 ggml_reshape_3d(ctx0, dec.output_upscaling_3_b, 1, 1, dec.output_upscaling_3_b->ne[0]),
                                 keys), keys);
@@ -1791,7 +1773,7 @@ bool sam_decode_mask(
     return true;
 }
 
-bool sam_write_masks(const sam_hparams& hparams, int nx, int ny, const sam_state & state) {
+bool sam_write_masks(const sam_hparams& hparams, int nx, int ny, const sam_state & state, const std::string & fname) {
     if (state.low_res_masks->ne[2] == 0) return true;
     if (state.low_res_masks->ne[2] != state.iou_predictions->ne[0]) {
         printf("Error: number of masks (%d) does not match number of iou predictions (%d)\n", (int)state.low_res_masks->ne[2], (int)state.iou_predictions->ne[0]);
@@ -1938,7 +1920,7 @@ bool sam_write_masks(const sam_hparams& hparams, int nx, int ny, const sam_state
         printf("Mask %d: iou = %f, stability_score = %f, bbox (%d, %d), (%d, %d)\n",
                 i, iou_data[i], stability_score, min_ix, max_ix, min_iy, max_iy);
 
-        std::string filename = "mask_out_" + std::to_string(i) + ".png";
+        std::string filename = fname + std::to_string(i) + ".png";
         if (!stbi_write_png(filename.c_str(), res.nx, res.ny, 1, res.data.data(), res.nx)) {
             printf("%s: failed to write mask %s\n", __func__, filename.c_str());
             return false;
@@ -1965,9 +1947,9 @@ struct ggml_cgraph  * sam_build_fast_graph(
     struct ggml_context * ctx0   = ggml_init(ggml_params);
     struct ggml_cgraph  * gf     = ggml_new_graph(ctx0);
 
-    prompt_encoder_result enc_res = sam_encode_prompt(model, ctx0, gf, state, nx, ny, point);
+    prompt_encoder_result enc_res = sam_encode_prompt(model, ctx0, gf, state);
     if (!enc_res.embd_prompt_sparse || !enc_res.embd_prompt_dense) {
-        fprintf(stderr, "%s: failed to encode prompt\n", __func__);
+        fprintf(stderr, "%s: failed to encode prompt (%f, %f)\n", __func__, point.x, point.y);
         return {};
     }
 
@@ -1984,16 +1966,56 @@ struct ggml_cgraph  * sam_build_fast_graph(
 
     ggml_free(ctx0);
 
+    ggml_gallocr_alloc_graph(state.allocr, gf);
+
+    // from sam_encode_prompt
+    {
+        // transform points
+        // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/automatic_mask_generator.py#L276
+        {
+            const int nmax = std::max(nx, ny);
+
+            const float scale = model.hparams.n_img_size() / (float) nmax;
+
+            const int nx_new = int(nx*scale + 0.5f);
+            const int ny_new = int(ny*scale + 0.5f);
+
+            point.x = point.x*(float(nx_new)/nx) + 0.5f;
+            point.y = point.y*(float(ny_new)/ny) + 0.5f;
+        }
+
+        struct ggml_tensor * inp = ggml_graph_get_tensor(gf, "prompt_input");
+        // set the input by converting the [0, 1] coordinates to [-1, 1]
+        float * data = (float *) inp->data;
+
+        data[0] = 2.0f*(point.x / model.hparams.n_img_size()) - 1.0f;
+        data[1] = 2.0f*(point.y / model.hparams.n_img_size()) - 1.0f;
+
+        // padding
+        // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/modeling/prompt_encoder.py#L81-L85
+        data[2] = 2.0f*(0.0f) - 1.0f;
+        data[3] = 2.0f*(0.0f) - 1.0f;
+    }
+
+    // from sam_fill_dense_pe
+    {
+        struct ggml_tensor * xy_embed_stacked = ggml_graph_get_tensor(gf, "xy_embed_stacked");
+        const int32_t n_img_embd = model.hparams.n_img_embd();
+        const float n_img_embd_inv = 1.0f / n_img_embd;
+        float * data = (float *) ggml_get_data(xy_embed_stacked);
+        for (int i = 0; i < n_img_embd; ++i) {
+            const int row = 2*i*n_img_embd;
+            const float y_val = 2 * (i + 0.5f) * n_img_embd_inv - 1;
+            for (int j = 0; j < n_img_embd; ++j) {
+                const float x_val = 2 * (j + 0.5f) * n_img_embd_inv - 1;
+                data[row + 2*j + 0] = x_val;
+                data[row + 2*j + 1] = y_val;
+            }
+        }
+    }
+
     return gf;
 }
-struct sam_params {
-    int32_t seed      = -1; // RNG seed
-    int32_t n_threads = std::min(4, (int32_t) std::thread::hardware_concurrency());
-
-    std::string model     = "models/sam-vit-b/ggml-model-f16.bin"; // model path
-    std::string fname_inp = "img.jpg";
-    std::string fname_out = "img.out";
-};
 
 void sam_print_usage(int argc, char ** argv, const sam_params & params) {
     fprintf(stderr, "usage: %s [options]\n", argv[0]);
@@ -2007,7 +2029,23 @@ void sam_print_usage(int argc, char ** argv, const sam_params & params) {
     fprintf(stderr, "  -i FNAME, --inp FNAME\n");
     fprintf(stderr, "                        input file (default: %s)\n", params.fname_inp.c_str());
     fprintf(stderr, "  -o FNAME, --out FNAME\n");
-    fprintf(stderr, "                        output file (default: %s)\n", params.fname_out.c_str());
+    fprintf(stderr, "                        mask file name prefix (default: %s)\n", params.fname_out.c_str());
+    fprintf(stderr, "SAM hyperparameters:\n");
+    fprintf(stderr, "  -mt FLOAT, --mask-threshold\n");
+    fprintf(stderr, "                        mask threshold (default: %f)\n", params.mask_threshold);
+    fprintf(stderr, "  -it FLOAT, --iou-threshold\n");
+    fprintf(stderr, "                        iou threshold (default: %f)\n", params.iou_threshold);
+    fprintf(stderr, "  -st FLOAT, --score-threshold\n");
+    fprintf(stderr, "                        score threshold (default: %f)\n", params.stability_score_threshold);
+    fprintf(stderr, "  -so FLOAT, --score-offset\n");
+    fprintf(stderr, "                        score offset (default: %f)\n", params.stability_score_offset);
+    fprintf(stderr, "  -e FLOAT, --epsilon\n");
+    fprintf(stderr, "                        epsilon (default: %f)\n", params.eps);
+    fprintf(stderr, "  -ed FLOAT, --epsilon-decoder-transformer\n");
+    fprintf(stderr, "                        epsilon decoder transformer (default: %f)\n", params.eps_decoder_transformer);
+    fprintf(stderr, "SAM prompt:\n");
+    fprintf(stderr, "  -p TUPLE, --point-prompt\n");
+    fprintf(stderr, "                        point to be used as prompt for SAM (default: %f,%f). Must be in a format FLOAT,FLOAT \n", params.pt.x, params.pt.y);
     fprintf(stderr, "\n");
 }
 
@@ -2025,6 +2063,34 @@ bool sam_params_parse(int argc, char ** argv, sam_params & params) {
             params.fname_inp = argv[++i];
         } else if (arg == "-o" || arg == "--out") {
             params.fname_out = argv[++i];
+        } else if (arg == "-mt" || arg == "--mask-threshold") {
+            params.mask_threshold = std::stof(argv[++i]);
+        } else if (arg == "-it" || arg == "--iou-threshold") {
+            params.iou_threshold = std::stof(argv[++i]);
+        } else if (arg == "-st" || arg == "--score-threshold") {
+            params.stability_score_threshold = std::stof(argv[++i]);
+        } else if (arg == "-so" || arg == "--score-offset") {
+            params.stability_score_offset = std::stof(argv[++i]);
+        } else if (arg == "-e" || arg == "--epsilon") {
+            params.eps = std::stof(argv[++i]);
+        } else if (arg == "-ed" || arg == "--epsilon-decoder-transformer") {
+            params.eps_decoder_transformer = std::stof(argv[++i]);
+        } else if (arg == "-p" || arg == "--point-prompt") {
+            // TODO multiple points per model invocation
+            char* point = argv[++i];
+
+            char* coord = strtok(point, ",");
+            if (!coord){
+                fprintf(stderr, "Error while parsing prompt!\n");
+                exit(1);
+            }
+            params.pt.x = std::stof(coord);
+            coord = strtok(NULL, ",");
+            if (!coord){
+                fprintf(stderr, "Error while parsing prompt!\n");
+                exit(1);
+            }
+            params.pt.y = std::stof(coord);
         } else if (arg == "-h" || arg == "--help") {
             sam_print_usage(argc, argv, params);
             exit(0);
@@ -2078,7 +2144,7 @@ int main(int argc, char ** argv) {
     {
         const int64_t t_start_us = ggml_time_us();
 
-        if (!sam_model_load(params.model, model)) {
+        if (!sam_model_load(params, model)) {
             fprintf(stderr, "%s: failed to load model from '%s'\n", __func__, params.model.c_str());
             return 1;
         }
@@ -2107,25 +2173,9 @@ int main(int argc, char ** argv) {
     }
 
 
-    static const size_t tensor_alignment = 32;
     {
-        state.buf_compute_img_enc.resize(ggml_tensor_overhead()*GGML_MAX_NODES + ggml_graph_overhead());
-        state.allocr = ggml_allocr_new_measure(tensor_alignment);
-        struct ggml_cgraph * gf_measure = sam_encode_image(model, state, img1);
-        if (!gf_measure) {
-            fprintf(stderr, "%s: failed to encode image\n", __func__);
-            return 1;
-        }
-
-        size_t alloc_size = ggml_allocr_alloc_graph(state.allocr, gf_measure) + tensor_alignment;
-        ggml_allocr_free(state.allocr);
-
-        // recreate allocator with exact memory requirements
-        state.buf_alloc_img_enc.resize(alloc_size);
-        state.allocr = ggml_allocr_new(state.buf_alloc_img_enc.data(), state.buf_alloc_img_enc.size(), tensor_alignment);
-
-        // compute the graph with the measured exact memory requirements from above
-        ggml_allocr_reset(state.allocr);
+        state.buf_compute_img_enc.resize(ggml_tensor_overhead()*GGML_DEFAULT_GRAPH_SIZE + ggml_graph_overhead());
+        state.allocr = ggml_gallocr_new(ggml_backend_cpu_buffer_type());
 
         struct ggml_cgraph  * gf = sam_encode_image(model, state, img1);
         if (!gf) {
@@ -2133,56 +2183,36 @@ int main(int argc, char ** argv) {
             return 1;
         }
 
-        ggml_allocr_alloc_graph(state.allocr, gf);
-
         ggml_graph_compute_helper(state.work_buffer, gf, params.n_threads);
 
         print_t_f32("embd_img", state.embd_img);
 
-        ggml_allocr_free(state.allocr);
+        ggml_gallocr_free(state.allocr);
         state.allocr = NULL;
         state.work_buffer.clear();
     }
     {
-        state.buf_compute_fast.resize(ggml_tensor_overhead()*GGML_MAX_NODES + ggml_graph_overhead());
-        state.allocr = ggml_allocr_new_measure(tensor_alignment);
+        state.buf_compute_fast.resize(ggml_tensor_overhead()*GGML_DEFAULT_GRAPH_SIZE + ggml_graph_overhead());
+        state.allocr = ggml_gallocr_new(ggml_backend_cpu_buffer_type());
 
-        // TODO: user input
-        const sam_point pt = { 414.375f, 162.796875f, };
-        // measure memory requirements for the graph
-        struct ggml_cgraph  * gf_measure = sam_build_fast_graph(model, state, img0.nx, img0.ny, pt);
-        if (!gf_measure) {
-            fprintf(stderr, "%s: failed to build fast graph to measure\n", __func__);
-            return 1;
-        }
+        // TODO: more varied prompts
+        fprintf(stderr, "prompt: (%f, %f)\n", params.pt.x, params.pt.y);
 
-        size_t alloc_size = ggml_allocr_alloc_graph(state.allocr, gf_measure) + tensor_alignment;
-        ggml_allocr_free(state.allocr);
-
-        // recreate allocator with exact memory requirements
-        state.buf_alloc_fast.resize(alloc_size);
-        state.allocr = ggml_allocr_new(state.buf_alloc_fast.data(), state.buf_alloc_fast.size(), tensor_alignment);
-
-        // compute the graph with the measured exact memory requirements from above
-        ggml_allocr_reset(state.allocr);
-
-        struct ggml_cgraph  * gf = sam_build_fast_graph(model, state, img0.nx, img0.ny, pt);
+        struct ggml_cgraph  * gf = sam_build_fast_graph(model, state, img0.nx, img0.ny, params.pt);
         if (!gf) {
             fprintf(stderr, "%s: failed to build fast graph\n", __func__);
             return 1;
         }
 
-        ggml_allocr_alloc_graph(state.allocr, gf);
-
         ggml_graph_compute_helper(state.work_buffer, gf, params.n_threads);
 
         //print_t_f32("iou_predictions", state.iou_predictions);
         //print_t_f32("low_res_masks", state.low_res_masks);
-        ggml_allocr_free(state.allocr);
+        ggml_gallocr_free(state.allocr);
         state.allocr = NULL;
     }
 
-    if (!sam_write_masks(model.hparams, img0.nx, img0.ny, state)) {
+    if (!sam_write_masks(model.hparams, img0.nx, img0.ny, state, params.fname_out)) {
         fprintf(stderr, "%s: failed to write masks\n", __func__);
         return 1;
     }

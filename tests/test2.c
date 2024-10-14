@@ -1,5 +1,5 @@
 #define _CRT_SECURE_NO_DEPRECATE // Disables ridiculous "unsafe" warnigns on Windows
-#include "ggml/ggml.h"
+#include "ggml.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -20,10 +20,10 @@ int main(int argc, const char ** argv) {
         .no_alloc   = false,
     };
 
-    //struct ggml_opt_params opt_params = ggml_opt_default_params(GGML_OPT_ADAM);
+    //struct ggml_opt_params opt_params = ggml_opt_default_params(GGML_OPT_TYPE_ADAM);
     //opt_params.adam.alpha = 0.01f;
 
-    struct ggml_opt_params opt_params = ggml_opt_default_params(GGML_OPT_LBFGS);
+    struct ggml_opt_params opt_params = ggml_opt_default_params(GGML_OPT_TYPE_LBFGS);
 
     // original threads: 8
     int nthreads = 8;
@@ -79,7 +79,7 @@ int main(int argc, const char ** argv) {
         printf("t0 = %f\n", ggml_get_f32_1d(t0, 0));
         printf("t1 = %f\n", ggml_get_f32_1d(t1, 0));
 
-        GGML_ASSERT(res == GGML_OPT_OK);
+        GGML_ASSERT(res == GGML_OPT_RESULT_OK);
 
         GGML_ASSERT(is_close(ggml_get_f32_1d(t0, 0),  5.0f, 1e-3f));
         GGML_ASSERT(is_close(ggml_get_f32_1d(t1, 0), 10.0f, 1e-3f));
@@ -110,7 +110,7 @@ int main(int argc, const char ** argv) {
 
         enum ggml_opt_result res = ggml_opt(NULL, opt_params, f);
 
-        GGML_ASSERT(res == GGML_OPT_OK);
+        GGML_ASSERT(res == GGML_OPT_RESULT_OK);
         GGML_ASSERT(is_close(ggml_get_f32_1d(t0, 0),  5.0f, 1e-2f));
         GGML_ASSERT(is_close(ggml_get_f32_1d(t1, 0), 10.0f, 1e-2f));
     }
@@ -131,7 +131,7 @@ int main(int argc, const char ** argv) {
 
         enum ggml_opt_result res = ggml_opt(NULL, opt_params, f);
 
-        GGML_ASSERT(res == GGML_OPT_OK);
+        GGML_ASSERT(res == GGML_OPT_RESULT_OK);
         GGML_ASSERT(is_close(ggml_get_f32_1d(f,  0), 0.0f, 1e-3f));
         GGML_ASSERT(is_close(ggml_get_f32_1d(t0, 0), 0.0f, 1e-3f));
         GGML_ASSERT(is_close(ggml_get_f32_1d(t1, 0), 0.0f, 1e-3f));
@@ -169,7 +169,7 @@ int main(int argc, const char ** argv) {
 
         enum ggml_opt_result res = ggml_opt(NULL, opt_params, f);
 
-        GGML_ASSERT(res == GGML_OPT_OK);
+        GGML_ASSERT(res == GGML_OPT_RESULT_OK);
         GGML_ASSERT(is_close(ggml_get_f32_1d(f,  0), 0.0f, 1e-3f));
         GGML_ASSERT(is_close(ggml_get_f32_1d(t0, 0), 1.0f, 1e-3f));
         GGML_ASSERT(is_close(ggml_get_f32_1d(t1, 0), 3.0f, 1e-3f));

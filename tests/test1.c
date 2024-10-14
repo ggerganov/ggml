@@ -1,4 +1,4 @@
-#include "ggml/ggml.h"
+#include "ggml.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,16 +28,18 @@ int main(int argc, const char ** argv) {
 
         ggml_print_objects(ctx0);
 
-        struct ggml_cgraph gf = ggml_build_forward(f);
-        struct ggml_cgraph gb = ggml_build_backward(ctx0, &gf, false);
+        struct ggml_cgraph * gf = ggml_new_graph_custom(ctx0, GGML_DEFAULT_GRAPH_SIZE, true);
+        ggml_build_forward_expand(gf, f);
+        struct ggml_cgraph * gb = ggml_graph_dup(ctx0, gf);
+        ggml_build_backward_expand(ctx0, gf, gb, false);
 
         ggml_set_f32(x, 2.0f);
         ggml_set_f32(a, 3.0f);
 
-        ggml_graph_reset(&gf);
+        ggml_graph_reset(gf);
         ggml_set_f32(f->grad, 1.0f);
 
-        ggml_graph_compute_with_ctx(ctx0, &gb, n_threads);
+        ggml_graph_compute_with_ctx(ctx0, gb, n_threads);
 
         printf("f     = %f\n", ggml_get_f32_1d(f, 0));
         printf("df/dx = %f\n", ggml_get_f32_1d(x->grad, 0));
@@ -47,10 +49,10 @@ int main(int argc, const char ** argv) {
 
         ggml_set_f32(x, 3.0f);
 
-        ggml_graph_reset(&gf);
+        ggml_graph_reset(gf);
         ggml_set_f32(f->grad, 1.0f);
 
-        ggml_graph_compute_with_ctx(ctx0, &gb, n_threads);
+        ggml_graph_compute_with_ctx(ctx0, gb, n_threads);
 
         printf("f     = %f\n", ggml_get_f32_1d(f, 0));
         printf("df/dx = %f\n", ggml_get_f32_1d(x->grad, 0));
@@ -58,8 +60,8 @@ int main(int argc, const char ** argv) {
         GGML_ASSERT(ggml_get_f32_1d(f, 0)       == 27.0f);
         GGML_ASSERT(ggml_get_f32_1d(x->grad, 0) == 18.0f);
 
-        ggml_graph_dump_dot(&gf, NULL, "test1-1-forward.dot");
-        ggml_graph_dump_dot(&gb, &gf,  "test1-1-backward.dot");
+        ggml_graph_dump_dot(gf, NULL, "test1-1-forward.dot");
+        ggml_graph_dump_dot(gb, gf,   "test1-1-backward.dot");
     }
 
     ///////////////////////////////////////////////////////////////
@@ -78,13 +80,15 @@ int main(int argc, const char ** argv) {
 
         struct ggml_tensor * y = ggml_add(ctx0, ggml_mul(ctx0, x1, x1), ggml_mul(ctx0, x1, x2));
 
-        struct ggml_cgraph gf = ggml_build_forward(y);
-        struct ggml_cgraph gb = ggml_build_backward(ctx0, &gf, false);
+        struct ggml_cgraph * gf = ggml_new_graph_custom(ctx0, GGML_DEFAULT_GRAPH_SIZE, true);
+        ggml_build_forward_expand(gf, y);
+        struct ggml_cgraph * gb = ggml_graph_dup(ctx0, gf);
+        ggml_build_backward_expand(ctx0, gf, gb, false);
 
-        ggml_graph_reset(&gf);
+        ggml_graph_reset(gf);
         ggml_set_f32(y->grad, 1.0f);
 
-        ggml_graph_compute_with_ctx(ctx0, &gb, n_threads);
+        ggml_graph_compute_with_ctx(ctx0, gb, n_threads);
 
         printf("y      = %f\n", ggml_get_f32_1d(y, 0));
         printf("df/dx1 = %f\n", ggml_get_f32_1d(x1->grad, 0));
@@ -97,21 +101,23 @@ int main(int argc, const char ** argv) {
         struct ggml_tensor * g1 = x1->grad;
         struct ggml_tensor * g2 = x2->grad;
 
-        struct ggml_cgraph gbb = ggml_build_backward(ctx0, &gb, true);
+        struct ggml_cgraph * gbb = ggml_graph_dup(ctx0, gb);
 
-        ggml_graph_reset(&gb);
+        ggml_build_backward_expand(ctx0, gb, gbb, false);
+
+        ggml_graph_reset(gb);
         ggml_set_f32(g1->grad, 1.0f);
         ggml_set_f32(g2->grad, 1.0f);
 
-        ggml_graph_compute_with_ctx(ctx0, &gbb, n_threads);
+        ggml_graph_compute_with_ctx(ctx0, gbb, n_threads);
 
         printf("H * [1, 1] = [ %f %f ]\n", ggml_get_f32_1d(x1->grad, 0), ggml_get_f32_1d(x2->grad, 0));
 
         GGML_ASSERT(ggml_get_f32_1d(x1->grad, 0) == 3.0f);
         GGML_ASSERT(ggml_get_f32_1d(x2->grad, 0) == 1.0f);
 
-        ggml_graph_dump_dot(&gf, NULL, "test1-2-forward.dot");
-        ggml_graph_dump_dot(&gb, &gf,  "test1-2-backward.dot");
+        ggml_graph_dump_dot(gf, NULL, "test1-2-forward.dot");
+        ggml_graph_dump_dot(gb, gf,   "test1-2-backward.dot");
     }
 
     ///////////////////////////////////////////////////////////////
@@ -125,16 +131,18 @@ int main(int argc, const char ** argv) {
 
         struct ggml_tensor * y = ggml_mul(ctx0, ggml_add(ctx0, ggml_mul(ctx0, x1, x1), ggml_mul(ctx0, x1, x2)), x1);
 
-        struct ggml_cgraph gf = ggml_build_forward(y);
-        struct ggml_cgraph gb = ggml_build_backward(ctx0, &gf, false);
+        struct ggml_cgraph * gf = ggml_new_graph_custom(ctx0, GGML_DEFAULT_GRAPH_SIZE, true);
+        ggml_build_forward_expand(gf, y);
+        struct ggml_cgraph * gb = ggml_graph_dup(ctx0, gf);
+        ggml_build_backward_expand(ctx0, gf, gb, false);
 
         ggml_set_f32(x1, 3.0f);
         ggml_set_f32(x2, 4.0f);
 
-        ggml_graph_reset(&gf);
+        ggml_graph_reset(gf);
         ggml_set_f32(y->grad, 1.0f);
 
-        ggml_graph_compute_with_ctx(ctx0, &gb, n_threads);
+        ggml_graph_compute_with_ctx(ctx0, gb, n_threads);
 
         printf("y      = %f\n", ggml_get_f32_1d(y, 0));
         printf("df/dx1 = %f\n", ggml_get_f32_1d(x1->grad, 0));
@@ -144,8 +152,8 @@ int main(int argc, const char ** argv) {
         GGML_ASSERT(ggml_get_f32_1d(x1->grad, 0) == 51.0f);
         GGML_ASSERT(ggml_get_f32_1d(x2->grad, 0) == 9.0f);
 
-        ggml_graph_dump_dot(&gf, NULL, "test1-3-forward.dot");
-        ggml_graph_dump_dot(&gb, &gf,  "test1-3-backward.dot");
+        ggml_graph_dump_dot(gf, NULL, "test1-3-forward.dot");
+        ggml_graph_dump_dot(gb, gf,   "test1-3-backward.dot");
     }
 
     ///////////////////////////////////////////////////////////////
@@ -161,17 +169,19 @@ int main(int argc, const char ** argv) {
 
         struct ggml_tensor * y = ggml_mul(ctx0, ggml_mul(ctx0, ggml_mul(ctx0, x1, x1), ggml_mul(ctx0, x2, x2)), x3);
 
-        struct ggml_cgraph gf = ggml_build_forward(y);
-        struct ggml_cgraph gb = ggml_build_backward(ctx0, &gf, false);
+        struct ggml_cgraph * gf = ggml_new_graph_custom(ctx0, GGML_DEFAULT_GRAPH_SIZE, true);
+        ggml_build_forward_expand(gf, y);
+        struct ggml_cgraph * gb = ggml_graph_dup(ctx0, gf);
+        ggml_build_backward_expand(ctx0, gf, gb, false);
 
         ggml_set_f32(x1, 1.0f);
         ggml_set_f32(x2, 2.0f);
         ggml_set_f32(x3, 3.0f);
 
-        ggml_graph_reset(&gf);
+        ggml_graph_reset(gf);
         ggml_set_f32(y->grad, 1.0f);
 
-        ggml_graph_compute_with_ctx(ctx0, &gb, n_threads);
+        ggml_graph_compute_with_ctx(ctx0, gb, n_threads);
 
         printf("y      = %f\n", ggml_get_f32_1d(y, 0));
         printf("df/dx1 = %f\n", ggml_get_f32_1d(x1->grad, 0));
@@ -187,14 +197,16 @@ int main(int argc, const char ** argv) {
         struct ggml_tensor * g2 = x2->grad;
         struct ggml_tensor * g3 = x3->grad;
 
-        struct ggml_cgraph gbb = ggml_build_backward(ctx0, &gb, true);
+        struct ggml_cgraph * gbb = ggml_graph_dup(ctx0, gb);
 
-        ggml_graph_reset(&gb);
+        ggml_build_backward_expand(ctx0, gb, gbb, false);
+
+        ggml_graph_reset(gb);
         ggml_set_f32(g1->grad, 1.0f);
         ggml_set_f32(g2->grad, 1.0f);
         ggml_set_f32(g3->grad, 1.0f);
 
-        ggml_graph_compute_with_ctx(ctx0, &gbb, n_threads);
+        ggml_graph_compute_with_ctx(ctx0, gbb, n_threads);
 
         printf("H * [1, 1, 1] = [ %f %f %f ]\n",
                 ggml_get_f32_1d(x1->grad, 0),
@@ -205,8 +217,8 @@ int main(int argc, const char ** argv) {
         GGML_ASSERT(ggml_get_f32_1d(x2->grad, 0) == 34.0f);
         GGML_ASSERT(ggml_get_f32_1d(x3->grad, 0) == 12.0f);
 
-        ggml_graph_dump_dot(&gf, NULL, "test1-4-forward.dot");
-        ggml_graph_dump_dot(&gb, &gf,  "test1-4-backward.dot");
+        ggml_graph_dump_dot(gf, NULL, "test1-4-forward.dot");
+        ggml_graph_dump_dot(gb, gf,   "test1-4-backward.dot");
     }
 
     ///////////////////////////////////////////////////////////////
@@ -220,16 +232,18 @@ int main(int argc, const char ** argv) {
 
         struct ggml_tensor * y = ggml_sum(ctx0, ggml_mul(ctx0, x1, x2));
 
-        struct ggml_cgraph gf = ggml_build_forward(y);
-        struct ggml_cgraph gb = ggml_build_backward(ctx0, &gf, false);
+        struct ggml_cgraph * gf = ggml_new_graph_custom(ctx0, GGML_DEFAULT_GRAPH_SIZE, true);
+        ggml_build_forward_expand(gf, y);
+        struct ggml_cgraph * gb = ggml_graph_dup(ctx0, gf);
+        ggml_build_backward_expand(ctx0, gf, gb, false);
 
         ggml_set_f32(x1, 3.0f);
         ggml_set_f32(x2, 5.0f);
 
-        ggml_graph_reset(&gf);
+        ggml_graph_reset(gf);
         ggml_set_f32(y->grad, 1.0f);
 
-        ggml_graph_compute_with_ctx(ctx0, &gb, n_threads);
+        ggml_graph_compute_with_ctx(ctx0, gb, n_threads);
 
         printf("y      = %f\n", ggml_get_f32_1d(y, 0));
         printf("df/dx1 = %f %f %f\n",
@@ -249,8 +263,8 @@ int main(int argc, const char ** argv) {
         GGML_ASSERT(ggml_get_f32_1d(x1->grad, 2) == 5.0f);
         GGML_ASSERT(ggml_get_f32_1d(x2->grad, 2) == 3.0f);
 
-        ggml_graph_dump_dot(&gf, NULL, "test1-5-forward.dot");
-        ggml_graph_dump_dot(&gb, &gf,  "test1-5-backward.dot");
+        ggml_graph_dump_dot(gf, NULL, "test1-5-forward.dot");
+        ggml_graph_dump_dot(gb, gf,   "test1-5-backward.dot");
     }
 
     ///////////////////////////////////////////////////////////////
@@ -273,16 +287,18 @@ int main(int argc, const char ** argv) {
                         )
                     );
 
-        struct ggml_cgraph gf = ggml_build_forward(y);
-        struct ggml_cgraph gb = ggml_build_backward(ctx0, &gf, false);
+        struct ggml_cgraph * gf = ggml_new_graph_custom(ctx0, GGML_DEFAULT_GRAPH_SIZE, true);
+        ggml_build_forward_expand(gf, y);
+        struct ggml_cgraph * gb = ggml_graph_dup(ctx0, gf);
+        ggml_build_backward_expand(ctx0, gf, gb, false);
 
         ggml_set_f32(x1, 3.0f);
         ggml_set_f32(x2, 5.0f);
 
-        ggml_graph_reset(&gf);
+        ggml_graph_reset(gf);
         ggml_set_f32(y->grad, 1.0f);
 
-        ggml_graph_compute_with_ctx(ctx0, &gb, n_threads);
+        ggml_graph_compute_with_ctx(ctx0, gb, n_threads);
 
         printf("y      = %f\n", ggml_get_f32_1d(y, 0));
         printf("df/dx1 = %f %f %f\n",
@@ -302,8 +318,8 @@ int main(int argc, const char ** argv) {
         GGML_ASSERT(ggml_get_f32_1d(x2->grad, 1) ==  3.0f);
         GGML_ASSERT(ggml_get_f32_1d(x2->grad, 2) ==  3.0f);
 
-        ggml_graph_dump_dot(&gf, NULL, "test1-6-forward.dot");
-        ggml_graph_dump_dot(&gb, &gf,  "test1-6-backward.dot");
+        ggml_graph_dump_dot(gf, NULL, "test1-6-forward.dot");
+        ggml_graph_dump_dot(gb, gf,   "test1-6-backward.dot");
     }
 
     ///////////////////////////////////////////////////////////////
@@ -326,16 +342,18 @@ int main(int argc, const char ** argv) {
                         )
                     );
 
-        struct ggml_cgraph gf = ggml_build_forward(y);
-        struct ggml_cgraph gb = ggml_build_backward(ctx0, &gf, false);
+        struct ggml_cgraph * gf = ggml_new_graph_custom(ctx0, GGML_DEFAULT_GRAPH_SIZE, true);
+        ggml_build_forward_expand(gf, y);
+        struct ggml_cgraph * gb = ggml_graph_dup(ctx0, gf);
+        ggml_build_backward_expand(ctx0, gf, gb, false);
 
         ggml_set_f32(x1, 3.0f);
         ggml_set_f32(x2, 5.0f);
 
-        ggml_graph_reset(&gf);
+        ggml_graph_reset(gf);
         ggml_set_f32(y->grad, 1.0f);
 
-        ggml_graph_compute_with_ctx(ctx0, &gb, n_threads);
+        ggml_graph_compute_with_ctx(ctx0, gb, n_threads);
 
         printf("y      = %f\n", ggml_get_f32_1d(y, 0));
         printf("df/dx1 = %f %f %f\n",
@@ -355,8 +373,8 @@ int main(int argc, const char ** argv) {
         GGML_ASSERT(ggml_get_f32_1d(x2->grad, 1) ==  3.0f);
         GGML_ASSERT(ggml_get_f32_1d(x2->grad, 2) ==  3.0f);
 
-        ggml_graph_dump_dot(&gf, NULL, "test1-7-forward.dot");
-        ggml_graph_dump_dot(&gb, &gf,  "test1-7-backward.dot");
+        ggml_graph_dump_dot(gf, NULL, "test1-7-forward.dot");
+        ggml_graph_dump_dot(gb, gf,   "test1-7-backward.dot");
     }
 
     ///////////////////////////////////////////////////////////////
@@ -373,16 +391,18 @@ int main(int argc, const char ** argv) {
                     ggml_sub(ctx0, x1, x2)
                     );
 
-        struct ggml_cgraph gf = ggml_build_forward(y);
-        struct ggml_cgraph gb = ggml_build_backward(ctx0, &gf, false);
+        struct ggml_cgraph * gf = ggml_new_graph_custom(ctx0, GGML_DEFAULT_GRAPH_SIZE, true);
+        ggml_build_forward_expand(gf, y);
+        struct ggml_cgraph * gb = ggml_graph_dup(ctx0, gf);
+        ggml_build_backward_expand(ctx0, gf, gb, false);
 
         ggml_set_f32(x1, 3.0f);
         ggml_set_f32(x2, 5.0f);
 
-        ggml_graph_reset(&gf);
+        ggml_graph_reset(gf);
         ggml_set_f32(y->grad, 1.0f);
 
-        ggml_graph_compute_with_ctx(ctx0, &gb, n_threads);
+        ggml_graph_compute_with_ctx(ctx0, gb, n_threads);
 
         printf("y      = %f\n", ggml_get_f32_1d(y, 0));
         printf("df/dx1 = %f %f %f\n",
@@ -405,10 +425,10 @@ int main(int argc, const char ** argv) {
         ggml_set_f32(x1, 7.0f);
         ggml_set_f32(x2, 5.0f);
 
-        ggml_graph_reset(&gf);
+        ggml_graph_reset(gf);
         ggml_set_f32(y->grad, 1.0f);
 
-        ggml_graph_compute_with_ctx(ctx0, &gb, n_threads);
+        ggml_graph_compute_with_ctx(ctx0, gb, n_threads);
 
         printf("y      = %f\n", ggml_get_f32_1d(y, 0));
         printf("df/dx1 = %f %f %f\n",
@@ -428,8 +448,8 @@ int main(int argc, const char ** argv) {
         GGML_ASSERT(ggml_get_f32_1d(x2->grad, 1) == -1.0f);
         GGML_ASSERT(ggml_get_f32_1d(x2->grad, 2) == -1.0f);
 
-        ggml_graph_dump_dot(&gf, NULL, "test1-8-forward.dot");
-        ggml_graph_dump_dot(&gb, &gf,  "test1-8-backward.dot");
+        ggml_graph_dump_dot(gf, NULL, "test1-8-forward.dot");
+        ggml_graph_dump_dot(gb, gf,   "test1-8-backward.dot");
     }
 
     ggml_free(ctx0);

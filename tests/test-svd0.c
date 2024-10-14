@@ -11,10 +11,6 @@
 
 #include <sys/time.h>
 
-#ifdef GGML_USE_ACCELERATE
-#include <Accelerate/Accelerate.h>
-#endif
-
 float frand(void) {
     return (float) rand() / (float) RAND_MAX;
 }
