@@ -494,7 +494,6 @@ extern "C" {
         GGML_OP_CONV_TRANSPOSE_2D,
         GGML_OP_POOL_1D,
         GGML_OP_POOL_2D,
-        GGML_OP_PAD_REFLEC_1D,
         GGML_OP_POOL_2D_BACK,
         GGML_OP_UPSCALE, // nearest interpolate
         GGML_OP_PAD,
@@ -1651,12 +1650,6 @@ extern "C" {
             int                   p0,  // padding
             int                   d0); // dilation
 
-    GGML_API struct ggml_tensor * ggml_pad_reflec_1d(
-            struct ggml_context * ctx,
-            struct ggml_tensor  * a,
-            int                   p0,
-            int                   p1);
-
     GGML_API struct ggml_tensor * ggml_conv_2d(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,   // convolution kernel
@@ -1667,6 +1660,7 @@ extern "C" {
             int                   p1,  // padding dimension 1
             int                   d0,  // dilation dimension 0
             int                   d1); // dilation dimension 1
+
 
     // kernel size is a->ne[0] x a->ne[1]
     // stride is equal to kernel size
