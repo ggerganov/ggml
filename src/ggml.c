@@ -2124,6 +2124,7 @@ inline static void ggml_vec_set_i8(const int n, int8_t * x, const int8_t v) { fo
 inline static void ggml_vec_set_i16(const int n, int16_t * x, const int16_t v) { for (int i = 0; i < n; ++i) x[i] = v; }
 
 inline static void ggml_vec_set_i32(const int n, int32_t * x, const int32_t v) { for (int i = 0; i < n; ++i) x[i] = v; }
+inline static void ggml_vec_cpy_i32(const int n, int32_t * y, const int32_t * x) { for (int i = 0; i < n; ++i) y[i] = x[i]; }
 
 inline static void ggml_vec_set_f16(const int n, ggml_fp16_t * x, const int32_t v) { for (int i = 0; i < n; ++i) x[i] = v; }
 
@@ -3035,6 +3036,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "POOL_2D_BACK",
     "UPSCALE",
     "PAD",
+    "PAD_REFLECT_1D",
     "ARANGE",
     "TIMESTEP_EMBEDDING",
     "ARGSORT",
@@ -3068,7 +3070,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "OPT_STEP_ADAMW",
 };
 
-static_assert(GGML_OP_COUNT == 81, "GGML_OP_COUNT != 81");
+static_assert(GGML_OP_COUNT == 82, "GGML_OP_COUNT != 82");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -3145,6 +3147,8 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "add_rel_pos(x)",
     "rwkv_wkv(k, v, r, tf, td, s)",
 
+    "pad_reflect_1d(x)",
+
     "unary(x)",
 
     "f(x)",
@@ -3163,7 +3167,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "adamw(x)",
 };
 
-static_assert(GGML_OP_COUNT == 81, "GGML_OP_COUNT != 81");
+static_assert(GGML_OP_COUNT == 82, "GGML_OP_COUNT != 82");
 
 static_assert(GGML_OP_POOL_COUNT == 2, "GGML_OP_POOL_COUNT != 2");
 
@@ -7010,6 +7014,29 @@ struct ggml_tensor * ggml_pad(
             a->ne[3] + p3);
 
     result->op     = GGML_OP_PAD;
+    result->src[0] = a;
+
+    return result;
+}
+
+
+// ggml_pad_reflect_1d
+
+struct ggml_tensor * ggml_pad_reflect_1d(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        int                   p0,
+        int                   p1) {
+    struct ggml_tensor * result = ggml_new_tensor_4d(ctx, a->type,
+            a->ne[0] + p0 + p1,
+            a->ne[1],
+            a->ne[2],
+            a->ne[3]);
+
+    ggml_set_op_params_i32(result, 0, p0);
+    ggml_set_op_params_i32(result, 1, p1);
+
+    result->op = GGML_OP_PAD_REFLECT_1D;
     result->src[0] = a;
 
     return result;
@@ -13179,6 +13206,78 @@ static void ggml_compute_forward_scale(
 
 // ggml_compute_forward_set
 
+
+static void ggml_compute_forward_set_i32(
+        const struct ggml_compute_params * params,
+        struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src0 = dst->src[0];
+    const struct ggml_tensor * src1 = dst->src[1];
+
+    GGML_ASSERT(ggml_are_same_shape(src0, dst));
+    GGML_ASSERT(ggml_is_contiguous(dst) && ggml_is_contiguous(src0));
+
+    // view src0 and dst with these strides and data offset inbytes during set
+    // nb0 is implicitely element_size because src0 and dst are contiguous
+    size_t nb1     = ((int32_t *) dst->op_params)[0];
+    size_t nb2     = ((int32_t *) dst->op_params)[1];
+    size_t nb3     = ((int32_t *) dst->op_params)[2];
+    size_t offset  = ((int32_t *) dst->op_params)[3];
+    bool   inplace = (bool) ((int32_t *) dst->op_params)[4];
+
+    if (!inplace) {
+        if (params->ith == 0) {
+            // memcpy needs to be synchronized across threads to avoid race conditions.
+            // => do it in INIT phase
+            memcpy(
+                ((char *)  dst->data),
+                ((char *) src0->data),
+                ggml_nbytes(dst));
+        }
+        ggml_barrier(params->threadpool);
+    }
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int nr = ggml_nrows(src1);
+    const int nc = src1->ne[0];
+
+    GGML_TENSOR_LOCALS(int64_t, ne1, src1, ne);
+    GGML_TENSOR_LOCALS(size_t,  nb1, src1, nb);
+
+    // src0 and dst as viewed during set
+    const size_t nb0 = ggml_element_size(src0);
+
+    const int im0 = (ne10 == 0 ? 0 : ne10-1);
+    const int im1 = (ne11 == 0 ? 0 : ne11-1);
+    const int im2 = (ne12 == 0 ? 0 : ne12-1);
+    const int im3 = (ne13 == 0 ? 0 : ne13-1);
+
+    GGML_ASSERT(offset + im0*nb0  + im1*nb1  + im2*nb2  + im3*nb3  <= ggml_nbytes(dst));
+
+    GGML_ASSERT(nb10 == sizeof(int32_t));
+
+    // rows per thread
+    const int dr = (nr + nth - 1)/nth;
+
+    // row range for this thread
+    const int ir0 = dr*ith;
+    const int ir1 = MIN(ir0 + dr, nr);
+
+    for (int ir = ir0; ir < ir1; ++ir) {
+        // src0 and dst are viewed with shape of src1 and offset
+        // => same indices
+        const int i3 = ir/(ne12*ne11);
+        const int i2 = (ir - i3*ne12*ne11)/ne11;
+        const int i1 = (ir - i3*ne12*ne11 - i2*ne11);
+
+        ggml_vec_cpy_i32(nc,
+                (int32_t *) ((char *)  dst->data + i3*nb3  + i2*nb2  + i1*nb1  + offset),
+                (int32_t *) ((char *) src1->data + i3*nb13 + i2*nb12 + i1*nb11));
+    }
+}
+
 static void ggml_compute_forward_set_f32(
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
@@ -13260,6 +13359,10 @@ static void ggml_compute_forward_set(
         case GGML_TYPE_F32:
             {
                 ggml_compute_forward_set_f32(params, dst);
+            } break;
+        case GGML_TYPE_I32:
+            {
+                ggml_compute_forward_set_i32(params, dst);
             } break;
         case GGML_TYPE_F16:
         case GGML_TYPE_BF16:
@@ -15456,6 +15559,39 @@ static void ggml_compute_forward_pad(
     }
 }
 
+// ggml_compute_forward_pad_reflect_1d
+
+static void ggml_compute_forward_pad_reflect_1d(
+        const struct ggml_compute_params * params,
+              struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src0 = dst->src[0];
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int32_t * opts = (const int32_t *) dst->op_params;
+    const int p0 = opts[0];
+    const int p1 = opts[1];
+
+    GGML_ASSERT(p0 >= 0);
+    GGML_ASSERT(p1 >= 0);
+
+    GGML_TENSOR_UNARY_OP_LOCALS
+
+    for (int64_t i1 = ith; i1 < ne1; i1 += nth) {
+        float * left  = (float *) ((char *) dst->data + i1*nb1 +         p0*nb0);
+        float * right = (float *) ((char *) dst->data + i1*nb1 + (ne0-p1-1)*nb0);
+
+        ggml_vec_cpy_f32(ne00, left, (float *) ((char *) src0->data + i1*nb01));
+
+        for (int i0 = 1; i0 <= p0; i0++) { left[-i0] = left[i0];   }
+        for (int i0 = 1; i0 <= p1; i0++) { right[i0] = right[-i0]; }
+    }
+}
 
 // ggml_compute_forward_arange
 
@@ -17442,6 +17578,10 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_pad(params, tensor);
             } break;
+        case GGML_OP_PAD_REFLECT_1D:
+            {
+                ggml_compute_forward_pad_reflect_1d(params, tensor);
+            } break;
         case GGML_OP_ARANGE:
             {
                 ggml_compute_forward_arange(params, tensor);
@@ -18518,6 +18658,10 @@ static void ggml_compute_backward(struct ggml_context * ctx, struct ggml_tensor 
             {
                 GGML_ABORT("fatal error"); // TODO: not implemented
             }
+        case GGML_OP_PAD_REFLECT_1D:
+            {
+                GGML_ABORT("fatal error"); // TODO: not implemented
+            }
         case GGML_OP_ARANGE:
             {
                 GGML_ABORT("fatal error"); // TODO: not implemented
@@ -19325,6 +19469,7 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
             } break;
         case GGML_OP_UPSCALE:
         case GGML_OP_PAD:
+        case GGML_OP_PAD_REFLECT_1D:
         case GGML_OP_ARANGE:
         case GGML_OP_TIMESTEP_EMBEDDING:
         case GGML_OP_ARGSORT:

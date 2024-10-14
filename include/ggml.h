@@ -497,6 +497,7 @@ extern "C" {
         GGML_OP_POOL_2D_BACK,
         GGML_OP_UPSCALE, // nearest interpolate
         GGML_OP_PAD,
+        GGML_OP_PAD_REFLECT_1D,
         GGML_OP_ARANGE,
         GGML_OP_TIMESTEP_EMBEDDING,
         GGML_OP_ARGSORT,
@@ -1760,6 +1761,13 @@ extern "C" {
             int                  p1,
             int                  p2,
             int                  p3);
+
+    // pad innermost dimension with reflection: [x, ..., x+n] -> [ ..., x+1, x, x+1, ..., x+n, x+n-1, ...]
+    GGML_API struct ggml_tensor * ggml_pad_reflect_1d(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            int                   p0,
+            int                   p1);
 
     // Ref: https://github.com/CompVis/stable-diffusion/blob/main/ldm/modules/diffusionmodules/util.py#L151
     // timesteps: [N,]
