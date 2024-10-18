@@ -1,6 +1,7 @@
+#include "ggml.h"
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
-#include "ggml.h"
+#include "ggml-opt.h"
 
 #include "mnist-common.h"
 
@@ -14,7 +15,7 @@
 #include <string>
 #include <utility>
 
-bool mnist_image_load(const std::string & fname, mnist_dataset & dataset) {
+bool mnist_image_load(const std::string & fname, ggml_opt_new_dataset * dataset) {
     auto fin = std::ifstream(fname, std::ios::binary);
     if (!fin) {
         fprintf(stderr, "failed to open images file %s\n", fname.c_str());
@@ -23,12 +24,14 @@ bool mnist_image_load(const std::string & fname, mnist_dataset & dataset) {
     fin.seekg(16);
 
     uint8_t image[MNIST_NINPUT];
-    float * buf = ggml_get_data_f32(dataset.data);
+    struct ggml_tensor * images = ggml_opt_new_dataset_data(dataset);
+    float * buf = ggml_get_data_f32(images);
 
-    for (int iex = 0; iex < dataset.nex; ++iex) {
+    GGML_ASSERT(images->ne[0] == MNIST_NINPUT);
+    for (int64_t iex = 0; iex < images->ne[1]; ++iex) {
         fin.read((char *) image, sizeof(image));
 
-        for (int i = 0; i < MNIST_NINPUT; ++i) {
+        for (int64_t i = 0; i < MNIST_NINPUT; ++i) {
             buf[iex*MNIST_NINPUT + i] = image[i] / 255.0f; // Normalize to [0, 1]
         }
     }
@@ -36,11 +39,14 @@ bool mnist_image_load(const std::string & fname, mnist_dataset & dataset) {
     return true;
 }
 
-void mnist_image_print(FILE * stream, mnist_dataset & dataset, const int iex) {
-    const float * image = ggml_get_data_f32(dataset.data) + iex*MNIST_NINPUT;
+void mnist_image_print(FILE * stream, ggml_opt_new_dataset * dataset, const int iex) {
+    struct ggml_tensor * images = ggml_opt_new_dataset_data(dataset);
+    GGML_ASSERT(images->ne[0] == MNIST_NINPUT);
+    GGML_ASSERT(iex < images->ne[1]);
+    const float * image = ggml_get_data_f32(images) + iex*MNIST_NINPUT;
 
-    for (int row = 0; row < MNIST_HW; row++) {
-        for (int col = 0; col < MNIST_HW; col++) {
+    for (int64_t row = 0; row < MNIST_HW; row++) {
+        for (int64_t col = 0; col < MNIST_HW; col++) {
             const int rgb = roundf(255.0f * image[row*MNIST_HW + col]);
 #ifdef _WIN32
             fprintf(stream, "%s", rgb >= 220 ? "##" : "__");                // Represented via text.
@@ -52,7 +58,7 @@ void mnist_image_print(FILE * stream, mnist_dataset & dataset, const int iex) {
     }
 }
 
-bool mnist_label_load(const std::string & fname, mnist_dataset & dataset) {
+bool mnist_label_load(const std::string & fname, ggml_opt_new_dataset * dataset) {
     auto fin = std::ifstream(fname, std::ios::binary);
     if (!fin) {
         fprintf(stderr, "failed to open labels file %s\n", fname.c_str());
@@ -61,12 +67,14 @@ bool mnist_label_load(const std::string & fname, mnist_dataset & dataset) {
     fin.seekg(8);
 
     uint8_t label;
-    float * buf = ggml_get_data_f32(dataset.labels);
+    struct ggml_tensor * labels = ggml_opt_new_dataset_labels(dataset);
+    float * buf = ggml_get_data_f32(labels);
 
-    for (int iex = 0; iex < dataset.nex; ++iex) {
+    GGML_ASSERT(labels->ne[0] == MNIST_NCLASSES);
+    for (int64_t iex = 0; iex < labels->ne[1]; ++iex) {
         fin.read((char *) &label, sizeof(label));
 
-        for (int i = 0; i < MNIST_NCLASSES; ++i) {
+        for (int64_t i = 0; i < MNIST_NCLASSES; ++i) {
             buf[iex*MNIST_NCLASSES + i] = i == label ? 1.0f : 0.0f;
         }
     }
@@ -383,15 +391,15 @@ void mnist_model_build(mnist_model & model, const int nbatch_logical, const int 
     model.nbatch_logical  = nbatch_logical;
     model.nbatch_physical = nbatch_physical;
 
+    model.images = ggml_new_tensor_2d(model.ctx_compute, GGML_TYPE_F32, MNIST_NINPUT, model.nbatch_physical);
+    ggml_set_name(model.images, "images");
+    ggml_set_input(model.images);
+
     if (model.arch == "mnist-fc") {
         ggml_set_param(model.ctx_compute, model.fc1_weight);
         ggml_set_param(model.ctx_compute, model.fc1_bias);
         ggml_set_param(model.ctx_compute, model.fc2_weight);
         ggml_set_param(model.ctx_compute, model.fc2_bias);
-
-        model.images = ggml_new_tensor_2d(model.ctx_compute, GGML_TYPE_F32, MNIST_NINPUT, model.nbatch_physical);
-        ggml_set_name(model.images, "images");
-        ggml_set_input(model.images);
 
         ggml_tensor * fc1 = ggml_relu(model.ctx_compute, ggml_add(model.ctx_compute,
             ggml_mul_mat(model.ctx_compute, model.fc1_weight, model.images),
@@ -407,12 +415,10 @@ void mnist_model_build(mnist_model & model, const int nbatch_logical, const int 
         ggml_set_param(model.ctx_compute, model.dense_weight);
         ggml_set_param(model.ctx_compute, model.dense_bias);
 
-        model.images = ggml_new_tensor_4d(model.ctx_compute, GGML_TYPE_F32, 28, 28, 1, model.nbatch_physical);
-        ggml_set_name(model.images, "images");
-        ggml_set_input(model.images);
+        struct ggml_tensor * images_2D = ggml_reshape_4d(model.ctx_compute, model.images, MNIST_HW, MNIST_HW, 1, model.images->ne[1]);
 
         struct ggml_tensor * conv1_out = ggml_relu(model.ctx_compute, ggml_add(model.ctx_compute,
-            ggml_conv_2d(model.ctx_compute, model.conv1_kernel, model.images, 1, 1, 1, 1, 1, 1),
+            ggml_conv_2d(model.ctx_compute, model.conv1_kernel, images_2D, 1, 1, 1, 1, 1, 1),
             model.conv1_bias));
         GGML_ASSERT(conv1_out->ne[0] == MNIST_HW);
         GGML_ASSERT(conv1_out->ne[1] == MNIST_HW);
@@ -459,212 +465,37 @@ void mnist_model_build(mnist_model & model, const int nbatch_logical, const int 
     GGML_ASSERT(model.logits->ne[1] == model.nbatch_physical);
     GGML_ASSERT(model.logits->ne[2] == 1);
     GGML_ASSERT(model.logits->ne[3] == 1);
-
-    model.probs = ggml_soft_max(model.ctx_compute, model.logits);
-    ggml_set_name(model.probs, "probs");
-    ggml_set_output(model.probs);
-    GGML_ASSERT(model.probs->type == GGML_TYPE_F32);
-    GGML_ASSERT(model.probs->ne[0] == MNIST_NCLASSES);
-    GGML_ASSERT(model.probs->ne[1] == model.nbatch_physical);
-    GGML_ASSERT(model.probs->ne[2] == 1);
-    GGML_ASSERT(model.probs->ne[3] == 1);
-
-    model.labels = ggml_new_tensor_2d(model.ctx_compute, GGML_TYPE_F32, MNIST_NCLASSES, model.nbatch_physical);
-    ggml_set_name(model.labels, "labels");
-    ggml_set_input(model.labels);
-
-    model.loss = ggml_cross_entropy_loss(model.ctx_compute, model.logits, model.labels);
-    ggml_set_name(model.loss, "loss");
-    ggml_set_output(model.loss);
-    ggml_set_loss(model.loss);
-    GGML_ASSERT(model.loss->type == GGML_TYPE_F32);
-    GGML_ASSERT(model.loss->ne[0] == 1);
-    GGML_ASSERT(model.loss->ne[1] == 1);
-    GGML_ASSERT(model.loss->ne[2] == 1);
-    GGML_ASSERT(model.loss->ne[3] == 1);
-
-    model.pred = ggml_argmax(model.ctx_compute, model.logits);
-    ggml_set_name(model.pred, "predictions");
-    ggml_set_output(model.pred);
-    GGML_ASSERT(model.pred->type == GGML_TYPE_I32);
-    GGML_ASSERT(model.pred->ne[0] == model.nbatch_physical);
-    GGML_ASSERT(model.pred->ne[1] == 1);
-    GGML_ASSERT(model.pred->ne[2] == 1);
-    GGML_ASSERT(model.pred->ne[3] == 1);
-
-    model.acc_count = ggml_count_equal(model.ctx_compute, model.pred, ggml_argmax(model.ctx_compute, model.labels));
-    ggml_set_name(model.acc_count, "accuracy_count");
-    ggml_set_output(model.acc_count);
-    GGML_ASSERT(model.acc_count->type == GGML_TYPE_I64);
-    GGML_ASSERT(model.acc_count->ne[0] == 1);
-    GGML_ASSERT(model.acc_count->ne[1] == 1);
-    GGML_ASSERT(model.acc_count->ne[2] == 1);
-    GGML_ASSERT(model.acc_count->ne[3] == 1);
 }
 
-mnist_eval_result mnist_model_eval(mnist_model & model, mnist_dataset & dataset) {
-    mnist_eval_result result;
+ggml_opt_new_result * mnist_model_eval(mnist_model & model, ggml_opt_new_dataset * dataset) {
+    ggml_opt_new_result * result = ggml_opt_new_result_init();
 
-    struct ggml_cgraph * gf = ggml_new_graph(model.ctx_compute);
-    // The outputs are diverging branches of the graphs, therefore multiple calls to ggml_build_forward_expand are needed.
-    ggml_build_forward_expand(gf, model.loss);
-    ggml_build_forward_expand(gf, model.pred);
-    ggml_build_forward_expand(gf, model.acc_count);
+    ggml_opt_new_params params = ggml_opt_new_default_params(model.backend, model.images, model.logits);
+    params.forward_only = true;
+    ggml_opt_new_context * opt_ctx = ggml_opt_new_init(params);
 
     model.buf_compute = ggml_backend_alloc_ctx_tensors(model.ctx_compute, model.backend);
 
     {
         const int64_t t_start_us = ggml_time_us();
 
-        float                tmp_loss;
-        std::vector<int32_t> tmp_pred(model.nbatch_physical);
-        int64_t              tmp_acc_count;
-
-        GGML_ASSERT(sizeof(tmp_loss)                    == ggml_nbytes(model.loss));
-        GGML_ASSERT(sizeof(tmp_pred[0])*tmp_pred.size() == ggml_nbytes(model.pred));
-        GGML_ASSERT(sizeof(tmp_acc_count)               == ggml_nbytes(model.acc_count));
-
-        GGML_ASSERT(dataset.nex % model.nbatch_physical == 0);
-        const int nbatches = dataset.nex/model.nbatch_physical;
-        for (int ibatch = 0; ibatch < nbatches; ++ibatch) {
-            dataset.get_batch(model.images, model.labels, ibatch);
-
-            ggml_backend_graph_compute(model.backend, gf);
-
-            ggml_backend_tensor_get(model.loss,      &tmp_loss,       0, ggml_nbytes(model.loss));
-            ggml_backend_tensor_get(model.pred,      tmp_pred.data(), 0, ggml_nbytes(model.pred));
-            ggml_backend_tensor_get(model.acc_count, &tmp_acc_count,  0, ggml_nbytes(model.acc_count));
-
-            result.loss.push_back(tmp_loss);
-            result.pred.insert(result.pred.end(), tmp_pred.begin(), tmp_pred.end());
-            result.ncorrect += tmp_acc_count;
-            result.ntotal   += model.nbatch_physical;
-        }
+        ggml_opt_new_epoch(opt_ctx, dataset, nullptr, result, 0, nullptr, nullptr);
 
         const int64_t t_total_us = ggml_time_us() - t_start_us;
         const double t_total_ms = 1e-3*t_total_us;
+        const int nex = ggml_opt_new_dataset_data(dataset)->ne[1];
         fprintf(stderr, "%s: model evaluation on %d images took %.2lf ms, %.2lf us/image\n",
-                __func__, (int)dataset.nex, t_total_ms, (double) t_total_us/dataset.nex);
+                __func__, nex, t_total_ms, (double) t_total_us/nex);
     }
 
-    result.success = true;
+    ggml_opt_new_free(opt_ctx);
+
     return result;
 }
 
-void mnist_model_train(mnist_model & model, mnist_dataset & dataset, const int nepoch, const float val_split) {
-    const int64_t t_start_us = ggml_time_us();
-
-    const int opt_period        = model.nbatch_logical / model.nbatch_physical;
-    const int nbatches_logical  = dataset.nex / model.nbatch_logical;
-    const int nbatches_physical = dataset.nex / model.nbatch_physical;
-    const int ibatch_split      = ((int)((1.0f - val_split)*nbatches_logical))*opt_period; // train <-> val split index (physical)
-    const int ishard_split      = ibatch_split * model.nbatch_physical/dataset.shard_size;
-
-    // gf == graph forward, forward pass only.
-    struct ggml_cgraph * gf = ggml_new_graph_custom(model.ctx_compute, GGML_DEFAULT_GRAPH_SIZE, /*grads =*/ true); // Forward pass.
-    // The outputs are diverging branches of the graphs, therefore multiple calls to ggml_build_forward_expand are needed.
-    ggml_build_forward_expand(gf, model.loss);
-    ggml_build_forward_expand(gf, model.pred);
-    ggml_build_forward_expand(gf, model.acc_count);
-
-    // gb_grad == graph backward gradients, forward pass, then backward pass to calculate gradients.
-    struct ggml_cgraph * gb_grad = ggml_graph_dup(model.ctx_compute, gf);
-    ggml_build_backward_expand(model.ctx_compute, gf, gb_grad, /*accumulate =*/ opt_period > 1);
-
-    // gb_opt == graph backward optimize, forward pass, then backward pass to calculate gradients, then optimizer step.
-    struct ggml_cgraph * gb_opt = ggml_graph_dup(model.ctx_compute, gb_grad);
-    ggml_build_opt_adamw(model.ctx_compute, gf, gb_opt, 1e-3f, 0.9f, 0.999f, 1e-8f, 0.0f);
-
+void mnist_model_train(mnist_model & model, ggml_opt_new_dataset * dataset, const int nepoch, const float val_split) {
     model.buf_compute = ggml_backend_alloc_ctx_tensors(model.ctx_compute, model.backend);
-    ggml_graph_reset(gb_opt); // Set gradients to zero, reset optimizer.
-
-    dataset.shuffle(-1); // Shuffle all data (train + validation).
-
-    for (int epoch = 0; epoch < nepoch; ++epoch) {
-        fprintf(stderr, "%s: epoch %02d start...", __func__, epoch);
-        const int64_t t_start_us = ggml_time_us();
-
-        dataset.shuffle(ishard_split); // Shuffle only the training data, keeping training and validation set separate.
-
-        int ibatch_physical = 0;
-
-        float                tmp_loss;
-        std::vector<int32_t> tmp_pred(model.nbatch_physical);
-        int64_t              tmp_acc_count;
-
-        GGML_ASSERT(sizeof(tmp_loss)                    == ggml_nbytes(model.loss));
-        GGML_ASSERT(sizeof(tmp_pred[0])*tmp_pred.size() == ggml_nbytes(model.pred));
-        GGML_ASSERT(sizeof(tmp_acc_count)               == ggml_nbytes(model.acc_count));
-
-        mnist_eval_result result_train;
-        for (; ibatch_physical < ibatch_split; ++ibatch_physical) {
-            dataset.get_batch(model.images, model.labels, ibatch_physical);
-
-            // With a period of opt_period == nbatch_logical/nbatch_physical iterations:
-            if ((ibatch_physical + 1) % opt_period != 0) {
-                // For the first opt_period - 1 iterations, only calculate gradients and accumulate them:
-                ggml_backend_graph_compute(model.backend, gb_grad);
-            } else {
-                // For the last iteration, calculate gradients and also apply the optimizer:
-                ggml_backend_graph_compute(model.backend, gb_opt); // gb_opt contains all nodes of gb_grad so no extra call for gb_grad is needed.
-                ggml_graph_reset(gb_grad); // Set gradients to zero, do not reset optimizer.
-            }
-
-            ggml_backend_tensor_get(model.loss,      &tmp_loss,       0, ggml_nbytes(model.loss));
-            ggml_backend_tensor_get(model.pred,      tmp_pred.data(), 0, ggml_nbytes(model.pred));
-            ggml_backend_tensor_get(model.acc_count, &tmp_acc_count,  0, ggml_nbytes(model.acc_count));
-
-            result_train.loss.push_back(tmp_loss);
-            result_train.pred.insert(result_train.pred.end(), tmp_pred.begin(), tmp_pred.end());
-            result_train.ncorrect += tmp_acc_count;
-            result_train.ntotal   += model.nbatch_physical;
-        }
-
-        mnist_eval_result result_val;
-        for (; ibatch_physical < nbatches_physical; ++ibatch_physical) {
-            dataset.get_batch(model.images, model.labels, ibatch_physical);
-
-            ggml_backend_graph_compute(model.backend, gf); // For the validation set, only the forward pass is needed.
-
-            ggml_backend_tensor_get(model.loss,      &tmp_loss,       0, ggml_nbytes(model.loss));
-            ggml_backend_tensor_get(model.pred,      tmp_pred.data(), 0, ggml_nbytes(model.pred));
-            ggml_backend_tensor_get(model.acc_count, &tmp_acc_count,  0, ggml_nbytes(model.acc_count));
-
-            result_val.loss.push_back(tmp_loss);
-            result_val.pred.insert(result_val.pred.end(), tmp_pred.begin(), tmp_pred.end());
-            result_val.ncorrect += tmp_acc_count;
-            result_val.ntotal   += model.nbatch_physical;
-        }
-
-        {
-            const double loss_mean = mnist_loss(result_train).first;
-            const double percent_correct = 100.0 * mnist_accuracy(result_train).first;
-
-            const int64_t t_epoch_us = ggml_time_us() - t_start_us;
-            const double t_epoch_s = 1e-6*t_epoch_us;
-            fprintf(stderr, "done, took %.2lfs, train_loss=%.6lf, train_acc=%.2f%%", t_epoch_s, loss_mean, percent_correct);
-        }
-
-        if (ibatch_split < nbatches_physical) {
-            const std::pair<double, double> loss = mnist_loss(result_val);
-            const std::pair<double, double> acc  = mnist_accuracy(result_val);
-
-            fprintf(stderr, ", val_loss=%.6lf+-%.6lf, val_acc=%.2f+-%.2f%%", loss.first, loss.second, 100.0*acc.first, 100.0*acc.second);
-        }
-        fprintf(stderr, "\n");
-    }
-
-    const int64_t t_total_us = ggml_time_us() - t_start_us;
-    const double t_total_s = 1e-6*t_total_us;
-    fprintf(stderr, "%s: training took %.2lfs\n", __func__, t_total_s);
-
-    if (ggml_backend_is_cpu(model.backend)) {
-        std::string fname = model.arch + "-f32.ggml";
-        fprintf(stderr, "%s: saving the GGML graph for the forward pass to %s\n", __func__, fname.c_str());
-        ggml_graph_export(gf, fname.c_str());
-    } else {
-        fprintf(stderr, "%s: not saving the GGML graph for the forward pass because this is only supported for the CPU backend\n", __func__);
-    }
+    ggml_opt_new_fit(model.backend, model.images, model.logits, dataset, nepoch, model.nbatch_logical, val_split);
 }
 
 void mnist_model_save(mnist_model & model, const std::string & fname) {
@@ -738,15 +569,19 @@ extern "C" {
 int wasm_eval(uint8_t * digitPtr) {
     std::vector<float> digit(digitPtr, digitPtr + MNIST_NINPUT);
 
-    struct mnist_dataset dataset(1, 1);
-    memcpy(dataset.data->data, digitPtr, ggml_nbytes(dataset.data));
-    ggml_set_zero(dataset.labels); // The labels are not needed.
+    struct ggml_opt_new_dataset * dataset = ggml_opt_new_dataset_init(MNIST_NINPUT, MNIST_NCLASSES, 1, 1);
+    struct ggml_tensor * data = ggml_opt_new_dataset_data(dataset);
+    memcpy(data->data, digitPtr, ggml_nbytes(data));
+    ggml_set_zero(ggml_opt_new_dataset_labels(dataset)); // The labels are not needed.
 
     mnist_model model = mnist_model_init_from_file("mnist-f32.gguf", "CPU");
     mnist_model_build(model, 1, 1);
-    mnist_eval_result result = mnist_model_eval(model, dataset);
+    ggml_opt_new_result * result = mnist_model_eval(model, dataset);
 
-    return result.pred[0];
+    int32_t pred;
+    ggml_opt_new_result_pred(result, &pred);
+
+    return pred;
 }
 
 int wasm_random_digit(char * digitPtr) {

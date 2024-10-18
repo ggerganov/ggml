@@ -18906,27 +18906,6 @@ void ggml_build_backward_expand(struct ggml_context * ctx, struct ggml_cgraph * 
     ggml_hash_set_free(&acc_table);
 }
 
-void ggml_build_opt_adamw(
-        struct ggml_context * ctx,
-        struct ggml_cgraph  * gf,
-        struct ggml_cgraph  * gb,
-        float                 alpha,
-        float                 beta1,
-        float                 beta2,
-        float                 eps,
-        float                 wd) {
-    for (int i = 0; i < gf->n_nodes; i++) {
-        struct ggml_tensor * node = gf->nodes[i];
-
-        if (node->flags & GGML_TENSOR_FLAG_PARAM) {
-            GGML_PRINT_DEBUG("%s: found root node %p\n", __func__, (void *) node);
-            struct ggml_tensor * opt_step = ggml_opt_step_adamw(ctx, node, node->grad, alpha, beta1, beta2, eps, wd);
-            ggml_build_forward_expand(gb, opt_step);
-        }
-    }
-}
-
-
 static void * incr_ptr_aligned(void ** p, size_t size, size_t align) {
     void * ptr = *p;
     ptr = (void *) GGML_PAD((uintptr_t) ptr, align);
