@@ -1,4 +1,5 @@
 #include "ggml.h"
+#include "ggml-opt.h"
 
 #include "mnist-common.h"
 
@@ -24,7 +25,7 @@ int main(int argc, char ** argv) {
         exit(1);
     }
 
-    struct mnist_dataset dataset(/*nex =*/ MNIST_NTEST, /*shard_size =*/ MNIST_NBATCH_PHYSICAL);
+    struct ggml_opt_new_dataset * dataset = ggml_opt_new_dataset_init(MNIST_NINPUT, MNIST_NCLASSES, MNIST_NTEST, MNIST_NBATCH_PHYSICAL);
 
     if (!mnist_image_load(argv[2], dataset)) {
         return 1;
@@ -38,26 +39,27 @@ int main(int argc, char ** argv) {
 
     const std::string backend = argc >= 5 ? argv[4] : "CPU";
 
-    mnist_eval_result result_eval;
+    ggml_opt_new_result * result_eval;
 
-    if (backend == "CPU") {
-        const int ncores_logical = std::thread::hardware_concurrency();
-        result_eval = mnist_graph_eval(
-            argv[1], ggml_get_data_f32(dataset.data), ggml_get_data_f32(dataset.labels), MNIST_NTEST, std::min(ncores_logical, (ncores_logical + 4)/2));
-        if (result_eval.success) {
-            fprintf(stdout, "%s: predicted digit is %d\n", __func__, result_eval.pred[iex]);
+    // if (backend == "CPU") {
+    //     const int ncores_logical = std::thread::hardware_concurrency();
+    //     result_eval = mnist_graph_eval(
+    //         argv[1], ggml_get_data_f32(ggml_opt_new_dataset_data(dataset)), ggml_get_data_f32(ggml_opt_new_dataset_data(dataset)),
+    //         MNIST_NTEST, std::min(ncores_logical, (ncores_logical + 4)/2));
+    //     if (result_eval.success) {
+    //         fprintf(stdout, "%s: predicted digit is %d\n", __func__, result_eval.pred[iex]);
 
-            std::pair<double, double> result_loss = mnist_loss(result_eval);
-            fprintf(stdout, "%s: test_loss=%.6lf+-%.6lf\n", __func__, result_loss.first, result_loss.second);
+    //         std::pair<double, double> result_loss = mnist_loss(result_eval);
+    //         fprintf(stdout, "%s: test_loss=%.6lf+-%.6lf\n", __func__, result_loss.first, result_loss.second);
 
-            std::pair<double, double> result_acc = mnist_accuracy(result_eval);
-            fprintf(stdout, "%s: test_acc=%.2lf+-%.2lf%%\n", __func__, 100.0*result_acc.first, 100.0*result_acc.second);
+    //         std::pair<double, double> result_acc = mnist_accuracy(result_eval);
+    //         fprintf(stdout, "%s: test_acc=%.2lf+-%.2lf%%\n", __func__, 100.0*result_acc.first, 100.0*result_acc.second);
 
-            return 0;
-        }
-    } else {
-        fprintf(stdout, "%s: not trying to load a GGML graph from %s because this is only supported for the CPU backend\n", __func__, argv[1]);
-    }
+    //         return 0;
+    //     }
+    // } else {
+    //     fprintf(stdout, "%s: not trying to load a GGML graph from %s because this is only supported for the CPU backend\n", __func__, argv[1]);
+    // }
 
     const int64_t t_start_us = ggml_time_us();
 
@@ -69,13 +71,21 @@ int main(int argc, char ** argv) {
 
     fprintf(stdout, "%s: loaded model in %.2lf ms\n", __func__, t_load_us / 1000.0);
     result_eval = mnist_model_eval(model, dataset);
-    fprintf(stdout, "%s: predicted digit is %d\n", __func__, result_eval.pred[iex]);
+    std::vector<int32_t> pred(MNIST_NTEST);
+    ggml_opt_new_result_pred(result_eval, pred.data());
+    fprintf(stdout, "%s: predicted digit is %d\n", __func__, pred[iex]);
 
-    std::pair<double, double> result_loss = mnist_loss(result_eval);
-    fprintf(stdout, "%s: test_loss=%.6lf+-%.6lf\n", __func__, result_loss.first, result_loss.second);
+    double loss;
+    double loss_unc;
+    ggml_opt_new_result_loss(result_eval, &loss, &loss_unc);
+    fprintf(stdout, "%s: test_loss=%.6lf+-%.6lf\n", __func__, loss, loss_unc);
 
-    std::pair<double, double> result_acc = mnist_accuracy(result_eval);
-    fprintf(stdout, "%s: test_acc=%.2lf+-%.2lf%%\n", __func__, 100.0*result_acc.first, 100.0*result_acc.second);
+    double accuracy;
+    double accuracy_unc;
+    ggml_opt_new_result_accuracy(result_eval, &accuracy, &accuracy_unc);
+    fprintf(stdout, "%s: test_acc=%.2lf+-%.2lf%%\n", __func__, 100.0*accuracy, 100.0*accuracy_unc);
+
+    ggml_opt_new_result_free(result_eval);
 
     return 0;
 }

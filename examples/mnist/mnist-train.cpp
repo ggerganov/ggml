@@ -1,3 +1,4 @@
+#include "ggml-opt.h"
 #include "mnist-common.h"
 
 #include <cmath>
@@ -19,7 +20,7 @@ int main(int argc, char ** argv) {
     // The MNIST model is so small that the overhead from data shuffling is non-negligible, especially with CUDA.
     // With a shard size of 10 this overhead is greatly reduced at the cost of less shuffling (does not seem to have a significant impact).
     // A batch of 500 images then consists of 50 random shards of size 10 instead of 500 random shards of size 1.
-    struct mnist_dataset dataset(/*nex =*/ MNIST_NTRAIN, /*shard_size =*/ 10);
+    struct ggml_opt_new_dataset * dataset = ggml_opt_new_dataset_init(MNIST_NINPUT, MNIST_NCLASSES, MNIST_NTRAIN, /*ndata_shard =*/ 10);
 
     if (!mnist_image_load(argv[3], dataset)) {
         return 1;
