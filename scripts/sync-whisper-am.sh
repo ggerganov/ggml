@@ -62,6 +62,7 @@ while read c; do
         ggml/src/ggml*.m \
         ggml/src/ggml*.metal \
         ggml/src/ggml*.cu \
+        ggml/src/ggml-amx/* \
         ggml/src/ggml-cann/* \
         ggml/src/ggml-cuda/* \
         ggml/src/ggml-sycl/* \
@@ -106,6 +107,8 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
     # ggml/src/ggml-aarch64.c      -> src/ggml-aarch64.c
     # ggml/src/ggml-aarch64.h      -> src/ggml-aarch64.h
     # ggml/src/ggml-alloc.c        -> src/ggml-alloc.c
+    # ggml/src/ggml-amx/*          -> src/ggml-amx/*
+    # ggml/src/ggml-amx.cpp        -> src/ggml-amx.cpp
     # ggml/src/ggml-backend-impl.h -> src/ggml-backend-impl.h
     # ggml/src/ggml-backend.cpp    -> src/ggml-backend.cpp
     # ggml/src/ggml-blas.cpp       -> src/ggml-blas.cpp
@@ -127,6 +130,7 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
     #
     # ggml/include/ggml.h         -> include/ggml.h
     # ggml/include/ggml-alloc.h   -> include/ggml-alloc.h
+    # ggml/include/ggml-amx.h     -> include/ggml-amx.h
     # ggml/include/ggml-backend.h -> include/ggml-backend.h
     # ggml/include/ggml-blas.h    -> include/ggml-blas.h
     # ggml/include/ggml-cann.h    -> include/ggml-cann.h
@@ -153,6 +157,8 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
         -e 's/\/ggml\/src\/ggml-aarch64\.c/\/src\/ggml-aarch64.c/g' \
         -e 's/\/ggml\/src\/ggml-aarch64\.h/\/src\/ggml-aarch64.h/g' \
         -e 's/\/ggml\/src\/ggml-alloc\.c/\/src\/ggml-alloc.c/g' \
+        -e 's/\/ggml\/src\/ggml-amx\//\/src\/ggml-amx\//g' \
+        -e 's/\/ggml\/src\/ggml-amx\.cpp/\/src\/ggml-amx.cpp/g' \
         -e 's/\/ggml\/src\/ggml-backend-impl\.h/\/src\/ggml-backend-impl.h/g' \
         -e 's/\/ggml\/src\/ggml-backend\.cpp/\/src\/ggml-backend.cpp/g' \
         -e 's/\/ggml\/src\/ggml-blas\.cpp/\/src\/ggml-blas.cpp/g' \
@@ -173,6 +179,7 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
         -e 's/\/ggml\/src\/vulkan-shaders\//\/src\/vulkan-shaders\//g' \
         -e 's/\/ggml\/include\/ggml\.h/\/include\/ggml.h/g' \
         -e 's/\/ggml\/include\/ggml-alloc\.h/\/include\/ggml-alloc.h/g' \
+        -e 's/\/ggml\/include\/ggml-amx\.h/\/include\/ggml-amx.h/g' \
         -e 's/\/ggml\/include\/ggml-backend\.h/\/include\/ggml-backend.h/g' \
         -e 's/\/ggml\/include\/ggml-blas\.h/\/include\/ggml-blas.h/g' \
         -e 's/\/ggml\/include\/ggml-cann\.h/\/include\/ggml-cann.h/g' \

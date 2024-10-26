@@ -8,6 +8,8 @@ cp -rpv ../whisper.cpp/ggml/src/ggml.c              src/ggml.c
 cp -rpv ../whisper.cpp/ggml/src/ggml-aarch64.c      src/ggml-aarch64.c
 cp -rpv ../whisper.cpp/ggml/src/ggml-aarch64.h      src/ggml-aarch64.h
 cp -rpv ../whisper.cpp/ggml/src/ggml-alloc.c        src/ggml-alloc.c
+cp -rpv ../whisper.cpp/ggml/src/ggml-amx/*          src/ggml-amx/
+cp -rpv ../whisper.cpp/ggml/src/ggml-amx.cpp        src/ggml-amx.cpp
 cp -rpv ../whisper.cpp/ggml/src/ggml-backend-impl.h src/ggml-backend-impl.h
 cp -rpv ../whisper.cpp/ggml/src/ggml-backend.cpp    src/ggml-backend.cpp
 cp -rpv ../whisper.cpp/ggml/src/ggml-blas.cpp       src/ggml-blas.cpp
@@ -30,6 +32,7 @@ cp -rpv ../whisper.cpp/ggml/src/vulkan-shaders/*    src/vulkan-shaders/
 
 cp -rpv ../whisper.cpp/ggml/include/ggml.h         include/ggml.h
 cp -rpv ../whisper.cpp/ggml/include/ggml-alloc.h   include/ggml-alloc.h
+cp -rpv ../whisper.cpp/ggml/include/ggml-amx.h     include/ggml-amx.h
 cp -rpv ../whisper.cpp/ggml/include/ggml-backend.h include/ggml-backend.h
 cp -rpv ../whisper.cpp/ggml/include/ggml-blas.h    include/ggml-blas.h
 cp -rpv ../whisper.cpp/ggml/include/ggml-cann.h    include/ggml-cann.h
