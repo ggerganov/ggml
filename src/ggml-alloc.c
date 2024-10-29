@@ -466,6 +466,7 @@ static bool ggml_gallocr_is_own(ggml_gallocr_t galloc, struct ggml_tensor * t) {
     return ggml_gallocr_hash_get(galloc, t)->allocated;
 }
 
+// TODO this function is unused, should it be removed?
 static void ggml_gallocr_set_node_offset(ggml_gallocr_t galloc, struct ggml_tensor * node, int buffer_id, size_t offset) {
     struct hash_node * hn = ggml_gallocr_hash_get(galloc, node);
     hn->buffer_id = buffer_id;
@@ -566,6 +567,23 @@ static int get_node_buffer_id(const int * node_buffer_ids, int i) {
 }
 
 static void ggml_gallocr_alloc_graph_impl(ggml_gallocr_t galloc, struct ggml_cgraph * graph, const int * node_buffer_ids, const int * leaf_buffer_ids) {
+    // if there is a previous allocation of a different graph with shared tensors the data of those tensors needs to be explicitly invalidated
+    // otherwise those tensors will not be considered when allocating any new tensors and possibly get overwritten
+    for (int i = 0; i < graph->n_leafs; ++i) {
+        struct ggml_tensor * leaf = graph->leafs[i];
+        if (ggml_gallocr_is_own(galloc, leaf)) {
+            leaf->data   = NULL;
+            leaf->buffer = NULL;
+        }
+    }
+    for (int i = 0; i < graph->n_nodes; ++i) {
+        struct ggml_tensor * node = graph->nodes[i];
+        if (ggml_gallocr_is_own(galloc, node)) {
+            node->data   = NULL;
+            node->buffer = NULL;
+        }
+    }
+
     // clear hash tables
     ggml_hash_set_reset(&galloc->hash_set);
     memset(galloc->hash_values, 0, sizeof(struct hash_node) * galloc->hash_set.size);
