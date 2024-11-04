@@ -1,4 +1,5 @@
 #include "ggml-backend.h"
+#include "ggml-cpu.h"
 #include "ggml.h"
 
 #ifdef GGML_USE_CUDA

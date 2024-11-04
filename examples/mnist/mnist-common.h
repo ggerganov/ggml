@@ -8,6 +8,7 @@
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
 #include "ggml.h"
+#include "ggml-cpu.h"
 
 #define MNIST_NTRAIN          60000
 #define MNIST_NTEST           10000
