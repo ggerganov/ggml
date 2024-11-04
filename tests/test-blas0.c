@@ -1,4 +1,5 @@
 #include "ggml.h"
+#include "ggml-cpu.h"
 
 #include <stdint.h>
 #include <stdio.h>
