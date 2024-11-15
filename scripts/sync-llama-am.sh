@@ -66,24 +66,26 @@ while read c; do
         fi
     fi
 
+        #ggml/src/CMakeLists.txt \
     git format-patch -U${ctx} -k $c~1..$c --stdout -- \
         ggml/CMakeLists.txt \
-        ggml/src/CMakeLists.txt \
-        ggml/cmake/FindSIMD.cmake \
         ggml/src/ggml*.h \
         ggml/src/ggml*.c \
         ggml/src/ggml*.cpp \
-        ggml/src/ggml*.m \
-        ggml/src/ggml*.metal \
-        ggml/src/ggml*.cu \
         ggml/src/ggml-amx/* \
+        ggml/src/ggml-blas/* \
         ggml/src/ggml-cann/* \
+        ggml/src/ggml-cpu/* \
         ggml/src/ggml-cuda/* \
+        ggml/src/ggml-hip/* \
+        ggml/src/ggml-kompute/* \
+        ggml/src/ggml-metal/* \
+        ggml/src/ggml-musa/* \
+        ggml/src/ggml-rpc/* \
         ggml/src/ggml-sycl/* \
-        ggml/src/vulkan-shaders/* \
+        ggml/src/ggml-vulkan/* \
         ggml/include/ggml*.h \
         tests/test-opt.cpp \
-        tests/test-grad0.cpp \
         tests/test-quantize-fns.cpp \
         tests/test-quantize-perf.cpp \
         tests/test-backend-ops.cpp \
@@ -116,23 +118,27 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     #
     # ggml/CMakelists.txt       -> CMakeLists.txt
     # ggml/src/CMakelists.txt   -> src/CMakeLists.txt
-    # ggml/cmake/FindSIMD.cmake -> cmake/FindSIMD.cmake
+    # ggml/cmake/FindSIMD.cmake -> src/ggml-cpu/cmake/FindSIMD.cmake (FIXME)
     #
     # ggml/src/ggml*.c          -> src/ggml*.c
     # ggml/src/ggml*.cpp        -> src/ggml*.cpp
     # ggml/src/ggml*.h          -> src/ggml*.h
-    # ggml/src/ggml*.cu         -> src/ggml*.cu
-    # ggml/src/ggml*.m          -> src/ggml*.m
     # ggml/src/ggml-amx/*       -> src/ggml-amx/*
+    # ggml/src/ggml-blas/*      -> src/ggml-blas/*
     # ggml/src/ggml-cann/*      -> src/ggml-cann/*
+    # ggml/src/ggml-cpu/*       -> src/ggml-cpu/*
     # ggml/src/ggml-cuda/*      -> src/ggml-cuda/*
+    # ggml/src/ggml-hip/*       -> src/ggml-hip/*
+    # ggml/src/ggml-kompute/*   -> src/ggml-kompute/*
+    # ggml/src/ggml-metal/*     -> src/ggml-metal/*
+    # ggml/src/ggml-musa/*      -> src/ggml-musa/*
+    # ggml/src/ggml-rpc/*       -> src/ggml-rpc/*
     # ggml/src/ggml-sycl/*      -> src/ggml-sycl/*
-    # ggml/src/vulkan-shaders/* -> src/vulkan-shaders/*
+    # ggml/src/ggml-vulkan/*    -> src/ggml-vulkan/*
     #
     # ggml/include/ggml*.h -> include/ggml*.h
     #
     # tests/test-opt.cpp           -> tests/test-opt.cpp
-    # tests/test-grad0.cpp         -> tests/test-grad0.cpp
     # tests/test-quantize-fns.cpp  -> tests/test-quantize-fns.cpp
     # tests/test-quantize-perf.cpp -> tests/test-quantize-perf.cpp
     # tests/test-backend-ops.cpp   -> tests/test-backend-ops.cpp
@@ -143,20 +149,24 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     cat llama-src.patch | sed -E \
         -e 's/\/ggml\/CMakeLists\.txt/\/CMakeLists.txt/g' \
         -e 's/\/ggml\/src\/CMakeLists\.txt/\/src\/CMakeLists.txt/g' \
-        -e 's/\/ggml\/cmake\/FindSIMD\.cmake/\/cmake\/FindSIMD.cmake/g' \
+        -e 's/\/ggml\/cmake\/FindSIMD\.cmake/\/src\/ggml-cpu\/cmake\/FindSIMD.cmake/g' \
         -e 's/\/ggml\/src\/ggml(.*)\.c/\/src\/ggml\1.c/g' \
         -e 's/\/ggml\/src\/ggml(.*)\.cpp/\/src\/ggml\1.cpp/g' \
         -e 's/\/ggml\/src\/ggml(.*)\.h/\/src\/ggml\1.h/g' \
-        -e 's/\/ggml\/src\/ggml(.*)\.cu/\/src\/ggml\1.cu/g' \
-        -e 's/\/ggml\/src\/ggml(.*)\.m/\/src\/ggml\1.m/g' \
         -e 's/\/ggml\/src\/ggml-amx\//\/src\/ggml-amx\//g' \
+        -e 's/\/ggml\/src\/ggml-blas\//\/src\/ggml-blas\//g' \
         -e 's/\/ggml\/src\/ggml-cann\//\/src\/ggml-cann\//g' \
+        -e 's/\/ggml\/src\/ggml-cpu\//\/src\/ggml-cpu\//g' \
         -e 's/\/ggml\/src\/ggml-cuda\//\/src\/ggml-cuda\//g' \
+        -e 's/\/ggml\/src\/ggml-hip\//\/src\/ggml-hip\//g' \
+        -e 's/\/ggml\/src\/ggml-kompute\//\/src\/ggml-kompute\//g' \
+        -e 's/\/ggml\/src\/ggml-metal\//\/src\/ggml-metal\//g' \
+        -e 's/\/ggml\/src\/ggml-musa\//\/src\/ggml-musa\//g' \
+        -e 's/\/ggml\/src\/ggml-rpc\//\/src\/ggml-rpc\//g' \
         -e 's/\/ggml\/src\/ggml-sycl\//\/src\/ggml-sycl\//g' \
-        -e 's/\/ggml\/src\/vulkan-shaders\//\/src\/vulkan-shaders\//g' \
+        -e 's/\/ggml\/src\/ggml-vulkan\//\/src\/ggml-vulkan\//g' \
         -e 's/\/ggml\/include\/ggml(.*)\.h/\/include\/ggml\1.h/g' \
         -e 's/\/tests\/test-opt\.cpp/\/tests\/test-opt.cpp/g' \
-        -e 's/\/tests\/test-grad0\.cpp/\/tests\/test-grad0.cpp/g' \
         -e 's/\/tests\/test-quantize-fns\.cpp/\/tests\/test-quantize-fns.cpp/g' \
         -e 's/\/tests\/test-quantize-perf\.cpp/\/tests\/test-quantize-perf.cpp/g' \
         -e 's/\/tests\/test-backend-ops\.cpp/\/tests\/test-backend-ops.cpp/g' \
