@@ -66,9 +66,9 @@ while read c; do
         fi
     fi
 
-        #ggml/src/CMakeLists.txt \
     git format-patch -U${ctx} -k $c~1..$c --stdout -- \
         ggml/CMakeLists.txt \
+        ggml/src/CMakeLists.txt \
         ggml/src/ggml*.h \
         ggml/src/ggml*.c \
         ggml/src/ggml*.cpp \
@@ -118,7 +118,6 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     #
     # ggml/CMakelists.txt       -> CMakeLists.txt
     # ggml/src/CMakelists.txt   -> src/CMakeLists.txt
-    # ggml/cmake/FindSIMD.cmake -> src/ggml-cpu/cmake/FindSIMD.cmake (FIXME)
     #
     # ggml/src/ggml*.c          -> src/ggml*.c
     # ggml/src/ggml*.cpp        -> src/ggml*.cpp
@@ -149,7 +148,6 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     cat llama-src.patch | sed -E \
         -e 's/\/ggml\/CMakeLists\.txt/\/CMakeLists.txt/g' \
         -e 's/\/ggml\/src\/CMakeLists\.txt/\/src\/CMakeLists.txt/g' \
-        -e 's/\/ggml\/cmake\/FindSIMD\.cmake/\/src\/ggml-cpu\/cmake\/FindSIMD.cmake/g' \
         -e 's/\/ggml\/src\/ggml(.*)\.c/\/src\/ggml\1.c/g' \
         -e 's/\/ggml\/src\/ggml(.*)\.cpp/\/src\/ggml\1.cpp/g' \
         -e 's/\/ggml\/src\/ggml(.*)\.h/\/src\/ggml\1.h/g' \
