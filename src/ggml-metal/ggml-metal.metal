@@ -2564,6 +2564,37 @@ kernel void kernel_im2col_ext(
 template [[host_name("kernel_im2col_ext_f32")]] kernel im2col_ext_t kernel_im2col_ext<float>;
 template [[host_name("kernel_im2col_ext_f16")]] kernel im2col_ext_t kernel_im2col_ext<half>;
 
+kernel void kernel_conv_transpose_1d_f32(
+        device const float * src0,
+        device const float * src1,
+        device        char * dst,
+        constant   int32_t & KOC,
+        constant   int32_t & IC,
+        constant   int32_t & s0,
+        uint3 tgpig[[threadgroup_position_in_grid]],
+        uint3  tgpg[[threadgroups_per_grid]],
+        uint3 tpitg[[thread_position_in_threadgroup]],
+        uint3   ntg[[threads_per_threadgroup]]) {
+
+    const int32_t offset_src0 = tgpig[0] * ntg[1] + tpitg[1];  // oc * K + k
+    const int32_t offset_src1 = tpitg[0];
+
+    float v = 0.0f;
+    for (int ic = 0; ic < IC; ic++) {
+        v += src0[offset_src0 + ic * KOC] * src1[offset_src1 + ic * ntg[0]];
+    }
+
+    device float * pdst = (device float *) (dst + tgpig[0] * ne0 * nb0);
+
+    pdst[oc * OL + l * s0 + k] += v;
+
+    // if (oc < 0 || oc >= OC || ol < 0 || ol >= OL) {
+    //     // ???
+    // } else {
+    //     pdst[oc * OL + l * s0 + k] += v;
+    // }
+}
+
 kernel void kernel_upscale_f32(
     device  const char * src0,
     device        char * dst,
