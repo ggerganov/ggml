@@ -176,22 +176,13 @@ if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
 endif()
 
 #
-# test-grad0
+# test-opt
 
-set(TEST_TARGET test-grad0)
+set(TEST_TARGET test-opt)
 add_executable(${TEST_TARGET} ${TEST_TARGET}.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
 set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
-
-#
-# test-opt
-
-# set(TEST_TARGET test-opt)
-# add_executable(${TEST_TARGET} ${TEST_TARGET}.cpp)
-# target_link_libraries(${TEST_TARGET} PRIVATE ggml)
-# add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
-# set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
 
 #
 # test-quantize-fns
@@ -267,36 +258,6 @@ add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
 set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
-
-#
-# test1
-
-set(TEST_TARGET test1)
-add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
-target_link_libraries(${TEST_TARGET} PRIVATE ggml)
-if (MSVC)
-    target_link_options(${TEST_TARGET} PRIVATE "/STACK: 8388608") # 8MB
-endif()
-add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
-set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
-
-#
-# test2
-
-# set(TEST_TARGET test2)
-# add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
-# target_link_libraries(${TEST_TARGET} PRIVATE ggml)
-# add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
-# set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
-
-#
-# test3
-
-# set(TEST_TARGET test3)
-# add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
-# target_link_libraries(${TEST_TARGET} PRIVATE ggml)
-# add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
-# set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
 
 #
 # test-pool
