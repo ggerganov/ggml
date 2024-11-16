@@ -3,7 +3,6 @@
 #include "ggml.h"
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
-#include "ggml-cpu.h"
 #include "ggml-impl.h"
 
 #include <algorithm>
@@ -16,7 +15,6 @@
 
 struct ggml_opt_dataset {
     struct ggml_context   * ctx;
-    ggml_backend_t          backend;
     ggml_backend_buffer_t   buf;
     struct ggml_tensor    * data;
     struct ggml_tensor    * labels;
@@ -105,9 +103,7 @@ ggml_opt_dataset_t ggml_opt_dataset_init(int64_t ne_datapoint, int64_t ne_label,
         result->nbs_labels = 0;
     }
 
-    result->backend = ggml_backend_cpu_init();
-    GGML_ASSERT(result->backend);
-    result->buf = ggml_backend_alloc_ctx_tensors(result->ctx, result->backend);
+    result->buf = ggml_backend_alloc_ctx_tensors_from_buft(result->ctx, ggml_backend_cpu_buffer_type());
 
     const int64_t nshards = ndata/ndata_shard;
     result->permutation.resize(nshards);
@@ -119,7 +115,6 @@ ggml_opt_dataset_t ggml_opt_dataset_init(int64_t ne_datapoint, int64_t ne_label,
 
 void ggml_opt_dataset_free(ggml_opt_dataset_t dataset) {
     ggml_backend_buffer_free(dataset->buf);
-    ggml_backend_free(dataset->backend);
     ggml_free(dataset->ctx);
     delete dataset;
 }
