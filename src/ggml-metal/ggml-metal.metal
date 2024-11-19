@@ -1348,10 +1348,9 @@ kernel void kernel_argmax(
         device   const void * x,
         device      int32_t * dst,
         constant    int64_t & ncols,
-        uint tpitg[[thread_position_in_threadgroup]]) {
-    device const float * x_row = (device const float *) ((device const char *) x + tpitg * ncols * sizeof(float));
+        uint tgpig[[threadgroup_position_in_grid]]) {
+    device const float * x_row = (device const float *) ((device const char *) x + tgpig * ncols * sizeof(float));
 
-    // initialize
     dst[tpitg] = 0;
 
     for (int i = 0; i < ncols; i++) {
