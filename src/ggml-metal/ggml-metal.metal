@@ -1347,9 +1347,9 @@ kernel void kernel_ssm_scan_f32(
 kernel void kernel_argmax(
         device   const void * x,
         device      int32_t * dst,
-        constant    int64_t & ncols,
+        constant    int64_t & nb01,
         uint tgpig[[threadgroup_position_in_grid]]) {
-    device const float * x_row = (device const float *) ((device const char *) x + tgpig * ncols * sizeof(float));
+    device const float * x_row = (device const float *) ((device const char *) x + tgpig * nb01);
 
     dst[tpitg] = 0;
 
