@@ -3485,7 +3485,8 @@ static void ggml_metal_encode_node(
                 [encoder setComputePipelineState:pipeline];
                 [encoder setBuffer:id_src0 offset:offs_src0        atIndex:0];
                 [encoder setBuffer:id_dst  offset:offs_dst         atIndex:1];
-                [encoder setBytes:&nb01    length:sizeof( int64_t) atIndex:2];
+                [encoder setBytes:&ne00    length:sizeof( int64_t) atIndex:2];
+                [encoder setBytes:&nb01    length:sizeof(uint64_t) atIndex:3];
 
                 [encoder dispatchThreadgroups:MTLSizeMake(nrows, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
             } break;
