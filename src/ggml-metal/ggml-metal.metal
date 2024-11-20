@@ -2568,31 +2568,31 @@ kernel void kernel_conv_transpose_1d_f32(
         device const float * src0,
         device const float * src1,
         device        char * dst,
-        constant   int32_t & KOC,
         constant   int32_t & IC,
+        constant   int32_t & IL,
+        constant   int32_t & K,
+        constant  uint64_t & nb0,
+        constant  uint64_t & nb1,
         constant   int32_t & s0,
-        uint3 tgpig[[threadgroup_position_in_grid]],
-        uint3  tgpg[[threadgroups_per_grid]],
-        uint3 tpitg[[thread_position_in_threadgroup]],
-        uint3   ntg[[threads_per_threadgroup]]) {
-
-    const int32_t offset_src0 = tgpig[0] * ntg[1] + tpitg[1];  // oc * K + k
-    const int32_t offset_src1 = tpitg[0];
+        uint3   tgpig[[threadgroup_position_in_grid]],
+        uint3   tgpg[[threadgroups_per_grid]]) {
 
     float v = 0.0f;
-    for (int ic = 0; ic < IC; ic++) {
-        v += src0[offset_src0 + ic * KOC] * src1[offset_src1 + ic * ntg[0]];
+
+    for (int c = 0; c < IC; c++) {
+        const int32_t kernel_offset = c * tgpg[1] * K + K * tgpig[1];
+        const int32_t input_offset = c * IL;
+
+        for (int i = 0; i < IL; i++) {
+            if (tgpig[0] >= i * s0 && tgpig[0] < i * s0 + K) {
+                v += src0[kernel_offset + tgpig[0] - i * s0] * src1[input_offset + i];
+            }
+        }
     }
 
-    device float * pdst = (device float *) (dst + tgpig[0] * ne0 * nb0);
+    device float * dst_ptr = (device float *) (dst + tgpig[0] * nb0 + tgpig[1] * nb1);
 
-    pdst[oc * OL + l * s0 + k] += v;
-
-    // if (oc < 0 || oc >= OC || ol < 0 || ol >= OL) {
-    //     // ???
-    // } else {
-    //     pdst[oc * OL + l * s0 + k] += v;
-    // }
+    dst_ptr[0] = v;
 }
 
 kernel void kernel_upscale_f32(

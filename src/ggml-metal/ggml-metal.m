@@ -2831,13 +2831,12 @@ static void ggml_metal_encode_node(
             {
                 GGML_ASSERT(ggml_is_contiguous(src0));
                 GGML_ASSERT(ggml_is_contiguous(src1));
-                // GGML_ASSERT(src0->type == GGML_TYPE_F16);
-                // GGML_ASSERT(src1->type == GGML_TYPE_F32);
-                // GGML_ASSERT( dst->type == GGML_TYPE_F16 || dst->type == GGML_TYPE_F32);
+                GGML_ASSERT(src0->type == GGML_TYPE_F16 || src0->type == GGML_TYPE_F32);
+                GGML_ASSERT(src1->type == GGML_TYPE_F32);
+                GGML_ASSERT( dst->type == GGML_TYPE_F32);
 
                 const int32_t s0 = ((const int32_t *)(dst->op_params))[0];
 
-                const int32_t N  = src1->ne[2];
                 const int32_t IC = src1->ne[1];
                 const int32_t IL = src1->ne[0];
 
@@ -2849,12 +2848,17 @@ static void ggml_metal_encode_node(
                 id<MTLComputePipelineState> pipeline = ctx->kernels[GGML_METAL_KERNEL_TYPE_CONV_TRANSPOSE_1D_F32].pipeline;
 
                 [encoder setComputePipelineState:pipeline];
-                [encoder setBuffer:id_src0 offset:offs_src0       atIndex:0];
-                [encoder setBuffer:id_src1 offset:offs_src1       atIndex:1];
-                [encoder setBuffer:id_dst  offset:offs_dst        atIndex:2];
-                [encoder setBytes:&s0      length:sizeof(int32_t) atIndex:3];
+                [encoder setBuffer:id_src0 offset:offs_src0         atIndex:0];
+                [encoder setBuffer:id_src1 offset:offs_src1         atIndex:1];
+                [encoder setBuffer:id_dst  offset:offs_dst          atIndex:2];
+                [encoder setBytes:&IC      length:sizeof( int32_t)  atIndex:3];
+                [encoder setBytes:&IL      length:sizeof( int32_t)  atIndex:4];
+                [encoder setBytes:&K       length:sizeof( int32_t)  atIndex:5];
+                [encoder setBytes:&nb0     length:sizeof( uint64_t) atIndex:6];
+                [encoder setBytes:&nb1     length:sizeof( uint64_t) atIndex:7];
+                [encoder setBytes:&s0      length:sizeof( int32_t)  atIndex:8];
 
-                [encoder dispatchThreadgroups:MTLSizeMake(OC, 1, 1) threadsPerThreadgroup:MTLSizeMake(IL, K, 1)];
+                [encoder dispatchThreadgroups:MTLSizeMake(OL, OC, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
             } break;
         case GGML_OP_UPSCALE:
             {
