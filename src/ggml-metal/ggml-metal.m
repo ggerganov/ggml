@@ -987,6 +987,7 @@ static bool ggml_metal_supports_op(const struct ggml_backend_metal_device_contex
         case GGML_OP_REPEAT:
         case GGML_OP_SCALE:
         case GGML_OP_CLAMP:
+        case GGML_OP_CONV_TRANSPOSE_1D:
             return true;
         case GGML_OP_SQR:
         case GGML_OP_SQRT:
