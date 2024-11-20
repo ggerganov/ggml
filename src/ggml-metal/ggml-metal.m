@@ -3475,6 +3475,8 @@ static void ggml_metal_encode_node(
             case GGML_OP_ARGMAX:
             {
                 GGML_ASSERT(src0->type == GGML_TYPE_F32);
+                GGML_ASSERT(ggml_is_contiguous_1(src0));
+                GGML_ASSERT(nb00 == ggml_type_size(src0->type));
 
                 const int64_t nrows = ggml_nrows(src0);
 
