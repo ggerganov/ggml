@@ -1,0 +1,3 @@
+[submodule "kompute"]
+	path = src/ggml-kompute/kompute
+	url = https://github.com/nomic-ai/kompute.git
