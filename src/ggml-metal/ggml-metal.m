@@ -264,7 +264,8 @@ enum ggml_metal_kernel_type {
     GGML_METAL_KERNEL_TYPE_IM2COL_F32,
     GGML_METAL_KERNEL_TYPE_IM2COL_EXT_F16,
     GGML_METAL_KERNEL_TYPE_IM2COL_EXT_F32,
-    GGML_METAL_KERNEL_TYPE_CONV_TRANSPOSE_1D_F32,
+    GGML_METAL_KERNEL_TYPE_CONV_TRANSPOSE_1D_F32_F32,
+    GGML_METAL_KERNEL_TYPE_CONV_TRANSPOSE_1D_F16_F32,
     GGML_METAL_KERNEL_TYPE_UPSCALE_F32,
     GGML_METAL_KERNEL_TYPE_PAD_F32,
     GGML_METAL_KERNEL_TYPE_ARANGE_F32,
@@ -788,7 +789,8 @@ static struct ggml_backend_metal_context * ggml_metal_init(ggml_backend_dev_t de
         GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_IM2COL_F32,                    im2col_f32,                     true);
         GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_IM2COL_EXT_F16,                im2col_ext_f16,                 true);
         GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_IM2COL_EXT_F32,                im2col_ext_f32,                 true);
-        GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_CONV_TRANSPOSE_1D_F32,         conv_transpose_1d_f32,          true);
+        GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_CONV_TRANSPOSE_1D_F32_F32,     conv_transpose_1d_f32_f32,      true);
+        GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_CONV_TRANSPOSE_1D_F16_F32,     conv_transpose_1d_f16_f32,      true);
         GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_UPSCALE_F32,                   upscale_f32,                    true);
         GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_PAD_F32,                       pad_f32,                        true);
         GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_TIMESTEP_EMBEDDING_F32,        timestep_embedding_f32,         true);
@@ -2846,7 +2848,17 @@ static void ggml_metal_encode_node(
                 const int32_t OL = dst->ne[0];
                 const int32_t OC = dst->ne[1];
 
-                id<MTLComputePipelineState> pipeline = ctx->kernels[GGML_METAL_KERNEL_TYPE_CONV_TRANSPOSE_1D_F32].pipeline;
+                id<MTLComputePipelineState> pipeline;
+
+                switch (src0->type) {
+                    case GGML_TYPE_F32: {
+                        pipeline = ctx->kernels[GGML_METAL_KERNEL_TYPE_CONV_TRANSPOSE_1D_F32_F32].pipeline;
+                    } break;
+                    case GGML_TYPE_F16: {
+                        pipeline = ctx->kernels[GGML_METAL_KERNEL_TYPE_CONV_TRANSPOSE_1D_F16_F32].pipeline;
+                    } break;
+                    default: GGML_ABORT("fatal error");
+                };
 
                 [encoder setComputePipelineState:pipeline];
                 [encoder setBuffer:id_src0 offset:offs_src0         atIndex:0];
@@ -2855,9 +2867,9 @@ static void ggml_metal_encode_node(
                 [encoder setBytes:&IC      length:sizeof( int32_t)  atIndex:3];
                 [encoder setBytes:&IL      length:sizeof( int32_t)  atIndex:4];
                 [encoder setBytes:&K       length:sizeof( int32_t)  atIndex:5];
-                [encoder setBytes:&nb0     length:sizeof( uint64_t) atIndex:6];
-                [encoder setBytes:&nb1     length:sizeof( uint64_t) atIndex:7];
-                [encoder setBytes:&s0      length:sizeof( int32_t)  atIndex:8];
+                [encoder setBytes:&s0      length:sizeof( int32_t)  atIndex:6];
+                [encoder setBytes:&nb0     length:sizeof(uint64_t)  atIndex:7];
+                [encoder setBytes:&nb1     length:sizeof(uint64_t)  atIndex:8];
 
                 [encoder dispatchThreadgroups:MTLSizeMake(OL, OC, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
             } break;
