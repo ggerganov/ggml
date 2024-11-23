@@ -1,4 +1,5 @@
-#include "ggml/ggml.h"
+#include "ggml.h"
+#include "ggml-cpu.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,8 +20,8 @@ void dup_to(struct ggml_tensor* src, struct ggml_tensor* dst) {
 
 bool can_dup(enum ggml_type src_type, enum ggml_type dst_type) {
     if (src_type == dst_type) return true;
-    if (src_type == GGML_TYPE_F32 && ggml_internal_get_type_traits(dst_type).from_float) return true;
-    if (dst_type == GGML_TYPE_F32 && ggml_internal_get_type_traits(src_type).to_float) return true;
+    if (src_type == GGML_TYPE_F32 && ggml_get_type_traits_cpu(dst_type)->from_float) return true;
+    if (dst_type == GGML_TYPE_F32 && ggml_get_type_traits    (src_type)->to_float) return true;
 
     return false;
 }

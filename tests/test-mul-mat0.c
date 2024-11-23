@@ -1,5 +1,6 @@
 #define _CRT_SECURE_NO_DEPRECATE // Disables ridiculous "unsafe" warnigns on Windows
-#include "ggml/ggml.h"
+#include "ggml.h"
+#include "ggml-cpu.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -96,15 +97,15 @@ bool check_gradient(
         float max_error_abs,
         float max_error_rel) {
     const int n_threads = 1;
+    ggml_set_loss(f);
 
     struct ggml_cgraph * gf = ggml_new_graph_custom(ctx0, GGML_DEFAULT_GRAPH_SIZE, true);
     ggml_build_forward_expand(gf, f);
     struct ggml_cgraph * gb = ggml_graph_dup(ctx0, gf);
-    ggml_build_backward_expand(ctx0, gf, gb, false);
+    ggml_build_backward_expand(ctx0, ctx0, gb, false);
 
     ggml_graph_compute_with_ctx(ctx0, gf, n_threads);
-    ggml_graph_reset  (gf);
-    ggml_set_f32      (f->grad, 1.0f);
+    ggml_graph_reset(gb);
     ggml_graph_compute_with_ctx(ctx0, gb, n_threads);
 
     ggml_graph_dump_dot(gf, NULL, "test-grad0-forward.dot");
@@ -131,11 +132,10 @@ bool check_gradient(
             set_element(x[i], k, x0);
 
             // compute gradient using backward graph
-            ggml_graph_reset  (gf);
-            ggml_set_f32      (f->grad, 1.0f);
+            ggml_graph_reset(gb);
             ggml_graph_compute_with_ctx(ctx0, gb, n_threads);
 
-            const float g1 = get_element(x[i]->grad, k);
+            const float g1 = get_element(ggml_graph_get_grad(gb, x[i]), k);
 
             const float error_abs = fabsf(g0 - g1);
             const float error_rel = g0 != 0 ? fabsf(g0 - g1)/fabs(g0) : 0;

@@ -1,655 +1,288 @@
-if (GGML_ALL_WARNINGS)
-    if (NOT MSVC)
-        add_compile_options(-Wunused -Wextra -Wcast-qual -Wdouble-promotion)
-        add_compile_options("$<$<COMPILE_LANGUAGE:C>:-Wshadow;-Wno-unused-function;-Wmissing-prototypes>")
-    else()
-        # todo : windows
+include(CheckCXXCompilerFlag)
+
+add_compile_definitions(GGML_SCHED_MAX_COPIES=${GGML_SCHED_MAX_COPIES})
+
+# enable libstdc++ assertions for debug builds
+if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+    add_compile_definitions($<$<CONFIG:Debug>:_GLIBCXX_ASSERTIONS>)
+endif()
+
+if (NOT MSVC)
+    if (GGML_SANITIZE_THREAD)
+        add_compile_options(-fsanitize=thread)
+        link_libraries     (-fsanitize=thread)
+    endif()
+
+    if (GGML_SANITIZE_ADDRESS)
+        add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+        link_libraries     (-fsanitize=address)
+    endif()
+
+    if (GGML_SANITIZE_UNDEFINED)
+        add_compile_options(-fsanitize=undefined)
+        link_libraries     (-fsanitize=undefined)
     endif()
 endif()
 
-# compiler flags
+function(get_flags CCID CCVER)
+    set(C_FLAGS "")
+    set(CXX_FLAGS "")
 
-if (NOT MSVC)
-    #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-math-errno -ffinite-math-only -funsafe-math-optimizations")
+    if (CCID MATCHES "Clang")
+        set(C_FLAGS   -Wunreachable-code-break -Wunreachable-code-return)
+        set(CXX_FLAGS -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi)
+
+        if (
+            (CCID STREQUAL "Clang"      AND CCVER VERSION_GREATER_EQUAL 3.8.0) OR
+            (CCID STREQUAL "AppleClang" AND CCVER VERSION_GREATER_EQUAL 7.3.0)
+        )
+            list(APPEND C_FLAGS -Wdouble-promotion)
+        endif()
+    elseif (CCID STREQUAL "GNU")
+        set(C_FLAGS   -Wdouble-promotion)
+        set(CXX_FLAGS -Wno-array-bounds)
+        if (CCVER VERSION_GREATER_EQUAL 8.1.0)
+            list(APPEND CXX_FLAGS -Wextra-semi)
+        endif()
+    endif()
+
+    set(GF_C_FLAGS   ${C_FLAGS}   PARENT_SCOPE)
+    set(GF_CXX_FLAGS ${CXX_FLAGS} PARENT_SCOPE)
+endfunction()
+
+if (GGML_FATAL_WARNINGS)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        list(APPEND C_FLAGS   -Werror)
+        list(APPEND CXX_FLAGS -Werror)
+    elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+        add_compile_options(/WX)
+    endif()
 endif()
 
-message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
+if (GGML_ALL_WARNINGS)
+    if (NOT MSVC)
+        list(APPEND WARNING_FLAGS -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function)
+        list(APPEND C_FLAGS       -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes
+                                  -Werror=implicit-int -Werror=implicit-function-declaration)
+        list(APPEND CXX_FLAGS     -Wmissing-declarations -Wmissing-noreturn)
 
-if (NOT UNAME_S)
-    execute_process(COMMAND uname -s OUTPUT_VARIABLE UNAME_S)
+        list(APPEND C_FLAGS   ${WARNING_FLAGS})
+        list(APPEND CXX_FLAGS ${WARNING_FLAGS})
+
+        get_flags(${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION})
+
+        add_compile_options("$<$<COMPILE_LANGUAGE:C>:${C_FLAGS};${GF_C_FLAGS}>"
+                            "$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS};${GF_CXX_FLAGS}>")
+    else()
+        # todo : msvc
+        set(C_FLAGS   "")
+        set(CXX_FLAGS "")
+    endif()
 endif()
-if (NOT UNAME_P)
-    execute_process(COMMAND uname -p OUTPUT_VARIABLE UNAME_P)
+
+if (GGML_LTO)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT result OUTPUT output)
+    if (result)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    else()
+        message(WARNING "IPO is not supported: ${output}")
+    endif()
 endif()
-if (NOT UNAME_M)
-    execute_process(COMMAND uname -m OUTPUT_VARIABLE UNAME_M)
+
+if (GGML_CCACHE)
+    find_program(GGML_CCACHE_FOUND ccache)
+
+    if (GGML_CCACHE_FOUND)
+        # TODO: should not be set globally
+        set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+        set(ENV{CCACHE_SLOPPINESS} time_macros)
+        message(STATUS "ccache found, compilation results will be cached. Disable with GGML_CCACHE=OFF.")
+    else()
+        message(STATUS "Warning: ccache not found - consider installing it for faster compilation or disable this warning with GGML_CCACHE=OFF")
+    endif ()
 endif()
-#message(STATUS "UNAME_S: ${UNAME_S}  UNAME_P: ${UNAME_P}  UNAME_M: ${UNAME_M}")
 
 # this version of Apple ld64 is buggy
 execute_process(
     COMMAND ${CMAKE_C_COMPILER} ${CMAKE_EXE_LINKER_FLAGS} -Wl,-v
     ERROR_VARIABLE output
+    OUTPUT_QUIET
 )
+
 if (output MATCHES "dyld-1015\.7")
     add_compile_definitions(HAVE_BUGGY_APPLE_LINKER)
 endif()
 
-# Mac OS + Arm can report x86_64
-# ref: https://github.com/ggerganov/whisper.cpp/issues/66#issuecomment-1282546789
-if (UNAME_S MATCHES "Darwin")
-    if (NOT UNAME_P MATCHES "arm")
-        execute_process(COMMAND sysctl -n hw.optional.arm64 OUTPUT_VARIABLE SYSCTL_M)
-	if (SYSCTL_M MATCHES "1")
-            #set(UNAME_P "arm")
-            #set(UNAME_M "arm64")
-	    message(WARNING "Your arch is announced as x86_64, but it seems to actually be ARM64. Not fixing that can lead to bad performance. For more info see: https://github.com/ggerganov/whisper.cpp/issues/66\#issuecomment-#1282546789")
-	endif()
+# architecture specific
+# TODO: probably these flags need to be tweaked on some architectures
+#       feel free to update the Makefile for your architecture and send a pull request or issue
+message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
+if (MSVC)
+    string(TOLOWER "${CMAKE_GENERATOR_PLATFORM}" CMAKE_GENERATOR_PLATFORM_LWR)
+    message(STATUS "CMAKE_GENERATOR_PLATFORM: ${CMAKE_GENERATOR_PLATFORM}")
+else ()
+    set(CMAKE_GENERATOR_PLATFORM_LWR "")
+endif ()
+
+if (NOT MSVC)
+    if (GGML_STATIC)
+        add_link_options(-static)
+        if (MINGW)
+            add_link_options(-static-libgcc -static-libstdc++)
+        endif()
+    endif()
+    if (GGML_GPROF)
+        add_compile_options(-pg)
     endif()
 endif()
 
-if (${CMAKE_SYSTEM_NAME} STREQUAL "Emscripten")
-    message(STATUS "Emscripten detected")
-elseif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
-    message(STATUS "ARM detected")
-    #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=apple-m1")
-elseif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "ppc64le" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "ppc64")
-    message(STATUS "PPC64 detected")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mpower9-vector")
+if (MINGW)
+    # Target Windows 8 for PrefetchVirtualMemory
+    add_compile_definitions(_WIN32_WINNT=${GGML_WIN_VER})
+endif()
+
+#
+# POSIX conformance
+#
+
+# clock_gettime came in POSIX.1b (1993)
+# CLOCK_MONOTONIC came in POSIX.1-2001 / SUSv3 as optional
+# posix_memalign came in POSIX.1-2001 / SUSv3
+# M_PI is an XSI extension since POSIX.1-2001 / SUSv3, came in XPG1 (1985)
+
+# Somehow in OpenBSD whenever POSIX conformance is specified
+# some string functions rely on locale_t availability,
+# which was introduced in POSIX.1-2008, forcing us to go higher
+if (CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
+    add_compile_definitions(_XOPEN_SOURCE=700)
 else()
-    message(STATUS "x86 detected")
-    #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx -mavx2 -mfma -mf16c")
-    if (UNAME_S MATCHES "Darwin")
-        execute_process(COMMAND sysctl machdep.cpu.features OUTPUT_VARIABLE AVX1_M)
-        if (AVX1_M MATCHES "AVX1.0")
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx")
-        endif()
-        execute_process(COMMAND sysctl machdep.cpu.leaf7_features OUTPUT_VARIABLE AVX2_M)
-        if (AVX2_M MATCHES "AVX2")
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx2")
-        endif()
-        if (AVX1_M MATCHES "FMA")
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfma")
-        endif()
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mf16c")
-    elseif (UNAME_S MATCHES "Linux")
-        message(STATUS "Linux detected")
-        execute_process(COMMAND grep "avx " /proc/cpuinfo OUTPUT_VARIABLE AVX1_M)
-        if (AVX1_M MATCHES "avx")
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx")
-        endif()
-        execute_process(COMMAND grep "avx2 " /proc/cpuinfo OUTPUT_VARIABLE AVX2_M)
-        if (AVX2_M MATCHES "avx2")
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx2")
-        endif()
-        execute_process(COMMAND grep "fma " /proc/cpuinfo OUTPUT_VARIABLE FMA_M)
-        if (FMA_M MATCHES "fma")
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfma")
-        endif()
-        execute_process(COMMAND grep "f16c " /proc/cpuinfo OUTPUT_VARIABLE F16C_M)
-        if (F16C_M MATCHES "f16c")
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mf16c")
-        endif()
-        execute_process(COMMAND grep "sse3 " /proc/cpuinfo OUTPUT_VARIABLE SSE3_M)
-        if (SSE3_M MATCHES "sse3")
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse3")
-        endif()
-    elseif (UNAME_S MATCHES "Haiku")
-        message(STATUS "Haiku detected")
-        execute_process(COMMAND sysinfo -cpu COMMAND grep "AVX " OUTPUT_VARIABLE AVX1_M)
-        if (AVX1_M MATCHES "avx")
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx")
-        endif()
-        execute_process(COMMAND sysinfo -cpu COMMAND grep "AVX2 " OUTPUT_VARIABLE AVX2_M)
-        if (AVX2_M MATCHES "avx2")
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx2")
-        endif()
-        execute_process(COMMAND sysinfo -cpu COMMAND grep "FMA " OUTPUT_VARIABLE FMA_M)
-        if (FMA_M MATCHES "fma")
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfma")
-        endif()
-        execute_process(COMMAND sysinfo -cpu COMMAND grep "F16C " OUTPUT_VARIABLE F16C_M)
-        if (F16C_M MATCHES "f16c")
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mf16c")
-        endif()
-    elseif (MSVC)
-        if (GGML_AVX512)
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /arch:AVX512")
-            # MSVC has no compile-time flags enabling specific
-            # AVX512 extensions, neither it defines the
-            # macros corresponding to the extensions.
-            # Do it manually.
-            if (GGML_AVX512_VBMI)
-                add_compile_definitions(__AVX512VBMI__)
-            endif()
-            if (GGML_AVX512_VNNI)
-                add_compile_definitions(__AVX512VNNI__)
-            endif()
-        elseif (GGML_AVX2)
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /arch:AVX2")
-        elseif (GGML_AVX)
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /arch:AVX")
-        endif()
-    else()
-        set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -mfma -mf16c -mavx -mavx2")
+    add_compile_definitions(_XOPEN_SOURCE=600)
+endif()
+
+# Data types, macros and functions related to controlling CPU affinity and
+# some memory allocation are available on Linux through GNU extensions in libc
+if (CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "Android")
+    add_compile_definitions(_GNU_SOURCE)
+endif()
+
+# RLIMIT_MEMLOCK came in BSD, is not specified in POSIX.1,
+# and on macOS its availability depends on enabling Darwin extensions
+# similarly on DragonFly, enabling BSD extensions is necessary
+if (
+    CMAKE_SYSTEM_NAME MATCHES "Darwin" OR
+    CMAKE_SYSTEM_NAME MATCHES "iOS"    OR
+    CMAKE_SYSTEM_NAME MATCHES "tvOS"   OR
+    CMAKE_SYSTEM_NAME MATCHES "DragonFly"
+)
+    add_compile_definitions(_DARWIN_C_SOURCE)
+endif()
+
+# alloca is a non-standard interface that is not visible on BSDs when
+# POSIX conformance is specified, but not all of them provide a clean way
+# to enable it in such cases
+if (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+    add_compile_definitions(__BSD_VISIBLE)
+endif()
+if (CMAKE_SYSTEM_NAME MATCHES "NetBSD")
+    add_compile_definitions(_NETBSD_SOURCE)
+endif()
+if (CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
+    add_compile_definitions(_BSD_SOURCE)
+endif()
+
+if (WIN32)
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+
+    if (BUILD_SHARED_LIBS)
+        # TODO: should not use this
+        set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
     endif()
 endif()
 
 # ggml
 
-set(TARGET ggml)
+add_library(ggml-base
+            ../include/ggml.h
+            ../include/ggml-alloc.h
+            ../include/ggml-backend.h
+            ../include/ggml-cpp.h
+            ../include/ggml-opt.h
+            ggml.c
+            ggml-alloc.c
+            ggml-backend.cpp
+            ggml-opt.cpp
+            ggml-threading.cpp
+            ggml-threading.h
+            ggml-quants.c
+            ggml-quants.h
+            ggml-aarch64.c
+            ggml-aarch64.h)
 
-# on APPLE - include Accelerate framework
-if (APPLE AND NOT GGML_NO_ACCELERATE)
-    find_library(ACCELERATE_FRAMEWORK Accelerate)
-    if (ACCELERATE_FRAMEWORK)
-        message(STATUS "Accelerate framework found")
+target_include_directories(ggml-base PRIVATE .)
 
-        set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${ACCELERATE_FRAMEWORK})
-        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_ACCELERATE -DACCELERATE_NEW_LAPACK -DACCELERATE_LAPACK_ILP64)
-    else()
-        message(WARNING "Accelerate framework not found")
-    endif()
-endif()
+add_library(ggml
+            ggml-backend-reg.cpp)
 
-if (GGML_BLAS)
-    if (GGML_STATIC)
-        set(BLA_STATIC ON)
-    endif()
-    #if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.22)
-    #    set(BLA_SIZEOF_INTEGER 8)
-    #endif()
+target_link_libraries(ggml PUBLIC ggml-base)
 
-    set(BLA_VENDOR ${GGML_BLAS_VENDOR})
-    find_package(BLAS)
-
-    if (BLAS_FOUND)
-        message(STATUS "BLAS found, Libraries: ${BLAS_LIBRARIES}")
-
-        if (("${BLAS_INCLUDE_DIRS}" STREQUAL "") AND NOT (${GGML_BLAS_VENDOR} MATCHES "Apple"))
-            # BLAS_INCLUDE_DIRS is missing in FindBLAS.cmake.
-            # see https://gitlab.kitware.com/cmake/cmake/-/issues/20268
-            find_package(PkgConfig REQUIRED)
-            if (${GGML_BLAS_VENDOR} MATCHES "Generic")
-                pkg_check_modules(DepBLAS REQUIRED blas)
-            elseif (${GGML_BLAS_VENDOR} MATCHES "OpenBLAS")
-                # As of openblas v0.3.22, the 64-bit is named openblas64.pc
-                pkg_check_modules(DepBLAS openblas64)
-                if (NOT DepBLAS_FOUND)
-                    pkg_check_modules(DepBLAS REQUIRED openblas)
-                endif()
-            elseif (${GGML_BLAS_VENDOR} MATCHES "FLAME")
-                pkg_check_modules(DepBLAS REQUIRED blis)
-            elseif (${GGML_BLAS_VENDOR} MATCHES "ATLAS")
-                pkg_check_modules(DepBLAS REQUIRED blas-atlas)
-            elseif (${GGML_BLAS_VENDOR} MATCHES "FlexiBLAS")
-                pkg_check_modules(DepBLAS REQUIRED flexiblas_api)
-            elseif (${GGML_BLAS_VENDOR} MATCHES "Intel")
-                # all Intel* libraries share the same include path
-                pkg_check_modules(DepBLAS REQUIRED mkl-sdl)
-            elseif (${GGML_BLAS_VENDOR} MATCHES "NVHPC")
-                # this doesn't provide pkg-config
-                # suggest to assign BLAS_INCLUDE_DIRS on your own
-                if ("${NVHPC_VERSION}" STREQUAL "")
-                    message(WARNING "Better to set NVHPC_VERSION")
-                else()
-                    set(DepBLAS_FOUND ON)
-                    set(DepBLAS_INCLUDE_DIRS "/opt/nvidia/hpc_sdk/${CMAKE_SYSTEM_NAME}_${CMAKE_SYSTEM_PROCESSOR}/${NVHPC_VERSION}/math_libs/include")
-                endif()
+function(ggml_add_backend backend)
+    string(TOUPPER "GGML_${backend}" backend_id)
+    if (${backend_id})
+        string(TOLOWER "ggml-${backend}" backend_target)
+        add_subdirectory(${backend_target})
+        # check again in case the backend disabled itself
+        # note that this should NOT be the normal behavior, in case of errors the backend should fail the build
+        # however, currently it is necessary for AMX, since it is enabled by default on llama.cpp
+        if (${backend_id})
+            message(STATUS "Including ${backend} backend")
+            if (${BUILD_SHARED_LIBS})
+                target_compile_definitions(${backend_target} PRIVATE GGML_BACKEND_BUILD)
+                target_compile_definitions(${backend_target} PUBLIC  GGML_BACKEND_SHARED)
             endif()
-            if (DepBLAS_FOUND)
-                set(BLAS_INCLUDE_DIRS ${DepBLAS_INCLUDE_DIRS})
-            else()
-                message(WARNING "BLAS_INCLUDE_DIRS neither been provided nor been automatically"
-                " detected by pkgconfig, trying to find cblas.h from possible paths...")
-                find_path(BLAS_INCLUDE_DIRS
-                    NAMES cblas.h
-                    HINTS
-                        /usr/include
-                        /usr/local/include
-                        /usr/include/openblas
-                        /opt/homebrew/opt/openblas/include
-                        /usr/local/opt/openblas/include
-                        /usr/include/x86_64-linux-gnu/openblas/include
-                )
-            endif()
+            install(TARGETS ${backend_target} LIBRARY)
+            target_link_libraries(ggml PUBLIC ${backend_target})
+            string(TOUPPER "GGML_USE_${backend}" backend_use)
+            target_compile_definitions(ggml PUBLIC ${backend_use})
         endif()
-
-        message(STATUS "BLAS found, Includes: ${BLAS_INCLUDE_DIRS}")
-
-        add_compile_options(${BLAS_LINKER_FLAGS})
-
-        add_compile_definitions(GGML_USE_BLAS)
-
-        if (${BLAS_INCLUDE_DIRS} MATCHES "mkl" AND (${GGML_BLAS_VENDOR} MATCHES "Generic" OR ${GGML_BLAS_VENDOR} MATCHES "Intel"))
-            add_compile_definitions(GGML_BLAS_USE_MKL)
-        endif()
-
-        set(GGML_HEADERS_BLAS ggml-blas.h)
-        set(GGML_SOURCES_BLAS ggml-blas.cpp)
-
-        set(GGML_EXTRA_LIBS     ${GGML_EXTRA_LIBS}     ${BLAS_LIBRARIES})
-        set(GGML_EXTRA_INCLUDES ${GGML_EXTRA_INCLUDES} ${BLAS_INCLUDE_DIRS})
-        set(GGML_EXTRA_FLAGS    ${GGML_EXTRA_FLAGS} -DGGML_USE_BLAS)
-    else()
-        message(WARNING "BLAS not found, please refer to "
-        "https://cmake.org/cmake/help/latest/module/FindBLAS.html#blas-lapack-vendors"
-        " to set correct GGML_BLAS_VENDOR")
     endif()
-endif()
+endfunction()
 
-if (GGML_CUBLAS)
-    message(WARNING "GGML_CUBLAS is deprecated and will be removed in the future.\nUse GGML_CUDA instead")
-    set(GGML_CUDA ON)
-endif()
+ggml_add_backend(CPU)
+ggml_add_backend(AMX)
+ggml_add_backend(BLAS)
+ggml_add_backend(CANN)
+ggml_add_backend(CUDA)
+ggml_add_backend(HIP)
+ggml_add_backend(Kompute)
+ggml_add_backend(METAL)
+ggml_add_backend(RPC)
+ggml_add_backend(SYCL)
+ggml_add_backend(Vulkan)
+ggml_add_backend(MUSA)
 
-if (GGML_CUDA)
-    cmake_minimum_required(VERSION 3.17)
+foreach (target ggml-base ggml)
+    target_include_directories(${target} PUBLIC    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include> $<INSTALL_INTERFACE:include>)
+    target_compile_features   (${target} PRIVATE c_std_11) # don't bump
+endforeach()
 
-    find_package(CUDAToolkit)
-    if (CUDAToolkit_FOUND)
-        message(STATUS "CUDA found")
-
-        if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-            # 52 == lowest CUDA 12 standard
-            # 60 == f16 CUDA intrinsics
-            # 61 == integer CUDA intrinsics
-            # 70 == compute capability at which unrolling a loop in mul_mat_q kernels is faster
-            if (GGML_CUDA_F16 OR GGML_CUDA_DMMV_F16)
-                set(CMAKE_CUDA_ARCHITECTURES "60;61;70") # needed for f16 CUDA intrinsics
-            else()
-                set(CMAKE_CUDA_ARCHITECTURES "52;61;70") # lowest CUDA 12 standard + lowest for integer intrinsics
-                #set(CMAKE_CUDA_ARCHITECTURES "OFF") # use this to compile much faster, but only F16 models work
-            endif()
-        endif()
-
-        message(STATUS "Using CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
-
-        enable_language(CUDA)
-
-        file(GLOB   GGML_SOURCES_CUDA "ggml-cuda/*.cu")
-        list(APPEND GGML_SOURCES_CUDA  ggml-cuda.h)
-        list(APPEND GGML_SOURCES_CUDA  ggml-cuda.cu)
-
-        file(GLOB SRCS "ggml-cuda/template-instances/fattn-wmma*.cu")
-        list(APPEND GGML_SOURCES_CUDA ${SRCS})
-        file(GLOB SRCS "ggml-cuda/template-instances/mmq*.cu")
-        list(APPEND GGML_SOURCES_CUDA ${SRCS})
-
-        if (GGML_CUDA_FA_ALL_QUANTS)
-            file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*.cu")
-            list(APPEND GGML_SOURCES_CUDA ${SRCS})
-            add_compile_definitions(GGML_CUDA_FA_ALL_QUANTS)
-        else()
-            file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*q4_0-q4_0.cu")
-            list(APPEND GGML_SOURCES_CUDA ${SRCS})
-            file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*q8_0-q8_0.cu")
-            list(APPEND GGML_SOURCES_CUDA ${SRCS})
-            file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*f16-f16.cu")
-            list(APPEND GGML_SOURCES_CUDA ${SRCS})
-        endif()
-
-        set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_CUDA)
-
-        if (GGML_CUDA_FORCE_DMMV)
-            add_compile_definitions(GGML_CUDA_FORCE_DMMV)
-        endif()
-        if (GGML_CUDA_FORCE_MMQ)
-            add_compile_definitions(GGML_CUDA_FORCE_MMQ)
-        endif()
-
-        # required for dynamic parallelism
-        # set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
-
-        if (GGML_STATIC)
-            if (WIN32)
-                # As of 12.3.1 CUDA Tookit for Windows does not offer a static cublas library
-                set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} CUDA::cudart_static CUDA::cublas CUDA::cublasLt)
-            else ()
-                set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} CUDA::cudart_static CUDA::cublas_static CUDA::cublasLt_static)
-            endif()
-        else()
-            set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} CUDA::cudart CUDA::cublas CUDA::cublasLt)
-        endif()
-
-        set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} CUDA::cuda_driver)
-
-        if (CMAKE_BUILD_TYPE MATCHES Debug)
-            set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -lineinfo")
-        endif()
-    else()
-        message(WARNING "CUDA not found")
-    endif()
-endif()
-
-# TODO: do not build separate ggml-rocm target (see CUDA build above, or llama.cpp for reference)
-if (GGML_HIPBLAS)
-    if (NOT EXISTS $ENV{ROCM_PATH})
-        if (NOT EXISTS /opt/rocm)
-            set(ROCM_PATH /usr)
-        else()
-            set(ROCM_PATH /opt/rocm)
-        endif()
-    else()
-        set(ROCM_PATH $ENV{ROCM_PATH})
-    endif()
-    list(APPEND CMAKE_PREFIX_PATH ${ROCM_PATH})
-    list(APPEND CMAKE_PREFIX_PATH "${ROCM_PATH}/lib64/cmake")
-
-    # CMake on Windows doesn't support the HIP language yet
-    if(WIN32)
-        set(CXX_IS_HIPCC TRUE)
-    else()
-        string(REGEX MATCH "hipcc(\.bat)?$" CXX_IS_HIPCC "${CMAKE_CXX_COMPILER}")
-    endif()
-
-    if (CXX_IS_HIPCC)
-        if(LINUX)
-            if (NOT ${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
-                message(WARNING "Only LLVM is supported for HIP, hint: CXX=/opt/rocm/llvm/bin/clang++")
-            endif()
-
-            message(WARNING "Setting hipcc as the C++ compiler is legacy behavior."
-                    " Prefer setting the HIP compiler directly. See README for details.")
-        endif()
-    else()
-        # Forward AMDGPU_TARGETS to CMAKE_HIP_ARCHITECTURES.
-        if(AMDGPU_TARGETS AND NOT CMAKE_HIP_ARCHITECTURES)
-            set(CMAKE_HIP_ARCHITECTURES ${AMDGPU_TARGETS})
-        endif()
-        cmake_minimum_required(VERSION 3.21)
-        enable_language(HIP)
-    endif()
-
-    find_package(hip     REQUIRED)
-    find_package(hipblas REQUIRED)
-    find_package(rocblas REQUIRED)
-
-    message(STATUS "HIP and hipBLAS found")
-
-    add_compile_definitions(GGML_USE_HIPBLAS GGML_USE_CUDA)
-
-    set(GGML_HEADERS_ROCM ggml-cuda.h)
-
-    file(GLOB GGML_SOURCES_ROCM "ggml-cuda/*.cu")
-    list(APPEND GGML_SOURCES_ROCM "ggml-cuda.cu")
-    list(APPEND GGML_SOURCES_ROCM ${SRCS})
-
-    file(GLOB SRCS "ggml-cuda/template-instances/fattn-wmma*.cu")
-    list(APPEND GGML_SOURCES_ROCM ${SRCS})
-    file(GLOB SRCS "ggml-cuda/template-instances/mmq*.cu")
-    list(APPEND GGML_SOURCES_ROCM ${SRCS})
-
-    if (GGML_CUDA_FA_ALL_QUANTS)
-        file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*.cu")
-        list(APPEND GGML_SOURCES_ROCM ${SRCS})
-        add_compile_definitions(GGML_CUDA_FA_ALL_QUANTS)
-    else()
-        file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*q4_0-q4_0.cu")
-        list(APPEND GGML_SOURCES_ROCM ${SRCS})
-        file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*q8_0-q8_0.cu")
-        list(APPEND GGML_SOURCES_ROCM ${SRCS})
-        file(GLOB SRCS "ggml-cuda/template-instances/fattn-vec*f16-f16.cu")
-        list(APPEND GGML_SOURCES_ROCM ${SRCS})
-    endif()
-
-    add_compile_definitions(GGML_USE_HIPBLAS GGML_USE_CUDA)
-
-    if (GGML_CUDA_FORCE_DMMV)
-        add_compile_definitions(GGML_CUDA_FORCE_DMMV)
-    endif()
-
-    if (GGML_CUDA_FORCE_MMQ)
-        add_compile_definitions(GGML_CUDA_FORCE_MMQ)
-    endif()
-
-    add_compile_definitions(GGML_CUDA_DMMV_X=${GGML_CUDA_DMMV_X})
-    add_compile_definitions(GGML_CUDA_MMV_Y=${GGML_CUDA_MMV_Y})
-    add_compile_definitions(K_QUANTS_PER_ITERATION=${GGML_CUDA_KQUANTS_ITER})
-
-    add_library(ggml-rocm OBJECT ${GGML_SOURCES_ROCM} ${GGML_HEADERS_ROCM})
-
-    if (CXX_IS_HIPCC)
-        set_source_files_properties(${GGML_SOURCES_ROCM} PROPERTIES LANGUAGE CXX)
-        target_link_libraries(ggml-rocm PRIVATE hip::device)
-    else()
-        set_source_files_properties(${GGML_SOURCES_ROCM} PROPERTIES LANGUAGE HIP)
-    endif()
-
-    target_link_libraries(ggml-rocm PRIVATE hip::device PUBLIC hip::host roc::rocblas roc::hipblas)
-    target_include_directories(ggml-rocm PRIVATE . ../include ../include/ggml)
-
-    if (BUILD_SHARED_LIBS)
-        set_target_properties(ggml-rocm PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    endif()
-
-    if (GGML_STATIC)
-        message(FATAL_ERROR "Static linking not supported for HIP/ROCm")
-    endif()
-    set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} ggml-rocm)
-endif()
-
-if (GGML_METAL)
-    find_library(FOUNDATION_LIBRARY         Foundation              REQUIRED)
-    find_library(METAL_FRAMEWORK            Metal                   REQUIRED)
-    find_library(METALKIT_FRAMEWORK         MetalKit                REQUIRED)
-    find_library(METALPERFORMANCE_FRAMEWORK MetalPerformanceShaders REQUIRED)
-
-    set(GGML_SOURCES_METAL ggml-metal.m ggml-metal.h)
-
-    set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_METAL)
-
-    #add_compile_definitions(GGML_METAL_NDEBUG)
-
-    # get full path to the file
-    #add_compile_definitions(GGML_METAL_DIR_KERNELS="${CMAKE_CURRENT_SOURCE_DIR}/")
-
-    # copy ggml-common.h and ggml-metal.metal to bin directory
-    configure_file(ggml-common.h    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ggml-common.h    COPYONLY)
-    configure_file(ggml-metal.metal ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ggml-metal.metal COPYONLY)
-
-    if (GGML_METAL_EMBED_LIBRARY)
-        enable_language(ASM)
-        add_compile_definitions(GGML_METAL_EMBED_LIBRARY)
-
-        set(METALLIB_COMMON "${CMAKE_CURRENT_SOURCE_DIR}/ggml-common.h")
-        set(METALLIB_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/ggml-metal.metal")
-
-        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/autogenerated")
-
-        # merge ggml-common.h and ggml-metal.metal into a single file
-        set(METALLIB_EMBED_ASM    "${CMAKE_BINARY_DIR}/autogenerated/ggml-metal-embed.s")
-        set(METALLIB_SOURCE_EMBED "${CMAKE_BINARY_DIR}/autogenerated/ggml-metal-embed.metal")
-
-        add_custom_command(
-            OUTPUT ${METALLIB_EMBED_ASM}
-            COMMAND echo "Embedding Metal library"
-            COMMAND sed -e '/\#include \"ggml-common.h\"/r ${METALLIB_COMMON}' -e '/\#include \"ggml-common.h\"/d' < ${METALLIB_SOURCE} > ${METALLIB_SOURCE_EMBED}
-            COMMAND echo ".section __DATA,__ggml_metallib"          >  ${METALLIB_EMBED_ASM}
-            COMMAND echo ".globl _ggml_metallib_start"              >> ${METALLIB_EMBED_ASM}
-            COMMAND echo "_ggml_metallib_start:"                    >> ${METALLIB_EMBED_ASM}
-            COMMAND echo ".incbin \\\"${METALLIB_SOURCE_EMBED}\\\"" >> ${METALLIB_EMBED_ASM}
-            COMMAND echo ".globl _ggml_metallib_end"                >> ${METALLIB_EMBED_ASM}
-            COMMAND echo "_ggml_metallib_end:"                      >> ${METALLIB_EMBED_ASM}
-            DEPENDS ggml-metal.metal ggml-common.h
-            COMMENT "Generate assembly for embedded Metal library"
-        )
-
-    set(GGML_SOURCES_METAL ${GGML_SOURCES_METAL} ${METALLIB_EMBED_ASM})
-    else()
-        if (GGML_METAL_SHADER_DEBUG)
-            # custom command to do the following:
-            #   xcrun -sdk macosx metal    -fno-fast-math -c ggml-metal.metal -o ggml-metal.air
-            #   xcrun -sdk macosx metallib                   ggml-metal.air   -o default.metallib
-            #
-            # note: this is the only way I found to disable fast-math in Metal. it's ugly, but at least it works
-            #       disabling fast math is needed in order to pass tests/test-backend-ops
-            # note: adding -fno-inline fixes the tests when using MTL_SHADER_VALIDATION=1
-            # note: unfortunately, we have to call it default.metallib instead of ggml.metallib
-            #       ref: https://github.com/ggerganov/whisper.cpp/issues/1720
-            set(XC_FLAGS -fno-fast-math -fno-inline -g)
-        else()
-            set(XC_FLAGS -O3)
-        endif()
-
-        # Append macOS metal versioning flags
-        if (GGML_METAL_MACOSX_VERSION_MIN)
-            message(STATUS "Adding -mmacosx-version-min=${GGML_METAL_MACOSX_VERSION_MIN} flag to metal compilation")
-            list(APPEND XC_FLAGS -mmacosx-version-min=${GGML_METAL_MACOSX_VERSION_MIN})
-        endif()
-        if (GGML_METAL_STD)
-            message(STATUS "Adding -std=${GGML_METAL_STD} flag to metal compilation")
-            list(APPEND XC_FLAGS -std=${GGML_METAL_STD})
-        endif()
-
-        add_custom_command(
-            OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/default.metallib
-            COMMAND xcrun -sdk macosx metal    ${XC_FLAGS} -c ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ggml-metal.metal -o ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ggml-metal.air
-            COMMAND xcrun -sdk macosx metallib                ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ggml-metal.air   -o ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/default.metallib
-            COMMAND rm -f ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ggml-metal.air
-            COMMAND rm -f ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ggml-common.h
-            COMMAND rm -f ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ggml-metal.metal
-            DEPENDS ggml-metal.metal ggml-common.h
-            COMMENT "Compiling Metal kernels"
-            )
-
-        add_custom_target(
-            ggml-metal ALL
-            DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/default.metallib
-            )
-    endif() # GGML_METAL_EMBED_LIBRARY
-
-
-    set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS}
-        ${FOUNDATION_LIBRARY}
-        ${METAL_FRAMEWORK}
-        ${METALKIT_FRAMEWORK}
-        ${METALPERFORMANCE_FRAMEWORK}
-        )
-endif()
-
-if (GGML_RPC)
-    add_compile_definitions(GGML_USE_RPC)
-
-    if (WIN32)
-        set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} ws2_32)
-    endif()
-
-    set(GGML_SOURCES_RPC ggml-rpc.cpp)
-endif()
-
-if (GGML_VULKAN)
-    find_package(Vulkan)
-    if (Vulkan_FOUND)
-        message(STATUS "Vulkan found")
-
-        set(GGML_VULKAN_SOURCES ggml-vulkan.cpp ggml-vulkan.h)
-
-        add_library(ggml-vulkan OBJECT ggml-vulkan.cpp ggml-vulkan.h)
-        if (BUILD_SHARED_LIBS)
-            set_target_properties(ggml-vulkan PROPERTIES POSITION_INDEPENDENT_CODE ON)
-        endif()
-        target_link_libraries(ggml-vulkan PRIVATE Vulkan::Vulkan)
-        target_include_directories(ggml-vulkan PRIVATE . ../include ../include/ggml)
-
-        add_compile_definitions(GGML_USE_VULKAN)
-
-        set(GGML_EXTRA_LIBS ${GGMl_EXTRA_LIBS} ggml-vulkan)
-    else()
-        message(WARNING "Vulkan not found")
-    endif()
-endif()
-
-if (GGML_PERF)
-    set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_PERF)
-endif()
-
-add_library(${TARGET}
-    ggml.c
-    ggml-alloc.c
-    ggml-backend.c
-    ggml-quants.c
-    ggml-impl.h
-    ggml-backend-impl.h
-    ../include/ggml/ggml.h
-    ../include/ggml/ggml-alloc.h
-    ../include/ggml/ggml-backend.h
-    ${GGML_SOURCES_CUDA}  ${GGML_HEADERS_CUDA}
-    ${GGML_SOURCES_METAL} ${GGML_HEADERS_METAL}
-    ${GGML_SOURCES_RPC}   ${GGML_HEADERS_RPC}
-    ${GGML_SOURCES_BLAS}  ${GGML_HEADERS_BLAS}
-    )
-
-target_include_directories(${TARGET} PUBLIC
-    .
-    ../include
-    ../include/ggml
-    ${GGML_EXTRA_INCS}
-    )
+target_link_libraries(ggml-base PRIVATE Threads::Threads)
 
 find_library(MATH_LIBRARY m)
 if (MATH_LIBRARY)
-    target_link_libraries(${TARGET} PUBLIC ${MATH_LIBRARY})
+    if (NOT WIN32 OR NOT DEFINED ENV{ONEAPI_ROOT})
+        target_link_libraries(ggml-base PRIVATE m)
+    endif()
 endif()
 
-target_link_libraries(${TARGET} PUBLIC ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
+if (CMAKE_SYSTEM_NAME MATCHES "Android")
+    target_link_libraries(ggml-base PRIVATE dl)
+endif()
 
 if (BUILD_SHARED_LIBS)
-    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
-
-    target_link_libraries(${TARGET} PUBLIC
-        ${CMAKE_DL_LIBS}
-        )
-
-    target_compile_definitions(${TARGET} PUBLIC
-        GGML_SHARED
-        )
-
-    target_compile_definitions(${TARGET} PRIVATE
-        GGML_BUILD
-        )
-
-    if (GGML_METAL)
-        set_target_properties(${TARGET} PROPERTIES RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/ggml-metal.metal")
-    endif()
+    foreach (target ggml-base ggml)
+        set_target_properties(${target} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        target_compile_definitions(${target} PRIVATE GGML_BUILD)
+        target_compile_definitions(${target} PUBLIC  GGML_SHARED)
+    endforeach()
 endif()
-
-target_compile_definitions(${TARGET} PUBLIC
-    ${GGML_EXTRA_FLAGS}
-    )
-
-if (MINGW)
-    target_link_libraries(${TARGET} PUBLIC
-        stdc++
-        )
-endif()
-
-if (GGML_SOURCES_CUDA)
-    message(STATUS "GGML CUDA sources found")
-    if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-        # Only configure gmml CUDA architectures is not globally set
-        if (NOT DEFINED GGML_CUDA_ARCHITECTURES)
-            # Not overriden by user, so set defaults
-            set(GGML_CUDA_ARCHITECTURES 52 61 70)
-        endif()
-        message(STATUS "GGML Configuring CUDA architectures ${GGML_CUDA_ARCHITECTURES}")
-        set_property(TARGET ggml  PROPERTY CUDA_ARCHITECTURES ${GGML_CUDA_ARCHITECTURES})
-    endif()
-    set_property(TARGET ggml  PROPERTY CUDA_SELECT_NVCC_ARCH_FLAGS "Auto")
-    if (NOT MSVC)
-        target_link_libraries(ggml PUBLIC stdc++)
-    endif()
-endif()
-
-set (GGML_PUBLIC_HEADERS
-     ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml.h
-     ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml-alloc.h
-     ${CMAKE_CURRENT_SOURCE_DIR}/../include/ggml/ggml-backend.h)
-
-set_target_properties(${TARGET} PROPERTIES
-                      PUBLIC_HEADER "${GGML_PUBLIC_HEADERS}")
-
-install(TARGETS ${TARGET}
-    LIBRARY DESTINATION lib
-    PUBLIC_HEADER DESTINATION include/ggml
-    )

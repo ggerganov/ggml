@@ -1,10 +1,9 @@
 #include "ggml.h"
-#include "ggml/ggml-alloc.h"
-#include "ggml/ggml-backend.h"
+#include "ggml-cpu.h"
+#include "ggml-alloc.h"
+#include "ggml-backend.h"
 
-//#define GGML_USE_CUBLAS // uncomment this to use cuda backend, make sure build ggml lib with GGML_CUBLAS=ON
-
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_CUDA
 #include "ggml-cuda.h"
 #endif
 
@@ -48,7 +47,7 @@ void load_model(test_model & model, float* a, float* b, int M, int N, int K, boo
     };
 
     // initialize the backend
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_CUDA
     if (use_gpu) {
         fprintf(stderr, "%s: using CUDA backend\n", __func__);
         model.backend = ggml_backend_cuda_init(0);
@@ -152,18 +151,13 @@ struct ggml_tensor* compute(const test_model & model, ggml_gallocr_t allocr) {
         ggml_backend_cpu_set_n_threads(model.backend, n_threads);
     }
 
-#ifdef GGML_USE_METAL
-    if (ggml_backend_is_metal(model.backend)) {
-        ggml_backend_metal_set_n_cb(model.backend, n_threads);
-    }
-#endif
 
     ggml_backend_graph_compute(model.backend, gf);
 
     //ggml_graph_print(gf);
 
     // in this case, the output tensor is the last one in the graph
-    return gf->nodes[gf->n_nodes - 1];
+    return ggml_graph_node(gf, -1);
 }
 
 
@@ -234,8 +228,8 @@ static void gemm_f16_out_f32(int m, int n, int k,
 void perform_gemm_test(float* a, float* b, float* expected, int M, int N, int K) {
     printf("\nPerforming gemm_f16_out_f32 test:\n");
 
-    float* gemm_out = new float[M * N];
-    gemm_f16_out_f32(M, N, K, a, b, gemm_out, 0, 1);
+    std::vector<float> gemm_out(M * N);
+    gemm_f16_out_f32(M, N, K, a, b, gemm_out.data(), 0, 1);
 
     for (int i = 0; i < M; i++) {
         for (int j = 0; j < N; j++) {
@@ -320,9 +314,9 @@ int main(void)
 
     struct ggml_tensor * result = compute(model, allocr);
 
-    float* out_data = new float[ggml_nelements(result)];
+    std::vector<float> out_data(ggml_nelements(result));
 
-    ggml_backend_tensor_get(result, out_data, 0, ggml_nbytes(result));
+    ggml_backend_tensor_get(result, out_data.data(), 0, ggml_nbytes(result));
 
     printf("\nPerforming ggml_mul_mat test:\n");
 

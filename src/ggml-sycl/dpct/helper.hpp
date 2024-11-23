@@ -15,6 +15,7 @@
 
 #include <sycl/sycl.hpp>
 #include <sycl/half_type.hpp>
+#include <syclcompat/math.hpp>
 #include <oneapi/mkl.hpp>
 #include <map>
 
@@ -255,7 +256,7 @@ namespace dpct
         void set_pitch(size_t pitch) { _pitch = pitch; }
 
         size_t get_x() { return _x; }
-        void set_x(size_t x) { _x = x; };
+        void set_x(size_t x) { _x = x; }
 
         size_t get_y() { return _y; }
         void set_y(size_t y) { _y = y; }
@@ -589,264 +590,225 @@ namespace dpct
     }
 
     /// dpct device extension
-    class device_ext : public sycl::device
-    {
-        typedef std::mutex mutex_type;
+    class device_ext : public sycl::device {
+      typedef std::mutex mutex_type;
 
-    public:
-        device_ext() : sycl::device(), _ctx(*this) {}
-        ~device_ext()
-        {
-            std::lock_guard<mutex_type> lock(m_mutex);
-            clear_queues();
-        }
-        device_ext(const sycl::device &base) : sycl::device(base), _ctx(*this)
-        {
-            std::lock_guard<mutex_type> lock(m_mutex);
-            init_queues();
-        }
+     public:
+      device_ext() : sycl::device() {}
+      ~device_ext() {
+        std::lock_guard<mutex_type> lock(m_mutex);
+        clear_queues();
+      }
+      device_ext(const sycl::device &base) : sycl::device(base) {
+        std::lock_guard<mutex_type> lock(m_mutex);
+        init_queues();
+      }
 
-        int is_native_atomic_supported() { return 0; }
-        int get_major_version() const
-        {
-            return dpct::get_major_version(*this);
-        }
+      int is_native_atomic_supported() { return 0; }
+      int get_major_version() const { return dpct::get_major_version(*this); }
 
-        int get_minor_version() const
-        {
-            return dpct::get_minor_version(*this);
-        }
+      int get_minor_version() const { return dpct::get_minor_version(*this); }
 
-        int get_max_compute_units() const
-        {
-            return get_device_info().get_max_compute_units();
-        }
+      int get_max_compute_units() const {
+        return get_device_info().get_max_compute_units();
+      }
 
-        /// Return the maximum clock frequency of this device in KHz.
-        int get_max_clock_frequency() const
-        {
-            return get_device_info().get_max_clock_frequency();
-        }
+      /// Return the maximum clock frequency of this device in KHz.
+      int get_max_clock_frequency() const {
+        return get_device_info().get_max_clock_frequency();
+      }
 
-        int get_integrated() const { return get_device_info().get_integrated(); }
+      int get_integrated() const { return get_device_info().get_integrated(); }
 
-        int get_max_sub_group_size() const
-        {
-            return get_device_info().get_max_sub_group_size();
-        }
+      int get_max_sub_group_size() const {
+        return get_device_info().get_max_sub_group_size();
+      }
 
-        int get_max_register_size_per_work_group() const
-        {
-            return get_device_info().get_max_register_size_per_work_group();
-        }
+      int get_max_register_size_per_work_group() const {
+        return get_device_info().get_max_register_size_per_work_group();
+      }
 
-        int get_max_work_group_size() const
-        {
-            return get_device_info().get_max_work_group_size();
-        }
+      int get_max_work_group_size() const {
+        return get_device_info().get_max_work_group_size();
+      }
 
-        int get_mem_base_addr_align() const
-        {
-            return get_info<sycl::info::device::mem_base_addr_align>();
-        }
+      int get_mem_base_addr_align() const {
+        return get_info<sycl::info::device::mem_base_addr_align>();
+      }
 
-        size_t get_global_mem_size() const
-        {
-            return get_device_info().get_global_mem_size();
-        }
+      size_t get_global_mem_size() const {
+        return get_device_info().get_global_mem_size();
+      }
 
-        size_t get_max_mem_alloc_size() const
-        {
-            return get_device_info().get_max_mem_alloc_size();
-        }
+      size_t get_max_mem_alloc_size() const {
+        return get_device_info().get_max_mem_alloc_size();
+      }
 
-        /// Get the number of bytes of free and total memory on the SYCL device.
-        /// \param [out] free_memory The number of bytes of free memory on the SYCL device.
-        /// \param [out] total_memory The number of bytes of total memory on the SYCL device.
-        void get_memory_info(size_t &free_memory, size_t &total_memory)
-        {
-            total_memory = get_device_info().get_global_mem_size();
-            const char *warning_info = "get_memory_info: [warning] ext_intel_free_memory is not "
-                                 "supported (export/set ZES_ENABLE_SYSMAN=1 to support), "
-                                 "use total memory as free memory";
+      /// Get the number of bytes of free and total memory on the SYCL device.
+      /// \param [out] free_memory The number of bytes of free memory on the
+      /// SYCL device. \param [out] total_memory The number of bytes of total
+      /// memory on the SYCL device.
+      void get_memory_info(size_t &free_memory, size_t &total_memory) {
+        total_memory = get_device_info().get_global_mem_size();
+        const char *warning_info =
+            "get_memory_info: [warning] ext_intel_free_memory is not "
+            "supported (export/set ZES_ENABLE_SYSMAN=1 to support), "
+            "use total memory as free memory";
 #if (defined(__SYCL_COMPILER_VERSION) && __SYCL_COMPILER_VERSION >= 20221105)
-            if (!has(sycl::aspect::ext_intel_free_memory))
-            {
-                std::cerr << warning_info << std::endl;
-                free_memory = total_memory;
-            }
-            else
-            {
-                free_memory = get_info<sycl::ext::intel::info::device::free_memory>();
-            }
+        if (!has(sycl::aspect::ext_intel_free_memory)) {
+          std::cerr << warning_info << std::endl;
+          free_memory = total_memory;
+        } else {
+          free_memory = get_info<sycl::ext::intel::info::device::free_memory>();
+        }
 #else
-            std::cerr << warning_info << std::endl;
-            free_memory = total_memory;
+        std::cerr << warning_info << std::endl;
+        free_memory = total_memory;
 #if defined(_MSC_VER) && !defined(__clang__)
 #pragma message("Querying the number of bytes of free memory is not supported")
 #else
 #warning "Querying the number of bytes of free memory is not supported"
 #endif
 #endif
+      }
+
+      void get_device_info(device_info &out) const {
+        dpct::get_device_info(out, *this);
+      }
+
+      device_info get_device_info() const {
+        device_info prop;
+        dpct::get_device_info(prop, *this);
+        return prop;
+      }
+
+      void reset() {
+        std::lock_guard<mutex_type> lock(m_mutex);
+        clear_queues();
+        init_queues();
+      }
+
+      sycl::queue &in_order_queue() { return _q_in_order; }
+
+      sycl::queue &out_of_order_queue() { return _q_out_of_order; }
+
+      sycl::queue &default_queue() { return in_order_queue(); }
+
+      void queues_wait_and_throw() {
+        std::unique_lock<mutex_type> lock(m_mutex);
+        lock.unlock();
+        for (auto &q : _queues) {
+            q.wait_and_throw();
         }
+        // Guard the destruct of current_queues to make sure the ref count is
+        // safe.
+        lock.lock();
+      }
 
-        void get_device_info(device_info &out) const
-        {
-            dpct::get_device_info(out, *this);
-        }
+      sycl::queue create_queue(bool enable_exception_handler = false) {
+        return create_in_order_queue(enable_exception_handler);
+      }
 
-        device_info get_device_info() const
-        {
-            device_info prop;
-            dpct::get_device_info(prop, *this);
-            return prop;
-        }
+      sycl::queue create_queue(sycl::device device,
+                               bool enable_exception_handler = false) {
+        return create_in_order_queue(device, enable_exception_handler);
+      }
 
-        void reset()
-        {
-            std::lock_guard<mutex_type> lock(m_mutex);
-            clear_queues();
-            init_queues();
-        }
+      sycl::queue create_in_order_queue(bool enable_exception_handler = false) {
+        std::lock_guard<mutex_type> lock(m_mutex);
+        return create_queue_impl(enable_exception_handler,
+                                 sycl::property::queue::in_order());
+      }
 
-        sycl::queue &in_order_queue() { return *_q_in_order; }
-
-        sycl::queue &out_of_order_queue() { return *_q_out_of_order; }
-
-        sycl::queue &default_queue()
-        {
-            return in_order_queue();
-        }
-
-        void queues_wait_and_throw()
-        {
-            std::unique_lock<mutex_type> lock(m_mutex);
-            std::vector<std::shared_ptr<sycl::queue>> current_queues(
-                _queues);
-            lock.unlock();
-            for (const auto &q : current_queues)
-            {
-                q->wait_and_throw();
-            }
-            // Guard the destruct of current_queues to make sure the ref count is safe.
-            lock.lock();
-        }
-
-        sycl::queue *create_queue(bool enable_exception_handler = false)
-        {
-            return create_in_order_queue(enable_exception_handler);
-        }
-
-        sycl::queue *create_queue(sycl::context context, sycl::device device,
-                                bool enable_exception_handler = false) {
-            return create_in_order_queue(context, device, enable_exception_handler);
-        }
-
-        sycl::queue *create_in_order_queue(bool enable_exception_handler = false) {
-            std::lock_guard<mutex_type> lock(m_mutex);
-            return create_queue_impl(enable_exception_handler,
-                                    sycl::property::queue::in_order());
-        }
-
-        sycl::queue *create_in_order_queue(sycl::context context, sycl::device device,
+      sycl::queue create_in_order_queue(sycl::device device,
                                         bool enable_exception_handler = false) {
-            std::lock_guard<mutex_type> lock(m_mutex);
-            return create_queue_impl(context, device, enable_exception_handler,
-                                    sycl::property::queue::in_order());
-        }
+        std::lock_guard<mutex_type> lock(m_mutex);
+        return create_queue_impl(device, enable_exception_handler,
+                                 sycl::property::queue::in_order());
+      }
 
-        sycl::queue *create_out_of_order_queue(bool enable_exception_handler = false) {
-            std::lock_guard<mutex_type> lock(m_mutex);
-            return create_queue_impl(enable_exception_handler);
-        }
+      sycl::queue create_out_of_order_queue(
+          bool enable_exception_handler = false) {
+        std::lock_guard<mutex_type> lock(m_mutex);
+        return create_queue_impl(enable_exception_handler);
+      }
 
-        void destroy_queue(sycl::queue *&queue)
-        {
-            std::lock_guard<mutex_type> lock(m_mutex);
-            _queues.erase(std::remove_if(_queues.begin(), _queues.end(),
-                                         [=](const std::shared_ptr<sycl::queue> &q) -> bool
-                                         {
-                                             return q.get() == queue;
-                                         }),
-                          _queues.end());
-            queue = nullptr;
-        }
-        void set_saved_queue(sycl::queue *q)
-        {
-            std::lock_guard<mutex_type> lock(m_mutex);
-            _saved_queue = q;
-        }
-        sycl::queue *get_saved_queue() const
-        {
-            std::lock_guard<mutex_type> lock(m_mutex);
-            return _saved_queue;
-        }
-        sycl::context get_context() const { return _ctx; }
+      void destroy_queue(sycl::queue queue) {
+        std::lock_guard<mutex_type> lock(m_mutex);
+        _queues.erase(std::remove_if(_queues.begin(), _queues.end(),
+                                    [=](const sycl::queue &q) -> bool
+                                    {
+                                        return q == queue;
+                                    }),
+                    _queues.end());
+      }
+      void set_saved_queue(sycl::queue q) {
+        std::lock_guard<mutex_type> lock(m_mutex);
+        _saved_queue = q;
+      }
+      sycl::queue get_saved_queue() const {
+        std::lock_guard<mutex_type> lock(m_mutex);
+        return _saved_queue;
+      }
 
-    private:
-        void clear_queues()
-        {
-            _queues.clear();
-            _q_in_order = _q_out_of_order = _saved_queue = nullptr;
-        }
+     private:
+      void clear_queues() { _queues.clear(); }
 
-        void init_queues()
-        {
-            _q_in_order = create_queue_impl(true, sycl::property::queue::in_order());
-            _q_out_of_order = create_queue_impl(true);
-            _saved_queue = &default_queue();
-        }
+      void init_queues() {
+        _q_in_order =
+            create_queue_impl(true, sycl::property::queue::in_order());
+        _q_out_of_order = create_queue_impl(true);
+        _saved_queue = default_queue();
+      }
 
-        /// Caller should acquire resource \p m_mutex before calling this function.
-        template <class... Properties>
-        sycl::queue *create_queue_impl(bool enable_exception_handler,
-                                       Properties... properties)
-        {
-            sycl::async_handler eh = {};
-            if (enable_exception_handler)
-            {
-                eh = exception_handler;
-            }
-            _queues.push_back(std::make_shared<sycl::queue>(
-                _ctx, *this, eh,
-                sycl::property_list(
+      /// Caller should acquire resource \p m_mutex before calling this
+      /// function.
+      template <class... Properties>
+      sycl::queue create_queue_impl(bool enable_exception_handler,
+                                    Properties... properties) {
+        sycl::async_handler eh = {};
+        if (enable_exception_handler) {
+          eh = exception_handler;
+        }
+        _queues.push_back(sycl::queue(
+            *this, eh,
+            sycl::property_list(
 #ifdef DPCT_PROFILING_ENABLED
-                    sycl::property::queue::enable_profiling(),
+                sycl::property::queue::enable_profiling(),
 #endif
-                    properties...)));
+                properties...)));
 
-            return _queues.back().get();
-        }
+        return _queues.back();
+      }
 
-        template <class... Properties>
-        sycl::queue *create_queue_impl(sycl::context context, sycl::device device,
+      template <class... Properties>
+      sycl::queue create_queue_impl(sycl::device device,
                                     bool enable_exception_handler,
                                     Properties... properties) {
-            sycl::async_handler eh = {};
-            if (enable_exception_handler) {
-                eh = exception_handler;
-            }
-            _queues.push_back(std::make_shared<sycl::queue>(
-                context, device, eh,
-                sycl::property_list(
-        #ifdef DPCT_PROFILING_ENABLED
-                    sycl::property::queue::enable_profiling(),
-        #endif
-                    properties...)));
-
-            return _queues.back().get();
+        sycl::async_handler eh = {};
+        if (enable_exception_handler) {
+          eh = exception_handler;
         }
+        _queues.push_back(sycl::queue(
+            device, eh,
+                        sycl::property_list(
+#ifdef DPCT_PROFILING_ENABLED
+                            sycl::property::queue::enable_profiling(),
+#endif
+                            properties...)));
 
-        void get_version(int &major, int &minor) const
-        {
-            detail::get_version(*this, major, minor);
-        }
-        sycl::queue *_q_in_order, *_q_out_of_order;
-        sycl::queue *_saved_queue;
-        sycl::context _ctx;
-        std::vector<std::shared_ptr<sycl::queue>> _queues;
-        mutable mutex_type m_mutex;
+        return _queues.back();
+      }
+
+      void get_version(int &major, int &minor) const {
+        detail::get_version(*this, major, minor);
+      }
+      sycl::queue _q_in_order, _q_out_of_order;
+      sycl::queue _saved_queue;
+      std::vector<sycl::queue> _queues;
+      mutable mutex_type m_mutex;
     };
+
 
     /// device manager
     class dev_mgr
@@ -899,15 +861,88 @@ namespace dpct
         unsigned int get_device_id(const sycl::device &dev)
         {
             unsigned int id = 0;
-            for (auto dev_item : _devs)
+            for (auto &dev_item : _devs)
             {
                 if (*dev_item == dev)
                 {
-                    break;
+                    return id;
                 }
                 id++;
             }
-            return id;
+            return -1;
+        }
+
+        inline std::string get_preferred_gpu_platform_name() {
+            std::string result;
+
+            std::string filter = "";
+            char* env = getenv("ONEAPI_DEVICE_SELECTOR");
+            if (env) {
+                if (std::strstr(env, "level_zero")) {
+                    filter = "level-zero";
+                }
+                else if (std::strstr(env, "opencl")) {
+                    filter = "opencl";
+                }
+                else if (std::strstr(env, "cuda")) {
+                    filter = "cuda";
+                }
+                else if (std::strstr(env, "hip")) {
+                    filter = "hip";
+                }
+                else {
+                    throw std::runtime_error("invalid device filter: " + std::string(env));
+                }
+            } else {
+                auto default_device = sycl::device(sycl::default_selector_v);
+                auto default_platform_name = default_device.get_platform().get_info<sycl::info::platform::name>();
+
+                if (std::strstr(default_platform_name.c_str(), "Level-Zero") || default_device.is_cpu()) {
+                    filter = "level-zero";
+                }
+                else if (std::strstr(default_platform_name.c_str(), "CUDA")) {
+                    filter = "cuda";
+                }
+                else if (std::strstr(default_platform_name.c_str(), "HIP")) {
+                    filter = "hip";
+                }
+            }
+
+            auto platform_list = sycl::platform::get_platforms();
+
+            for (const auto& platform : platform_list) {
+                auto devices = platform.get_devices();
+                auto gpu_dev = std::find_if(devices.begin(), devices.end(), [](const sycl::device& d) {
+                    return d.is_gpu();
+                });
+
+                if (gpu_dev == devices.end()) {
+                    // cout << "platform [" << platform_name
+                    //      << "] does not contain GPU devices, skipping\n";
+                    continue;
+                }
+
+                auto platform_name = platform.get_info<sycl::info::platform::name>();
+                std::string platform_name_low_case;
+                platform_name_low_case.resize(platform_name.size());
+
+                std::transform(
+                    platform_name.begin(), platform_name.end(), platform_name_low_case.begin(), ::tolower);
+
+                if (platform_name_low_case.find(filter) == std::string::npos) {
+                    // cout << "platform [" << platform_name
+                    //      << "] does not match with requested "
+                    //      << filter << ", skipping\n";
+                    continue;
+                }
+
+                result = platform_name;
+            }
+
+            if (result.empty())
+                throw std::runtime_error("can not find preferred GPU platform");
+
+            return result;
         }
 
         template <class DeviceSelector>
@@ -954,7 +989,7 @@ namespace dpct
             if (backend == "opencl:cpu") return 4;
             if (backend == "opencl:acc") return 5;
             printf("convert_backend_index: can't handle backend=%s\n", backend.c_str());
-            GGML_ASSERT(false);
+            GGML_ABORT("fatal error");
         }
         static bool compare_backend(std::string &backend1, std::string &backend2) {
             return convert_backend_index(backend1) < convert_backend_index(backend2);
@@ -974,10 +1009,15 @@ namespace dpct
             // Keep track of the number of devices per backend
             std::map<sycl::backend, size_t> DeviceNums;
             std::map<std::string, std::vector<sycl::device>> backend_devices;
+            auto preferred_platform_name = get_preferred_gpu_platform_name();
 
             while (!Platforms.empty()) {
                 auto Platform = Platforms.back();
                 Platforms.pop_back();
+                auto platform_name = Platform.get_info<sycl::info::platform::name>();
+                if (platform_name.compare(preferred_platform_name) != 0) {
+                    continue;
+                }
                 auto devices = Platform.get_devices();
                 std::string backend_type = get_device_backend_and_type(devices[0]);
                 for (const auto &device : devices) {
@@ -1100,7 +1140,7 @@ namespace dpct
 #error "Only support Windows and Linux."
 #endif
                 next_free = mapped_address_space;
-            };
+            }
 
         public:
             using buffer_id_t = int;
@@ -1121,7 +1161,7 @@ namespace dpct
 #else
 #error "Only support Windows and Linux."
 #endif
-            };
+            }
 
             mem_mgr(const mem_mgr &) = delete;
             mem_mgr &operator=(const mem_mgr &) = delete;
@@ -1791,31 +1831,10 @@ namespace dpct
                                            : id);
     }
 
-    template <typename T>
-    sycl::vec<T, 4> extract_and_sign_or_zero_extend4(T val)
-    {
-        return sycl::vec<T, 1>(val)
-            .template as<sycl::vec<
-                std::conditional_t<std::is_signed_v<T>, int8_t, uint8_t>, 4>>()
-            .template convert<T>();
-    }
-
-    template <typename T1, typename T2>
-    using dot_product_acc_t =
-        std::conditional_t<std::is_unsigned_v<T1> && std::is_unsigned_v<T2>,
-                           uint32_t, int32_t>;
-
     template <typename T1, typename T2, typename T3>
     inline auto dp4a(T1 a, T2 b, T3 c)
     {
-        dot_product_acc_t<T1, T2> res = c;
-        auto va = extract_and_sign_or_zero_extend4(a);
-        auto vb = extract_and_sign_or_zero_extend4(b);
-        res += va[0] * vb[0];
-        res += va[1] * vb[1];
-        res += va[2] * vb[2];
-        res += va[3] * vb[3];
-        return res;
+        return syclcompat::dp4a(a, b, c);
     }
 
     struct sub_sat
@@ -2031,6 +2050,11 @@ namespace dpct
     static inline device_ext &get_current_device()
     {
         return dev_mgr::instance().current_device();
+    }
+
+    static inline device_ext &get_device(unsigned int id)
+    {
+        return dev_mgr::instance().get_device(id);
     }
 
     static inline sycl::queue &get_in_order_queue()
@@ -2470,6 +2494,7 @@ namespace dpct
                                            b, ldb, beta, c, ldc, batch_size);
             break;
         }
+#endif
         case detail::get_type_combination_id(
             library_data_t::real_int8, library_data_t::real_int8,
             library_data_t::real_int32, library_data_t::real_int32):
@@ -2502,7 +2527,6 @@ namespace dpct
                 batch_size);
             break;
         }
-#endif
         case detail::get_type_combination_id(
             library_data_t::real_half, library_data_t::real_half,
             library_data_t::real_half, library_data_t::real_float):
@@ -2639,6 +2663,7 @@ namespace dpct
                                            stride_c, batch_size);
             break;
         }
+#endif
         case detail::get_type_combination_id(
             library_data_t::real_int8, library_data_t::real_int8,
             library_data_t::real_int32, library_data_t::real_int32):
@@ -2667,7 +2692,6 @@ namespace dpct
                 beta, c, ldc, stride_c, batch_size);
             break;
         }
-#endif
         case detail::get_type_combination_id(
             library_data_t::real_half, library_data_t::real_half,
             library_data_t::real_half, library_data_t::real_float):

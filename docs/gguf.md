@@ -20,86 +20,98 @@ The key difference between GGJT and GGUF is the use of a key-value structure for
 
 ### GGUF Naming Convention
 
-GGUF follow a naming convention of `<Model>(-<Version>)-(<ExpertsCount>x)<Parameters>-<EncodingScheme>(-<Shard>).gguf`
+GGUF follow a naming convention of `<BaseName><SizeLabel><FineTune><Version><Encoding><Type><Shard>.gguf` where each component is delimitated by a `-` if present. Ultimately this is intended to make it easier for humans to at a glance get the most important details of a model. It is not intended to be perfectly parsable in the field due to the diversity of existing gguf filenames.
 
 The components are:
-1. **Model**: A descriptive name for the model type or architecture.
-    - This can be derived from gguf metadata `general.name` substituting spaces for dashes.
-2. **Version**: (Optional) Denotes the model version number, formatted as `v<Major>.<Minor>`
-    - If model is missing a version number then assume `v0.0` (Prerelease)
+1. **BaseName**: A descriptive name for the model base type or architecture.
+    - This can be derived from gguf metadata `general.basename` substituting spaces for dashes.
+1. **SizeLabel**: Parameter weight class (useful for leader boards) represented as `<expertCount>x<count><scale-prefix>`
+    - This can be derived from gguf metadata `general.size_label` if available or calculated if missing.
+    - Rounded decimal point is supported in count with a single letter scale prefix to assist in floating point exponent shown below
+      - `Q`: Quadrillion parameters.
+      - `T`: Trillion parameters.
+      - `B`: Billion parameters.
+      - `M`: Million parameters.
+      - `K`: Thousand parameters.
+    - Additional `-<attributes><count><scale-prefix>` can be appended as needed to indicate other attributes of interest
+1. **FineTune**: A descriptive name for the model fine tuning goal (e.g. Chat, Instruct, etc...)
+    - This can be derived from gguf metadata `general.finetune` substituting spaces for dashes.
+1. **Version**: (Optional) Denotes the model version number, formatted as `v<Major>.<Minor>`
+    - If model is missing a version number then assume `v1.0` (First Public Release)
     - This can be derived from gguf metadata `general.version`
-3. **ExpertsCount**: (Optional) Indicates the number of experts found in a Mixture of Experts based model.
-    - This can be derived from gguf metadata `llama.expert_count`
-4. **Parameters**: Indicates the number of parameters and their scale, represented as `<count><scale-prefix>`:
-    - `Q`: Quadrillion parameters.
-    - `T`: Trillion parameters.
-    - `B`: Billion parameters.
-    - `M`: Million parameters.
-    - `K`: Thousand parameters.
-5. **EncodingScheme**: Indicates the weights encoding scheme that was applied to the model. Content, type mixture and arrangement however are determined by user code and can vary depending on project needs.
-6. **Shard**: (Optional) Indicates and denotes that the model has been split into multiple shards, formatted as `<ShardNum>-of-<ShardTotal>`.
+1. **Encoding**: Indicates the weights encoding scheme that was applied to the model. Content, type mixture and arrangement however are determined by user code and can vary depending on project needs.
+1. **Type**: Indicates the kind of gguf file and the intended purpose for it
+  - If missing, then file is by default a typical gguf tensor model file
+  - `LoRA` : GGUF file is a LoRA adapter
+  - `vocab` : GGUF file with only vocab data and metadata
+1. **Shard**: (Optional) Indicates and denotes that the model has been split into multiple shards, formatted as `<ShardNum>-of-<ShardTotal>`.
     - *ShardNum* : Shard position in this model. Must be 5 digits padded by zeros.
       - Shard number always starts from `00001` onwards (e.g. First shard always starts at `00001-of-XXXXX` rather than `00000-of-XXXXX`).
     - *ShardTotal* : Total number of shards in this model. Must be 5 digits padded by zeros.
 
-#### Parsing Above Naming Convention
 
-To correctly parse a well formed naming convention based gguf filename, it is recommended to read from right to left using `-` as the delimiter. This strategy allow for the most flexibility in model name to include dashes if they so choose, while at the same time allowing for version string to be optional. This approach also gives some future proofing to extend the format if needed in the future.
+#### Validating Above Naming Convention
+
+At a minimum all model files should have at least BaseName, SizeLabel, Version, in order to be easily validated as a file that is keeping with the GGUF Naming Convention. An example of this issue is that it is easy for Encoding to be mistaken as a FineTune if Version is omitted.
+
+To validate you can use this regular expression `^(?<BaseName>[A-Za-z0-9\s]*(?:(?:-(?:(?:[A-Za-z\s][A-Za-z0-9\s]*)|(?:[0-9\s]*)))*))-(?:(?<SizeLabel>(?:\d+x)?(?:\d+\.)?\d+[A-Za-z](?:-[A-Za-z]+(\d+\.)?\d+[A-Za-z]+)?)(?:-(?<FineTune>[A-Za-z0-9\s-]+))?)?-(?:(?<Version>v\d+(?:\.\d+)*))(?:-(?<Encoding>(?!LoRA|vocab)[\w_]+))?(?:-(?<Type>LoRA|vocab))?(?:-(?<Shard>\d{5}-of-\d{5}))?\.gguf$` which will check that you got the minimum BaseName, SizeLabel and Version present in the correct order.
 
 For example:
 
-  * `Mixtral-v0.1-8x7B-Q2_K.gguf`:
+  * `Mixtral-8x7B-v0.1-KQ2.gguf`:
     - Model Name: Mixtral
-    - Version Number: v0.1
     - Expert Count: 8
     - Parameter Count: 7B
-    - Weight Encoding Scheme: Q2_K
-    - Shard: N/A
+    - Version Number: v0.1
+    - Weight Encoding Scheme: KQ2
 
   * `Hermes-2-Pro-Llama-3-8B-F16.gguf`:
     - Model Name: Hermes 2 Pro Llama 3
-    - Version Number: v0.0
     - Expert Count: 0
     - Parameter Count: 8B
+    - Version Number: v1.0
     - Weight Encoding Scheme: F16
     - Shard: N/A
 
-  * `Grok-v1.0-100B-Q4_0-00003-of-00009.gguf"`
+  * `Grok-100B-v1.0-Q4_0-00003-of-00009.gguf`
     - Model Name: Grok
-    - Version Number: v1.0
     - Expert Count: 0
     - Parameter Count: 100B
+    - Version Number: v1.0
     - Weight Encoding Scheme: Q4_0
     - Shard: 3 out of 9 total shards
 
-You can also try using `/^(?<model_name>[A-Za-z0-9\s-]+)(?:-v(?<major>\d+)\.(?<minor>\d+))?-(?:(?<experts_count>\d+)x)?(?<parameters>\d+[A-Za-z]?)-(?<encoding_scheme>[\w_]+)(?:-(?<shard>\d{5})-of-(?<shardTotal>\d{5}))?\.gguf$/` regular expression to extract all the values above as well. Just don't forget to convert `-` to ` ` for the model name.
 
 <details><summary>Example Node.js Regex Function</summary>
 
 ```js
 #!/usr/bin/env node
-const ggufRegex = /^(?<model_name>[A-Za-z0-9\s-]+)(?:-v(?<major>\d+)\.(?<minor>\d+))?-(?:(?<experts_count>\d+)x)?(?<parameters>\d+[A-Za-z]?)-(?<encoding_scheme>[\w_]+)(?:-(?<shard>\d{5})-of-(?<shardTotal>\d{5}))?\.gguf$/;
+const ggufRegex = /^(?<BaseName>[A-Za-z0-9\s]*(?:(?:-(?:(?:[A-Za-z\s][A-Za-z0-9\s]*)|(?:[0-9\s]*)))*))-(?:(?<SizeLabel>(?:\d+x)?(?:\d+\.)?\d+[A-Za-z](?:-[A-Za-z]+(\d+\.)?\d+[A-Za-z]+)?)(?:-(?<FineTune>[A-Za-z0-9\s-]+))?)?-(?:(?<Version>v\d+(?:\.\d+)*))(?:-(?<Encoding>(?!LoRA|vocab)[\w_]+))?(?:-(?<Type>LoRA|vocab))?(?:-(?<Shard>\d{5}-of-\d{5}))?\.gguf$/;
 
 function parseGGUFFilename(filename) {
   const match = ggufRegex.exec(filename);
   if (!match)
     return null;
-  const {model_name, major = '0', minor = '0', experts_count = null, parameters, encoding_scheme, shard = null, shardTotal = null} = match.groups;
-  return {modelName: model_name.trim().replace(/-/g, ' '), version: `v${major}.${minor}`, expertsCount: experts_count ? +experts_count : null, parameters, encodingScheme: encoding_scheme, shard: shard ? +shard : null, shardTotal: shardTotal ? +shardTotal : null};
+  const {BaseName = null, SizeLabel = null, FineTune = null, Version = "v1.0", Encoding = null, Type = null, Shard = null} = match.groups;
+  return {BaseName: BaseName, SizeLabel: SizeLabel, FineTune: FineTune, Version: Version, Encoding: Encoding, Type: Type, Shard: Shard};
 }
 
 const testCases = [
-  {filename: 'Mixtral-v0.1-8x7B-Q2_K.gguf',              expected: { modelName: 'Mixtral',              version: 'v0.1',   expertsCount: 8,    parameters: '7B',   encodingScheme: 'Q2_K',  shard: null,    shardTotal: null }},
-  {filename: 'Grok-v1.0-100B-Q4_0-00003-of-00009.gguf', expected: { modelName: 'Grok',                 version: 'v1.0',   expertsCount: null, parameters: '100B', encodingScheme: 'Q4_0', shard: 3,       shardTotal: 9    }},
-  {filename: 'Hermes-2-Pro-Llama-3-8B-F16.gguf',        expected: { modelName: 'Hermes 2 Pro Llama 3', version: 'v0.0',   expertsCount: null, parameters: '8B',   encodingScheme: 'F16',  shard: null,    shardTotal: null }},
-  {filename: 'Hermes-2-Pro-Llama-3-v32.33-8Q-F16.gguf', expected: { modelName: 'Hermes 2 Pro Llama 3', version: 'v32.33', expertsCount: null, parameters: '8Q',   encodingScheme: 'F16',  shard: null,    shardTotal: null }},
-  {filename: 'not-a-known-arrangement.gguf', expected: null},
+  {filename: 'Mixtral-8x7B-v0.1-KQ2.gguf',                         expected: { BaseName: 'Mixtral',              SizeLabel: '8x7B',     FineTune: null, Version: 'v0.1',   Encoding: 'KQ2',  Type: null, Shard: null}},
+  {filename: 'Grok-100B-v1.0-Q4_0-00003-of-00009.gguf',            expected: { BaseName: 'Grok',                 SizeLabel: '100B',     FineTune: null, Version: 'v1.0',   Encoding: 'Q4_0', Type: null, Shard: "00003-of-00009"}},
+  {filename: 'Hermes-2-Pro-Llama-3-8B-v1.0-F16.gguf',              expected: { BaseName: 'Hermes-2-Pro-Llama-3', SizeLabel: '8B', FineTune: null, Version: 'v1.0',   Encoding: 'F16',  Type: null, Shard: null}},
+  {filename: 'Phi-3-mini-3.8B-ContextLength4k-instruct-v1.0.gguf', expected: { BaseName: 'Phi-3-mini',   SizeLabel: '3.8B-ContextLength4k', FineTune: 'instruct', Version: 'v1.0',   Encoding: null,  Type: null, Shard: null}},
+  {filename: 'not-a-known-arrangement.gguf',                       expected: null},
 ];
 
 testCases.forEach(({ filename, expected }) => {
   const result = parseGGUFFilename(filename);
   const passed = JSON.stringify(result) === JSON.stringify(expected);
   console.log(`${filename}: ${passed ? "PASS" : "FAIL"}`);
+  if (!passed) {
+      console.log(result);
+      console.log(expected);
+  }
 });
 ```
 
@@ -342,11 +354,25 @@ By convention, most counts/lengths/etc are `uint64` unless otherwise specified. 
 
 #### General metadata
 
-- `general.name`: The name of the model. This should be a human-readable name that can be used to identify the model. It should be unique within the community that the model is defined in.
-- `general.author`: The author of the model.
-- `general.url`: URL to the model's homepage. This can be a GitHub repo, a paper, etc.
+- `general.name: string`: The name of the model. This should be a human-readable name that can be used to identify the model. It should be unique within the community that the model is defined in.
+- `general.author: string`: The author of the model.
+- `general.version: string`: The version of the model.
+- `general.organization: string`: The organization of the model.
+- `general.basename: string`: The base model name / architecture of the model
+- `general.finetune: string`: What has the base model been optimized toward.
 - `general.description: string`: free-form description of the model including anything that isn't covered by the other fields
+- `general.quantized_by: string`: The name of the individual who quantized the model
+- `general.size_label: string`: Size class of the model, such as number of weights and experts. (Useful for leader boards)
 - `general.license: string`: License of the model, expressed as a [SPDX license expression](https://spdx.github.io/spdx-spec/v2-draft/SPDX-license-expressions/) (e.g. `"MIT OR Apache-2.0`). Do not include any other information, such as the license text or the URL to the license.
+- `general.license.name: string`: Human friendly license name
+- `general.license.link: string`: URL to the license.
+- `general.url: string`: URL to the model's homepage. This can be a GitHub repo, a paper, etc.
+- `general.doi: string`: Digital Object Identifier (DOI) https://www.doi.org/
+- `general.uuid: string`: [Universally unique identifier](https://en.wikipedia.org/wiki/Universally_unique_identifier)
+- `general.repo_url: string`: URL to the model's repository such as a GitHub repo or HuggingFace repo
+- `general.tags: string[]`: List of tags that can be used as search terms for a search engine or social media
+- `general.languages: string[]`: What languages can the model speak. Encoded as [ISO 639](https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes) two letter codes
+- `general.datasets: string[]`: Links or references to datasets that the model was trained upon
 - `general.file_type: uint32`: An enumerated value describing the type of the majority of the tensors in the file. Optional; can be inferred from the tensor types.
   - `ALL_F32 = 0`
   - `MOSTLY_F16 = 1`
@@ -372,8 +398,20 @@ By convention, most counts/lengths/etc are `uint64` unless otherwise specified. 
 
 Information about where this model came from. This is useful for tracking the provenance of the model, and for finding the original source if the model is modified. For a model that was converted from GGML, for example, these keys would point to the model that was converted from.
 
-- `general.source.url: string`: URL to the source of the model. Can be a GitHub repo, a paper, etc.
-- `general.source.huggingface.repository: string`: Hugging Face model repository that this model is either hosted on or based on
+- `general.source.url: string`: URL to the source of the model's homepage. This can be a GitHub repo, a paper, etc.
+- `general.source.doi: string`: Source Digital Object Identifier (DOI) https://www.doi.org/
+- `general.source.uuid: string`: Source [Universally unique identifier](https://en.wikipedia.org/wiki/Universally_unique_identifier)
+- `general.source.repo_url: string`: URL to the source of the model's repository such as a GitHub repo or HuggingFace repo
+
+- `general.base_model.count: uint32`: Number of parent models
+- `general.base_model.{id}.name: string`: The name of the parent model.
+- `general.base_model.{id}.author: string`: The author of the parent model.
+- `general.base_model.{id}.version: string`: The version of the parent model.
+- `general.base_model.{id}.organization: string`: The organization of the parent model.
+- `general.base_model.{id}.url: string`: URL to the source of the parent model's homepage. This can be a GitHub repo, a paper, etc.
+- `general.base_model.{id}.doi: string`: Parent Digital Object Identifier (DOI) https://www.doi.org/
+- `general.base_model.{id}.uuid: string`: Parent [Universally unique identifier](https://en.wikipedia.org/wiki/Universally_unique_identifier)
+- `general.base_model.{id}.repo_url: string`: URL to the source of the parent model's repository such as a GitHub repo or HuggingFace repo
 
 ### LLM
 

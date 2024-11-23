@@ -1,3 +1,5 @@
+find_library(MATH_LIBRARY m)
+
 # check systems
 if (NOT UNAME_S)
     execute_process(COMMAND uname -s OUTPUT_VARIABLE UNAME_S)
@@ -174,15 +176,6 @@ if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
 endif()
 
 #
-# test-grad0
-
-set(TEST_TARGET test-grad0)
-add_executable(${TEST_TARGET} ${TEST_TARGET}.cpp)
-target_link_libraries(${TEST_TARGET} PRIVATE ggml)
-add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
-set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
-
-#
 # test-opt
 
 set(TEST_TARGET test-opt)
@@ -253,40 +246,14 @@ target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
 set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
 
+if (MATH_LIBRARY)
+    target_link_libraries(test-mul-mat2 PRIVATE ${MATH_LIBRARY})
+endif()
+
 #
 # test0
 
 set(TEST_TARGET test0)
-add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
-target_link_libraries(${TEST_TARGET} PRIVATE ggml)
-add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
-set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
-
-#
-# test1
-
-set(TEST_TARGET test1)
-add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
-target_link_libraries(${TEST_TARGET} PRIVATE ggml)
-if (MSVC)
-    target_link_options(${TEST_TARGET} PRIVATE "/STACK: 8388608") # 8MB
-endif()
-add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
-set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
-
-#
-# test2
-
-set(TEST_TARGET test2)
-add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
-target_link_libraries(${TEST_TARGET} PRIVATE ggml)
-add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
-set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
-
-#
-# test3
-
-set(TEST_TARGET test3)
 add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
@@ -336,6 +303,14 @@ set(TEST_TARGET test-conv-transpose)
 add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+
+# test-conv-transpose-1d
+
+set(TEST_TARGET test-conv-transpose-1d)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.cpp)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+
 
 #
 # test-dup
@@ -406,9 +381,9 @@ set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_
 
 
 #
-# test-backend-buffer
+# test-backend-ops
 
-set(TEST_TARGET test-backend-buffer)
+set(TEST_TARGET test-backend-ops)
 add_executable(${TEST_TARGET} ${TEST_TARGET}.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
@@ -416,10 +391,10 @@ set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_
 
 
 #
-# test-backend-ops
+# test-cont
 
-set(TEST_TARGET test-backend-ops)
-add_executable(${TEST_TARGET} ${TEST_TARGET}.cpp)
+set(TEST_TARGET test-cont)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml)
 add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
 set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")

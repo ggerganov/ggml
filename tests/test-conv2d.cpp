@@ -1,10 +1,9 @@
 #include "ggml.h"
-#include "ggml/ggml-alloc.h"
-#include "ggml/ggml-backend.h"
+#include "ggml-cpu.h"
+#include "ggml-alloc.h"
+#include "ggml-backend.h"
 
-// #define GGML_USE_CUBLAS
-
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_CUDA
 #include "ggml-cuda.h"
 #endif
 
@@ -42,17 +41,17 @@ void load_model(test_model & model, bool use_gpu = false) {
     int IW = 8, IH = 6, N = 1;
 
     // Initialize adata
-    float * adata = new float[KW * KH * IC * OC];
+    std::vector<float> adata(KW * KH * IC * OC);
     for (int i = 0; i < KW * KH * IC * OC; i++) {
         adata[i] = 2.5f;
     }
 
     // Convert adata to fp16 format
     std::vector<ggml_fp16_t> hadata(KW * KH * IC * OC);
-    ggml_fp32_to_fp16_row(adata, hadata.data(), KW * KH * IC * OC);
+    ggml_fp32_to_fp16_row(adata.data(), hadata.data(), KW * KH * IC * OC);
 
     // Initialize bdata
-    float * bdata =  new float[IW * IH * IC * N];
+    std::vector<float> bdata(IW * IH * IC * N);
     for (int i = 0; i < IW * IH * IC * N; i++) {
         bdata[i] = 1.5f;
     }
@@ -74,8 +73,10 @@ void load_model(test_model & model, bool use_gpu = false) {
             /*.no_alloc   =*/ true,
     };
 
+    ggml_log_set(ggml_log_callback_default, nullptr);
+
     // initialize the backend
-#ifdef GGML_USE_CUBLAS
+#ifdef GGML_USE_CUDA
     if (use_gpu) {
         fprintf(stderr, "%s: using CUDA backend\n", __func__);
         model.backend = ggml_backend_cuda_init(0);
@@ -88,7 +89,6 @@ void load_model(test_model & model, bool use_gpu = false) {
 #ifdef GGML_USE_METAL
     if (use_gpu) {
         fprintf(stderr, "%s: using Metal backend\n", __func__);
-        ggml_backend_metal_log_set_callback(ggml_log_callback_default, nullptr);
         model.backend = ggml_backend_metal_init();
         if (!model.backend) {
             fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
@@ -131,9 +131,9 @@ void load_model(test_model & model, bool use_gpu = false) {
                 || ggml_backend_is_metal(model.backend)
 #endif
     ) {
-        memcpy(model.b->data, bdata, ggml_nbytes(model.b));
+        memcpy(model.b->data, bdata.data(), ggml_nbytes(model.b));
     } else {
-        ggml_backend_tensor_set(model.b, bdata, 0, ggml_nbytes(model.b));
+        ggml_backend_tensor_set(model.b, bdata.data(), 0, ggml_nbytes(model.b));
     }
 }
 
@@ -184,12 +184,6 @@ struct ggml_cgraph * compute_graph(const test_model & model, ggml_gallocr_t allo
         ggml_backend_cpu_set_n_threads(model.backend, n_threads);
     }
 
-#ifdef GGML_USE_METAL
-    if (ggml_backend_is_metal(model.backend)) {
-        ggml_backend_metal_set_n_cb(model.backend, n_threads);
-    }
-#endif
-
     ggml_backend_graph_compute(model.backend, gf);
 
     //ggml_graph_print(gf);
@@ -223,19 +217,19 @@ int main(void)
     struct ggml_tensor * im2col_res = NULL;
     struct ggml_tensor * conv2d_res = NULL;
 
-    for(int i = 0; i < gf_res->n_nodes; i++) {
-        if(strcmp(ggml_get_name(gf_res->nodes[i]), "im2col_res") == 0) {
-            im2col_res = gf_res->nodes[i];
-        } else if(strcmp(ggml_get_name(gf_res->nodes[i]), "conv2d_res") == 0) {
-            conv2d_res = gf_res->nodes[i];
+    for(int i = 0; i < ggml_graph_n_nodes(gf_res); ++i) {
+        if(strcmp(ggml_get_name(ggml_graph_node(gf_res, i)), "im2col_res") == 0) {
+            im2col_res = ggml_graph_node(gf_res, i);
+        } else if(strcmp(ggml_get_name(ggml_graph_node(gf_res, i)), "conv2d_res") == 0) {
+            conv2d_res = ggml_graph_node(gf_res, i);
         }
     }
 
-    uint16_t* im2col_data = new uint16_t[ggml_nelements(im2col_res)];
-    float* conv2d_data = new float[ggml_nelements(conv2d_res)];
+    std::vector<uint16_t> im2col_data(ggml_nelements(im2col_res));
+    std::vector<float> conv2d_data(ggml_nelements(conv2d_res));
 
-    ggml_backend_tensor_get(im2col_res, im2col_data, 0, ggml_nbytes(im2col_res));
-    ggml_backend_tensor_get(conv2d_res, conv2d_data, 0, ggml_nbytes(conv2d_res));
+    ggml_backend_tensor_get(im2col_res, im2col_data.data(), 0, ggml_nbytes(im2col_res));
+    ggml_backend_tensor_get(conv2d_res, conv2d_data.data(), 0, ggml_nbytes(conv2d_res));
 
     const int n_conv2d_test = 480;
     const int n_im2col_test = 4320;

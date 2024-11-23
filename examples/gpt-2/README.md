@@ -28,7 +28,7 @@ Sample performance on MacBook M1 Pro:
 
 Sample output:
 
-```
+```bash
 $ ./bin/gpt-2 -h
 usage: ./bin/gpt-2 [options]
 
@@ -82,7 +82,7 @@ via the [convert-ckpt-to-ggml.py](convert-ckpt-to-ggml.py) python script.
 
 Here is the entire process for the GPT-2 117M model (download from official site + conversion):
 
-```
+```bash
 cd ggml/build
 ../examples/gpt-2/download-model.sh 117M
 
@@ -111,7 +111,7 @@ Clone the respective repository from here: https://huggingface.co/cerebras
 
 Use the [convert-cerebras-to-ggml.py](convert-cerebras-to-ggml.py) script to convert the model to `ggml` format:
 
-```
+```bash
 cd ggml/build
 git clone https://huggingface.co/cerebras/Cerebras-GPT-111M models/
 python ../examples/gpt-2/convert-cerebras-to-ggml.py models/Cerebras-GPT-111M/
@@ -125,7 +125,7 @@ way, you can directly download a single binary file and start using it. No pytho
 
 Here is how to get the 117M ggml model:
 
-```
+```bash
 cd ggml/build
 ../examples/gpt-2/download-ggml-model.sh 117M
 
@@ -146,7 +146,7 @@ You can also try to quantize the `ggml` models via 4-bit integer quantization.
 Keep in mind that for smaller models, this will render them completely useless.
 You generally want to quantize larger models.
 
-```
+```bash
 # quantize GPT-2 F16 to Q4_0 (faster but less precise)
 ./bin/gpt-2-quantize models/gpt-2-1558M/ggml-model-f16.bin models/gpt-2-1558M/ggml-model-q4_0.bin 2
 ./bin/gpt-2 -m models/gpt-2-1558M/ggml-model-q4_0.bin -p "This is an example"
@@ -163,7 +163,7 @@ You can try the batched generation from a given prompt using the gpt-2-batched b
 
 Sample output:
 
-```
+```bash
 $ gpt-2-batched -np 5 -m models/gpt-2-117M/ggml-model.bin -p "Hello my name is" -n 50
 
 main: seed = 1697037431

@@ -1,6 +1,7 @@
-#include "ggml/ggml.h"
-#include "ggml/ggml-alloc.h"
-#include "ggml/ggml-backend.h"
+#include "ggml.h"
+#include "ggml-cpu.h"
+#include "ggml-alloc.h"
+#include "ggml-backend.h"
 
 #ifdef GGML_USE_CUDA
 #include "ggml-cuda.h"
@@ -108,6 +109,8 @@ struct gpt2_model {
 void init_backends(gpt2_model & model, const gpt_params & params) {
     ggml_backend_t gpu_backend = NULL;
 
+    ggml_log_set(ggml_log_callback_default, nullptr);
+
     // initialize the backends
 #ifdef GGML_USE_CUDA
     if (params.n_gpu_layers > 0) {
@@ -122,12 +125,9 @@ void init_backends(gpt2_model & model, const gpt_params & params) {
 #ifdef GGML_USE_METAL
     if (params.n_gpu_layers > 0) {
         fprintf(stderr, "%s: using Metal backend\n", __func__);
-        ggml_backend_metal_log_set_callback(ggml_log_callback_default, nullptr);
         gpu_backend = ggml_backend_metal_init();
         if (!gpu_backend) {
             fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
-        } else {
-            ggml_backend_metal_set_n_cb(gpu_backend, params.n_threads);
         }
     }
 #endif
@@ -888,7 +888,7 @@ bool gpt2_eval(
     //}
 
     // in this case, the output tensor is the last one in the graph
-    struct ggml_tensor * inpL = gf->nodes[gf->n_nodes - 1];
+    struct ggml_tensor * inpL = ggml_graph_node(gf, -1);
 
     //embd_w.resize(n_vocab*N);
     //ggml_backend_tensor_get(inpL, embd_w.data(), 0, sizeof(float)*n_vocab*N);

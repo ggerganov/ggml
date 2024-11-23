@@ -17,11 +17,18 @@ $ ./convert-yolov3-tiny.py yolov3-tiny.weights
 yolov3-tiny.weights converted to yolov3-tiny.gguf
 ```
 
+Alternatively, you can download the converted model from [HuggingFace](https://huggingface.co/rgerganov/yolo-gguf/resolve/main/yolov3-tiny.gguf)
+
 Object detection:
 
 ```bash
 $ wget https://raw.githubusercontent.com/pjreddie/darknet/master/data/dog.jpg
 $ ./yolov3-tiny -m yolov3-tiny.gguf -i dog.jpg
+load_model: using CUDA backend
+ggml_cuda_init: GGML_CUDA_FORCE_MMQ:    no
+ggml_cuda_init: GGML_CUDA_FORCE_CUBLAS: no
+ggml_cuda_init: found 1 CUDA devices:
+  Device 0: NVIDIA T1200 Laptop GPU, compute capability 7.5, VMM: yes
 Layer  0 output shape:  416 x 416 x   16 x   1
 Layer  1 output shape:  208 x 208 x   16 x   1
 Layer  2 output shape:  208 x 208 x   32 x   1
@@ -48,5 +55,5 @@ car: 52%
 truck: 56%
 car: 62%
 bicycle: 59%
-Detected objects saved in 'predictions.jpg' (time: 0.357000 sec.)
+Detected objects saved in 'predictions.jpg' (time: 0.057000 sec.)
 ```

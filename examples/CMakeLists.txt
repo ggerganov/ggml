@@ -25,3 +25,7 @@ add_subdirectory(sam)
 add_subdirectory(yolo)
 add_subdirectory(simple)
 add_subdirectory(magika)
+
+if (GGML_METAL)
+    add_subdirectory(perf-metal)
+endif()

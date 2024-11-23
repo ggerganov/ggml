@@ -1,6 +1,7 @@
-#include "ggml/ggml.h"
-#include "ggml/ggml-alloc.h"
-#include "ggml/ggml-backend.h"
+#include "ggml.h"
+#include "ggml-cpu.h"
+#include "ggml-alloc.h"
+#include "ggml-backend.h"
 
 #ifdef GGML_USE_CUDA
 #include "ggml-cuda.h"
@@ -268,6 +269,8 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
         printf("%s: backend buffer size = %6.2f MB\n", __func__, buffer_size/(1024.0*1024.0));
     }
 
+    ggml_log_set(ggml_log_callback_default, nullptr);
+
     // create the ggml context
     {
         size_t n_tensors = 2 + 6 + 12*model.hparams.n_layer;
@@ -298,7 +301,6 @@ bool gpt2_model_load(const std::string & fname, gpt2_model & model, gpt_vocab & 
 #ifdef GGML_USE_METAL
     if (n_gpu_layers > 0) {
         fprintf(stderr, "%s: using Metal backend\n", __func__);
-        ggml_backend_metal_log_set_callback(ggml_log_callback_default, nullptr);
         model.backend = ggml_backend_metal_init();
         if (!model.backend) {
             fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
@@ -942,11 +944,6 @@ int gpt2_decode(
     if (ggml_backend_is_cpu(model.backend)) {
         ggml_backend_cpu_set_n_threads(model.backend, n_threads);
     }
-#ifdef GGML_USE_METAL
-    if (ggml_backend_is_metal(model.backend)) {
-        ggml_backend_metal_set_n_cb(model.backend, n_threads);
-    }
-#endif
     ggml_backend_graph_compute(model.backend, gf);
 
     //if (n_past%100 == 0) {
@@ -955,7 +952,7 @@ int gpt2_decode(
     //}
 
     // in this case, the output tensor is the last one in the graph
-    struct ggml_tensor * inpL = gf->nodes[gf->n_nodes - 1];
+    struct ggml_tensor * inpL = ggml_graph_node(gf, -1);
 
     if (batch.logits) {
         // return logits for all tokens

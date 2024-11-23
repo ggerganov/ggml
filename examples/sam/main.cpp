@@ -2,6 +2,7 @@
 #define _CRT_SECURE_NO_DEPRECATE // Disables ridiculous "unsafe" warnigns on Windows
 
 #include "ggml.h"
+#include "ggml-cpu.h"
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
 #define STB_IMAGE_IMPLEMENTATION
@@ -345,7 +346,7 @@ static void ggml_disconnect_node_from_graph(ggml_tensor * t) {
 }
 
 static void ggml_graph_compute_helper(std::vector<uint8_t> & buf, ggml_cgraph * graph, int n_threads) {
-    struct ggml_cplan plan = ggml_graph_plan(graph, n_threads);
+    struct ggml_cplan plan = ggml_graph_plan(graph, n_threads, nullptr);
 
     if (plan.work_size > 0) {
         buf.resize(plan.work_size);

@@ -1,6 +1,7 @@
-#include "ggml/ggml.h"
-#include "ggml/ggml-alloc.h"
-#include "ggml/ggml-backend.h"
+#include "ggml.h"
+#include "ggml-cpu.h"
+#include "ggml-alloc.h"
+#include "ggml-backend.h"
 
 #include "common.h"
 #include "common-ggml.h"
@@ -698,7 +699,7 @@ bool gpt2_eval(
     }
 
     // run the computation
-    struct ggml_cplan plan = ggml_graph_plan(gf, n_threads);
+    struct ggml_cplan plan = ggml_graph_plan(gf, n_threads, nullptr);
     static std::vector<uint8_t> work_buffer;
     work_buffer.resize(plan.work_size);
     plan.work_data = work_buffer.data();

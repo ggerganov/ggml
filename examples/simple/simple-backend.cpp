@@ -1,6 +1,7 @@
 #include "ggml.h"
-#include "ggml/ggml-alloc.h"
-#include "ggml/ggml-backend.h"
+#include "ggml-cpu.h"
+#include "ggml-alloc.h"
+#include "ggml-backend.h"
 
 #ifdef GGML_USE_CUDA
 #include "ggml-cuda.h"
@@ -43,6 +44,8 @@ struct simple_model {
 
 // initialize the tensors of the model in this case two matrices 2x2
 void load_model(simple_model & model, float * a, float * b, int rows_A, int cols_A, int rows_B, int cols_B) {
+    ggml_log_set(ggml_log_callback_default, nullptr);
+
     // initialize the backend
 #ifdef GGML_USE_CUDA
     fprintf(stderr, "%s: using CUDA backend\n", __func__);
@@ -54,7 +57,6 @@ void load_model(simple_model & model, float * a, float * b, int rows_A, int cols
 
 #ifdef GGML_USE_METAL
     fprintf(stderr, "%s: using Metal backend\n", __func__);
-    ggml_backend_metal_log_set_callback(ggml_log_callback_default, nullptr);
     model.backend = ggml_backend_metal_init();
     if (!model.backend) {
         fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
@@ -131,16 +133,10 @@ struct ggml_tensor * compute(const simple_model & model, ggml_gallocr_t allocr) 
         ggml_backend_cpu_set_n_threads(model.backend, n_threads);
     }
 
-#ifdef GGML_USE_METAL
-    if (ggml_backend_is_metal(model.backend)) {
-        ggml_backend_metal_set_n_cb(model.backend, n_threads);
-    }
-#endif
-
     ggml_backend_graph_compute(model.backend, gf);
 
     // in this case, the output tensor is the last one in the graph
-    return gf->nodes[gf->n_nodes - 1];
+    return ggml_graph_node(gf, -1);
 }
 
 int main(void) {

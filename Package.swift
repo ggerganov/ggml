@@ -21,7 +21,7 @@ let package = Package(
             sources: [
                 "src/ggml.c",
                 "src/ggml-alloc.c",
-                "src/ggml-backend.c",
+                "src/ggml-backend.cpp",
                 "src/ggml-quants.c",
                 "src/ggml-metal.m",
             ],
