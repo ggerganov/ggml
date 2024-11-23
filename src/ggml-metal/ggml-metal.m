@@ -2913,12 +2913,17 @@ static void ggml_metal_encode_node(
                 [encoder setBytes:&ne01 length:sizeof(ne01) atIndex:3];
                 [encoder setBytes:&ne02 length:sizeof(ne02) atIndex:4];
                 [encoder setBytes:&ne03 length:sizeof(ne03) atIndex:5];
-                [encoder setBytes:&nb00 length:sizeof(nb00) atIndex:6];
-                [encoder setBytes:&nb01 length:sizeof(nb01) atIndex:7];
-                [encoder setBytes:&nb02 length:sizeof(nb02) atIndex:8];
-                [encoder setBytes:&nb03 length:sizeof(nb03) atIndex:9];
-                [encoder setBytes:&p0   length:sizeof(p0)   atIndex:10];
-                [encoder setBytes:&p1   length:sizeof(p1)   atIndex:11];
+                [encoder setBytes:&ne0  length:sizeof(ne0)  atIndex:6];
+                [encoder setBytes:&nb00 length:sizeof(nb00) atIndex:7];
+                [encoder setBytes:&nb01 length:sizeof(nb01) atIndex:8];
+                [encoder setBytes:&nb02 length:sizeof(nb02) atIndex:9];
+                [encoder setBytes:&nb03 length:sizeof(nb03) atIndex:10];
+                [encoder setBytes:&nb0  length:sizeof(nb0)  atIndex:11];
+                [encoder setBytes:&nb1  length:sizeof(nb1)  atIndex:12];
+                [encoder setBytes:&nb2  length:sizeof(nb2)  atIndex:13];
+                [encoder setBytes:&nb3  length:sizeof(nb3)  atIndex:14];
+                [encoder setBytes:&p0   length:sizeof(p0)   atIndex:15];
+                [encoder setBytes:&p1   length:sizeof(p1)   atIndex:16];
 
                 const int nth = MIN(1024, ne0);
 
