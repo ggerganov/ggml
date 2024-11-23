@@ -10429,6 +10429,40 @@ static void ggml_compute_forward_pad(
     }
 }
 
+// ggml_compute_forward_pad_reflect_1d
+
+static void ggml_compute_forward_pad_reflect_1d(
+        const struct ggml_compute_params * params,
+              struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src0 = dst->src[0];
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int32_t * opts = (const int32_t *) dst->op_params;
+    const int p0 = opts[0];
+    const int p1 = opts[1];
+
+    GGML_TENSOR_UNARY_OP_LOCALS
+
+    for (int64_t i3 = 0; i3 < ne3; i3++) {
+        for (int64_t i2 = 0; i2 < ne2; i2++) {
+            for (int64_t i1 = ith; i1 < ne1; i1 += nth) {
+                float * left  = (float *) ((char *) dst->data + i3*nb3 + i2*nb2 + i1*nb1 +         p0*nb0);
+                float * right = (float *) ((char *) dst->data + i3*nb3 + i2*nb2 + i1*nb1 + (ne0-p1-1)*nb0);
+
+                ggml_vec_cpy_f32(ne00, left, (float *) ((char *) src0->data + i3*nb03 + i2*nb02 + i1*nb01));
+
+                for (int i0 = 1; i0 <= p0; i0++) { left[-i0] = left[i0];   }
+                for (int i0 = 1; i0 <= p1; i0++) { right[i0] = right[-i0]; }
+            }
+        }
+    }
+}
 
 // ggml_compute_forward_arange
 
