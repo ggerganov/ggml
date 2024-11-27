@@ -6,7 +6,10 @@ Please note that training in GGML is a work-in-progress and not production ready
 
 ## Obtaining the data
 
-The data can either be downloaded [here](https://yann.lecun.com/exdb/mnist/) or it will be downloaded automatically when running `mnist-train-fc.py`.
+A description of the dataset can be found on [Yann LeCun's website](https://yann.lecun.com/exdb/mnist/).
+While it is also in principle possible to download the dataset from this website these downloads are frequently throttled and
+it is recommended to use [HuggingFace](https://huggingface.co/datasets/ylecun/mnist) instead.
+The dataset will be downloaded automatically when running `mnist-train-fc.py`.
 
 ## Fully connected network
 
