@@ -1353,8 +1353,8 @@ kernel void kernel_argmax(
         threadgroup int32_t * shared_argmax [[threadgroup(1)]],
         uint  tgpig[[threadgroup_position_in_grid]],
         uint  tpitg[[thread_position_in_threadgroup]],
-        uint sgitg[[simdgroup_index_in_threadgroup]],
-        uint tiisg[[thread_index_in_simdgroup]],
+        uint  sgitg[[simdgroup_index_in_threadgroup]],
+        uint  tiisg[[thread_index_in_simdgroup]],
         uint    ntg[[threads_per_threadgroup]]) {
     device const float * x_row = (device const float *) ((device const char *) x + tgpig * nb01);
 
