@@ -3480,6 +3480,11 @@ static void ggml_metal_encode_node(
 
                 const int64_t nrows = ggml_nrows(src0);
 
+                int nth = 32; // SIMD width
+                while (nth < ne00 && nth*ne01*ne02*ne03 < 256) {
+                    nth *= 2;
+                }
+
                 id<MTLComputePipelineState> pipeline = ctx->kernels[GGML_METAL_KERNEL_TYPE_ARGMAX].pipeline;
 
                 [encoder setComputePipelineState:pipeline];
@@ -3487,8 +3492,10 @@ static void ggml_metal_encode_node(
                 [encoder setBuffer:id_dst  offset:offs_dst         atIndex:1];
                 [encoder setBytes:&ne00    length:sizeof( int64_t) atIndex:2];
                 [encoder setBytes:&nb01    length:sizeof(uint64_t) atIndex:3];
+                [encoder setThreadgroupMemoryLength:32*sizeof(float)   atIndex:0];
+                [encoder setThreadgroupMemoryLength:32*sizeof(int32_t) atIndex:1];
 
-                [encoder dispatchThreadgroups:MTLSizeMake(nrows, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+                [encoder dispatchThreadgroups:MTLSizeMake(nrows, 1, 1) threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
             } break;
        default:
             {
