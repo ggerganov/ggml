@@ -6380,6 +6380,7 @@ struct gguf_tensor_info {
     uint64_t offset; // offset from start of `data`, must be a multiple of `ALIGNMENT`
 
     // for writing API
+    ggml_backend_buffer_t buffer;
     const void * data;
     size_t size;
 };
@@ -7317,6 +7318,7 @@ void gguf_add_tensor(
 
     ctx->infos[idx].type   = tensor->type;
     ctx->infos[idx].offset = 0;
+    ctx->infos[idx].buffer = tensor->buffer;
     ctx->infos[idx].data   = tensor->data;
     ctx->infos[idx].size   = ggml_nbytes(tensor);
 
@@ -7410,6 +7412,20 @@ static void gguf_bwrite_el(struct gguf_buf * buf, const void * val, size_t el_si
 
     if (buf->data) {
         memcpy((char *) buf->data + buf->offset, val, el_size);
+    }
+    buf->offset += el_size;
+}
+
+static void gguf_bwrite_tensor_data(struct gguf_buf * buf, const struct ggml_tensor * tensor, size_t el_size) {
+    gguf_buf_grow(buf, el_size);
+
+    if (buf->data) {
+        char * dst = (char *) buf->data + buf->offset;
+        if (tensor->buffer) {
+            ggml_backend_tensor_get(tensor, dst, 0, el_size);
+        } else {
+            memcpy(dst, tensor->data, el_size);
+        }
     }
     buf->offset += el_size;
 }
@@ -7514,7 +7530,31 @@ static void gguf_write_to_buf(const struct gguf_context * ctx, struct gguf_buf *
         const size_t size     = info->size;
         const size_t size_pad = GGML_PAD(size, ctx->alignment);
 
-        gguf_bwrite_el(buf, info->data, size);
+        // reconstruct a fake tensor that can be used to retrieve data from backend buffers
+        struct ggml_tensor fake_tensor = {
+            /*.type      =*/ info->type,
+            /*.backend   =*/ GGML_BACKEND_TYPE_CPU,
+            /*.buffer    =*/ info->buffer,
+            /*.ne        =*/ { info->ne[0], info->ne[1], info->ne[2], info->ne[3] },
+            /*.nb        =*/ { 0, 0, 0, 0 },
+            /*.op        =*/ GGML_OP_NONE,
+            /*.op_params =*/ { 0 },
+            /*.flags     =*/ 0,
+            /*.src       =*/ { NULL },
+            /*.view_src  =*/ NULL,
+            /*.view_offs =*/ 0,
+            /*.data      =*/ (void *)(uintptr_t)info->data, // double cast suppresses warning for casting away const qualifier
+            /*.name      =*/ { 0 },
+            /*.extra     =*/ NULL,
+            /*.padding   =*/ { 0 },
+        };
+        ggml_set_name(&fake_tensor, info->name.data);
+        fake_tensor.nb[0] = ggml_type_size(info->type);
+        fake_tensor.nb[1] = fake_tensor.nb[0]*(fake_tensor.ne[0]/ggml_blck_size(info->type));
+        for (int j = 2; j < GGML_MAX_DIMS; j++) {
+            fake_tensor.nb[j] = fake_tensor.nb[j - 1]*fake_tensor.ne[j - 1];
+        }
+        gguf_bwrite_tensor_data(buf, &fake_tensor, size);
 
         if (size_pad != size) {
             uint8_t pad = 0;
