@@ -1,9 +1,27 @@
 #include "ggml.h"
 #include "ggml-cpu.h"
+#include "ggml-alloc.h"
+#include "ggml-backend.h"
+
+#ifdef GGML_USE_CUDA
+#include "ggml-cuda.h"
+#endif
+
+#ifdef GGML_USE_METAL
+#include "ggml-metal.h"
+#endif
 
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+
+static void ggml_log_callback_default(ggml_log_level level, const char * text, void * user_data) {
+    (void) level;
+    (void) user_data;
+    fputs(text, stderr);
+    fflush(stderr);
+}
 
 struct ggml_context* make_ctx(void) {
     struct ggml_init_params params = {
@@ -31,15 +49,66 @@ void check_tensor(struct ggml_tensor * t, float * expected_t_d, int ne0, int ne1
     }
 }
 
-void test_pad_reflect_1d(void) {
+void test_pad_reflect_1d(bool use_gpu) {
+    ggml_backend_t backend = NULL;
+    struct ggml_init_params params;
+    ggml_backend_buffer_t buffer;
+    struct ggml_context * ctx;
+    struct ggml_tallocr tallocr;
+    ggml_gallocr_t gallocr;
+
+    // initialize the backend
+#ifdef GGML_USE_CUDA
+    if (use_gpu) {
+        fprintf(stderr, "%s: using CUDA backend\n", __func__);
+        backend = ggml_backend_cuda_init(0);
+        if (!backend) {
+            fprintf(stderr, "%s: ggml_backend_cuda_init() failed\n", __func__);
+        }
+    }
+#endif
+
+#ifdef GGML_USE_METAL
+    if (use_gpu) {
+        fprintf(stderr, "%s: using Metal backend\n", __func__);
+        backend = ggml_backend_metal_init();
+        if (!backend) {
+            fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
+        }
+    }
+#endif
+
+    if (!backend) {
+        fprintf(stderr, "%s: using CPU backend\n", __func__);
+        backend = ggml_backend_cpu_init();
+    }
+
     // Test cases for different padding configurations
     {
-        struct ggml_context * ctx = make_ctx();
+        params = (struct ggml_init_params){
+            .mem_size   = 16*1024*1024,
+            .mem_buffer = NULL,
+            .no_alloc   = true,
+        };
+
+        ggml_log_set(ggml_log_callback_default, nullptr);
+
+        ctx = ggml_init(params);
+        buffer = ggml_backend_alloc_buffer(backend, 16*1024*1024);
+        tallocr = ggml_tallocr_new(buffer);
+        gallocr = ggml_gallocr_new(ggml_backend_get_default_buffer_type(backend));
 
         // Create a simple 1D input tensor [1, 2, 3, 4]
         struct ggml_tensor * t = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 4);
         float input_data[] = {1.0f, 2.0f, 3.0f, 4.0f};
-        memcpy(t->data, input_data, ggml_nbytes(t));
+        ggml_tallocr_alloc(&tallocr, t);
+
+        // load data to buffer
+        if(ggml_backend_is_cpu(backend)) {
+            memcpy(t->data, input_data, ggml_nbytes(t));
+        } else {
+            ggml_backend_tensor_set(t, input_data, 0, ggml_nbytes(t));
+        }
 
         // Test case 1: pad left=1, right=1
         // Expected: [2, 1, 2, 3, 4, 3]
@@ -61,17 +130,32 @@ void test_pad_reflect_1d(void) {
         ggml_build_forward_expand(gf, out_2);
         ggml_build_forward_expand(gf, out_3);
 
-        ggml_graph_compute_with_ctx(ctx, gf, 1);
+        ggml_gallocr_alloc_graph(gallocr, gf);
+
+        ggml_backend_graph_compute(backend, gf);
 
         check_tensor(out_1, expected_1, 6, 1, 1);
         check_tensor(out_2, expected_2, 7, 1, 1);
         check_tensor(out_3, expected_3, 7, 1, 1);
 
         ggml_free(ctx);
+        ggml_backend_buffer_free(buffer);
+        ggml_gallocr_free(gallocr);
     }
 
     {
-        struct ggml_context * ctx = make_ctx();
+        params = (struct ggml_init_params){
+            .mem_size   = 16*1024*1024,
+            .mem_buffer = NULL,
+            .no_alloc   = true,
+        };
+
+        ggml_log_set(ggml_log_callback_default, nullptr);
+
+        ctx = ggml_init(params);
+        buffer = ggml_backend_alloc_buffer(backend, 16*1024*1024);
+        tallocr = ggml_tallocr_new(buffer);
+        gallocr = ggml_gallocr_new(ggml_backend_get_default_buffer_type(backend));
 
         // Create a 2D input tensor (5 columns × 4 rows)
         struct ggml_tensor * t = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 5, 4);
@@ -81,7 +165,14 @@ void test_pad_reflect_1d(void) {
             11.0f, 12.0f, 13.0f, 14.0f, 15.0f, // row 3
             16.0f, 17.0f, 18.0f, 19.0f, 20.0f  // row 4
         };
-        memcpy(t->data, input_data, ggml_nbytes(t));
+        ggml_tallocr_alloc(&tallocr, t);
+
+        // load data to buffer
+        if(ggml_backend_is_cpu(backend)) {
+            memcpy(t->data, input_data, ggml_nbytes(t));
+        } else {
+            ggml_backend_tensor_set(t, input_data, 0, ggml_nbytes(t));
+        }
 
         // Test case 4: pad left=3, right=2 on a 2D tensor
         // Each row should be padded independently
@@ -95,15 +186,26 @@ void test_pad_reflect_1d(void) {
 
         struct ggml_cgraph * gf = ggml_new_graph(ctx);
         ggml_build_forward_expand(gf, out_4);
-        ggml_graph_compute_with_ctx(ctx, gf, 1);
+
+        ggml_gallocr_alloc_graph(gallocr, gf);
+
+        ggml_backend_graph_compute(backend, gf);
 
         check_tensor(out_4, expected_4, 10, 4, 1);
 
         ggml_free(ctx);
+        ggml_gallocr_free(gallocr);
+        ggml_backend_buffer_free(buffer);
     }
+
+    ggml_backend_free(backend);
 }
 
 int main(int argc, const char * argv[]) {
-    test_pad_reflect_1d();
+    bool use_gpu = false;
+    if (argc > 1) {
+        use_gpu = strcmp(argv[1], "--gpu") == 0;
+    }
+    test_pad_reflect_1d(use_gpu);
     return 0;
 }
