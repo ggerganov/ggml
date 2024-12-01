@@ -3584,6 +3584,10 @@ static void ggml_metal_encode_node(
                 const size_t offset  = ((int32_t *) dst->op_params)[3];
                 const bool   inplace = (bool) ((int32_t *) dst->op_params)[4];
 
+                if (!inplace) {
+                    memcpy(((char *)  dst->data), ((char *) src0->data), ggml_nbytes(dst));
+                }
+
                 const int im0 = (ne10 == 0 ? 0 : ne10-1);
                 const int im1 = (ne11 == 0 ? 0 : ne11-1);
                 const int im2 = (ne12 == 0 ? 0 : ne12-1);
