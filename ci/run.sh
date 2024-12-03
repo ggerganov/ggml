@@ -308,7 +308,6 @@ if [ -z ${GG_BUILD_LOW_PERF} ]; then
     source "$MNT/venv/bin/activate"
 
     pip install -r ${SRC}/requirements.txt --disable-pip-version-check
-    pip install --editable gguf-py --disable-pip-version-check
 fi
 
 
