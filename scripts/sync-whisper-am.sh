@@ -62,7 +62,6 @@ while read c; do
         ggml/src/ggml*.m \
         ggml/src/ggml*.metal \
         ggml/src/ggml*.cu \
-        ggml/src/ggml-amx/* \
         ggml/src/ggml-cann/* \
         ggml/src/ggml-cuda/* \
         ggml/src/ggml-sycl/* \
@@ -108,7 +107,6 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
     # ggml/src/ggml*.h          -> src/ggml*.h
     # ggml/src/ggml*.cu         -> src/ggml*.cu
     # ggml/src/ggml*.m          -> src/ggml*.m
-    # ggml/src/ggml-amx/*       -> src/ggml-amx/*
     # ggml/src/ggml-cann/*      -> src/ggml-cann/*
     # ggml/src/ggml-cuda/*      -> src/ggml-cuda/*
     # ggml/src/ggml-sycl/*      -> src/ggml-sycl/*
@@ -133,7 +131,6 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
         -e 's/\/ggml\/src\/ggml(.*)\.h/\/src\/ggml\1.h/g' \
         -e 's/\/ggml\/src\/ggml(.*)\.cu/\/src\/ggml\1.cu/g' \
         -e 's/\/ggml\/src\/ggml(.*)\.m/\/src\/ggml\1.m/g' \
-        -e 's/\/ggml\/src\/ggml-amx\//\/src\/ggml-amx\//g' \
         -e 's/\/ggml\/src\/ggml-cann\//\/src\/ggml-cann\//g' \
         -e 's/\/ggml\/src\/ggml-cuda\//\/src\/ggml-cuda\//g' \
         -e 's/\/ggml\/src\/ggml-sycl\//\/src\/ggml-sycl\//g' \

@@ -9,7 +9,6 @@ cp -rpv ../whisper.cpp/ggml/src/ggml*.cpp        src/
 cp -rpv ../whisper.cpp/ggml/src/ggml*.h          src/
 cp -rpv ../whisper.cpp/ggml/src/ggml*.cu         src/
 cp -rpv ../whisper.cpp/ggml/src/ggml*.m          src/
-cp -rpv ../whisper.cpp/ggml/src/ggml-amx/*       src/ggml-amx/
 cp -rpv ../whisper.cpp/ggml/src/ggml-cann/*      src/ggml-cann/
 cp -rpv ../whisper.cpp/ggml/src/ggml-cuda/*      src/ggml-cuda/
 cp -rpv ../whisper.cpp/ggml/src/ggml-sycl/*      src/ggml-sycl/
