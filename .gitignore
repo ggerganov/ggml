@@ -26,6 +26,7 @@ zig-out/
 zig-cache/
 
 *.o
+*.d
 *.dot
 
 *.sw?
