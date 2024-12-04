@@ -293,15 +293,23 @@ function gg_sum_yolo {
 
 ## main
 
-if [ -z $GG_BUILD_LOW_PERF ]; then
+if [ -z ${GG_BUILD_LOW_PERF} ]; then
+    # Create symlink: ./ggml/models-mnt -> $MNT/models/models-mnt
     rm -rf ${SRC}/models-mnt
-
     mnt_models=${MNT}/models
     mkdir -p ${mnt_models}
     ln -sfn ${mnt_models} ${SRC}/models-mnt
+
+    # Create a fresh python3 venv and enter it
+    if ! python3 -m venv "$MNT/venv"; then
+        echo "Error: Failed to create Python virtual environment at $MNT/venv."
+        exit 1
+    fi
+    source "$MNT/venv/bin/activate"
+
+    pip install -r ${SRC}/requirements.txt --disable-pip-version-check
 fi
 
-python3 -m pip install -r ${SRC}/requirements.txt
 
 ret=0
 

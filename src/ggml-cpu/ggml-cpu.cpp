@@ -3,6 +3,7 @@
 #include "ggml-cpu.h"
 #include "ggml-cpu-aarch64.h"
 #include "ggml-impl.h"
+#include "amx/amx.h"
 #include <cctype>
 #include <string>
 #include <vector>
@@ -134,12 +135,16 @@ static ggml_backend_buffer_type_t * ggml_backend_cpu_get_extra_bufts(ggml_backen
     static std::vector<ggml_backend_buffer_type_t> bufts = []() {
         std::vector<ggml_backend_buffer_type_t> bufts;
 
-#ifdef GGML_USE_CPU_HBM
-        bufts.push_back(ggml_backend_cpu_hbm_buffer_type());
+#if defined(__AMX_INT8__) && defined(__AVX512VNNI__)
+        if (ggml_backend_amx_buffer_type()) {
+            bufts.push_back(ggml_backend_amx_buffer_type());
+        }
 #endif
 
 #ifdef GGML_USE_CPU_AARCH64
-        bufts.push_back(ggml_backend_cpu_aarch64_buffer_type());
+        if (ggml_backend_cpu_aarch64_buffer_type()) {
+            bufts.push_back(ggml_backend_cpu_aarch64_buffer_type());
+        }
 #endif
 
         bufts.push_back(NULL);
@@ -456,11 +461,26 @@ static bool ggml_backend_cpu_device_supports_op(ggml_backend_dev_t dev, const st
     const struct ggml_tensor * src0 = op->src[0];
     const struct ggml_tensor * src1 = op->src[1];
 
+    if (op->op == GGML_OP_NONE || op->op == GGML_OP_RESHAPE || op->op == GGML_OP_VIEW || op->op == GGML_OP_PERMUTE || op->op == GGML_OP_TRANSPOSE) {
+        return true;
+    }
+
     if (src0 && src0->buffer && ggml_backend_cpu_buft_is_aarch64(src0->buffer->buft)) {
-        if (op->op != GGML_OP_MUL_MAT || src0->type != GGML_TYPE_Q4_0 || ggml_aarch64_get_optimal_repack_type(src0) == GGML_TYPE_Q4_0) {
+        if (op->op != GGML_OP_MUL_MAT || src0->type == ggml_aarch64_get_optimal_repack_type(src0)) {
             return false;
         }
     }
+
+#if defined(__AMX_INT8__) && defined(__AVX512VNNI__)
+    if (src0 && src0->buffer && ggml_backend_amx_buft_is_amx(src0->buffer->buft)) {
+        return ggml_backend_amx_device_supports_op(op);
+    }
+    for (int i = 1; i < GGML_MAX_SRC; i++) {
+        if (op->src[i] && op->src[i]->buffer && ggml_backend_amx_buft_is_amx(op->src[i]->buffer->buft)) {
+            return false;
+        }
+    }
+#endif
 
     for (int i = 1; i < GGML_MAX_SRC; i++) {
         if (op->src[i] && op->src[i]->buffer && ggml_backend_cpu_buft_is_aarch64(op->src[i]->buffer->buft)) {
@@ -491,7 +511,13 @@ static bool ggml_backend_cpu_device_supports_op(ggml_backend_dev_t dev, const st
 }
 
 static bool ggml_backend_cpu_device_supports_buft(ggml_backend_dev_t dev, ggml_backend_buffer_type_t buft) {
-    return ggml_backend_buft_is_host(buft) || ggml_backend_cpu_buft_is_aarch64(buft);
+    bool supported = ggml_backend_buft_is_host(buft) || ggml_backend_cpu_buft_is_aarch64(buft);
+
+#if defined(__AMX_INT8__) && defined(__AVX512VNNI__)
+    supported = supported || ggml_backend_amx_buft_is_amx(buft);
+#endif
+
+    return supported;
 
     GGML_UNUSED(dev);
 }
@@ -541,16 +567,12 @@ static ggml_backend_dev_t ggml_backend_cpu_reg_get_device(ggml_backend_reg_t reg
     return &ggml_backend_cpu_device;
 }
 
-struct ggml_backend_feature {
-    const char * name;
-    const char * value;
-};
-
-// Not used yet
 // This is intended to replace the the ggml_cpu_has_* functions when loading the CPU backend dynamically,
-// and additionally to allow other backends to expose their own list of features that applications can query using the same API.
+// and additionally to allow other backends to expose their own list of features that applications can query using the same API
 static ggml_backend_feature * ggml_backend_cpu_get_features(ggml_backend_reg_t reg) {
     static std::vector<ggml_backend_feature> features = []() {
+        ggml_cpu_init();
+
         std::vector<ggml_backend_feature> features;
         if (ggml_cpu_has_sse3()) {
             features.push_back({ "SSE3", "1" });
@@ -561,6 +583,9 @@ static ggml_backend_feature * ggml_backend_cpu_get_features(ggml_backend_reg_t r
         if (ggml_cpu_has_avx()) {
             features.push_back({ "AVX", "1" });
         }
+        if (ggml_cpu_has_avx_vnni()) {
+            features.push_back({ "AVX_VNNI", "1" });
+        }
         if (ggml_cpu_has_avx2()) {
             features.push_back({ "AVX2", "1" });
         }
@@ -569,9 +594,6 @@ static ggml_backend_feature * ggml_backend_cpu_get_features(ggml_backend_reg_t r
         }
         if (ggml_cpu_has_fma()) {
             features.push_back({ "FMA", "1" });
-        }
-        if (ggml_cpu_has_avx_vnni()) {
-            features.push_back({ "AVX_VNNI", "1" });
         }
         if (ggml_cpu_has_avx512()) {
             features.push_back({ "AVX512", "1" });
@@ -619,6 +641,10 @@ static ggml_backend_feature * ggml_backend_cpu_get_features(ggml_backend_reg_t r
         if (ggml_cpu_has_llamafile()) {
             features.push_back({ "LLAMAFILE", "1" });
         }
+        // TODO: rename this
+    #ifdef GGML_USE_CPU_AARCH64
+        features.push_back({ "AARCH64_REPACK", "1" });
+    #endif
 
         features.push_back({ nullptr, nullptr });
 
@@ -636,6 +662,29 @@ static void * ggml_backend_cpu_get_proc_address(ggml_backend_reg_t reg, const ch
     }
     if (strcmp(name, "ggml_backend_dev_get_extra_bufts") == 0) {
         return (void *)ggml_backend_cpu_get_extra_bufts;
+    }
+    if (strcmp(name, "ggml_backend_get_features") == 0) {
+        return (void *)ggml_backend_cpu_get_features;
+    }
+    if (strcmp(name, "ggml_backend_set_abort_callback") == 0) {
+        return (void *)ggml_backend_cpu_set_abort_callback;
+    }
+    if (strcmp(name, "ggml_backend_cpu_numa_init") == 0) {
+        return (void *)ggml_numa_init;
+    }
+    if (strcmp(name, "ggml_backend_cpu_is_numa") == 0) {
+        return (void *)ggml_is_numa;
+    }
+
+    // threadpool - TODO:  move to ggml-base
+    if (strcmp(name, "ggml_threadpool_new") == 0) {
+        return (void *)ggml_threadpool_new;
+    }
+    if (strcmp(name, "ggml_threadpool_free") == 0) {
+        return (void *)ggml_threadpool_free;
+    }
+    if (strcmp(name, "ggml_backend_cpu_set_threadpool") == 0) {
+        return (void *)ggml_backend_cpu_set_threadpool;
     }
 
     return NULL;
@@ -655,9 +704,12 @@ ggml_backend_reg_t ggml_backend_cpu_reg(void) {
     ggml_cpu_init();
 
     static struct ggml_backend_reg ggml_backend_cpu_reg = {
-        /* .iface   = */ ggml_backend_cpu_reg_i,
-        /* .context = */ NULL,
+        /* .api_version = */ GGML_BACKEND_API_VERSION,
+        /* .iface       = */ ggml_backend_cpu_reg_i,
+        /* .context     = */ NULL,
     };
 
     return &ggml_backend_cpu_reg;
 }
+
+GGML_BACKEND_DL_IMPL(ggml_backend_cpu_reg)

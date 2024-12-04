@@ -47,9 +47,20 @@
 #define CC_TURING     750
 #define CC_AMPERE     800
 #define CC_OFFSET_AMD 1000000
-#define CC_RDNA1      (CC_OFFSET_AMD + 1010)
-#define CC_RDNA2      (CC_OFFSET_AMD + 1030)
-#define CC_RDNA3      (CC_OFFSET_AMD + 1100)
+
+// GCN/CNDA, wave size is 64
+#define CC_GCN4       (CC_OFFSET_AMD + 803)  // Tonga, Fiji, Polaris, minimum for fast fp16
+#define CC_VEGA       (CC_OFFSET_AMD + 900)  // Vega56/64, minimum for fp16 dual issue
+#define CC_VEGA20     (CC_OFFSET_AMD + 906)  // MI50/Radeon VII, minimum for dp4a
+#define CC_CDNA       (CC_OFFSET_AMD + 908)  // MI100, minimum for MFMA, acc registers
+#define CC_CDNA2      (CC_OFFSET_AMD + 910)  // MI210, minimum acc register renameing
+#define CC_CDNA3      (CC_OFFSET_AMD + 942)  // MI300
+
+// RNDA removes MFMA, dp4a, xnack, acc registers, wave size is 32
+#define CC_RDNA1      (CC_OFFSET_AMD + 1010) // RX 5000
+#define CC_RDNA2      (CC_OFFSET_AMD + 1030) // RX 6000, minimum for dp4a
+#define CC_RDNA3      (CC_OFFSET_AMD + 1100) // RX 7000, minimum for WMMA
+
 #define CC_QY1        210
 #define CC_QY2        220
 
@@ -180,8 +191,8 @@ static __device__ __forceinline__ int warp_reduce_sum(int x) {
     return __reduce_add_sync(0xffffffff, x);
 #else
 #pragma unroll
-    for (int mask = 16; mask > 0; mask >>= 1) {
-        x += __shfl_xor_sync(0xffffffff, x, mask, 32);
+    for (int offset = 16; offset > 0; offset >>= 1) {
+        x += __shfl_xor_sync(0xffffffff, x, offset, 32);
     }
     return x;
 #endif // !(defined(GGML_USE_HIP) && defined(__HIP_PLATFORM_AMD__)) && __CUDA_ARCH__ >= CC_AMPERE
@@ -189,17 +200,17 @@ static __device__ __forceinline__ int warp_reduce_sum(int x) {
 
 static __device__ __forceinline__ float warp_reduce_sum(float x) {
 #pragma unroll
-    for (int mask = 16; mask > 0; mask >>= 1) {
-        x += __shfl_xor_sync(0xffffffff, x, mask, 32);
+    for (int offset = 16; offset > 0; offset >>= 1) {
+        x += __shfl_xor_sync(0xffffffff, x, offset, 32);
     }
     return x;
 }
 
 static __device__ __forceinline__ float2 warp_reduce_sum(float2 a) {
 #pragma unroll
-    for (int mask = 16; mask > 0; mask >>= 1) {
-        a.x += __shfl_xor_sync(0xffffffff, a.x, mask, 32);
-        a.y += __shfl_xor_sync(0xffffffff, a.y, mask, 32);
+    for (int offset = 16; offset > 0; offset >>= 1) {
+        a.x += __shfl_xor_sync(0xffffffff, a.x, offset, 32);
+        a.y += __shfl_xor_sync(0xffffffff, a.y, offset, 32);
     }
     return a;
 }
@@ -209,16 +220,16 @@ static __device__ __forceinline__ half2 warp_reduce_sum(half2 a) {
 
 #if defined(GGML_USE_HIP) && defined(__HIP_PLATFORM_AMD__)
 #pragma unroll
-    for (int mask = 16; mask > 0; mask >>= 1) {
-        const half2 a_other = __shfl_xor_sync(0xffffffff, a, mask, 32);
+    for (int offset = 16; offset > 0; offset >>= 1) {
+        const half2 a_other = __shfl_xor_sync(0xffffffff, a, offset, 32);
         reinterpret_cast<half&>(a.x) +=  __low2half(a_other);
         reinterpret_cast<half&>(a.y) += __high2half(a_other);
     }
     return a;
 #else
 #pragma unroll
-    for (int mask = 16; mask > 0; mask >>= 1) {
-        a = __hadd2(a, __shfl_xor_sync(0xffffffff, a, mask, 32));
+    for (int offset = 16; offset > 0; offset >>= 1) {
+        a = __hadd2(a, __shfl_xor_sync(0xffffffff, a, offset, 32));
     }
     return a;
 #endif // defined(GGML_USE_HIP) && defined(__HIP_PLATFORM_AMD__)
@@ -231,8 +242,8 @@ static __device__ __forceinline__ half2 warp_reduce_sum(half2 a) {
 
 static __device__ __forceinline__ float warp_reduce_max(float x) {
 #pragma unroll
-    for (int mask = 16; mask > 0; mask >>= 1) {
-        x = fmaxf(x, __shfl_xor_sync(0xffffffff, x, mask, 32));
+    for (int offset = 16; offset > 0; offset >>= 1) {
+        x = fmaxf(x, __shfl_xor_sync(0xffffffff, x, offset, 32));
     }
     return x;
 }
@@ -275,8 +286,8 @@ static __device__ __forceinline__ half2 ggml_cuda_hmax2(const half2 a, const hal
 static __device__ __forceinline__ half2 warp_reduce_max(half2 x) {
 #if !(defined(GGML_USE_HIP) && defined(__HIP_PLATFORM_AMD__)) && __CUDA_ARCH__ >= CC_PASCAL
 #pragma unroll
-   for (int mask = 16; mask > 0; mask >>= 1) {
-       x = ggml_cuda_hmax2(x, __shfl_xor_sync(0xffffffff, x, mask, 32));
+   for (int offset = 16; offset > 0; offset >>= 1) {
+       x = ggml_cuda_hmax2(x, __shfl_xor_sync(0xffffffff, x, offset, 32));
    }
    return x;
 #else

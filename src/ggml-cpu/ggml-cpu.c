@@ -10,6 +10,7 @@
 #include "ggml-quants.h"
 #include "ggml-cpu-quants.h"
 #include "ggml-threading.h"
+#include "amx/amx.h"
 #include "ggml.h"
 
 #if defined(_MSC_VER) || defined(__MINGW32__)
@@ -109,10 +110,11 @@ static ggml_fp16_t ggml_table_gelu_quick_f16[1 << 16];
 #if defined(__ARM_ARCH)
 struct ggml_arm_arch_features_type {
     int has_neon;
+    int has_dotprod;
     int has_i8mm;
     int has_sve;
     int sve_cnt;
-} ggml_arm_arch_features = {-1, -1, -1, 0};
+} ggml_arm_arch_features = {-1, -1, -1, -1, 0};
 #endif
 
 
@@ -446,6 +448,15 @@ static const struct ggml_type_traits_cpu type_traits_cpu[GGML_TYPE_COUNT] = {
         .vec_dot_type             = GGML_TYPE_Q8_K,
         .nrows                    = 1,
     },
+    [GGML_TYPE_IQ4_NL_4_4] = {
+        .from_float               = NULL,
+        .vec_dot                  = NULL,
+        .vec_dot_type             = GGML_TYPE_Q8_0,
+        .nrows                    = 1,
+        .ncols                    = 4,
+        .gemv                     = ggml_gemv_iq4_nl_4x4_q8_0,
+        .gemm                     = ggml_gemm_iq4_nl_4x4_q8_0,
+    },
 };
 
 const struct ggml_type_traits_cpu * ggml_get_type_traits_cpu(enum ggml_type type) {
@@ -614,7 +625,7 @@ do {                                                                  \
     for (int i = 0; i < offset; ++i) {                                \
         x[i] = _mm512_add_ps(x[i], x[offset+i]);                      \
     }                                                                 \
-    res = _mm512_reduce_add_ps(x[0]);                                 \
+    res = (ggml_float) _mm512_reduce_add_ps(x[0]);                    \
 } while (0)
 
 // TODO: is this optimal ?
@@ -664,7 +675,7 @@ do {                                                              \
     for (int i = 0; i < offset; ++i) {                            \
         x[i] = _mm512_add_ps(x[i], x[offset+i]);                  \
     }                                                             \
-    res = _mm512_reduce_add_ps(x[0]);                             \
+    res = (ggml_float) _mm512_reduce_add_ps(x[0]);                \
 } while (0)
 
 #define GGML_F16_VEC                GGML_F32Cx16
@@ -675,8 +686,8 @@ do {                                                              \
 #define GGML_F16_VEC_FMA            GGML_F32Cx16_FMA
 #define GGML_F16_VEC_ADD            GGML_F32Cx16_ADD
 #define GGML_F16_VEC_MUL            GGML_F32Cx16_MUL
-#define GGML_F16_VEC_REDUCE         GGML_F32Cx16_REDUCE
 
+#define GGML_F16_VEC_REDUCE         GGML_F32Cx16_REDUCE
 #elif defined(__AVX__)
 
 #define GGML_SIMD
@@ -1168,28 +1179,28 @@ static inline void __lasx_f32cx8_store(ggml_fp16_t * x, __m256 y) {
 #define GGML_F32x4_FMA(a, b, c) __lsx_vfmadd_s(b, c, a)
 #define GGML_F32x4_ADD     __lsx_vfadd_s
 #define GGML_F32x4_MUL     __lsx_vfmul_s
-#define GGML_F32x4_REDUCE(res, x)                                 \
-{                                                                 \
-    int offset = GGML_F32_ARR >> 1;                               \
-    for (int i = 0; i < offset; ++i) {                            \
-        x[i] = __lsx_vfadd_s(x[i], x[offset+i]);                     \
-    }                                                             \
-    offset >>= 1;                                                 \
-    for (int i = 0; i < offset; ++i) {                            \
-        x[i] = __lsx_vfadd_s(x[i], x[offset+i]);                     \
-    }                                                             \
-    offset >>= 1;                                                 \
-    for (int i = 0; i < offset; ++i) {                            \
-        x[i] = __lsx_vfadd_s(x[i], x[offset+i]);                     \
-    }                                                             \
-    __m128i tmp = __lsx_vsrli_d((__m128i)x[0], 32); \
-    tmp = (__m128i)__lsx_vfadd_s((__m128)tmp, x[0]); \
-    tmp = __lsx_vpickev_w(__lsx_vldi(0), tmp); \
-    const __m128 t0 = __lsx_vshuf4i_w(tmp, 0x88); \
-    tmp = __lsx_vsrli_d((__m128i)t0, 32); \
-    tmp = (__m128i)__lsx_vfadd_s((__m128)tmp, t0); \
-    tmp = __lsx_vpickev_w(__lsx_vldi(0), tmp); \
-    res = (ggml_float) __lsx_vpickve2gr_w(__lsx_vshuf4i_w(tmp, 0x88), 0);        \
+#define GGML_F32x4_REDUCE(res, x)                                                     \
+{                                                                                     \
+    int offset = GGML_F32_ARR >> 1;                                                   \
+    for (int i = 0; i < offset; ++i) {                                                \
+        x[i] = __lsx_vfadd_s(x[i], x[offset + i]);                                    \
+    }                                                                                 \
+    offset >>= 1;                                                                     \
+    for (int i = 0; i < offset; ++i) {                                                \
+        x[i] = __lsx_vfadd_s(x[i], x[offset + i]);                                    \
+    }                                                                                 \
+    offset >>= 1;                                                                     \
+    for (int i = 0; i < offset; ++i) {                                                \
+        x[i] = __lsx_vfadd_s(x[i], x[offset + i]);                                    \
+    }                                                                                 \
+    __m128i tmp     = __lsx_vsrli_d((__m128i) x[0], 32);                              \
+    tmp             = (__m128i) __lsx_vfadd_s((__m128) tmp, x[0]);                    \
+    tmp             = __lsx_vpickev_w(__lsx_vldi(0), tmp);                            \
+    const __m128 t0 = __lsx_vshuf4i_w(tmp, 0x88);                                     \
+    tmp             = __lsx_vsrli_d((__m128i) t0, 32);                                \
+    tmp             = (__m128i) __lsx_vfadd_s((__m128) tmp, t0);                      \
+    tmp             = __lsx_vpickev_w(__lsx_vldi(0), tmp);                            \
+    res             = (ggml_float) __lsx_vpickve2gr_w(__lsx_vshuf4i_w(tmp, 0x88), 0); \
 }
 
 #define GGML_F32_VEC        GGML_F32x4
@@ -1357,32 +1368,18 @@ struct ggml_compute_state {
     int ith;
 };
 
-struct ggml_compute_params {
-    // ith = thread index, nth = number of threads
-    int ith, nth;
-
-    // work buffer for all threads
-    size_t wsize;
-    void * wdata;
-
-    struct ggml_threadpool * threadpool;
-};
-
 //
 // fundamental operations
 //
 
 inline static void ggml_vec_set_i8(const int n, int8_t * x, const int8_t v) { for (int i = 0; i < n; ++i) x[i] = v; }
-
 inline static void ggml_vec_set_i16(const int n, int16_t * x, const int16_t v) { for (int i = 0; i < n; ++i) x[i] = v; }
 
 inline static void ggml_vec_set_i32(const int n, int32_t * x, const int32_t   v) { for (int i = 0; i < n; ++i) x[i] = v;    }
 inline static void ggml_vec_cpy_i32(const int n, int32_t * y, const int32_t * x) { for (int i = 0; i < n; ++i) y[i] = x[i]; }
 
 inline static void ggml_vec_set_f16(const int n, ggml_fp16_t * x, const int32_t v) { for (int i = 0; i < n; ++i) x[i] = v; }
-
 inline static void ggml_vec_set_bf16(const int n, ggml_bf16_t * x, const ggml_bf16_t v) { for (int i = 0; i < n; ++i) x[i] = v; }
-
 inline static void ggml_vec_add_f32 (const int n, float * z, const float * x, const float * y) { for (int i = 0; i < n; ++i) z[i]  = x[i] + y[i]; }
 inline static void ggml_vec_add1_f32(const int n, float * z, const float * x, const float   v) { for (int i = 0; i < n; ++i) z[i]  = x[i] + v;    }
 inline static void ggml_vec_acc_f32 (const int n, float * y, const float * x)                  { for (int i = 0; i < n; ++i) y[i] += x[i];        }
@@ -2277,7 +2274,7 @@ struct ggml_state {
 
 static struct ggml_state g_state = {0};
 
-static void ggml_barrier(struct ggml_threadpool * tp) {
+void ggml_barrier(struct ggml_threadpool * tp) {
     int n_threads = atomic_load_explicit(&tp->n_threads_cur, memory_order_relaxed);
     if (n_threads == 1) {
         return;
@@ -2440,6 +2437,7 @@ static void ggml_init_arm_arch_features(void) {
     uint32_t hwcap2 = getauxval(AT_HWCAP2);
 
     ggml_arm_arch_features.has_neon = !!(hwcap & HWCAP_ASIMD);
+    ggml_arm_arch_features.has_dotprod = !!(hwcap && HWCAP_ASIMDDP);
     ggml_arm_arch_features.has_i8mm = !!(hwcap2 & HWCAP2_I8MM);
     ggml_arm_arch_features.has_sve  = !!(hwcap & HWCAP_SVE);
 
@@ -2453,6 +2451,11 @@ static void ggml_init_arm_arch_features(void) {
         oldp = 0;
     }
     ggml_arm_arch_features.has_neon = oldp;
+
+    if (sysctlbyname("hw.optional.arm.FEAT_DotProd", &oldp, &size, NULL, 0) != 0) {
+        oldp = 0;
+    }
+    ggml_arm_arch_features.has_dotprod = oldp;
 
     if (sysctlbyname("hw.optional.arm.FEAT_I8MM", &oldp, &size, NULL, 0) != 0) {
         oldp = 0;
@@ -7440,6 +7443,13 @@ static void ggml_compute_forward_mul_mat(
         type = (enum ggml_type)(intptr_t)src0->extra;
     }
 
+#if defined(__AMX_INT8__) && defined(__AVX512VNNI__)
+    if (src0->buffer && ggml_backend_amx_buft_is_amx(src0->buffer->buft)) {
+        ggml_backend_amx_mul_mat(params, dst);
+        return;
+    }
+#endif
+
     enum ggml_type           const vec_dot_type         = type_traits_cpu[type].vec_dot_type;
     ggml_from_float_t        const from_float           = type_traits_cpu[vec_dot_type].from_float;
     ggml_from_float_to_mat_t const from_float_to_mat    = type_traits_cpu[vec_dot_type].from_float_to_mat;
@@ -7561,14 +7571,6 @@ UseGgmlGemm2:;
     // This is the size of the rest of the dimensions of the result
     const int64_t nr1 = ne1 * ne2 * ne3;
 
-    // dot kernels can handle 1 row and col at a time, but mmla kernels can process 2 rows and cols
-    int64_t num_rows_per_vec_dot = vec_dot_num_rows;
-    // TODO: currently the mmla kernels support only even numbered rows/cols.
-    // this check can be removed once they are extended to support odd numbered rows/cols too
-    if ((nr0 % 2 != 0) || (ne11 % 2 != 0)) {
-        num_rows_per_vec_dot = 1;
-    }
-
     // Now select a reasonable chunk size.
     int chunk_size = 16;
 
@@ -7630,6 +7632,15 @@ UseGgmlGemm2:;
 
         const int64_t ir1_start = dr1 * ith1;
         const int64_t ir1_end = MIN(ir1_start + dr1, nr1);
+
+        // dot kernels can handle 1 row and col at a time, but mmla kernels can process 2 rows and cols
+        int64_t num_rows_per_vec_dot = vec_dot_num_rows;
+
+        // these checks are needed to avoid crossing dim1 boundaries
+        // can be optimized, but the logic would become more complicated, so keeping it like this for simplicity
+        if ((nr0 % 2 != 0) || (ne11 % 2 != 0) || ((ir0_end - ir0_start) % 2 != 0) || ((ir1_end - ir1_start) % 2 != 0)) {
+            num_rows_per_vec_dot = 1;
+        }
 
         ggml_compute_forward_mul_mat_one_chunk(params, dst, type, num_rows_per_vec_dot, ir0_start, ir0_end, ir1_start, ir1_end);
 
@@ -9209,6 +9220,7 @@ static void ggml_compute_forward_clamp(
         case GGML_TYPE_Q4_0_4_4:
         case GGML_TYPE_Q4_0_4_8:
         case GGML_TYPE_Q4_0_8_8:
+        case GGML_TYPE_IQ4_NL_4_4:
         case GGML_TYPE_I8:
         case GGML_TYPE_I16:
         case GGML_TYPE_I32:
@@ -10505,6 +10517,40 @@ static void ggml_compute_forward_pad(
     }
 }
 
+// ggml_compute_forward_pad_reflect_1d
+
+static void ggml_compute_forward_pad_reflect_1d(
+        const struct ggml_compute_params * params,
+              struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src0 = dst->src[0];
+
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
+    GGML_ASSERT( dst->type == GGML_TYPE_F32);
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int32_t * opts = (const int32_t *) dst->op_params;
+    const int p0 = opts[0];
+    const int p1 = opts[1];
+
+    GGML_TENSOR_UNARY_OP_LOCALS
+
+    for (int64_t i3 = 0; i3 < ne3; i3++) {
+        for (int64_t i2 = 0; i2 < ne2; i2++) {
+            for (int64_t i1 = ith; i1 < ne1; i1 += nth) {
+                float * left  = (float *) ((char *) dst->data + i3*nb3 + i2*nb2 + i1*nb1 +         p0*nb0);
+                float * right = (float *) ((char *) dst->data + i3*nb3 + i2*nb2 + i1*nb1 + (ne0-p1-1)*nb0);
+
+                ggml_vec_cpy_f32(ne00, left, (float *) ((char *) src0->data + i3*nb03 + i2*nb02 + i1*nb01));
+
+                for (int i0 = 1; i0 <= p0; i0++) { left[-i0] = left[i0];   }
+                for (int i0 = 1; i0 <= p1; i0++) { right[i0] = right[-i0]; }
+            }
+        }
+    }
+}
 
 // ggml_compute_forward_arange
 
@@ -12601,6 +12647,10 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             {
                 ggml_compute_forward_pad(params, tensor);
             } break;
+        case GGML_OP_PAD_REFLECT_1D:
+            {
+                ggml_compute_forward_pad_reflect_1d(params, tensor);
+            } break;
         case GGML_OP_ARANGE:
             {
                 ggml_compute_forward_arange(params, tensor);
@@ -12943,6 +12993,7 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
             } break;
         case GGML_OP_UPSCALE:
         case GGML_OP_PAD:
+        case GGML_OP_PAD_REFLECT_1D:
         case GGML_OP_ARANGE:
         case GGML_OP_TIMESTEP_EMBEDDING:
         case GGML_OP_ARGSORT:
@@ -13352,10 +13403,16 @@ struct ggml_cplan ggml_graph_plan(
                 } break;
             case GGML_OP_MUL_MAT:
                 {
+#if defined(__AMX_INT8__) && defined(__AVX512VNNI__)
+                    if (node->src[0]->buffer && ggml_backend_amx_buft_is_amx(node->src[0]->buffer->buft)) {
+                        cur = ggml_backend_amx_desired_wsize(node);
+                    }
+#endif
                     const enum ggml_type vec_dot_type = type_traits_cpu[node->src[0]->type].vec_dot_type;
 
                     if (node->src[1]->type != vec_dot_type) {
-                        cur = ggml_row_size(vec_dot_type, ggml_nelements(node->src[1]));
+                        size_t cur2 = ggml_row_size(vec_dot_type, ggml_nelements(node->src[1]));
+                        cur = MAX(cur, cur2);
                     }
                 } break;
             case GGML_OP_MUL_MAT_ID:
@@ -13654,29 +13711,6 @@ static void ggml_graph_compute_kickoff(struct ggml_threadpool * threadpool, int 
 
 #endif // GGML_USE_OPENMP
 
-void ggml_threadpool_params_init(struct ggml_threadpool_params * p, int n_threads) {
-    p->n_threads  = n_threads;
-    p->prio       = 0;     // default priority (usually means normal or inherited)
-    p->poll       = 50;    // hybrid-polling enabled
-    p->strict_cpu = false; // no strict placement (all threads share same cpumask)
-    p->paused     = false; // threads are ready to go
-    memset(p->cpumask, 0, GGML_MAX_N_THREADS); // all-zero means use the default affinity (usually inherited)
-}
-
-struct ggml_threadpool_params ggml_threadpool_params_default(int n_threads) {
-    struct ggml_threadpool_params p;
-    ggml_threadpool_params_init(&p, n_threads);
-    return p;
-}
-
-bool ggml_threadpool_params_match(const struct ggml_threadpool_params * p0, const struct ggml_threadpool_params * p1) {
-    if (p0->n_threads      != p1->n_threads  )    return false;
-    if (p0->prio           != p1->prio       )    return false;
-    if (p0->poll           != p1->poll       )    return false;
-    if (p0->strict_cpu     != p1->strict_cpu )    return false;
-    return memcmp(p0->cpumask, p1->cpumask, GGML_MAX_N_THREADS) == 0;
-}
-
 static struct ggml_threadpool * ggml_threadpool_new_impl(
     struct ggml_threadpool_params * tpp,
                struct ggml_cgraph * cgraph,
@@ -13972,15 +14006,23 @@ int ggml_cpu_has_vsx(void) {
 }
 
 int ggml_cpu_has_neon(void) {
-#if defined(__ARM_ARCH)
+#if defined(__ARM_ARCH) && defined(__ARM_NEON)
     return ggml_arm_arch_features.has_neon;
 #else
     return 0;
 #endif
 }
 
+int ggml_cpu_has_dotprod(void) {
+#if defined(__ARM_ARCH) && defined(__ARM_FEATURE_DOTPROD)
+    return ggml_arm_arch_features.has_dotprod;
+#else
+    return 0;
+#endif
+}
+
 int ggml_cpu_has_sve(void) {
-#if defined(__ARM_ARCH)
+#if defined(__ARM_ARCH) && defined(__ARM_FEATURE_SVE)
     return ggml_arm_arch_features.has_sve;
 #else
     return 0;
@@ -13988,7 +14030,7 @@ int ggml_cpu_has_sve(void) {
 }
 
 int ggml_cpu_has_matmul_int8(void) {
-#if defined(__ARM_ARCH)
+#if defined(__ARM_ARCH) && defined(__ARM_FEATURE_MATMUL_INT8)
     return ggml_arm_arch_features.has_i8mm;
 #else
     return 0;
@@ -13996,7 +14038,7 @@ int ggml_cpu_has_matmul_int8(void) {
 }
 
 int ggml_cpu_get_sve_cnt(void) {
-#if defined(__ARM_ARCH)
+#if defined(__ARM_ARCH) && defined(__ARM_FEATURE_SVE)
     return ggml_arm_arch_features.sve_cnt;
 #else
     return 0;
