@@ -4,8 +4,8 @@
 #define BC 8
 #define BN 32
 #define BK 64
-#define TW 8
-#define TH 16
+#define TW 32
+#define TH 4
 #define BN_p 138
 
 __constant__ int access_f_s[2][32];
