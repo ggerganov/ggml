@@ -37,8 +37,8 @@ struct test_model {
 
 void load_model(test_model & model, bool use_gpu = false) {
     // create data
-    int KW = 3, KH = 3, IC = 256, OC = 256;
-    int IW = 832, IH = 1216, N = 1;
+    int KW = 3, KH = 3, IC = 512, OC = 512;
+    int IW = 64, IH = 96, N = 1;
 
     printf(" input: IC = %d, OC = %d, IW = %d, IH = %d \n ", IC, OC, IW, IH);
 

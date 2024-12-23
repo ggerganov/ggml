@@ -1,5 +1,5 @@
 #include "common.cuh"
-
+#include <type_traits>
 
 #define BC 8
 #define BN 32
