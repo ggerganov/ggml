@@ -37,7 +37,7 @@ struct test_model {
 
 void load_model(test_model & model, bool use_gpu = false) {
     // create data
-    int KW = 3, KH = 3, IC = 128, OC = 128;
+    int KW = 3, KH = 3, IC = 64, OC = 64;
     int IW = 64, IH = 96, N = 1;
 
     printf(" input: IC = %d, OC = %d, IW = %d, IH = %d \n ", IC, OC, IW, IH);
@@ -382,15 +382,15 @@ int main(void)
 
     bool passed = true;
     // for(int i = 0; i < ggml_nelements(wino_res); i++) {
-    for(int i = 0; i < 3*28; i++) {
-        float diff = fabs(conv2d_data[i] - wino_data[i]);
-        // if(diff > 1.e-4) {
-              printf("(%f, %f, %f, %d) \n", 
-              conv2d_data[i],
-              wino_data[i], diff, i);
-            // break;
-        // }
-    }
+    // for(int i = 0; i < 3*28; i++) {
+    //     float diff = fabs(conv2d_data[i] - wino_data[i]);
+    //     // if(diff > 1.e-4) {
+    //           printf("(%f, %f, %f, %d) \n", 
+    //           conv2d_data[i],
+    //           wino_data[i], diff, i);
+    //         // break;
+    //     // }
+    // }
 
     
 

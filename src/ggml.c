@@ -7184,7 +7184,8 @@ struct ggml_tensor * ggml_winograd_stage0(
         is_node = true;
     }
 
-    struct ggml_tensor * result = ggml_new_tensor_4d(ctx, GGML_TYPE_F32, a->ne[3], 4, 4, a->ne[2]);
+    // struct ggml_tensor * result = ggml_new_tensor_4d(ctx, GGML_TYPE_F32, a->ne[3], 4, 4, a->ne[2]);
+    struct ggml_tensor * result = ggml_new_tensor_4d(ctx, a->type, a->ne[3], 4, 4, a->ne[2]);
 
     result->op   = GGML_OP_WINOGRAD_STAGE0;
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
