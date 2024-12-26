@@ -208,6 +208,7 @@ __device__ __forceinline__ void  transform_output_tile(float * __restrict__ pOut
   } 
 }
 
+template<int TW, int TH>
 __device__ __forceinline__ unsigned int get_mask(int idd, int tiles_dim_w, int tiles_dim_h, 
          int tw, int th, int out_w, int out_h){
 
@@ -242,6 +243,7 @@ __device__ __forceinline__ unsigned int get_mask(int idd, int tiles_dim_w, int t
   return mask;
 }
 
+template<int TW, int TH>
 __device__ __forceinline__ void store_output_tile(float4 acumm_smem[][16], float *shared_mem, float * __restrict__ C, 
 int out_h, int out_w, int tiles_dim_w, int tiles_dim_h,  int tw, int th, 
 float4 *input_frag_mem, float4* filter_frag_mem){
@@ -271,8 +273,8 @@ float4 *input_frag_mem, float4* filter_frag_mem){
   int id2 = (idd2 % tw) * 2 + (idd2 / tw) * out_w * 2;
 
   // unsigned short mask1 = 0x000F;
-  unsigned int mask1 = get_mask(idd1, tiles_dim_w, tiles_dim_h, tw, th, out_w, out_h);
-  unsigned int mask2 = get_mask(idd2, tiles_dim_w, tiles_dim_h, tw, th, out_w, out_h);
+  unsigned int mask1 = get_mask<TW, TH>(idd1, tiles_dim_w, tiles_dim_h, tw, th, out_w, out_h);
+  unsigned int mask2 = get_mask<TW, TH>(idd2, tiles_dim_w, tiles_dim_h, tw, th, out_w, out_h);
   
   // output transpose step
   int t=0;
@@ -520,6 +522,7 @@ __device__ __forceinline__ void prefetch_filter_tile(const float * __restrict__ 
   }
 }
 
+template<int TW, int TH>
 __device__ __forceinline__ void prefetch_input_tile(const float * __restrict__ pInputs, float *tile, int in_h, 
                        int in_w, int tw, int th, unsigned short mask){
   
@@ -585,6 +588,7 @@ __device__  __forceinline__ void prefetch_input_frag(float4* input_frag, float4 
   *((float4*) (input_frag + 3)) = *(A_frag + frag_offset + offset2); //3=2+1
 }
 
+template<int TW, int TH>
 __global__ void Winograd_kernel(const float *A, const float *B, float *C,
                     int tiles_dim_w, int tiles_dim_h,
                     int in_c, int in_h, int in_w,
@@ -647,7 +651,7 @@ __global__ void Winograd_kernel(const float *A, const float *B, float *C,
   float4 *swap_filter;
   float4 *swap_input;
 
-  prefetch_input_tile(A, img_tile, in_h, in_w, X, Y, m);
+  prefetch_input_tile<TW, TH>(A, img_tile, in_h, in_w, X, Y, m);
   prefetch_filter_tile(B, filter_tile, filt_k);
 
   float4 *input_frag_buffer  = (float4*) (input_frag+4);
@@ -697,7 +701,7 @@ __global__ void Winograd_kernel(const float *A, const float *B, float *C,
     B += filt_k*BC*4*4;
 
     if(iter<(in_c-BC)){
-      prefetch_input_tile(A, img_tile, in_h, in_w, X, Y, m);
+      prefetch_input_tile<TW, TH>(A, img_tile, in_h, in_w, X, Y, m);
       prefetch_filter_tile(B, filter_tile, filt_k);
     }
 
@@ -705,12 +709,12 @@ __global__ void Winograd_kernel(const float *A, const float *B, float *C,
   }
 
   // Transpose, transform and store accumulated result
-  store_output_tile(accumulator, shared_mem, C, out_h, out_w, tiles_dim_w, tiles_dim_h, X, Y,
+  store_output_tile<TW, TH>(accumulator, shared_mem, C, out_h, out_w, tiles_dim_w, tiles_dim_h, X, Y,
                   input_frag_mem, filter_frag_mem);
                      
 }
 
-cudaError_t convolutionForward_32Tx64x8(float *k, int in_h, int in_w, float *w, int out_h,
+/*cudaError_t convolutionForward_32Tx64x8(float *k, int in_h, int in_w, float *w, int out_h,
                   int out_w, int out_c, float *C, float *Ww,                 
                 int tiles_dim_w, int tiles_dim_h, int tile_size,
                 int in_c, int filt_k, int filt_c, int filt_h, int filt_w, int m){
@@ -728,7 +732,7 @@ cudaError_t convolutionForward_32Tx64x8(float *k, int in_h, int in_w, float *w, 
   tiles_dim_w, tiles_dim_h, in_c, in_h, in_w, tile_size, X, Y, filt_k, filt_c, out_c, tile_2d_s, out_h, out_w);
 
   return cudaGetLastError();
-}
+}*/
 
 // }
 
@@ -760,8 +764,10 @@ static void conv_winograd_stage1_f32_f32_cuda(int tiles_dim_w, int tiles_dim_h, 
     int64_t out_h  = in_h;
     int64_t out_w  = in_w;
     int smem_size = (16*BN*BC + 16*BC*BK)*4;
+    int max_size = 65536; // 64 KB
+    cudaFuncSetAttribute(Winograd_kernel<32, 4>, cudaFuncAttributeMaxDynamicSharedMemorySize, max_size);
 
-    Winograd_kernel<<<dim3((tiles_dim_w+X-1)/X, (tiles_dim_h+Y-1)/Y, filt_k/BK), dim3(BN, 8), smem_size, stream>>>(src1, src0, dst,
+    Winograd_kernel<32, 4><<<dim3((tiles_dim_w+X-1)/X, (tiles_dim_h+Y-1)/Y, filt_k/BK), dim3(BN, 8), smem_size, stream>>>(src1, src0, dst,
                tiles_dim_w, tiles_dim_h, in_c, in_h, in_w, tile_size, X, Y, 
                filt_k, filt_c, out_c, tile_2d_s, out_h, out_w);    
 }
