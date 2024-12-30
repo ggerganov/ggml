@@ -35,12 +35,14 @@ struct test_model {
     struct ggml_context * ctx;
 };
 
-void load_model(test_model & model, bool use_gpu = false) {
-    // create data
-    int KW = 3, KH = 3, IC = 64, OC = 64;
-    int IW = 64, IH = 96, N = 1;
 
-    printf(" input: IC = %d, OC = %d, IW = %d, IH = %d \n ", IC, OC, IW, IH);
+
+void load_model(test_model & model, int ic, int oc, int iw, int ih, bool use_gpu = false ) {
+    // create data
+    int KW = 3, KH = 3, IC = ic, OC = oc;
+    int IW = iw, IH = ih, N = 1;
+
+    // printf(" input: IC = %d, OC = %d, IW = %d, IH = %d \n ", IC, OC, IW, IH);
 
     // Initialize adata
     std::vector<float> adata(KW * KH * IC * OC);
@@ -65,8 +67,8 @@ void load_model(test_model & model, bool use_gpu = false) {
         buffer_size += 1024; // overhead
     }
 
-    printf("%s: ggml tensor size    = %d bytes\n", __func__, (int) sizeof(ggml_tensor));
-    printf("%s: backend buffer size = %0.2f MB\n", __func__, (buffer_size/ 1024.f/ 1024.f));
+    // printf("%s: ggml tensor size    = %d bytes\n", __func__, (int) sizeof(ggml_tensor));
+    // printf("%s: backend buffer size = %0.2f MB\n", __func__, (buffer_size/ 1024.f/ 1024.f));
 
     int num_tensors = 2;
     struct ggml_init_params params {
@@ -78,7 +80,7 @@ void load_model(test_model & model, bool use_gpu = false) {
     // initialize the backend
 #ifdef GGML_USE_CUDA
     if (use_gpu) {
-        fprintf(stderr, "%s: using CUDA backend\n", __func__);
+        // fprintf(stderr, "%s: using CUDA backend\n", __func__);
         model.backend = ggml_backend_cuda_init(0);
         if (!model.backend) {
             fprintf(stderr, "%s: ggml_backend_cuda_init() failed\n", __func__);
@@ -220,7 +222,7 @@ struct ggml_cgraph * build_graph_1(const test_model& model) {
     return gf;
 }
 
-struct ggml_cgraph * compute_graph_0(const test_model & model, ggml_gallocr_t allocr) {
+double compute_graph_0(const test_model & model, ggml_gallocr_t allocr, int iters) {
     struct ggml_cgraph * gf = build_graph_0(model);
 
     // allocate tensors
@@ -237,7 +239,7 @@ struct ggml_cgraph * compute_graph_0(const test_model & model, ggml_gallocr_t al
     }
 #endif
 
-   int iterations = 20;
+   
 
     ggml_backend_graph_compute(model.backend, gf);
 
@@ -245,7 +247,7 @@ struct ggml_cgraph * compute_graph_0(const test_model & model, ggml_gallocr_t al
 
     int64_t start_time = ggml_time_us();
 
-    for(int iter=0; iter<iterations; iter++){
+    for(int iter=0; iter<iters; iter++){
         ggml_backend_graph_compute(model.backend, gf);
     }
 
@@ -253,16 +255,16 @@ struct ggml_cgraph * compute_graph_0(const test_model & model, ggml_gallocr_t al
     int64_t end_time = ggml_time_us();
     double time_us = end_time - start_time;
 
-    time_us = time_us/iterations;
-    printf(" Taking %f ms\n ", time_us/1000);
+    time_us = time_us/iters;
+    // printf(" Taking %f ms\n ", time_us/1000);
    
     //ggml_graph_print(gf);
 
-    return gf;
+    return time_us/1000;
 }
 
 
-struct ggml_cgraph * compute_graph_1(const test_model & model, ggml_gallocr_t allocr) {
+double compute_graph_1(const test_model & model, ggml_gallocr_t allocr, int iters) {
     struct ggml_cgraph * gf = build_graph_1(model);
 
     // allocate tensors
@@ -279,15 +281,14 @@ struct ggml_cgraph * compute_graph_1(const test_model & model, ggml_gallocr_t al
     }
 #endif
 
-   int iterations = 20;
-
+   
     ggml_backend_graph_compute(model.backend, gf);
 
     ggml_backend_synchronize(model.backend);
 
     int64_t start_time = ggml_time_us();
 
-    for(int iter=0; iter<iterations; iter++){
+    for(int iter=0; iter<iters; iter++){
         ggml_backend_graph_compute(model.backend, gf);
     }
 
@@ -295,24 +296,41 @@ struct ggml_cgraph * compute_graph_1(const test_model & model, ggml_gallocr_t al
     int64_t end_time = ggml_time_us();
     double time_us = end_time - start_time;
 
-    time_us = time_us/iterations;
-    printf(" Taking %f ms\n ", time_us/1000);  
+    time_us = time_us/iters;
+    // printf(" Taking %f ms\n ", time_us/1000);  
 
     //ggml_graph_print(gf);
 
-    return gf;
+    return time_us/1000;
 }
 
 int main(void)
 {
     ggml_time_init();
+    std::vector<std::tuple<int, int, int, int>> configs = {
+        std::make_tuple(64,64,48,64),
+        std::make_tuple(320,320,104,152),
+        std::make_tuple(640,640,52,76),
+        std::make_tuple(640,640,104,152),
+        std::make_tuple(960,320,104,152),
+        std::make_tuple(1280,1280,26,38),
+        std::make_tuple(1280,640,52,76),
+        std::make_tuple(1920,1280,26,38),
+        std::make_tuple(2560,1280,26,38),
+        std::make_tuple(512,512,104,152),
+        std::make_tuple(512,512,208,304),
+        std::make_tuple(512,256,416,608),
+        std::make_tuple(256,128,832,1216),
+        std::make_tuple(256,256,832,1216)
+    };
 
-    test_model model;
-    load_model(model, true);
+    int k = 0;
 
-    ggml_gallocr_t allocr = NULL;
+    for (auto c : configs){
+        test_model model;
+        load_model(model, std::get<0>(c), std::get<1>(c), std::get<2>(c), std::get<3>(c), true);
 
-    {
+        ggml_gallocr_t allocr = NULL;
         allocr = ggml_gallocr_new(ggml_backend_get_default_buffer_type(model.backend));
 
         //create the worst case graph for memory usage estimation
@@ -320,65 +338,81 @@ int main(void)
 
         // compute the required memory
         ggml_gallocr_reserve(allocr, gf);
-        size_t mem_size = ggml_gallocr_get_buffer_size(allocr, 0);
-        fprintf(stderr, "%s: compute buffer size: %.2f MB\n", __func__, mem_size/1024.0f/1024.0f);
-    }
+        size_t mem_size0 = ggml_gallocr_get_buffer_size(allocr, 0);
+        // fprintf(stderr, "%s: compute buffer size: %.2f MB\n", __func__, mem_size/1024.0f/1024.0f);
+       
 
-    struct ggml_cgraph * gf_res_0 = NULL;    
+        struct ggml_cgraph * gf_res_0 = NULL;    
+        int iterations = 20;
 
-    gf_res_0 = compute_graph_0(model, allocr);
+        double run_time0 = compute_graph_0(model, allocr, iterations);
 
 
-    // ggml_gallocr_t allocr = NULL;
-
-    {
+        //allocr = NULL;
+        
         allocr = ggml_gallocr_new(ggml_backend_get_default_buffer_type(model.backend));
 
         //create the worst case graph for memory usage estimation
-        struct ggml_cgraph * gf = build_graph_1(model);
+        gf = build_graph_1(model);
 
         // compute the required memory
         ggml_gallocr_reserve(allocr, gf);
-        size_t mem_size = ggml_gallocr_get_buffer_size(allocr, 0);
-        fprintf(stderr, "%s: compute buffer size: %.2f MB\n", __func__, mem_size/1024.0f/1024.0f);
-    }
+        size_t mem_size1 = ggml_gallocr_get_buffer_size(allocr, 0);
+            // fprintf(stderr, "%s: compute buffer size: %.2f MB\n", __func__, mem_size/1024.0f/1024.0f);
+        
 
-    struct ggml_cgraph * gf_res_1 = NULL;    
+        struct ggml_cgraph * gf_res_1 = NULL;    
 
-    gf_res_1 = compute_graph_1(model, allocr);
+        double run_time1 = compute_graph_1(model, allocr, iterations);
 
-    
-
-
-    
-
-    struct ggml_tensor * wino_res = NULL;
-    struct ggml_tensor * conv2d_res = NULL;
-
-    for(int i = 0; i < ggml_graph_n_nodes(gf_res_0); ++i) {
-        if(strcmp(ggml_get_name(ggml_graph_node(gf_res_0, i)), "wino_res") == 0) {
-            wino_res = ggml_graph_node(gf_res_0, i);
-        } else if(strcmp(ggml_get_name(ggml_graph_node(gf_res_0, i)), "conv2d_res") == 0) {
-            conv2d_res = ggml_graph_node(gf_res_0, i);
+        if(k==0) { 
+            k = 1;
+            fprintf(stderr, "| (IC, OC, IW, IH) | im2col TIME | im2col VRAM |  wino TIME | wino VRAM \n");
+            fprintf(stderr, "| --- | --- | --- |  --- | --- \n");
         }
+
+        fprintf(stderr, " | (%d, %d, %d, %d) | %.2f ms | %.2f MB | %.2f ms | %.2f MB\n", 
+                std::get<0>(c), std::get<1>(c), std::get<2>(c), std::get<3>(c),
+                run_time0, mem_size0/1024.0f/1024.0f,
+                run_time1, mem_size1/1024.0f/1024.0f);
+
+        ggml_free(model.ctx);
+        ggml_backend_buffer_free(model.buffer);
+        ggml_backend_free(model.backend);
+        ggml_gallocr_free(allocr);
+
     }
 
-    for(int i = 0; i < ggml_graph_n_nodes(gf_res_1); ++i) {
-        if(strcmp(ggml_get_name(ggml_graph_node(gf_res_1, i)), "wino_res") == 0) {
-            wino_res = ggml_graph_node(gf_res_1, i);
-        } else if(strcmp(ggml_get_name(ggml_graph_node(gf_res_1, i)), "conv2d_res") == 0) {
-            conv2d_res = ggml_graph_node(gf_res_1, i);
-        }
-    }
-
-    std::vector<float> wino_data(ggml_nelements(wino_res));
-    std::vector<float> conv2d_data(ggml_nelements(conv2d_res));
-
-    ggml_backend_tensor_get(wino_res, wino_data.data(), 0, ggml_nbytes(wino_res));
-    ggml_backend_tensor_get(conv2d_res, conv2d_data.data(), 0, ggml_nbytes(conv2d_res));
 
     
-    printf("\nPerforming test:\n");    
+
+    // struct ggml_tensor * wino_res = NULL;
+    // struct ggml_tensor * conv2d_res = NULL;
+
+    // for(int i = 0; i < ggml_graph_n_nodes(gf_res_0); ++i) {
+    //     if(strcmp(ggml_get_name(ggml_graph_node(gf_res_0, i)), "wino_res") == 0) {
+    //         wino_res = ggml_graph_node(gf_res_0, i);
+    //     } else if(strcmp(ggml_get_name(ggml_graph_node(gf_res_0, i)), "conv2d_res") == 0) {
+    //         conv2d_res = ggml_graph_node(gf_res_0, i);
+    //     }
+    // }
+
+    // for(int i = 0; i < ggml_graph_n_nodes(gf_res_1); ++i) {
+    //     if(strcmp(ggml_get_name(ggml_graph_node(gf_res_1, i)), "wino_res") == 0) {
+    //         wino_res = ggml_graph_node(gf_res_1, i);
+    //     } else if(strcmp(ggml_get_name(ggml_graph_node(gf_res_1, i)), "conv2d_res") == 0) {
+    //         conv2d_res = ggml_graph_node(gf_res_1, i);
+    //     }
+    // }
+
+    // std::vector<float> wino_data(ggml_nelements(wino_res));
+    // std::vector<float> conv2d_data(ggml_nelements(conv2d_res));
+
+    // ggml_backend_tensor_get(wino_res, wino_data.data(), 0, ggml_nbytes(wino_res));
+    // ggml_backend_tensor_get(conv2d_res, conv2d_data.data(), 0, ggml_nbytes(conv2d_res));
+
+    
+    // printf("\nPerforming test:\n");    
 
     bool passed = true;
     // for(int i = 0; i < ggml_nelements(wino_res); i++) {
@@ -394,10 +428,6 @@ int main(void)
 
     
 
-    ggml_free(model.ctx);
-
-    ggml_backend_buffer_free(model.buffer);
-    ggml_backend_free(model.backend);
-    ggml_gallocr_free(allocr);
+  
     return 0;
 }
