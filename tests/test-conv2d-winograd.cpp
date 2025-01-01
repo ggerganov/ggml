@@ -140,6 +140,8 @@ void load_model(test_model & model, int ic, int oc, int iw, int ih, bool use_gpu
     }
 }
 
+typedef struct ggml_cgraph* (*build_graph_t)(const test_model& model);
+
 struct ggml_cgraph * build_graph_0(const test_model& model) {
     static size_t buf_size = ggml_tensor_overhead()*GGML_DEFAULT_GRAPH_SIZE + ggml_graph_overhead();
     static std::vector<uint8_t> buf(buf_size);
@@ -222,8 +224,13 @@ struct ggml_cgraph * build_graph_1(const test_model& model) {
     return gf;
 }
 
-double compute_graph_0(const test_model & model, ggml_gallocr_t allocr, int iters) {
-    struct ggml_cgraph * gf = build_graph_0(model);
+
+
+
+std::vector<float> compute_graph(const test_model & model, ggml_gallocr_t allocr,
+            build_graph_t build_graph, int iters, double *t) {
+    struct ggml_cgraph * gf = build_graph(model);
+
 
     // allocate tensors
     ggml_gallocr_alloc_graph(allocr, gf);
@@ -260,49 +267,24 @@ double compute_graph_0(const test_model & model, ggml_gallocr_t allocr, int iter
    
     //ggml_graph_print(gf);
 
-    return time_us/1000;
+    struct ggml_tensor *res = NULL;
+
+    for(int i = 0; i < ggml_graph_n_nodes(gf); ++i) {
+        if(strcmp(ggml_get_name(ggml_graph_node(gf, i)), "wino_res") == 0) {
+            res = ggml_graph_node(gf, i);
+        } else if(strcmp(ggml_get_name(ggml_graph_node(gf, i)), "conv2d_res") == 0) {
+            res = ggml_graph_node(gf, i);
+        }
+    }
+
+    std::vector<float> data(ggml_nelements(res));
+    ggml_backend_tensor_get(res, data.data(), 0, ggml_nbytes(res));
+
+    *t = time_us/1000;
+    return data;
+
 }
 
-
-double compute_graph_1(const test_model & model, ggml_gallocr_t allocr, int iters) {
-    struct ggml_cgraph * gf = build_graph_1(model);
-
-    // allocate tensors
-    ggml_gallocr_alloc_graph(allocr, gf);
-    int n_threads = 1;
-
-    if (ggml_backend_is_cpu(model.backend)) {
-        ggml_backend_cpu_set_n_threads(model.backend, n_threads);
-    }
-
-#ifdef GGML_USE_METAL
-    if (ggml_backend_is_metal(model.backend)) {
-        ggml_backend_metal_set_n_cb(model.backend, n_threads);
-    }
-#endif
-
-   
-    ggml_backend_graph_compute(model.backend, gf);
-
-    ggml_backend_synchronize(model.backend);
-
-    int64_t start_time = ggml_time_us();
-
-    for(int iter=0; iter<iters; iter++){
-        ggml_backend_graph_compute(model.backend, gf);
-    }
-
-    ggml_backend_synchronize(model.backend);
-    int64_t end_time = ggml_time_us();
-    double time_us = end_time - start_time;
-
-    time_us = time_us/iters;
-    // printf(" Taking %f ms\n ", time_us/1000);  
-
-    //ggml_graph_print(gf);
-
-    return time_us/1000;
-}
 
 int main(void)
 {
@@ -345,7 +327,8 @@ int main(void)
         struct ggml_cgraph * gf_res_0 = NULL;    
         int iterations = 20;
 
-        double run_time0 = compute_graph_0(model, allocr, iterations);
+        double run_time0;
+        std::vector<float> conv2d_data = compute_graph(model, allocr, build_graph_0, iterations, &run_time0);
 
 
         //allocr = NULL;
@@ -363,11 +346,12 @@ int main(void)
 
         struct ggml_cgraph * gf_res_1 = NULL;    
 
-        double run_time1 = compute_graph_1(model, allocr, iterations);
+        double run_time1;
+        std::vector<float> wino_data = compute_graph(model, allocr, build_graph_1, iterations, &run_time1);
 
         if(k==0) { 
             k = 1;
-            fprintf(stderr, "| (IC, OC, IW, IH) | im2col TIME | im2col VRAM |  wino TIME | wino VRAM \n");
+            fprintf(stderr, "| (IC, OC, IW, IH) | im2col+GEMM TIME | im2col+GEMM VRAM |  Winograd TIME | Winograd VRAM \n");
             fprintf(stderr, "| --- | --- | --- |  --- | --- \n");
         }
 
@@ -376,6 +360,18 @@ int main(void)
                 run_time0, mem_size0/1024.0f/1024.0f,
                 run_time1, mem_size1/1024.0f/1024.0f);
 
+
+        // for(int i = 0; i < ggml_nelements(wino_res); i++) {
+        // for(int i = 0; i < 3*28; i++) {
+        //     float diff = fabs(conv2d_data[i] - wino_data[i]);
+        //     // if(diff > 1.e-4) {
+        //           printf("(%f, %f, %f, %d) \n",
+        //           conv2d_data[i],
+        //           wino_data[i], diff, i);
+        //         // break;
+        //     // }
+        // }
+
         ggml_free(model.ctx);
         ggml_backend_buffer_free(model.buffer);
         ggml_backend_free(model.backend);
@@ -383,51 +379,8 @@ int main(void)
 
     }
 
-
-    
-
-    // struct ggml_tensor * wino_res = NULL;
-    // struct ggml_tensor * conv2d_res = NULL;
-
-    // for(int i = 0; i < ggml_graph_n_nodes(gf_res_0); ++i) {
-    //     if(strcmp(ggml_get_name(ggml_graph_node(gf_res_0, i)), "wino_res") == 0) {
-    //         wino_res = ggml_graph_node(gf_res_0, i);
-    //     } else if(strcmp(ggml_get_name(ggml_graph_node(gf_res_0, i)), "conv2d_res") == 0) {
-    //         conv2d_res = ggml_graph_node(gf_res_0, i);
-    //     }
-    // }
-
-    // for(int i = 0; i < ggml_graph_n_nodes(gf_res_1); ++i) {
-    //     if(strcmp(ggml_get_name(ggml_graph_node(gf_res_1, i)), "wino_res") == 0) {
-    //         wino_res = ggml_graph_node(gf_res_1, i);
-    //     } else if(strcmp(ggml_get_name(ggml_graph_node(gf_res_1, i)), "conv2d_res") == 0) {
-    //         conv2d_res = ggml_graph_node(gf_res_1, i);
-    //     }
-    // }
-
-    // std::vector<float> wino_data(ggml_nelements(wino_res));
-    // std::vector<float> conv2d_data(ggml_nelements(conv2d_res));
-
-    // ggml_backend_tensor_get(wino_res, wino_data.data(), 0, ggml_nbytes(wino_res));
-    // ggml_backend_tensor_get(conv2d_res, conv2d_data.data(), 0, ggml_nbytes(conv2d_res));
-
     
     // printf("\nPerforming test:\n");    
-
-    bool passed = true;
-    // for(int i = 0; i < ggml_nelements(wino_res); i++) {
-    // for(int i = 0; i < 3*28; i++) {
-    //     float diff = fabs(conv2d_data[i] - wino_data[i]);
-    //     // if(diff > 1.e-4) {
-    //           printf("(%f, %f, %f, %d) \n", 
-    //           conv2d_data[i],
-    //           wino_data[i], diff, i);
-    //         // break;
-    //     // }
-    // }
-
-    
-
   
     return 0;
 }
