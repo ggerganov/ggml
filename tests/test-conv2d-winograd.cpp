@@ -303,7 +303,8 @@ int main(void)
         std::make_tuple(512,512,208,304),
         std::make_tuple(512,256,416,608),
         std::make_tuple(256,128,832,1216),
-        std::make_tuple(256,256,832,1216)
+        std::make_tuple(256,256,832,1216),
+        std::make_tuple(320,256,1024,1920)
     };
 
     int k = 0;
@@ -330,8 +331,9 @@ int main(void)
         double run_time0;
         std::vector<float> conv2d_data = compute_graph(model, allocr, build_graph_0, iterations, &run_time0);
 
+        ggml_gallocr_free(allocr);
 
-        //allocr = NULL;
+        allocr = NULL;
         
         allocr = ggml_gallocr_new(ggml_backend_get_default_buffer_type(model.backend));
 
