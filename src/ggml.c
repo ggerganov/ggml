@@ -6841,6 +6841,11 @@ struct gguf_context * gguf_init_from_file_impl(FILE * file, struct gguf_init_par
                 info->ne[j] = 1;
             }
 
+            if (strlen(info->name.data) > GGML_MAX_NAME - 1) {
+                fprintf(stderr, "%s: tensor name '%s' is too long (maximum length: %d characters)\n", __func__, info->name.data, GGML_MAX_NAME - 1);
+                ok = false;
+            }
+            
             ok = ok && gguf_fread_str(file, &info->name,                          &offset);
             ok = ok && gguf_fread_el (file, &info->n_dims, sizeof(info->n_dims),  &offset);
 
