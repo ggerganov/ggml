@@ -86,6 +86,7 @@ while read c; do
         ggml/src/ggml-sycl/* \
         ggml/src/ggml-vulkan/* \
         ggml/include/ggml*.h \
+        ggml/include/gguf*.h \
         tests/test-opt.cpp \
         tests/test-quantize-fns.cpp \
         tests/test-quantize-perf.cpp \
