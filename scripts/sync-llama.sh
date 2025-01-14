@@ -7,6 +7,7 @@ cp -rpv ../llama.cpp/ggml/cmake/FindSIMD.cmake cmake/FindSIMD.cmake
 cp -rpv ../llama.cpp/ggml/src/ggml*.c          src/
 cp -rpv ../llama.cpp/ggml/src/ggml*.cpp        src/
 cp -rpv ../llama.cpp/ggml/src/ggml*.h          src/
+cp -rpv ../llama.cpp/ggml/src/gguf*.cpp        src/
 cp -rpv ../llama.cpp/ggml/src/ggml-blas/*      src/ggml-blas/
 cp -rpv ../llama.cpp/ggml/src/ggml-cann/*      src/ggml-cann/
 cp -rpv ../llama.cpp/ggml/src/ggml-cpu/*       src/ggml-cpu/
@@ -21,6 +22,7 @@ cp -rpv ../llama.cpp/ggml/src/ggml-sycl/*      src/ggml-sycl/
 cp -rpv ../llama.cpp/ggml/src/ggml-vulkan/*    src/ggml-vulkan/
 
 cp -rpv ../llama.cpp/ggml/include/ggml*.h include/
+cp -rpv ../llama.cpp/ggml/include/gguf*.h include/
 
 cp -rpv ../llama.cpp/tests/test-opt.cpp           tests/test-opt.cpp
 cp -rpv ../llama.cpp/tests/test-quantize-fns.cpp  tests/test-quantize-fns.cpp
