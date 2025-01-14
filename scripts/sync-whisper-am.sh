@@ -59,6 +59,7 @@ while read c; do
         ggml/src/ggml*.h \
         ggml/src/ggml*.c \
         ggml/src/ggml*.cpp \
+        ggml/src/gguf*.cpp \
         ggml/src/ggml-blas/* \
         ggml/src/ggml-cann/* \
         ggml/src/ggml-cpu/* \
@@ -72,6 +73,7 @@ while read c; do
         ggml/src/ggml-sycl/* \
         ggml/src/ggml-vulkan/* \
         ggml/include/ggml*.h \
+        ggml/include/gguf*.h \
         examples/common.h \
         examples/common.cpp \
         examples/common-ggml.h \
@@ -110,6 +112,7 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
     # ggml/src/ggml*.c          -> src/ggml*.c
     # ggml/src/ggml*.cpp        -> src/ggml*.cpp
     # ggml/src/ggml*.h          -> src/ggml*.h
+    # ggml/src/gguf*.cpp        -> src/gguf*.cpp
     # ggml/src/ggml-blas/*      -> src/ggml-blas/*
     # ggml/src/ggml-cann/*      -> src/ggml-cann/*
     # ggml/src/ggml-cpu/*       -> src/ggml-cpu/*
@@ -124,6 +127,7 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
     # ggml/src/ggml-vulkan/*    -> src/ggml-vulkan/*
     #
     # ggml/include/ggml*.h -> include/ggml*.h
+    # ggml/include/gguf*.h -> include/gguf*.h
     #
     # examples/common.h        -> examples/common.h
     # examples/common.cpp      -> examples/common.cpp
@@ -140,6 +144,7 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
         -e 's/\/ggml\/src\/ggml(.*)\.c/\/src\/ggml\1.c/g' \
         -e 's/\/ggml\/src\/ggml(.*)\.cpp/\/src\/ggml\1.cpp/g' \
         -e 's/\/ggml\/src\/ggml(.*)\.h/\/src\/ggml\1.h/g' \
+        -e 's/\/ggml\/src\/gguf(.*)\.cpp/\/src\/gguf\1.cpp/g' \
         -e 's/\/ggml\/src\/ggml-blas\//\/src\/ggml-blas\//g' \
         -e 's/\/ggml\/src\/ggml-cann\//\/src\/ggml-cann\//g' \
         -e 's/\/ggml\/src\/ggml-cpu\//\/src\/ggml-cpu\//g' \
@@ -153,6 +158,7 @@ if [ -f $SRC_GGML/whisper-src.patch ]; then
         -e 's/\/ggml\/src\/ggml-sycl\//\/src\/ggml-sycl\//g' \
         -e 's/\/ggml\/src\/ggml-vulkan\//\/src\/ggml-vulkan\//g' \
         -e 's/\/ggml\/include\/ggml(.*)\.h/\/include\/ggml\1.h/g' \
+        -e 's/\/ggml\/include\/gguf(.*)\.h/\/include\/gguf\1.h/g' \
         -e 's/\/examples\/common\.h/\/examples\/common.h/g' \
         -e 's/\/examples\/common\.cpp/\/examples\/common.cpp/g' \
         -e 's/\/examples\/common-ggml\.h/\/examples\/common-ggml.h/g' \
