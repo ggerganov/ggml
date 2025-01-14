@@ -80,6 +80,7 @@ while read c; do
         ggml/src/ggml-kompute/* \
         ggml/src/ggml-metal/* \
         ggml/src/ggml-musa/* \
+        ggml/src/ggml-opencl/* \
         ggml/src/ggml-rpc/* \
         ggml/src/ggml-sycl/* \
         ggml/src/ggml-vulkan/* \
@@ -129,6 +130,7 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
     # ggml/src/ggml-kompute/*   -> src/ggml-kompute/*
     # ggml/src/ggml-metal/*     -> src/ggml-metal/*
     # ggml/src/ggml-musa/*      -> src/ggml-musa/*
+    # ggml/src/ggml-opencl/*    -> src/ggml-opencl/*
     # ggml/src/ggml-rpc/*       -> src/ggml-rpc/*
     # ggml/src/ggml-sycl/*      -> src/ggml-sycl/*
     # ggml/src/ggml-vulkan/*    -> src/ggml-vulkan/*
@@ -157,6 +159,7 @@ if [ -f $SRC_GGML/llama-src.patch ]; then
         -e 's/\/ggml\/src\/ggml-kompute\//\/src\/ggml-kompute\//g' \
         -e 's/\/ggml\/src\/ggml-metal\//\/src\/ggml-metal\//g' \
         -e 's/\/ggml\/src\/ggml-musa\//\/src\/ggml-musa\//g' \
+        -e 's/\/ggml\/src\/ggml-opencl\//\/src\/ggml-opencl\//g' \
         -e 's/\/ggml\/src\/ggml-rpc\//\/src\/ggml-rpc\//g' \
         -e 's/\/ggml\/src\/ggml-sycl\//\/src\/ggml-sycl\//g' \
         -e 's/\/ggml\/src\/ggml-vulkan\//\/src\/ggml-vulkan\//g' \

@@ -15,6 +15,7 @@ cp -rpv ../llama.cpp/ggml/src/ggml-hip/*       src/ggml-hip/
 cp -rpv ../llama.cpp/ggml/src/ggml-kompute/*   src/ggml-kompute/
 cp -rpv ../llama.cpp/ggml/src/ggml-metal/*     src/ggml-metal/
 cp -rpv ../llama.cpp/ggml/src/ggml-musa/*      src/ggml-musa/
+cp -rpv ../llama.cpp/ggml/src/ggml-opencl/*    src/ggml-opencl/
 cp -rpv ../llama.cpp/ggml/src/ggml-rpc/*       src/ggml-rpc/
 cp -rpv ../llama.cpp/ggml/src/ggml-sycl/*      src/ggml-sycl/
 cp -rpv ../llama.cpp/ggml/src/ggml-vulkan/*    src/ggml-vulkan/

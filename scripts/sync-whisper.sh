@@ -15,6 +15,7 @@ cp -rpv ../whisper.cpp/ggml/src/ggml-hip/*       src/ggml-hip/
 cp -rpv ../whisper.cpp/ggml/src/ggml-kompute/*   src/ggml-kompute/
 cp -rpv ../whisper.cpp/ggml/src/ggml-metal/*     src/ggml-metal/
 cp -rpv ../whisper.cpp/ggml/src/ggml-musa/*      src/ggml-musa/
+cp -rpv ../whisper.cpp/ggml/src/ggml-opencl/*    src/ggml-opencl/
 cp -rpv ../whisper.cpp/ggml/src/ggml-rpc/*       src/ggml-rpc/
 cp -rpv ../whisper.cpp/ggml/src/ggml-sycl/*      src/ggml-sycl/
 cp -rpv ../whisper.cpp/ggml/src/ggml-vulkan/*    src/ggml-vulkan/
