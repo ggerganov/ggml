@@ -54,6 +54,7 @@ static void ggml_backend_amx_buffer_init_tensor(ggml_backend_buffer_t buffer, st
     tensor->extra = (void *) ggml::cpu::amx::get_tensor_traits(buffer, tensor);
 
     GGML_UNUSED(buffer);
+    return GGML_STATUS_SUCCESS;
 }
 
 static void ggml_backend_amx_buffer_memset_tensor(ggml_backend_buffer_t buffer, struct ggml_tensor * tensor,

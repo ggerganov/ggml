@@ -76,7 +76,7 @@ int main(int /*argc*/, const char** /*argv*/) {
             ggml_backend_cpu_set_n_threads(backend, n_threads);
         }
 
-        ggml_backend_graph_compute(backend, graph);
+        GGML_ASSERT(ggml_backend_graph_compute(backend, graph) == GGML_STATUS_SUCCESS);
 
         float * output = new float[ggml_nelements(t)];
         ggml_backend_tensor_get(t, output, 0, ggml_nbytes(t));

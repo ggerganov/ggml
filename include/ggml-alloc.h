@@ -53,8 +53,8 @@ GGML_API void           ggml_gallocr_free(ggml_gallocr_t galloc);
 // call with a worst-case graph to avoid buffer reallocations
 // not strictly required for single buffer usage: ggml_gallocr_alloc_graph will reallocate the buffers automatically if needed
 // returns false if the buffer allocation failed
-GGML_API bool ggml_gallocr_reserve(ggml_gallocr_t galloc, struct ggml_cgraph * graph);
-GGML_API bool ggml_gallocr_reserve_n(
+GGML_API enum ggml_status ggml_gallocr_reserve(ggml_gallocr_t galloc, struct ggml_cgraph * graph);
+GGML_API enum ggml_status ggml_gallocr_reserve_n(
     ggml_gallocr_t galloc,
     struct ggml_cgraph * graph,
     const int * node_buffer_ids,

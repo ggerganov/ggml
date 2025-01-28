@@ -39,8 +39,14 @@ ggml_backend_buffer_t ggml_backend_buft_alloc_buffer(ggml_backend_buffer_type_t 
         // return a dummy buffer for zero-sized allocations
         return ggml_backend_buffer_init(buft, {}, NULL, 0);
     }
-
-    return buft->iface.alloc_buffer(buft, size);
+    ggml_backend_buffer_t b = NULL;
+    try {
+      b = buft->iface.alloc_buffer(buft, size);
+    }  catch (const std::exception &e) {
+        GGML_LOG_ERROR("%s: iface.alloc_buffer failed: %s \n", __func__, e.what());
+        return NULL;
+    }
+    return b;
 }
 
 size_t ggml_backend_buft_get_alignment(ggml_backend_buffer_type_t buft) {
@@ -172,6 +178,7 @@ enum ggml_backend_buffer_usage ggml_backend_buffer_get_usage(ggml_backend_buffer
 }
 
 ggml_backend_buffer_type_t ggml_backend_buffer_get_type(ggml_backend_buffer_t buffer) {
+    assert(buffer);
     return buffer->buft;
 }
 
@@ -329,7 +336,16 @@ enum ggml_status ggml_backend_graph_compute(ggml_backend_t backend, struct ggml_
 }
 
 enum ggml_status ggml_backend_graph_compute_async(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
-    return backend->iface.graph_compute(backend, cgraph);
+    ggml_status s;
+    try {
+        s = backend->iface.graph_compute(backend, cgraph);
+    } catch(std::bad_alloc &e) {
+        return GGML_STATUS_ALLOC_FAILED;
+    }  catch (std::exception &e) {
+        GGML_LOG_INFO("%s: graph_compute threw: %s", __func__, e.what());
+        return  GGML_STATUS_FAILED;
+    }
+    return s;
 }
 
 bool ggml_backend_supports_op(ggml_backend_t backend, const struct ggml_tensor * op) {

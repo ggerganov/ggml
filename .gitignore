@@ -1,4 +1,6 @@
 build/
+release/
+debug/
 build-*/
 out/
 tmp/
