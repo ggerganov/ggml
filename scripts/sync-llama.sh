@@ -2,7 +2,7 @@
 
 cp -rpv ../llama.cpp/ggml/CMakeLists.txt       CMakeLists.txt
 cp -rpv ../llama.cpp/ggml/src/CMakeLists.txt   src/CMakeLists.txt
-cp -rpv ../llama.cpp/ggml/cmake/FindSIMD.cmake cmake/FindSIMD.cmake
+cp -rpv ../llama.cpp/ggml/cmake/*              cmake/
 
 cp -rpv ../llama.cpp/ggml/src/ggml*.c          src/
 cp -rpv ../llama.cpp/ggml/src/ggml*.cpp        src/
