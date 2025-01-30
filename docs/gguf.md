@@ -268,7 +268,7 @@ struct gguf_header_t {
 };
 
 uint64_t align_offset(uint64_t offset) {
-    return offset + (ALIGNMENT - (offset % ALIGNMENT)) % ALIGNMENT;
+    return offset + ALIGNMENT - offset % ALIGNMENT;
 }
 
 struct gguf_tensor_info_t {
