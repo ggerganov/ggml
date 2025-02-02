@@ -110,7 +110,8 @@ option(GGML_AVX512_VBMI      "ggml: enable AVX512-VBMI"      OFF)
 option(GGML_AVX512_VNNI      "ggml: enable AVX512-VNNI"      OFF)
 option(GGML_AVX512_BF16      "ggml: enable AVX512-BF16"      OFF)
 if (NOT MSVC)
-    # in MSVC F16C and FMA is implied with AVX2/AVX512
+    # in MSVC SSE42, F16C and FMA are implied with AVX2/AVX512
+    option(GGML_SSE42        "ggml: enable SSE4.2"           ${INS_ENB})
     option(GGML_FMA          "ggml: enable FMA"              ${INS_ENB})
     option(GGML_F16C         "ggml: enable F16C"             ${INS_ENB})
     # MSVC does not seem to support AMX
