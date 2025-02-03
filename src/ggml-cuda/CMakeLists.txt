@@ -96,7 +96,7 @@ if (CUDAToolkit_FOUND)
 
     set(CUDA_CXX_FLAGS "")
 
-    set(CUDA_FLAGS -use_fast_math)
+    set(CUDA_FLAGS -use_fast_math --threads=0 --split-compile=0)
 
     if (GGML_FATAL_WARNINGS)
         list(APPEND CUDA_FLAGS -Werror all-warnings)
