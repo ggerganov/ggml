@@ -3601,44 +3601,32 @@ static block_q4_0x4 make_block_q4_0x4(block_q4_0 * in, unsigned int blck_size_in
     }
 
     const int end = QK4_0 * 2 / blck_size_interleave;
-    const size_t qs_size = sizeof(out.qs);
+    constexpr size_t qs_size = QK4_0 * 2;  // Size of output qs array
 
     if (blck_size_interleave == 8) {
         const uint64_t xor_mask = 0x8888888888888888ULL;
-        for (int i = 0; i < end; ++i) {
+        for (int i = 0; i < end && (i + 1) * blck_size_interleave <= qs_size; ++i) {
             int src_id = i % 4;
             int src_offset = (i / 4) * blck_size_interleave;
             int dst_offset = i * blck_size_interleave;
 
-            // Bounds checking
-            if (dst_offset + sizeof(uint64_t) <= qs_size &&
-                src_offset + sizeof(uint64_t) <= sizeof(in[src_id].qs)) {
-                uint64_t elems;
-                // Using memcpy to avoid unaligned memory accesses
-                memcpy(&elems, &in[src_id].qs[src_offset], sizeof(uint64_t));
-                elems ^= xor_mask;
-                memcpy(&out.qs[dst_offset], &elems, sizeof(uint64_t));
-            } else {
-                GGML_ASSERT(false && "buffer overflow prevented in make_block_q4_0x4");
-            }
+            uint64_t elems;
+            // Using memcpy to avoid unaligned memory accesses
+            memcpy(&elems, &in[src_id].qs[src_offset], sizeof(uint64_t));
+            elems ^= xor_mask;
+            memcpy(&out.qs[dst_offset], &elems, sizeof(uint64_t));
         }
     } else if (blck_size_interleave == 4) {
         const uint32_t xor_mask = 0x88888888;
-        for (int i = 0; i < end; ++i) {
+        for (int i = 0; i < end && (i + 1) * blck_size_interleave <= qs_size; ++i) {
             int src_id = i % 4;
             int src_offset = (i / 4) * blck_size_interleave;
             int dst_offset = i * blck_size_interleave;
 
-            // Bounds checking
-            if (dst_offset + sizeof(uint32_t) <= qs_size &&
-                src_offset + sizeof(uint32_t) <= sizeof(in[src_id].qs)) {
-                uint32_t elems;
-                memcpy(&elems, &in[src_id].qs[src_offset], sizeof(uint32_t));
-                elems ^= xor_mask;
-                memcpy(&out.qs[dst_offset], &elems, sizeof(uint32_t));
-            } else {
-                GGML_ASSERT(false && "buffer overflow prevented in make_block_q4_0x4");
-            }
+            uint32_t elems;
+            memcpy(&elems, &in[src_id].qs[src_offset], sizeof(uint32_t));
+            elems ^= xor_mask;
+            memcpy(&out.qs[dst_offset], &elems, sizeof(uint32_t));
         }
     } else {
         GGML_ASSERT(false && "invalid block size interleave value");
