@@ -5130,6 +5130,65 @@ struct ggml_tensor * ggml_opt_step_adamw(
     return result;
 }
 
+// ggml_fft
+
+static struct ggml_tensor * ggml_fft_impl(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a,
+        bool                  inplace) {
+    GGML_ASSERT(ggml_is_vector(a));
+    bool is_node = false;
+
+    // Instead of checking a->grad directly, we should check if the tensor
+    // is part of a computation graph and has gradients enabled
+    if (!inplace && (a->flags & GGML_TENSOR_FLAG_PARAM)) {
+        is_node = true;
+    }
+
+    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
+
+    // Set the operation type directly
+    result->op = GGML_OP_FFT;
+    // Initialize op params if needed
+    ggml_set_op_params(result, NULL, 0);
+
+    // Instead of setting grad directly, we should mark the tensor as requiring gradients
+    if (is_node) {
+        result->flags |= GGML_TENSOR_FLAG_PARAM;
+    }
+    result->src[0] = a;
+
+    return result;
+}
+
+struct ggml_tensor * ggml_fft(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a) {
+    return ggml_fft_impl(ctx, a, false);
+}
+
+// ggml_ifft
+
+struct ggml_tensor * ggml_ifft(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a) {
+    GGML_ASSERT(ggml_is_vector(a));
+    struct ggml_tensor * result = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, a->ne[0]/2);
+
+    // Set the operation type directly
+    result->op = GGML_OP_IFFT;
+    // Initialize op params if needed
+    ggml_set_op_params(result, NULL, 0);
+
+    // Instead of checking a->grad directly, check if input tensor requires gradients
+    if (a->flags & GGML_TENSOR_FLAG_PARAM) {
+        // Mark the result tensor as requiring gradients
+        result->flags |= GGML_TENSOR_FLAG_PARAM;
+    }
+    result->src[0] = a;
+    return result;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 struct ggml_hash_set ggml_hash_set_new(size_t size) {

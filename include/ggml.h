@@ -521,6 +521,9 @@ extern "C" {
         GGML_OP_OPT_STEP_ADAMW,
 
         GGML_OP_COUNT,
+
+        GGML_OP_FFT,       // Fast Fourier Transform
+        GGML_OP_IFFT,      // Inverse Fast Fourier Transform
     };
 
     enum ggml_unary_op {
@@ -1774,6 +1777,15 @@ extern "C" {
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
             int                   k);
+
+    // Fast Fourier Transform operations
+    GGML_API struct ggml_tensor * ggml_fft(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+    GGML_API struct ggml_tensor * ggml_ifft(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
 
 #define GGML_KQ_MASK_PAD 32
 
