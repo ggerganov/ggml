@@ -4018,9 +4018,10 @@ static void ggml_compute_forward_dup_q(
     }
 }
 
-static size_t ggml_compute_forward_dup(size_t continuation, 
+static size_t ggml_compute_forward_dup(size_t continuation,
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -4464,6 +4465,7 @@ static void ggml_compute_forward_add_q_f32(
 static size_t ggml_compute_forward_add(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
     const struct ggml_tensor * src1 = dst->src[1];
@@ -4846,6 +4848,7 @@ static void ggml_compute_forward_add1_bf16_bf16(
 static size_t ggml_compute_forward_add1(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
     const struct ggml_tensor * src1 = dst->src[1];
@@ -4935,12 +4938,12 @@ static size_t ggml_compute_forward_acc_f32(size_t continuation,
         bool   inplace = (bool) ((int32_t *) dst->op_params)[4];
         if (!inplace) {
             size_t total = ggml_nbytes(dst);
-            size_t offset = (total + params->nth - 1) / params->nth;
-            size_t start = params->ith * offset;
+            size_t stride = (total + params->nth - 1) / params->nth;
+            size_t start = params->ith * stride;
             if (total > start)
             {
                 size_t rest = total - start;
-                size_t bytes = rest < offset ? rest : offset;
+                size_t bytes = rest < stride ? rest : stride;
                 char* dstp = ((char*)dst->data) + start;
                 char* srcp = ((char*)src0->data) + start;
                 // memcpy needs to be synchronized across threads to avoid race conditions.
@@ -5125,6 +5128,7 @@ static void ggml_compute_forward_sub_f32(
 static size_t  ggml_compute_forward_sub(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -5217,6 +5221,7 @@ static void ggml_compute_forward_mul_f32(
 static size_t ggml_compute_forward_mul(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
     const struct ggml_tensor * src1 = dst->src[1];
@@ -5312,6 +5317,7 @@ static void ggml_compute_forward_div_f32(
 static size_t ggml_compute_forward_div(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -5358,6 +5364,7 @@ static void ggml_compute_forward_sqr_f32(
 static size_t ggml_compute_forward_sqr(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -5404,6 +5411,7 @@ static void ggml_compute_forward_sqrt_f32(
 static size_t ggml_compute_forward_sqrt(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -5450,6 +5458,7 @@ static void ggml_compute_forward_log_f32(
 static size_t ggml_compute_forward_log(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -5496,6 +5505,7 @@ static void ggml_compute_forward_sin_f32(
 static size_t ggml_compute_forward_sin(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -5542,6 +5552,7 @@ static void ggml_compute_forward_cos_f32(
 static size_t ggml_compute_forward_cos(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -5661,6 +5672,7 @@ static void ggml_compute_forward_sum_bf16(
 static size_t ggml_compute_forward_sum(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -5723,6 +5735,7 @@ static void ggml_compute_forward_sum_rows_f32(
 static size_t ggml_compute_forward_sum_rows(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -5781,6 +5794,7 @@ static void ggml_compute_forward_mean_f32(
 static size_t ggml_compute_forward_mean(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -5830,6 +5844,7 @@ static void ggml_compute_forward_argmax_f32(
 static size_t ggml_compute_forward_argmax(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -6026,6 +6041,7 @@ static void ggml_compute_forward_repeat_f16(
 static size_t ggml_compute_forward_repeat(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -6112,6 +6128,7 @@ static void ggml_compute_forward_repeat_back_f32(
 static size_t ggml_compute_forward_repeat_back(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -6176,6 +6193,7 @@ static void ggml_compute_forward_concat_f32(
 static size_t ggml_compute_forward_concat(size_t continuation, 
     const struct ggml_compute_params * params,
     struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -6756,6 +6774,7 @@ static void ggml_compute_forward_leaky_relu_f32(
 static size_t ggml_compute_forward_leaky_relu(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -6820,6 +6839,7 @@ static void ggml_compute_forward_silu_back_f32(
 static size_t ggml_compute_forward_silu_back(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -7019,6 +7039,7 @@ static void ggml_compute_forward_norm_f32(
 static size_t ggml_compute_forward_norm(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -7088,6 +7109,7 @@ static void ggml_compute_forward_rms_norm_f32(
 static size_t ggml_compute_forward_rms_norm(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -7264,6 +7286,7 @@ static void ggml_compute_forward_rms_norm_back_f32(
 static size_t ggml_compute_forward_rms_norm_back(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -7360,6 +7383,7 @@ static void ggml_compute_forward_group_norm_f32(
 static size_t ggml_compute_forward_group_norm(size_t continuation, 
     const struct ggml_compute_params * params,
     struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -8155,6 +8179,7 @@ static void ggml_compute_forward_scale_f32(
 static size_t ggml_compute_forward_scale(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -8189,23 +8214,26 @@ static size_t ggml_compute_forward_set_f32(size_t continuation,
     size_t nb2     = ((int32_t *) dst->op_params)[1];
     size_t nb3     = ((int32_t *) dst->op_params)[2];
     size_t offset  = ((int32_t *) dst->op_params)[3];
-    bool   inplace = (bool) ((int32_t *) dst->op_params)[4];
 
     if (continuation == 0) { //first call though this op
-        size_t total = ggml_nbytes(dst);
-        size_t offset = (total + params->nth - 1) / params->nth;
-        size_t start = params->ith * offset;
-        if (total > start)
+        bool inplace = (bool) ((int32_t *) dst->op_params)[4];
+        if (inplace)
         {
-            size_t rest = total - start;
-            size_t bytes = rest < offset ? rest : offset;
-            char* dstp = ((char*)dst->data) + start;
-            char* srcp = ((char*)src0->data) + start;
-            // memcpy needs to be synchronized across threads to avoid race conditions.
-            // => do it in INIT phase
-            memcpy(dstp, srcp, bytes);
+            size_t total = ggml_nbytes(dst);
+            size_t stride = (total + params->nth - 1) / params->nth;
+            size_t start = params->ith * stride;
+            if (total > start)
+            {
+                size_t rest = total - start;
+                size_t bytes = rest < stride ? rest : stride;
+                char* dstp = ((char*)dst->data) + start;
+                char* srcp = ((char*)src0->data) + start;
+                // memcpy needs to be synchronized across threads to avoid race conditions.
+                // => do it in INIT phase
+                memcpy(dstp, srcp, bytes);
+            }
+            return 1; //sync all threads and recall with (continuation == 1) at the root
         }
-        return 1; //sync all threads and recall with (continuation == 1) at the root
     }
 
     const int ith = params->ith;
@@ -8271,12 +8299,12 @@ static size_t ggml_compute_forward_set_i32(size_t continuation,
         bool inplace = (bool) ((int32_t *) dst->op_params)[4];
         if (!inplace) {
             size_t total = ggml_nbytes(dst);
-            size_t offset = (total + params->nth - 1) / params->nth;
-            size_t start = params->ith * offset;
+            size_t stride = (total + params->nth - 1) / params->nth;
+            size_t start = params->ith * stride;
             if (total > start)
             {
                 size_t rest = total - start;
-                size_t bytes = rest < offset ? rest : offset;
+                size_t bytes = rest < stride ? rest : stride;
                 char* dstp = ((char*)dst->data) + start;
                 char* srcp = ((char*)src0->data) + start;
                 // memcpy needs to be synchronized across threads to avoid race conditions.
@@ -8398,6 +8426,7 @@ static size_t ggml_compute_forward_reshape(size_t continuation,
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
     // NOP
+    UNUSED(continuation);
     UNUSED(params);
     UNUSED(dst);
     return 0;
@@ -8407,8 +8436,9 @@ static size_t ggml_compute_forward_reshape(size_t continuation,
 
 static size_t ggml_compute_forward_view(size_t continuation, 
         const struct ggml_compute_params * params,
-        const struct ggml_tensor * dst) {
+        struct ggml_tensor * dst) {
     // NOP
+    UNUSED(continuation);
     UNUSED(params);
     UNUSED(dst);
     return 0;
@@ -8418,8 +8448,9 @@ static size_t ggml_compute_forward_view(size_t continuation,
 
 static size_t ggml_compute_forward_permute(size_t continuation, 
         const struct ggml_compute_params * params,
-        const struct ggml_tensor * dst) {
+        struct ggml_tensor * dst) {
     // NOP
+    UNUSED(continuation);
     UNUSED(params);
     UNUSED(dst);
     return 0;
@@ -8429,8 +8460,9 @@ static size_t ggml_compute_forward_permute(size_t continuation,
 
 static size_t ggml_compute_forward_transpose(size_t continuation, 
         const struct ggml_compute_params * params,
-        const struct ggml_tensor * dst) {
+        struct ggml_tensor * dst) {
     // NOP
+    UNUSED(continuation);
     UNUSED(params);
     UNUSED(dst);
     return 0;
@@ -8608,6 +8640,7 @@ static void ggml_compute_forward_get_rows_f32(
 static size_t ggml_compute_forward_get_rows(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -8747,6 +8780,7 @@ static void ggml_compute_forward_get_rows_back_f32(
 static size_t ggml_compute_forward_get_rows_back(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -8830,6 +8864,7 @@ static void ggml_compute_forward_diag_f32(
 static size_t ggml_compute_forward_diag(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -9047,6 +9082,7 @@ static void ggml_compute_forward_soft_max_f32(
 static size_t ggml_compute_forward_soft_max(size_t continuation, 
         const struct ggml_compute_params * params,
               struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -9153,6 +9189,7 @@ static void ggml_compute_forward_soft_max_ext_back_f32(
 static size_t ggml_compute_forward_soft_max_ext_back(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -9214,6 +9251,7 @@ static void ggml_compute_forward_clamp_f32(
 static size_t ggml_compute_forward_clamp(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -9733,6 +9771,7 @@ static void ggml_compute_forward_rope_f16(
 static size_t ggml_compute_forward_rope(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -9758,6 +9797,7 @@ static size_t ggml_compute_forward_rope(size_t continuation,
 static size_t ggml_compute_forward_rope_back(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -10141,6 +10181,8 @@ static void ggml_compute_forward_im2col_f16(
 static size_t ggml_compute_forward_im2col(size_t continuation, 
         const struct ggml_compute_params * params,
               struct ggml_tensor * dst) {
+    UNUSED(continuation);
+
     switch (dst->type) {
         case GGML_TYPE_F16:
             {
@@ -10163,6 +10205,7 @@ static size_t ggml_compute_forward_im2col(size_t continuation,
 static size_t ggml_compute_forward_im2col_back_f32(size_t continuation, 
         const struct ggml_compute_params * params,
               struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0]; // gradients of forward pass output
     const struct ggml_tensor * src1 = dst->src[1]; // convolution kernel
@@ -10410,6 +10453,7 @@ static void ggml_compute_forward_pool_1d_sk_p0(
 static size_t ggml_compute_forward_pool_1d(size_t continuation, 
         const struct ggml_compute_params * params,
               struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const int32_t * opts = (const int32_t *)dst->op_params;
     enum ggml_op_pool op = opts[0];
@@ -10428,6 +10472,7 @@ static size_t ggml_compute_forward_pool_1d(size_t continuation,
 static size_t ggml_compute_forward_pool_2d(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src = dst->src[0];
 
@@ -10505,6 +10550,7 @@ static size_t ggml_compute_forward_pool_2d(size_t continuation,
 static size_t ggml_compute_forward_pool_2d_back(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src  = dst->src[0];
     const struct ggml_tensor * dstf = dst->src[1]; // forward tensor of dst
@@ -10667,6 +10713,7 @@ static void ggml_compute_forward_upscale_f32(
 static size_t ggml_compute_forward_upscale(size_t continuation, 
     const struct ggml_compute_params * params,
     struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -10726,6 +10773,7 @@ static void ggml_compute_forward_pad_f32(
 static size_t ggml_compute_forward_pad(size_t continuation, 
     const struct ggml_compute_params * params,
     struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -10747,6 +10795,7 @@ static size_t ggml_compute_forward_pad(size_t continuation,
 static size_t ggml_compute_forward_pad_reflect_1d(size_t continuation, 
         const struct ggml_compute_params * params,
               struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -10806,6 +10855,7 @@ static void ggml_compute_forward_arange_f32(
 static size_t ggml_compute_forward_arange(size_t continuation, 
     const struct ggml_compute_params * params,
     struct ggml_tensor * dst) {
+    UNUSED(continuation);
     switch (dst->type) {
         case GGML_TYPE_F32:
             {
@@ -10855,6 +10905,7 @@ static void ggml_compute_forward_timestep_embedding_f32(
 static size_t ggml_compute_forward_timestep_embedding(size_t continuation, 
     const struct ggml_compute_params * params,
     struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -10915,6 +10966,7 @@ static void ggml_compute_forward_argsort_f32(
 static size_t ggml_compute_forward_argsort(size_t continuation, 
     const struct ggml_compute_params * params,
     struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -11151,6 +11203,8 @@ static void ggml_compute_forward_flash_attn_ext_f16(
 static size_t ggml_compute_forward_flash_attn_ext(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
+
     const struct ggml_tensor* q = dst->src[0];
     const struct ggml_tensor* k = dst->src[1];
     const struct ggml_tensor* v = dst->src[2];
@@ -11579,6 +11633,8 @@ static void ggml_compute_forward_ssm_conv_f32(
 static size_t ggml_compute_forward_ssm_conv(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
+
     switch (dst->src[0]->type) {
         case GGML_TYPE_F32:
             {
@@ -11672,6 +11728,8 @@ static void ggml_compute_forward_ssm_scan_f32(
 static size_t ggml_compute_forward_ssm_scan(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
+
     switch (dst->src[0]->type) {
         case GGML_TYPE_F32:
             {
@@ -11733,6 +11791,7 @@ static void ggml_compute_forward_win_part_f32(
 static size_t ggml_compute_forward_win_part(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -11795,6 +11854,7 @@ static void ggml_compute_forward_win_unpart_f32(
 static size_t ggml_compute_forward_win_unpart(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -11816,6 +11876,7 @@ static size_t ggml_compute_forward_win_unpart(size_t continuation,
 static size_t ggml_compute_forward_unary(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const enum ggml_unary_op op = ggml_get_unary_op(dst);
 
@@ -11915,6 +11976,7 @@ static void ggml_compute_forward_get_rel_pos_f16(
 static size_t ggml_compute_forward_get_rel_pos(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -12221,6 +12283,7 @@ static size_t ggml_compute_forward_rwkv_wkv6_f32(size_t continuation,
 static size_t ggml_compute_forward_rwkv_wkv6(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -12468,6 +12531,7 @@ static void ggml_compute_forward_map_unary_f32(
 static size_t ggml_compute_forward_map_unary(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     ggml_unary_op_f32_t fun;
     memcpy(&fun, dst->op_params, sizeof(fun));
@@ -12519,6 +12583,7 @@ static void ggml_compute_forward_map_binary_f32(
 static size_t ggml_compute_forward_map_binary(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     ggml_binary_op_f32_t fun;
     memcpy(&fun, dst->op_params, sizeof(fun));
@@ -12542,6 +12607,8 @@ static size_t ggml_compute_forward_map_binary(size_t continuation,
 static size_t ggml_compute_forward_map_custom1_f32(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
+
     ggml_custom1_op_f32_t fun;
     memcpy(&fun, dst->op_params, sizeof(fun));
     const struct ggml_tensor * a = dst->src[0];
@@ -12559,6 +12626,8 @@ static size_t ggml_compute_forward_map_custom1_f32(size_t continuation,
 static size_t ggml_compute_forward_map_custom2_f32(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
+
     ggml_custom2_op_f32_t fun;
     memcpy(&fun, dst->op_params, sizeof(fun));
     const struct ggml_tensor * a = dst->src[0];
@@ -12577,6 +12646,8 @@ static size_t ggml_compute_forward_map_custom2_f32(size_t continuation,
 static size_t ggml_compute_forward_map_custom3_f32(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
+
     ggml_custom3_op_f32_t fun;
     memcpy(&fun, dst->op_params, sizeof(fun));
     const struct ggml_tensor * a = dst->src[0];
@@ -12596,6 +12667,7 @@ static size_t ggml_compute_forward_map_custom3_f32(size_t continuation,
 static size_t ggml_compute_forward_map_custom1(size_t continuation, 
         const struct ggml_compute_params * params,
               struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * a = dst->src[0];
 
@@ -12611,6 +12683,7 @@ static size_t ggml_compute_forward_map_custom1(size_t continuation,
 static size_t ggml_compute_forward_map_custom2(size_t continuation, 
         const struct ggml_compute_params * params,
               struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * a = dst->src[0];
     const struct ggml_tensor * b = dst->src[1];
@@ -12627,6 +12700,7 @@ static size_t ggml_compute_forward_map_custom2(size_t continuation,
 static size_t ggml_compute_forward_map_custom3(size_t continuation, 
         const struct ggml_compute_params * params,
               struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * a = dst->src[0];
     const struct ggml_tensor * b = dst->src[1];
@@ -12806,6 +12880,7 @@ static void ggml_compute_forward_cross_entropy_loss_back_f32(
 static size_t ggml_compute_forward_cross_entropy_loss_back(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -12891,6 +12966,7 @@ static void ggml_compute_forward_opt_step_adamw_f32(
 static size_t ggml_compute_forward_opt_step_adamw(size_t continuation, 
         const struct ggml_compute_params * params,
         struct ggml_tensor * dst) {
+    UNUSED(continuation);
 
     const struct ggml_tensor * src0 = dst->src[0];
 
@@ -12911,18 +12987,24 @@ static size_t ggml_compute_forward_opt_step_adamw(size_t continuation,
 static size_t ggml_compute_forward_none(size_t continuation, 
     const struct ggml_compute_params* params,
     struct ggml_tensor* dst) {
+    UNUSED(continuation);
+    UNUSED(params);
+    UNUSED(dst);
     return 0;
 }
 
 static size_t ggml_compute_forward_error(size_t continuation, 
     const struct ggml_compute_params* params,
     struct ggml_tensor* dst) {
+    UNUSED(continuation);
+    UNUSED(params);
+    UNUSED(dst);
     GGML_ABORT("fatal error");
     return 0;
 }
 
-typedef size_t (*ggml_op_function)(size_t continuation, struct ggml_compute_params*, struct ggml_tensor*);
-ggml_op_function ggml_op_functions[GGML_OP_COUNT + 1] =
+typedef size_t (*ggml_op_function)(size_t, const struct ggml_compute_params*, struct ggml_tensor*);
+static ggml_op_function ggml_op_functions[GGML_OP_COUNT + 1] =
 {
     /*GGML_OP_NONE */                               ggml_compute_forward_none,
 
