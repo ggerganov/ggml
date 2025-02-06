@@ -1787,7 +1787,7 @@ extern "C" {
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
 
-#define GGML_KQ_MASK_PAD 32
+#define GGML_KQ_MASK_PAD 64
 
     // q:    [n_embd, n_batch,     n_head,    1]
     // k:    [n_embd, n_kv,        n_head_kv, 1]
