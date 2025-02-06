@@ -990,9 +990,12 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS",
     "CROSS_ENTROPY_LOSS_BACK",
     "OPT_STEP_ADAMW",
+
+    "FFT",
+    "IFFT",
 };
 
-static_assert(GGML_OP_COUNT == 83, "GGML_OP_COUNT != 83");
+static_assert(GGML_OP_COUNT == 85, "GGML_OP_COUNT != 85");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -1087,9 +1090,12 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "cross_entropy_loss(x,y)",
     "cross_entropy_loss_back(x,y)",
     "adamw(x)",
+
+    "fft(x)",
+    "ifft(x)",
 };
 
-static_assert(GGML_OP_COUNT == 83, "GGML_OP_COUNT != 83");
+static_assert(GGML_OP_COUNT == 85, "GGML_OP_COUNT != 85");
 
 static_assert(GGML_OP_POOL_COUNT == 2, "GGML_OP_POOL_COUNT != 2");
 
@@ -5134,28 +5140,12 @@ struct ggml_tensor * ggml_opt_step_adamw(
 
 static struct ggml_tensor * ggml_fft_impl(
         struct ggml_context * ctx,
-        struct ggml_tensor  * a,
-        bool                  inplace) {
+        struct ggml_tensor  * a) {
     GGML_ASSERT(ggml_is_vector(a));
-    bool is_node = false;
 
-    // Instead of checking a->grad directly, we should check if the tensor
-    // is part of a computation graph and has gradients enabled
-    if (!inplace && (a->flags & GGML_TENSOR_FLAG_PARAM)) {
-        is_node = true;
-    }
+    struct ggml_tensor * result = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, a->ne[0]);
 
-    struct ggml_tensor * result = inplace ? ggml_view_tensor(ctx, a) : ggml_dup_tensor(ctx, a);
-
-    // Set the operation type directly
     result->op = GGML_OP_FFT;
-    // Initialize op params if needed
-    ggml_set_op_params(result, NULL, 0);
-
-    // Instead of setting grad directly, we should mark the tensor as requiring gradients
-    if (is_node) {
-        result->flags |= GGML_TENSOR_FLAG_PARAM;
-    }
     result->src[0] = a;
 
     return result;
@@ -5164,7 +5154,7 @@ static struct ggml_tensor * ggml_fft_impl(
 struct ggml_tensor * ggml_fft(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    return ggml_fft_impl(ctx, a, false);
+    return ggml_fft_impl(ctx, a);
 }
 
 // ggml_ifft
@@ -5175,17 +5165,9 @@ struct ggml_tensor * ggml_ifft(
     GGML_ASSERT(ggml_is_vector(a));
     struct ggml_tensor * result = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, a->ne[0]/2);
 
-    // Set the operation type directly
     result->op = GGML_OP_IFFT;
-    // Initialize op params if needed
-    ggml_set_op_params(result, NULL, 0);
-
-    // Instead of checking a->grad directly, check if input tensor requires gradients
-    if (a->flags & GGML_TENSOR_FLAG_PARAM) {
-        // Mark the result tensor as requiring gradients
-        result->flags |= GGML_TENSOR_FLAG_PARAM;
-    }
     result->src[0] = a;
+
     return result;
 }
 

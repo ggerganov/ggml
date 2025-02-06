@@ -520,10 +520,10 @@ extern "C" {
         GGML_OP_CROSS_ENTROPY_LOSS_BACK,
         GGML_OP_OPT_STEP_ADAMW,
 
-        GGML_OP_COUNT,
-
         GGML_OP_FFT,       // Fast Fourier Transform
         GGML_OP_IFFT,      // Inverse Fast Fourier Transform
+
+        GGML_OP_COUNT,
     };
 
     enum ggml_unary_op {
