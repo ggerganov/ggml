@@ -1,8 +1,5 @@
 # ggml
 
-> [!NOTE]
-> Upcoming repository transfer: https://github.com/ggerganov/ggml/discussions/1102
-
 [Roadmap](https://github.com/users/ggerganov/projects/7) / [Manifesto](https://github.com/ggerganov/llama.cpp/discussions/205)
 
 Tensor library for machine learning
@@ -23,7 +20,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 ## Build
 
 ```bash
-git clone https://github.com/ggerganov/ggml
+git clone https://github.com/ggml-org/ggml
 cd ggml
 
 # install python dependencies in a virtual environment
