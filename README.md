@@ -20,7 +20,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 ## Build
 
 ```bash
-git clone https://github.com/ggerganov/ggml
+git clone https://github.com/ggml-org/ggml
 cd ggml
 
 # install python dependencies in a virtual environment
