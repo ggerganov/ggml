@@ -49,7 +49,7 @@ printf "Downloading ggml model $model ...\n"
 mkdir -p models/gpt-2-$model
 
 if [ -x "$(command -v wget)" ]; then
-    wget --quiet --show-progress -O models/gpt-2-$model/ggml-model.bin $src/$pfx-$model.bin
+    wget --quiet -O models/gpt-2-$model/ggml-model.bin $src/$pfx-$model.bin
 elif [ -x "$(command -v curl)" ]; then
     curl -L --output models/gpt-2-$model/ggml-model.bin $src/$pfx-$model.bin
 else
