@@ -3592,17 +3592,20 @@ static void ggml_gemm_iq4_nl_4x4_q8_0(int n, float * GGML_RESTRICT s, size_t bs,
 }
 
 static block_q4_0x4 make_block_q4_0x4(block_q4_0 * in, unsigned int blck_size_interleave) {
-    block_q4_0x4 out;
+    // Zero initialize the output structure
+    block_q4_0x4 out = {};
 
+    // Copy d values
     for (int i = 0; i < 4; i++) {
         out.d[i] = in[i].d;
     }
 
     const int end = QK4_0 * 2 / blck_size_interleave;
+    constexpr size_t qs_size = QK4_0 * 2;  // Size of output qs array
 
     if (blck_size_interleave == 8) {
         const uint64_t xor_mask = 0x8888888888888888ULL;
-        for (int i = 0; i < end; ++i) {
+        for (int i = 0; i < end && (i + 1) * blck_size_interleave <= qs_size; ++i) {
             int src_id = i % 4;
             int src_offset = (i / 4) * blck_size_interleave;
             int dst_offset = i * blck_size_interleave;
@@ -3615,7 +3618,7 @@ static block_q4_0x4 make_block_q4_0x4(block_q4_0 * in, unsigned int blck_size_in
         }
     } else if (blck_size_interleave == 4) {
         const uint32_t xor_mask = 0x88888888;
-        for (int i = 0; i < end; ++i) {
+        for (int i = 0; i < end && (i + 1) * blck_size_interleave <= qs_size; ++i) {
             int src_id = i % 4;
             int src_offset = (i / 4) * blck_size_interleave;
             int dst_offset = i * blck_size_interleave;
@@ -3626,7 +3629,7 @@ static block_q4_0x4 make_block_q4_0x4(block_q4_0 * in, unsigned int blck_size_in
             memcpy(&out.qs[dst_offset], &elems, sizeof(uint32_t));
         }
     } else {
-        GGML_ASSERT(false);
+        GGML_ASSERT(false && "invalid block size interleave value");
     }
 
     return out;
