@@ -151,8 +151,9 @@ struct ggml_tensor* compute(const test_model & model, ggml_gallocr_t allocr) {
         ggml_backend_cpu_set_n_threads(model.backend, n_threads);
     }
 
-
-    ggml_backend_graph_compute(model.backend, gf);
+    ggml_status status = ggml_backend_graph_compute(model.backend, gf);
+    if (status != GGML_STATUS_SUCCESS)
+        return nullptr;
 
     //ggml_graph_print(gf);
 
@@ -313,6 +314,10 @@ int main(void)
     }
 
     struct ggml_tensor * result = compute(model, allocr);
+    if (!result) {
+        printf("ggml_mul_mat: failed to compute graph");
+        return EXIT_FAILURE;
+    }
 
     std::vector<float> out_data(ggml_nelements(result));
 

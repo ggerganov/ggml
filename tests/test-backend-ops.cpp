@@ -633,7 +633,9 @@ struct test_case {
         ggml_build_forward_expand(gf, out);
 
         // warmup run
-        ggml_backend_graph_compute(backend, gf);
+        ggml_status status = ggml_backend_graph_compute(backend, gf);
+        if (status != GGML_STATUS_SUCCESS)
+            printf("Warning: ggml_backend_graph_compute warmup failed: ggml status=%d \n", status);
 
         // determine number of runs
         int n_runs;

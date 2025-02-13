@@ -70,7 +70,13 @@ void ggml_cuda_error(const char * stmt, const char * func, const char * file, in
     GGML_LOG_ERROR("  current device: %d, in function %s at %s:%d\n", id, func, file, line);
     GGML_LOG_ERROR("  %s\n", stmt);
     // abort with GGML_ABORT to get a stack trace
-    GGML_ABORT(GGML_CUDA_NAME " error");
+    static const char* GGML_CUDA_NO_ABORT = getenv("GGML_CUDA_NO_ABORT");
+    if (!GGML_CUDA_NO_ABORT) {
+        GGML_ABORT(GGML_CUDA_NAME " error");
+    }
+#ifndef __CUDA_ARCH__
+    throw std::runtime_error(msg);
+#endif
 }
 
 // this is faster on Windows
@@ -92,6 +98,7 @@ int ggml_cuda_get_device() {
     return id;
 }
 
+// Note: Does not abort/throw because does not use CUDA_CHECK
 static cudaError_t ggml_cuda_device_malloc(void ** ptr, size_t size, int device) {
     ggml_cuda_set_device(device);
 #if defined(GGML_USE_HIP) && defined(GGML_HIP_UMA)
@@ -536,7 +543,8 @@ static void * ggml_backend_cuda_buffer_get_base(ggml_backend_buffer_t buffer) {
 
 static void ggml_backend_cuda_buffer_init_tensor(ggml_backend_buffer_t buffer, ggml_tensor * tensor) {
     ggml_backend_cuda_buffer_context * ctx = (ggml_backend_cuda_buffer_context *)buffer->context;
-
+    GGML_ASSERT(tensor);
+    GGML_LOG_DEBUG("%s: t=%p %s\n", __func__, tensor, tensor->name);
     if (tensor->view_src != NULL) {
         assert(tensor->view_src->buffer->buft == buffer->buft);
         return;
@@ -945,8 +953,14 @@ static ggml_backend_buffer_t ggml_backend_cuda_split_buffer_type_alloc_buffer(gg
     // however, the size still represents the maximum cumulative size of all the device buffers after the tensors are allocated,
     // as returned by get_alloc_size. this limit is enforced during tensor allocation by ggml-alloc, so it must be correct.
     ggml_backend_cuda_split_buffer_context * ctx = new ggml_backend_cuda_split_buffer_context();
-
-    return ggml_backend_buffer_init(buft, ggml_backend_cuda_split_buffer_interface, ctx, size);
+    ggml_backend_buffer_t b = NULL;
+    try {
+        b = ggml_backend_buffer_init(buft, ggml_backend_cuda_split_buffer_interface, ctx, size);
+    }  catch (std::exception &e) {
+        GGML_LOG_ERROR("%s: ggml_backend_buffer_init threw: %s \n", __func__, e.what());
+        return NULL;
+    }
+    return b;
 }
 
 static size_t ggml_backend_cuda_split_buffer_type_get_alignment(ggml_backend_buffer_type_t buft) {

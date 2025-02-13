@@ -120,8 +120,8 @@ static int ggml_cuda_highest_compiled_arch(const int arch) {
 
 #define GGML_CUDA_MAX_STREAMS 8
 
-[[noreturn]]
-void ggml_cuda_error(const char * stmt, const char * func, const char * file, int line, const char * msg);
+// Print the error. Will also either abort or throw an exception.
+[[noreturn]] void ggml_cuda_error(const char * stmt, const char * func, const char * file, int line, const char * msg);
 
 #define CUDA_CHECK_GEN(err, success, error_fn)                                      \
      do {                                                                           \
@@ -162,6 +162,7 @@ static const char * cu_get_error_str(CUresult err) {
     cuGetErrorString(err, &err_str);
     return err_str;
 }
+// Will print error and abort/throw
 #define CU_CHECK(err) CUDA_CHECK_GEN(err, CUDA_SUCCESS, cu_get_error_str)
 #endif
 
