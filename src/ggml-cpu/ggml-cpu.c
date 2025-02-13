@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <time.h>
 #include <math.h>
+#include <complex.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -12706,6 +12707,123 @@ static void ggml_compute_forward_opt_step_adamw(
             }
     }
 }
+
+// FFT
+
+static bool is_power_of_2(int64_t n) {
+    return n > 0 && (n & (n - 1)) == 0;
+}
+
+// Recursive implementation of FFT
+static void fft_recursive(float complex *x, int64_t n, bool inverse) {
+    if (n <= 1) return;
+
+    // Split into even and odd
+    int64_t half = n / 2;
+    float complex *even = (float complex *)malloc(half * sizeof(float complex));
+    float complex *odd = (float complex *)malloc(half * sizeof(float complex));
+
+    for (int64_t i = 0; i < half; i++) {
+        even[i] = x[2*i];
+        odd[i] = x[(2*i+1)];
+    }
+
+    // Recursive FFT on even and odd parts
+    fft_recursive(even, half, inverse);
+    fft_recursive(odd, half, inverse);
+
+    // Combine results
+    float angle_factor = inverse ? 2.0 * M_PI / n : -2.0 * M_PI / n;
+    for (int64_t k = 0; k < half; k++) {
+        float complex t = cexpf(angle_factor * k * I) * odd[k];
+        x[k] = even[k] + t;
+        x[k+half] = even[k] - t;
+    }
+
+    free(even);
+    free(odd);
+}
+
+static void ggml_compute_forward_fft(
+    const struct ggml_compute_params * params,
+    struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src = dst->src[0];
+
+    GGML_ASSERT(src->type == GGML_TYPE_F32); // Only support f32 for now
+    GGML_ASSERT(ggml_is_vector(src));  // Only support 1D FFT for now
+    GGML_ASSERT(is_power_of_2(src->ne[0]));  // Length must be power of 2
+
+    if (params->ith != 0) {
+        return;
+    }
+
+    // Allocate temporary complex array
+    int64_t n = src->ne[0];
+    float complex *x = (float complex *)malloc(n * sizeof(float complex));
+
+    // Copy input data to complex array
+    float *src_data = (float *)src->data;
+    for (int64_t i = 0; i < n; i++) {
+        x[i] = src_data[i] + 0.0f * I;
+    }
+
+    // Perform FFT
+    fft_recursive(x, n, false);
+
+    // Copy result back
+    float *dst_data = (float *)dst->data;
+    for (int64_t i = 0; i < n; i++) {
+        // Store real and imaginary parts in interleaved format
+        dst_data[2*i] = crealf(x[i]);
+        dst_data[2*i+1] = cimagf(x[i]);
+    }
+
+    free(x);
+}
+
+static void ggml_compute_forward_ifft(
+    const struct ggml_compute_params * params,
+    struct ggml_tensor * dst) {
+
+    const struct ggml_tensor * src = dst->src[0];
+
+    GGML_ASSERT(src->type == GGML_TYPE_F32);
+    GGML_ASSERT(ggml_is_vector(src));
+    GGML_ASSERT(is_power_of_2(src->ne[0]/2));
+
+    if (params->ith != 0) {
+        return;
+    }
+
+    // Allocate temporary complex array
+    int64_t n = src->ne[0];
+    float complex *x = (float complex *)malloc(n * sizeof(float complex));
+
+    // Copy input data to complex array
+    float *src_data = (float *)src->data;
+    for (int64_t i = 0; i < n; i++) {
+        x[i] = src_data[2*i] + src_data[2*i+1]*I;
+    }
+
+    // Perform recursive IFFT
+    fft_recursive(x, n, true);
+
+    // Scale the result by 1/N
+    float scale = 1.0f / n;
+    for (int64_t i = 0; i < n; i++) {
+        x[i] *= scale;
+    }
+
+    // Copy result back (real part only for IFFT)
+    float *dst_data = (float *)dst->data;
+    for (int64_t i = 0; i < n; i++) {
+        dst_data[i] = crealf(x[i]);
+    }
+
+    free(x);
+}
+
 /////////////////////////////////
 
 static void ggml_compute_forward(struct ggml_compute_params * params, struct ggml_tensor * tensor) {
@@ -13071,6 +13189,16 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
                 ggml_compute_forward_opt_step_adamw(params, tensor);
             }
             break;
+        case GGML_OP_FFT:
+            {
+                ggml_compute_forward_fft(params, tensor);
+            }
+            break;
+        case GGML_OP_IFFT:
+            {
+                ggml_compute_forward_ifft(params, tensor);
+            }
+            break;
         case GGML_OP_NONE:
             {
                 // nop
@@ -13357,6 +13485,11 @@ static int ggml_get_n_tasks(struct ggml_tensor * node, int n_threads) {
             {
                 GGML_ABORT("fatal error");
             }
+        case GGML_OP_FFT:
+        case GGML_OP_IFFT:
+            {
+                n_tasks = 1;
+            } break;
         default:
             {
                 fprintf(stderr, "%s: op not implemented: ", __func__);

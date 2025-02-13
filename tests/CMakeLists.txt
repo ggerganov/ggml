@@ -303,6 +303,21 @@ add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
 set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
 
 #
+# test-fft
+
+set(TEST_TARGET test-fft)
+add_executable(${TEST_TARGET} ${TEST_TARGET}.c)
+target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+if (MSVC)
+    target_link_options(${TEST_TARGET} PRIVATE "/STACK: 8388608") # 8MB
+endif()
+if (MATH_LIBRARY)
+    target_link_libraries(${TEST_TARGET} PRIVATE ${MATH_LIBRARY})
+endif()
+add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
+
+#
 # test-pad-reflect-1d
 
 set(TEST_TARGET test-pad-reflect-1d)

@@ -990,9 +990,12 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "CROSS_ENTROPY_LOSS",
     "CROSS_ENTROPY_LOSS_BACK",
     "OPT_STEP_ADAMW",
+
+    "FFT",
+    "IFFT",
 };
 
-static_assert(GGML_OP_COUNT == 83, "GGML_OP_COUNT != 83");
+static_assert(GGML_OP_COUNT == 85, "GGML_OP_COUNT != 85");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -1087,9 +1090,12 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "cross_entropy_loss(x,y)",
     "cross_entropy_loss_back(x,y)",
     "adamw(x)",
+
+    "fft(x)",
+    "ifft(x)",
 };
 
-static_assert(GGML_OP_COUNT == 83, "GGML_OP_COUNT != 83");
+static_assert(GGML_OP_COUNT == 85, "GGML_OP_COUNT != 85");
 
 static_assert(GGML_OP_POOL_COUNT == 2, "GGML_OP_POOL_COUNT != 2");
 
@@ -5126,6 +5132,41 @@ struct ggml_tensor * ggml_opt_step_adamw(
     result->src[2] = m;
     result->src[3] = v;
     result->src[4] = adamw_params;
+
+    return result;
+}
+
+// ggml_fft
+
+static struct ggml_tensor * ggml_fft_impl(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a) {
+    GGML_ASSERT(ggml_is_vector(a));
+
+    struct ggml_tensor * result = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, a->ne[0]);
+
+    result->op = GGML_OP_FFT;
+    result->src[0] = a;
+
+    return result;
+}
+
+struct ggml_tensor * ggml_fft(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a) {
+    return ggml_fft_impl(ctx, a);
+}
+
+// ggml_ifft
+
+struct ggml_tensor * ggml_ifft(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * a) {
+    GGML_ASSERT(ggml_is_vector(a));
+    struct ggml_tensor * result = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, a->ne[0]/2);
+
+    result->op = GGML_OP_IFFT;
+    result->src[0] = a;
 
     return result;
 }
