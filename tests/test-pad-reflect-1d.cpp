@@ -11,6 +11,10 @@
 #include "ggml-metal.h"
 #endif
 
+#ifdef GGML_USE_VULKAN
+#include "ggml-vulkan.h"
+#endif
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -76,6 +80,16 @@ void test_pad_reflect_1d(bool use_gpu) {
             fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
         }
     }
+#endif
+
+#ifdef GGML_USE_VULKAN
+        if (use_gpu) {
+            fprintf(stderr, "%s: using Vulkan backend\n", __func__);
+            backend = ggml_backend_vk_init(0);
+            if (!backend) {
+                fprintf(stderr, "%s: ggml_backend_vk_init() failed\n", __func__);
+            }
+        }
 #endif
 
     if (!backend) {

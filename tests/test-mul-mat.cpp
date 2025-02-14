@@ -11,6 +11,10 @@
 #include "ggml-metal.h"
 #endif
 
+#ifdef GGML_USE_VULKAN
+#include "ggml-vulkan.h"
+#endif
+
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -65,6 +69,16 @@ void load_model(test_model & model, float* a, float* b, int M, int N, int K, boo
             fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
         }
     }
+#endif
+
+#ifdef GGML_USE_VULKAN
+        if (use_gpu) {
+            fprintf(stderr, "%s: using Vulkan backend\n", __func__);
+            model.backend = ggml_backend_vk_init(0);
+            if (!model.backend) {
+                fprintf(stderr, "%s: ggml_backend_vk_init() failed\n", __func__);
+            }
+        }
 #endif
 
     if(!model.backend) {

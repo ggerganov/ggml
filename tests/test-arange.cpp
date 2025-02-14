@@ -11,6 +11,10 @@
 #include "ggml-metal.h"
 #endif
 
+#ifdef GGML_USE_VULKAN
+#include "ggml-vulkan.h"
+#endif
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,6 +43,16 @@ int main(int /*argc*/, const char** /*argv*/) {
             backend = ggml_backend_metal_init();
             if (!backend) {
                 fprintf(stderr, "%s: ggml_backend_metal_init() failed\n", __func__);
+            }
+        }
+        #endif
+
+        #ifdef GGML_USE_VULKAN
+        if (!backend) {
+            fprintf(stderr, "%s: using Vulkan backend\n", __func__);
+            backend = ggml_backend_vk_init(0);
+            if (!backend) {
+                fprintf(stderr, "%s: ggml_backend_vk_init() failed\n", __func__);
             }
         }
         #endif

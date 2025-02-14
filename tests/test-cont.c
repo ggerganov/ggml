@@ -6,6 +6,10 @@
 #include "ggml-cuda.h"
 #endif
 
+#ifdef GGML_USE_VULKAN
+#include "ggml-vulkan.h"
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -35,6 +39,12 @@ ggml_backend_t make_backend(void) {
     backend = ggml_backend_cuda_init(0);
     GGML_ASSERT(backend != NULL);
 #endif
+
+#ifdef GGML_USE_VULKAN
+    backend = ggml_backend_vk_init(0);
+    GGML_ASSERT(backend != NULL);
+#endif
+
 
     if (!backend) {
         backend = ggml_backend_cpu_init();
