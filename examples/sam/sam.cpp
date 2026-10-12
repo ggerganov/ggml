@@ -1267,33 +1267,25 @@ struct ggml_cgraph  * sam_encode_image(
             cur = ggml_mul_mat(ctx0, layer.qkv_w, cur);
             cur = ggml_add_inplace(ctx0, cur, layer.qkv_b);
 
-            // split qkv into separate tensors
+            // qkv is stored as three n_enc_state-wide segments (q, k, v) along dim 0, each
+            // holding n_enc_head heads of n_enc_head_dim values - slice them as strided views
+            // instead of materializing the split (same approach as clip.cpp in llama.cpp)
             // ref: https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/modeling/image_encoder.py#L225-L229
             const int B = cur->ne[3];
 
-            cur = ggml_reshape_4d(ctx0, cur, n_enc_state, 3, W*H, B);
-            cur = ggml_cont(ctx0, ggml_permute(ctx0, cur, 0, 3, 1, 2));
+            const size_t nb_head = n_enc_head_dim * cur->nb[0]; // stride between heads inside a segment
+            const size_t nb_seg  = n_enc_state     * cur->nb[0]; // stride between the q, k and v segments
 
-            struct ggml_tensor * Q;
-            struct ggml_tensor * K;
-            struct ggml_tensor * V;
+            struct ggml_tensor * Q = ggml_view_4d(ctx0, cur, n_enc_head_dim, W*H, n_enc_head, B, cur->nb[1], nb_head, cur->nb[3], 0*nb_seg);
+            struct ggml_tensor * K = ggml_view_4d(ctx0, cur, n_enc_head_dim, W*H, n_enc_head, B, cur->nb[1], nb_head, cur->nb[3], 1*nb_seg);
+            struct ggml_tensor * V = ggml_view_4d(ctx0, cur, n_enc_head_dim, W*H, n_enc_head, B, cur->nb[1], nb_head, cur->nb[3], 2*nb_seg);
 
-            Q = ggml_view_3d   (ctx0, cur, n_enc_state, W*H, B, cur->nb[1], cur->nb[2], 0*cur->nb[3]);
-            Q = ggml_reshape_4d(ctx0, Q,   n_enc_head_dim, n_enc_head, W*H, B);
-            Q = ggml_cont      (ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));
-            Q = ggml_reshape_3d(ctx0, Q,   n_enc_head_dim, W*H, B*n_enc_head);
+            // ggml_mul_mat consumes the strided K directly
+            struct ggml_tensor * KQ = ggml_reshape_3d(ctx0, ggml_mul_mat(ctx0, K, Q), W*H, W*H, B*n_enc_head);
 
-            K = ggml_view_3d   (ctx0, cur, n_enc_state, W*H, B, cur->nb[1], cur->nb[2], 1*cur->nb[3]);
-            K = ggml_reshape_4d(ctx0, K,   n_enc_head_dim, n_enc_head, W*H, B);
-            K = ggml_cont      (ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3));
-            K = ggml_reshape_3d(ctx0, K,   n_enc_head_dim, W*H, B*n_enc_head);
-
-            V = ggml_view_3d   (ctx0, cur, n_enc_state, W*H, B, cur->nb[1], cur->nb[2], 2*cur->nb[3]);
-            V = ggml_reshape_4d(ctx0, V,   n_enc_head_dim, n_enc_head, W*H, B);
-            V = ggml_cont      (ctx0, ggml_permute(ctx0, V, 1, 2, 0, 3)); // transposed
-            V = ggml_reshape_3d(ctx0, V,   W*H, n_enc_head_dim, B*n_enc_head);
-
-            struct ggml_tensor * KQ = ggml_mul_mat(ctx0, K, Q);
+            // rel_pos needs a contiguous q; V must be transposed for the second mul_mat
+            Q = ggml_reshape_3d(ctx0, ggml_cont(ctx0, Q), n_enc_head_dim, W*H, B*n_enc_head);
+            V = ggml_reshape_3d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, V, 1, 0, 2, 3)), W*H, n_enc_head_dim, B*n_enc_head);
 
             struct ggml_tensor * KQ_scaled =
                 ggml_scale_inplace(ctx0,
@@ -1810,8 +1802,8 @@ bool sam_decode_mask(
         ggml_build_forward_expand(gf, ggml_cpy(ctx0, out, ggml_view_2d(ctx0, hyper_in, hyper_in->ne[0], hyper_in->ne[2], hyper_in->nb[1], i*hyper_in->nb[1])));
     }
 
-    struct ggml_tensor * masks = ggml_mul_mat(ctx0, hyper_in, upscaled_embedding);
-    masks = ggml_cont(ctx0, ggml_transpose(ctx0, masks)); // TODO: Shouldn't be needed
+    // swapping the operands yields [W*H, num_mask_tokens, batch] directly (no transpose needed)
+    struct ggml_tensor * masks = ggml_mul_mat(ctx0, upscaled_embedding, hyper_in);
     masks = ggml_reshape_4d(ctx0, masks, keys->ne[0], keys->ne[1], masks->ne[1], keys->ne[3]);
 
     // Generate mask quality predictions
