@@ -571,7 +571,29 @@ class tinyBLAS {
             return false;
 #endif
         // compute RM for only need tile with size RM&RM-1
-#if VECTOR_REGISTERS == 32
+// A 4x6 tile keeps 24 vector accumulators live. That fits aarch64's 32 registers on paper -- with
+// 4 A-vectors and 1 B-vector the block needs 29 -- but GCC does not allocate it: at -O3 it keeps the
+// Cv[][] array's canonical copy in memory and stores all 24 accumulators to the stack on EVERY k
+// iteration (12 `stp q` per 24 `fmla`, verified in the disassembly with gcc 14.2 aarch64). The A72
+// has one store pipe, so those stores cost about as many cycles as the arithmetic they protect.
+//
+// Measured on a Cortex-A72 over the eleven F32 GEMM shapes of a VITS vocoder (K 96-1344, M 288-73472,
+// N 32-384), 4 threads, through this dispatcher: 4x6 tile 15.6 GFLOP/s, 4x3 tile 22.0, 4x4 tile 22.1
+// -- and a standalone 4x4 kernel with no spills, 24.3. Spilling tracks tile size and nothing else:
+// counting q-register stores to the stack per block gives 0 for 4x3 and 4x4, 8 for 4x5, 10 for 4x6,
+// 19 for 4x7, 29 for 4x8, 32 for 8x4. So on GCC/aarch64 the 16-register schedule below is the fast
+// one, despite the register file being twice that size.
+//
+// Scoped to GCC because clang does NOT want this. clang 19 holds the same 4x6 tile with zero spills
+// (checked in the object code) and runs the unpatched schedule at 23.8 GFLOP/s on the same core; the
+// smaller tile costs it about 1%. So this is a GCC code-generation fix rather than a microarchitecture
+// one, and a clang-built wheel -- every macOS one -- should keep the schedule upstream chose.
+//
+// This is half the story: ggml's inner loop also spends 14 instructions an iteration re-deriving
+// operand addresses, which the companion patch (0002) fixes. Tile alone is 22.0 GFLOP/s, addresses
+// alone are 15.5 -- the spill dominates until it is gone -- and the two together are 25.1, which is
+// past a hand-written kernel. See loom.cpp BACKLOG.md P4.15.
+#if VECTOR_REGISTERS == 32 && !(defined(__ARM_NEON) && defined(__GNUC__) && !defined(__clang__))
         if (m % 16 == 0 && (m/16 >= params->nth)) {
             const int64_t SIZE_N = BLOCK_SIZE<6>(n);
             mnpack<4, 6, 4>(m, n, SIZE_N, 12);
@@ -587,7 +609,7 @@ class tinyBLAS {
             mnpack<4, 6, 1>(m, n, SIZE_N, 12);
             return true;
         }
-#else  // VECTOR_REGISTERS == 16
+#else  // VECTOR_REGISTERS == 16, or NEON on GCC (see above)
         if (m % 16 == 0 && (m/16 >= params->nth)) {
             const int64_t SIZE_N = BLOCK_SIZE<3>(n);
             mnpack<4, 3, 4>(m, n, SIZE_N, 24);
