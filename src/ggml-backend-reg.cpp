@@ -456,6 +456,17 @@ static fs::path get_executable_path() {
         base_path = base_path.substr(0, last_slash);
     }
     return base_path + L"\\";
+#elif defined(__OpenBSD__)
+    std::vector<char> path(PATH_MAX);
+    if (getexecpath(path.data(), path.size()) != 0)
+	    return {};
+    std::string base_path(path.data(), path.size());
+    // remove executable name
+    auto last_slash = base_path.find_last_of('/');
+    if (last_slash != std::string::npos) {
+        base_path = base_path.substr(0, last_slash);
+    }
+    return base_path + "/";
 #else
     return {};
 #endif
