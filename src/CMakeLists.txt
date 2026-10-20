@@ -621,7 +621,9 @@ endforeach()
 
 target_link_libraries(ggml-base PRIVATE Threads::Threads)
 
-if (DEFINED MATH_LIBRARY)
+# Use truthy check instead of DEFINED: on Windows find_library(m) sets MATH_LIBRARY to
+# MATH_LIBRARY-NOTFOUND, which is DEFINED but not a valid library to link.
+if (MATH_LIBRARY)
     target_link_libraries(ggml-base PRIVATE ${MATH_LIBRARY})
 elseif (NOT WIN32 AND NOT DEFINED ENV{ONEAPI_ROOT})
     target_link_libraries(ggml-base PRIVATE m)
