@@ -7,6 +7,7 @@
 #include <cstring>
 #include <fstream>
 #include <vector>
+#include <thread>
 
 static void ggml_log_callback_default(ggml_log_level level, const char * text, void * user_data) {
     (void) level;
@@ -114,6 +115,7 @@ struct ggml_tensor * compute(simple_model & model, struct ggml_cgraph * gf) {
 int main(void) {
     ggml_time_init();
 
+    std::thread worker([]() {
     simple_model model;
     init_model(model);
 
@@ -149,5 +151,7 @@ int main(void) {
     ggml_backend_sched_free(model.sched);
     ggml_backend_free(model.backend);
     ggml_backend_free(model.cpu_backend);
+    });
+    worker.join();
     return 0;
 }
