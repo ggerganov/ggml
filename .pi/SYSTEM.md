@@ -1,1 +1,0 @@
-gg/SYSTEM.md
