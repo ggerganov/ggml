@@ -140,6 +140,42 @@ struct mnist_model {
         }
     }
 
+    mnist_model(const mnist_model &) = delete;
+    mnist_model & operator=(const mnist_model &) = delete;
+    mnist_model & operator=(mnist_model &&) = delete;
+
+    mnist_model(mnist_model && other) noexcept
+        : arch(std::move(other.arch)),
+          backend_sched(other.backend_sched),
+          backends(std::move(other.backends)),
+          nbatch_logical(other.nbatch_logical),
+          nbatch_physical(other.nbatch_physical),
+          images(other.images),
+          logits(other.logits),
+          fc1_weight(other.fc1_weight),
+          fc1_bias(other.fc1_bias),
+          fc2_weight(other.fc2_weight),
+          fc2_bias(other.fc2_bias),
+          conv1_kernel(other.conv1_kernel),
+          conv1_bias(other.conv1_bias),
+          conv2_kernel(other.conv2_kernel),
+          conv2_bias(other.conv2_bias),
+          dense_weight(other.dense_weight),
+          dense_bias(other.dense_bias),
+          ctx_gguf(other.ctx_gguf),
+          ctx_static(other.ctx_static),
+          ctx_compute(other.ctx_compute),
+          buf_gguf(other.buf_gguf),
+          buf_static(other.buf_static)
+{
+            other.backend_sched = nullptr;
+            other.ctx_gguf      = nullptr;
+            other.ctx_static    = nullptr;
+            other.ctx_compute   = nullptr;
+            other.buf_gguf      = nullptr;
+            other.buf_static    = nullptr;
+}
+
     ~mnist_model() {
         ggml_free(ctx_gguf);
         ggml_free(ctx_static);
