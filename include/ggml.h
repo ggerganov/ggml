@@ -1432,8 +1432,8 @@ extern "C" {
             struct ggml_tensor  * a,
             float                 eps);
 
-    // a - x
-    // b - dy
+    // a - dy
+    // b - x
     GGML_API struct ggml_tensor * ggml_rms_norm_back(
             struct ggml_context * ctx,
             struct ggml_tensor  * a,
