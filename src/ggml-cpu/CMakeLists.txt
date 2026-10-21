@@ -719,6 +719,10 @@ function(ggml_add_cpu_backend_variant_impl tag_name)
     target_compile_options(${GGML_CPU_NAME} PRIVATE ${ARCH_FLAGS})
     target_compile_definitions(${GGML_CPU_NAME} PRIVATE ${ARCH_DEFINITIONS})
 
+    if (GGML_LTO AND NOT MSVC)
+        target_link_options(${GGML_CPU_NAME} PRIVATE ${ARCH_FLAGS})
+    endif()
+
     if (EMSCRIPTEN)
         set_target_properties(${GGML_CPU_NAME} PROPERTIES COMPILE_FLAGS "-msimd128")
     endif()
