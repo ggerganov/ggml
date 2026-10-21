@@ -1207,7 +1207,11 @@ static vk_fa_tuning_params get_fa_tuning_params_scalar(const vk_device& device, 
         result.subgroup_size = 32;
         result.disable_subgroups = true;
     } else if (device->vendor_id == VK_VENDOR_ID_AMD && device->architecture != AMD_GCN) {
-        result.subgroup_size = n_rows < 4 ? 32 : device->subgroup_size;
+        // Only ask for 32-wide subgroups where size control can grant them: a device that
+        // cannot (GCN left unclassified by an old driver) would run the shader at its own
+        // width while the SubGroupSize constant says 32, and return wrong results.
+        const bool can_use_32 = device->subgroup_size_control && device->subgroup_min_size <= 32;
+        result.subgroup_size = (n_rows < 4 && can_use_32) ? 32 : device->subgroup_size;
     } else {
         result.subgroup_size = device->subgroup_size;
     }
